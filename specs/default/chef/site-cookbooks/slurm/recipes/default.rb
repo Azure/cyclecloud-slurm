@@ -2,4 +2,5 @@
 # Cookbook:: slurm
 # Recipe:: default
 #
-# Copyright:: 2017, The Authors, All Rights Reserved.
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.

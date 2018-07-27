@@ -1,3 +1,5 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 name "slurm_master_role"
 description "Slurm Master Role"
 run_list("role[scheduler]",

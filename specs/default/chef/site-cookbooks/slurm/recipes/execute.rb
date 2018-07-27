@@ -1,6 +1,8 @@
 #
 # Cookbook Name:: slurm
 # Recipe:: execute
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 
 slurmver = node[:slurm][:version]
 slurmarch = node[:slurm][:arch]

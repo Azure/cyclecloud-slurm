@@ -1,6 +1,8 @@
 #
 # Cookbook Name:: slurm
 # Recipe:: autostop
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
 #
 
 cookbook_file "#{node[:cyclecloud][:bootstrap]}/autostop.rb" do
