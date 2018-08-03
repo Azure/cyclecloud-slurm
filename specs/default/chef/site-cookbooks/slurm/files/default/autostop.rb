@@ -3,6 +3,7 @@
 # Licensed under the MIT License.
 require 'json'
 
+myhost=`hostname`
 # Arguments
 AUTOSTOP_ENABLED = `jetpack config cyclecloud.cluster.autoscale.stop_enabled`.downcase.strip == "true"
 if not AUTOSTOP_ENABLED
@@ -17,9 +18,11 @@ idle_long_enough = false
 
 
 def IsActive()
+   # This may not be strictly required but keeping it just in case
    activejobs=system("ps -ef | grep [s]lurmstepd > /dev/null 2>&1")
-   #activenode=system("\"$(hostname -s)[^0-9]\" $SGE_ROOT/activenodes/qstat_t.log > /dev/null 2>&1")
-   activenode=system("ls /var/spool/slurmd | grep job")
+   # Scheduler makes a list of all active nodes every minute
+   # so we aren't querying it directly and DDOSing at scale
+   activenode=system("grep -q \"$(hostname -s)\" /sched/activenodes")
    if activejobs || activenode
      return true
    else
