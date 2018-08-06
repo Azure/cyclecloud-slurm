@@ -1,0 +1,23 @@
+ControlMachine="<%= @nodename %>"
+MpiDefault=none
+ProctrackType=proctrack/pgid
+ReturnToService=2
+PropagateResourceLimits=ALL
+SlurmctldPidFile=/var/run/slurm-llnl/slurmctld.pid
+SlurmdPidFile=/var/run/slurm-llnl/slurmd.pid
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmUser="<%= node[:slurm][:user][:name] %>"
+StateSaveLocation=/var/spool/slurmd
+SwitchType=switch/none
+TaskPlugin=task/none
+FastSchedule=0
+SchedulerType=sched/backfill
+SelectType=select/linear
+AccountingStorageType=accounting_storage/none
+ClusterName=cluster
+JobAcctGatherType=jobacct_gather/none
+SlurmctldDebug=5
+SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
+SlurmdDebug=5
+SlurmdLogFile=/var/log/slurmd/slurmd.log
+PartitionName=debug Nodes=ALL Default=YES MaxTime=INFINITE State=UP 

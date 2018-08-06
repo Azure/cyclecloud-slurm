@@ -3,53 +3,11 @@
 # Recipe:: scheduler
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-slurmver = node[:slurm][:version]
-slurmarch = node[:slurm][:arch]
+
+include_recipe 'slurm::default'
+
 slurmuser = node[:slurm][:user][:name]
-
-nodename = node[:cyclecloud][:instance][:hostname]
-
-slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
-slurmrpms.each do |slurmpkg|
-  jetpack_download "#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
-    project "slurm"
-    not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm") }
-  end
-end
-
-slurmrpms.each do |slurmpkg|
-  package "#{node[:jetpack][:downloads]}/#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
-    action :install
-  end
-end
-
-# Fix munge permissions and create key
-directory "/etc/munge" do
-  owner 'munge'
-  group 'munge'
-  mode 0700
-end
-directory "/var/lib/munge" do
-  owner 'munge'
-  group 'munge'
-  mode 0711
-end
-directory "/var/log/munge" do
-  owner 'munge'
-  group 'munge'
-  mode 0700
-end
-directory "/run/munge" do
-  owner 'munge'
-  group 'munge'
-  mode 0755
-end
-
-directory "/sched/munge" do
-  owner 'munge'
-  group 'munge'
-  mode 0700
-end
+myplatform = node[:platform]
 
 execute 'Create munge key' do
   command "dd if=/dev/urandom bs=1 count=1024 >/sched/munge/munge.key"
@@ -72,29 +30,12 @@ remote_file '/etc/munge/munge.key' do
 end
 
 service 'munge' do
-  action [:enable, :start]
-end
-
-# Set up slurm 
-user slurmuser do
-  comment 'User to run slurmd'
-  shell '/bin/false'
-  action :create
-end
-
-directory '/var/spool/slurmd' do
-  owner "#{slurmuser}"
-  action :create
-end
-
-directory '/var/log/slurmctld' do
-  owner "#{slurmuser}"
-  action :create
+  action [:enable, :restart]
 end
 
 template '/sched/slurm.conf' do
   owner "#{slurmuser}"
-  source 'slurm.conf.erb'
+  source "slurm.conf_#{myplatform}.erb"
   action :create_if_missing
   variables lazy {{
     :nodename => node[:machinename]
@@ -127,6 +68,12 @@ end
 
 service 'slurmctld' do
   action [:enable, :start]
+end
+
+defer_block "Defer starting munge until end of converge" do
+  service 'munge' do
+    action [:enable, :restart]
+  end
 end
 
 include_recipe "slurm::autostart"
