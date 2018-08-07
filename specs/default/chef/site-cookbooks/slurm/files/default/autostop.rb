@@ -9,7 +9,7 @@ AUTOSTOP_ENABLED = `jetpack config cyclecloud.cluster.autoscale.stop_enabled`.do
 if not AUTOSTOP_ENABLED
   exit 0
 end
-  
+
 IDLE_TIME_AFTER_JOBS = `jetpack config cyclecloud.cluster.autoscale.idle_time_after_jobs`.to_i
 IDLE_TIME_BEFORE_JOBS = `jetpack config cyclecloud.cluster.autoscale.idle_time_before_jobs`.to_i
 
@@ -58,11 +58,11 @@ else
     else
       timeout = IDLE_TIME_AFTER_JOBS
     end
-    
+
     if idle_seconds > timeout
       idle_long_enough = true
     end
-    
+
   end
 end
 
@@ -73,6 +73,6 @@ file.close
 
 # Do the shutdown
 if idle_long_enough
-  myhost=`hostname`
+  system("scontrol update nodename=$(hostname) state=DRAIN reason='autostop'")
   system("jetpack shutdown --idle")
 end

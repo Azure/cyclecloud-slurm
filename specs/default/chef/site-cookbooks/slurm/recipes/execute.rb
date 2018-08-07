@@ -4,7 +4,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-include_recipe 'slurm::default'
+include_recipe "slurm::default"
 
 slurmuser = node[:slurm][:user][:name]
 
@@ -30,6 +30,13 @@ defer_block "Defer starting slurmd until end of converge" do
 
   service 'munge' do
     action [:enable, :restart]
+  end
+
+  myhost = lambda { node[:hostname] }
+  # Re-enable a host the first time it converges in the event it was drained
+  execute 'set node to active' do
+    command "scontrol update nodename=#{myhost.call} state=IDLE && touch /etc/slurm.reenabled"
+    creates '/etc/slurm.reenabled'
   end
 end
 
