@@ -35,7 +35,7 @@ defer_block "Defer starting slurmd until end of converge" do
   myhost = lambda { node[:hostname] }
   # Re-enable a host the first time it converges in the event it was drained
   execute 'set node to active' do
-    command "scontrol update nodename=#{myhost.call} state=IDLE && touch /etc/slurm.reenabled"
+    command "scontrol update nodename=#{myhost.call} state=UNDRAIN && touch /etc/slurm.reenabled"
     creates '/etc/slurm.reenabled'
   end
 end
