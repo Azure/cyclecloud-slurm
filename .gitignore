@@ -20,6 +20,7 @@
 x64/
 x86/
 bld/
+build/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
@@ -328,3 +329,6 @@ ASALocalRun/
 
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
+
+# rpmbuild output
+*.rpm

@@ -1,9 +1,14 @@
 #!/bin/bash
 
-SLURM_PKG="slurm-17.11.5.tar.bz2"
+SLURM_VERSION="17.11.12"
+SLURM_PKG="slurm-${SLURM_VERSION}.tar.bz2"
 DOWNLOAD_URL="https://download.schedmd.com/slurm"
 
-yum install -y rpm-build munge-devel munge-libs readline-devel openssl-devel pam-devel perl-ExtUtils-MakeMaker gcc mysql mysql-devel
+# munge is in EPEL
+yum -y install epel-release && yum -q makecache
+
+# Install other build deps
+yum install -y rpm-build munge-devel munge-libs readline-devel openssl openssl-devel pam-devel perl-ExtUtils-MakeMaker gcc mysql mysql-devel wget
 wget "${DOWNLOAD_URL}/${SLURM_PKG}"
 
 rpmbuild -ta ${SLURM_PKG}

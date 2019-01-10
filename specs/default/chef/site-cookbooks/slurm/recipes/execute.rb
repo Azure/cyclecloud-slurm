@@ -20,7 +20,6 @@ link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
-  mode '0700'
 end
 
 defer_block "Defer starting slurmd until end of converge" do

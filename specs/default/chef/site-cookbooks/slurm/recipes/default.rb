@@ -23,7 +23,6 @@ when 'ubuntu'
     to '/etc/slurm-llnl'
     owner "#{slurmuser}"
     group "#{slurmuser}"
-    mode '0700'
   end
 
   link '/bin/sinfo' do

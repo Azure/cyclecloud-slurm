@@ -4,7 +4,7 @@ Slurm
 
 This project sets up an auto-scaling Slurm cluster
 
-   
+
 Pre-Requisites
 --------------
 
@@ -24,10 +24,12 @@ This sample requires the following:
 
   5. You must have access to a configured CycleCloud "Locker" for Project Storage
      (Cluster-Init and Chef).
-     
-  6. You need to either build the Slurm RPMs and put them in the `blobs/` directory 
-     or get them from someone who has already built them. There is a script in the 
-     cluster-init `scratch` directory to build the RPMs.
+
+  6. You need to build the Slurm RPMs and put them in the `blobs/` directory.
+     There is a script in the cluster-init `scratch` directory to build the RPMs on a cloud node.
+     Alternatively, you can run the included `./docker-rpmbuild.sh` on a development machine with
+     `docker` installed.  This `docker-rpmbuild.sh` script will generate the rpm files for
+     CentOS 7.x compatible nodes and place them in the `blobs/` directory.
 
   7. Optional: To use the `cyclecloud project upload <locker>` command, you must
      have a Pogo configuration file set up with write-access to your locker.
@@ -43,7 +45,7 @@ This sample requires the following:
 Usage
 =====
 
-A. Configuring the Project
+A. Deploying the Project
 --------------------------
 
 The first step is to configure the project for use with your storage locker:
@@ -52,23 +54,7 @@ The first step is to configure the project for use with your storage locker:
 
   2. Switch to the Slurm sample directory.
 
-  3. Run ``cyclecloud project add_target my_locker`` (assuming the locker is named "my_locker").
-     The locker name will generally be the same as the cloud provider you created when configuring
-     CycleCloud. The expected output looks like this:::
-
-       $ cyclecloud project add_target my_locker
-       Name: slurm
-       Version: 1.0.0
-       Targets:
-          my_locker: {'default': 'true', 'is_locker': 'true'}
-
-     NOTE: You may call add_target as many times as needed to add additional target lockers.
-
-       
-B. Deploying the Project
-------------------------
-
-To upload the project (including any local changes) to your target locker, run the
+  3. Upload the project (including any local changes) to your target locker, run the
 `cyclecloud project upload` command from the project directory.  The expected output looks like
 this:::
 
@@ -80,7 +66,7 @@ this:::
 For the upload to succeed, you must have a valid Pogo configuration for your target Locker.
 
 
-C. Importing the Cluster Template
+B. Importing the Cluster Template
 ---------------------------------
 
 To import the cluster:
