@@ -157,7 +157,7 @@ defaultvalue = 17.11.12-1
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
 
         [[[parameter MasterClusterInitSpecs]]]
         Label = Master Cluster-Init
