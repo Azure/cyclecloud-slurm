@@ -18,9 +18,9 @@ end
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
-  owner "#{slurmuser}"
-  group "#{slurmuser}"
-  mode '0700'
+  #owner "#{slurmuser}"
+  #group "#{slurmuser}"
+  #mode '0700'
 end
 
 defer_block "Defer starting slurmd until end of converge" do
@@ -33,9 +33,10 @@ defer_block "Defer starting slurmd until end of converge" do
   end
 
   myhost = lambda { node[:hostname] }
+  slurmfeature = node[:slurm][:feature][:name]
   # Re-enable a host the first time it converges in the event it was drained
   execute 'set node to active' do
-    command "scontrol update nodename=#{myhost.call} state=IDLE && touch /etc/slurm.reenabled"
+    command "scontrol update nodename=#{myhost.call} availablefeature=#{slurmfeature} state=IDLE && touch /etc/slurm.reenabled"
     creates '/etc/slurm.reenabled'
   end
 end

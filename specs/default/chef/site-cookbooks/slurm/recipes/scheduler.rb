@@ -53,9 +53,9 @@ end
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
-  owner "#{slurmuser}"
-  group "#{slurmuser}"
-  mode '0700'
+  #owner "#{slurmuser}"
+  #group "#{slurmuser}"
+  #mode '0700'
 end
 
 cookbook_file "/etc/security/limits.d/slurm-limits.conf" do

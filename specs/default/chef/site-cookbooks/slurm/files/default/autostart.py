@@ -13,8 +13,11 @@ def _get_jobs():
     autoscale_jobs = []
     for job in jobs.splitlines():
 
-        job_id, job_cores, job_state = job.split('|')
-        slot_type = 'execute'
+        job_id, job_cores, job_state, job_feature = job.split('|')
+	if job_feature == "(null)":
+                slot_type = 'execute'
+        else:
+                slot_type = job_feature
 
         job = {
             'name': job_id,
@@ -28,7 +31,7 @@ def _get_jobs():
 
 def get_slurm_jobs():
     # Returns jobs in JOBID|CPUS|STATE format
-    args = ['/bin/squeue', '-h', '-t', 'RUNNING,PENDING', '--format=%i|%C|%T']
+    args = ['/bin/squeue', '-h', '-t', 'RUNNING,PENDING', '--format=%i|%C|%T|%f']
     result = subprocess.check_output(args)
     return result
 
