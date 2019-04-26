@@ -1,9 +1,14 @@
-from cyclecloud import autoscale_util
-import subprocess
-import logging
-from cyclecloud.job import Job, PackingStrategy
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+#
+
 import datetime
-from subprocess import check_call
+import logging
+import numbers
+from subprocess import check_call, check_output
+
+
+SLURM_NULL = "(null)"
 
 
 class FieldSpec:
@@ -14,7 +19,7 @@ class FieldSpec:
         self.default_value = default_value
         
     def __str__(self):
-        return "%s:%s" % (self.name, self.width)
+        return "{}:{}".format(self.name, self.width)
         
 
 class SLURMDriver:
@@ -38,22 +43,26 @@ class SLURMDriver:
             jobs_args = ["--job", ",".join(jobs)]
         else:
             jobs_args = []
+        
         format_args = []
+        
         for spec in self._job_format:
-            format_args.append("%s:%s" % (spec.name, spec.width)) 
+            format_args.append("{}:{}".format(spec.name, spec.width)) 
         
         # '--format=%i|%C|%T|%D|%J|%m|%N|%P|%f|%h|%n|%Y|%s|%E'
         args = ['/bin/squeue', '-h', '-t', 'RUNNING,PENDING,COMPLETING', '--noheader', '-O', ','.join(format_args)] + jobs_args
         logging.debug(" ".join(args))
-        return subprocess.check_output(args)
+        return check_output(args)
     
     def invoke_sinfo(self):
         format_args = []
+        
         for spec in self._host_format:
-            format_args.append("%s:%s" % (spec.name, spec.width))
+            format_args.append("{}:{}".format(spec.name, spec.width))
+            
         args = ["sinfo", "-N", "--noheader", "-O", ",".join(format_args)]
         logging.debug(" ".join(args))
-        return subprocess.check_output(args)
+        return check_output(args)
     
     def _parse_fixed_width(self, line, format_specs):
         '''fixed width parsing of squeue/sinfo output'''
@@ -65,19 +74,19 @@ class SLURMDriver:
         for spec in format_specs:
             length = int(self.override_format_lengths.get(spec.name, spec.width))
             if len(line) < i + length:
-                raise RuntimeError("Line is too short: could not parse squeue line with format %s . %d < %d + %d\n'%s'" % (spec, len(line), i, length, line))
+                raise RuntimeError("Line is too short: could not parse squeue line with format {} . {} < {} + {}\n'{}'".format(spec, len(line), i, length, line))
             value = line[i: i + length].strip()
             
             try:
                 value = value or spec.default_value
                 ret[spec.name] = spec.convert(value)
             except Exception as e:
-                raise ValueError("Could not parse field %s with value '%s': %s" %( spec.name, value, str(e)))
+                raise ValueError("Could not parse field {} with value '{}': {}".format(spec.name, value, str(e)))
             
             i = i + length
         
         if i != len(line):
-            raise RuntimeError("Line is too long (%d): could not parse squeue line with format %s - '%s'" % (len(line) - i, format_specs, line))
+            raise RuntimeError("Line is too long ({}): could not parse squeue line with format {} - '{}'".formate(len(line) - i, format_specs, line))
         
         return ret
     
@@ -90,75 +99,12 @@ class SLURMDriver:
     def get_jobs(self, jobs=None):
         result = self.invoke_squeue(jobs)
         
-        autoscale_jobs = []
-        eligible_threshold = datetime.datetime.now() + datetime.timedelta(0, self.eligibletime_threshold)
-        
-        one_hour = datetime.timedelta(0, 3600)
-        epoch = datetime.datetime.strptime("0", "%S")
-        
+        ret = []
         for line in result.splitlines(False):
-            '''
-                %s Node selection plugin specific data for a job. Possible data includes: Geometry requirement of resource allocation (X,Y,Z dimensions),
-                   Connection type (TORUS, MESH, or NAV == torus else mesh), Permit rotation of geometry (yes or no), Node use (VIRTUAL or COPROCESSOR), etc. (Valid for jobs only)
-            '''
             raw_job = self.parse_squeue_line(line)
+            ret.append(raw_job)
             
-            if raw_job["eligibletime"] and raw_job["eligibletime"] > eligible_threshold:
-                logging.debug("Ignoring job %s as it will not be running for at least %.1f minutes. (%s)",
-                              raw_job["jobid"], self.eligibletime_threshold / 60., raw_job["eligibletime"])
-                continue
-            
-            if raw_job["timeleft"]:
-                weight = min(1, (raw_job["timeleft"] - epoch).total_seconds() / one_hour)
-            else:
-                weight = 1
-
-            numnodes = int(raw_job["numnodes"]) if "numnodes" in raw_job else None
-            
-            network_attrs = parse_network(raw_job["network"])
-            if "instances" in network_attrs:
-                numnodes = int(network_attrs["instances"])
-            
-            ncpus = int(raw_job["numcpus"]) / max(numnodes, 1)
-            
-            if raw_job["dependency"]:
-                # TODO ideally, if the endtime was within say 10 minutes we should start the dependencies?
-                logging.debug("Skipping %s because it has dependencies", raw_job["jobid"])
-                continue
-            
-            def nodes_to_list(x):
-                return x.split(",") if x and x != "(null)" else []
-            
-            # TODO pending / hints
-            assigned_nodes = nodes_to_list(raw_job["nodelist"]) if raw_job["state"] == "RUNNING" else []
-            
-            resources = {"ncpus": int(ncpus)}
-            if raw_job["minmemory"]:
-                resources["minmemory"] = autoscale_util.parse_gb_size("minmemory", raw_job["minmemory"])
-                
-            exclusive = raw_job.get("over_subscribe") == "NO" or network_attrs.get("exclusive", False)
-            is_grouped = network_attrs.get("sn_single") or raw_job["reqswitch"] > 0
-            placeby = "PlacementGroupId" if is_grouped else None
-            packing_strategy = PackingStrategy.SCATTER if numnodes else PackingStrategy.PACK
-            
-#             numnodes_or_tasks = (numnodes or 1) * max(int(raw_job["numtask"]), 1) 
-            
-            assigned_nodes = assigned_nodes or [None]
-            for assigned_node in assigned_nodes:
-                autoscale_job = Job(name=raw_job["jobid"],
-                                    nodes=numnodes,
-                                    nodearray=None,
-                                    exclusive=exclusive,
-                                    packing_strategy=packing_strategy,
-                                    resources=resources, 
-                                    placeby=placeby,
-                                    placeby_value=None, 
-                                    executing_hostname=assigned_node,
-                                    runtime=weight,
-                                    state=raw_job["state"])
-                autoscale_jobs.append(autoscale_job)
-                
-        return autoscale_jobs
+        return ret
     
     def get_hosts(self):
         stdout = self.invoke_sinfo()
@@ -169,8 +115,7 @@ class SLURMDriver:
         for line in stdout.splitlines():
             host = self.parse_sinfo_line(line)
             
-            private_ip = autoscale_util.get_private_ip(host["nodehost"])
-            ret[private_ip] = {"hostname": host["nodehost"],
+            ret[host["nodehost"]] = {"hostname": host["nodehost"],
                                "state": host["statecompact"].replace("*", ""),
                                "unresponsive": "*" in host["statecompact"],
                                "ncpus": host["cpus"],
@@ -180,19 +125,33 @@ class SLURMDriver:
         return ret
     
     def drain(self, hostnames):
-        check_call(["scontrol", "update", "NodeName=%s" % ",".join(hostnames), "State=DRAIN", "Reason=CycleCloud autoscale"])
+        check_call(["scontrol", "update", "NodeName={}".format(",".join(hostnames)), "State=DRAIN", "Reason=CycleCloud autoscale"])
         
     def future(self, hostnames):
-        check_call(["scontrol", "update", "NodeName=%s" % ",".join(hostnames), "State=FUTURE", "Reason=CycleCloud autoscale"])
+        check_call(["scontrol", "update", "NodeName={}".format(",".join(hostnames)), "State=FUTURE", "Reason=CycleCloud autoscale"])
         
     def update_job(self, job_id, key, value):
-        subprocess.check_call(["scontrol", "Update", "JobId=%s" % job_id, "%s=%s" % (key, value)])
+        check_call(["scontrol", "Update", "JobId={}".format(job_id), "{}={}".format(key, value)])
+        
+    def get_placement_group_from_feature(self, node):
+        output = check_output(["scontrol", "show", "node", node, "--future", "-o"])
+        active_features = None
+        for expr in output.split():
+            if "=" in expr:
+                key, value = expr.split("=")
+                if key.lower() == "activefeatures":
+                    active_features = value.split(",")
+        
+        if active_features:
+            for feature in active_features:
+                if feature.lower().startswith("cyclepg"):
+                    return feature.lower()
     
 
 def _memory_converter_from_mb(value):
     if value is None or not value.strip():
         return None
-    return autoscale_util.parse_gb_size("mem", value)
+    return parse_gb_size("mem", value)
 
 
 def _convert_timestamp(value):
@@ -223,14 +182,35 @@ def _convert_timeleft(value):
         
 
 def parse_network(expr):
-    ret = {}
+    """
+    Parses --network=Instances=2,SN_SINGLE,US,MPI ...
+    See https://slurm.schedmd.com/sbatch.html
+    
+    
+    Parameters:
+    expr: string, The --network=expression
+
+    Returns: NetworkSpecification 
+    """
+
+    network_args = {}
     for tok in expr.split(","):
         if "=" in tok:
             key, value = tok.split("=", 2)
-            ret[key.lower()] = value
+            network_args[key.lower()] = value
         else:
-            ret[tok.lower()] = True
-    return ret
+            network_args[tok.lower()] = True
+    network_spec = NetworkSpecification()
+    
+    if network_args.get("instances"):
+        try:
+            network_spec.instances = int(network_args.get("instances"))
+        except Exception:
+            logging.exception("Could not parse the number of instances for network expr %s", expr)
+            
+        network_spec.sn_single = network_args.get("sn_single", False)
+    
+    return network_spec
 
 
 def format_network(network):
@@ -239,8 +219,31 @@ def format_network(network):
         if value is True:
             ret.append(key)
         else:
-            ret.append("%s=%s" % (key, value))
+            ret.append("{}={}".format(key, value))
     return ",".join(ret)
+
+
+def parse_nodelist(nodelist_expr):
+    nodes = []
+    for e in nodelist_expr.split(","):
+        def expand(expr):
+            if "[" not in expr:
+                nodes.append(expr)
+                return
+            
+            leftb = expr.rindex("[") 
+            rightb = expr.rindex("]") 
+            range_expr = expr[leftb + 1: rightb]
+            start, stop = range_expr.split("-")
+            
+            while int(start) <= int(stop):
+                node = expr[0: leftb] + start + expr[rightb + 1:]
+                expand(node)
+                formatexpr = "%0" + str(len(start)) + "d"
+                start = formatexpr % (int(start) + 1)
+                
+        expand(e)
+    return nodes
 
 
 class HostStates:
@@ -264,3 +267,50 @@ class HostStates:
     @staticmethod
     def is_active(state):
         return state in [HostStates.allocated, HostStates.completing, HostStates.draining, HostStates.mixed]
+    
+
+class NetworkSpecification:
+    
+    def __init__(self):
+        self.sn_single = False
+        self.instances = 0
+        self.sn_single = False
+        
+        
+class InvalidSizeExpressionError(RuntimeError):
+    pass
+    
+    
+def parse_gb_size(attr, value):
+    if isinstance(value, numbers.Number):
+        return value
+    try:
+        
+        value = value.lower()
+        if value.endswith("pb"):
+            value = float(value[:-2]) * 1024
+        elif value.endswith("p"):
+            value = float(value[:-1]) * 1024
+        elif value.endswith("gb"):
+            value = float(value[:-2])
+        elif value.endswith("g"):
+            value = float(value[:-1])
+        elif value.endswith("mb"):
+            value = float(value[:-2]) / 1024
+        elif value.endswith("m"):
+            value = float(value[:-1]) / 1024
+        elif value.endswith("kb"):
+            value = float(value[:-2]) / (1024 * 1024)
+        elif value.endswith("k"):
+            value = float(value[:-1]) / (1024 * 1024)
+        elif value.endswith("b"):
+            value = float(value[:-1]) / (1024 * 1024 * 1024)
+        else:
+            try:
+                value = int(value)
+            except:
+                value = float(value)
+        
+        return value
+    except ValueError:
+        raise InvalidSizeExpressionError("Unsupported size for {} - {}".format(attr, value))

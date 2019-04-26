@@ -13,12 +13,35 @@ def test_hello_world():
         fw.write(
 """#!/bin/bash
 #
-#SBATCH --job-name=%s
-#SBATCH --output=test_hello_world.txt
+#SBATCH --job-name={job_name}
+#SBATCH --output=test_hello_world.{job_name}.txt
 #
 #SBATCH --ntasks=1
-srun hostname
-srun sleep 60""" % job_name)
+srun hostname""".format(job_name=job_name))
+    
+    subprocess.check_call(["sbatch", script_path])
+
+    deadline = time.time() + 20 * 60
+    while time.time() < deadline:
+        time.sleep(1)
+        stdout = subprocess.check_output(['squeue', '--format', "%j", "-h"])
+        if job_name not in stdout:
+            return
+    raise AssertionError("Timed out waiting for job %s to finish" % job_name)
+
+
+def test_single_switch():
+    script_path = os.path.expanduser("~/hello_world.sh")
+    job_name = str(uuid.uuid4())
+    with open(script_path, 'w') as fw:
+        fw.write(
+"""#!/bin/bash
+#
+#SBATCH --job-name={job_name}
+#SBATCH --output=test_hello_world.{job_name}.txt
+#
+#SBATCH --switches 1
+srun hostname""".format(job_name=job_name))
     
     subprocess.check_call(["sbatch", script_path])
 

@@ -20,7 +20,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
 
-        [[[cluster-init cyclecloud/slurm:default:1.0.2]]]
+        [[[cluster-init cyclecloud/slurm:default:2.0.0]]]
         Optional = true
 
     [[node master]]
@@ -30,7 +30,7 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
 
-        [[[cluster-init cyclecloud/slurm:master:1.0.2]]]
+        [[[cluster-init cyclecloud/slurm:master:2.0.0]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -49,8 +49,9 @@ Autoscale = $Autoscale
 
 
         [[[configuration]]]
+        slurm.autoscale = true
 
-        [[[cluster-init cyclecloud/slurm:execute:1.0.2]]]
+        [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -142,10 +143,49 @@ Order = 20
     Order = 5
 
         [[[parameter configuration_slurm_version]]]
-        required = True
-        label = Slurm Version
-        description = Version of Slurm to install on the cluster
-        defaultvalue = 17.11.12-1
+	required = True
+	label = Slurm Version
+	description = Version of Slurm to install on the cluster
+	defaultvalue = 18.08.7-1
+
+	[[[parameter configuration_slurm_user_name]]]
+	required = True
+	label = Slurm Username
+	description = Username for the slurm service account
+	defaultvalue = slurm
+
+	[[[parameter configuration_slurm_user_uid]]]
+	required = True
+	label = Slurm User ID
+	description = User ID for the slurm service account
+	defaultvalue = 11100
+
+
+	[[[parameter configuration_slurm_user_gid]]]
+	required = True
+	label = Slurm Group ID
+	description = Default Group ID for the slurm service account
+	defaultvalue = 11100
+
+
+	[[[parameter configuration_munge_user_name]]]
+	required = True
+	label = Munge Username
+	description = Username for the munge service account
+	defaultvalue = munge
+
+	[[[parameter configuration_munge_user_uid]]]
+	required = True
+	label = Munge User ID
+	description = User ID for the munge service account
+	defaultvalue = 11101
+
+	[[[parameter configuration_munge_user_gid]]]
+	required = True
+	label = Munge Group ID
+	description = Default Group ID for the munge service account
+	defaultvalue = 11101
+
 
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."

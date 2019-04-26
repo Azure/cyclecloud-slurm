@@ -119,14 +119,3 @@ directory '/var/log/slurmctld' do
   owner slurmuser
   action :create
 end
-
-template '/etc/slurm/topology.conf' do
-  owner "#{slurmuser}"
-  source "topology.conf.erb"
-  action :create_if_missing
-  variables lazy {{
-    :hostname => node[:hostname],
-    :nodearray_machinetype => node[:cyclecloud][:node][:template] + (node[:autoscale].nil? ? "" : node[:autoscale][:machinetype]).gsub("_", ""),
-    :placementgroup => node[:cyclecloud][:node][:placement_group]
-  }}
-end

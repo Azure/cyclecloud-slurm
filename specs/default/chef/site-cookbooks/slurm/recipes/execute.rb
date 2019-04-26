@@ -5,6 +5,7 @@
 # Licensed under the MIT License.
 
 include_recipe "slurm::default"
+require 'chef/mixin/shell_out'
 
 slurmuser = node[:slurm][:user][:name]
 
@@ -22,7 +23,29 @@ link '/etc/slurm/slurm.conf' do
   group "#{slurmuser}"
 end
 
+link '/etc/slurm/topology.conf' do
+  to '/sched/topology.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
 defer_block "Defer starting slurmd until end of converge" do
+  nodename=shell_out("grep '#{node[:ipaddress]} ' /sched/nodeaddrs | cut -d' ' -f2-").stdout
+  if nodename.nil? || nodename.strip().empty?() then
+    raise "Waiting for nodeaddr to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
+  end
+
+  nodename=nodename.strip()
+
+  slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
+  # TODO RDH
+  file '/etc/sysconfig/slurmd' do
+    content slurmd_sysconfig
+    mode '0700'
+    owner 'slurm'
+    group 'slurm'
+  end
+
   service 'slurmd' do
     action [:enable, :start]
   end
@@ -34,9 +57,9 @@ defer_block "Defer starting slurmd until end of converge" do
   myhost = lambda { node[:hostname] }
   # Re-enable a host the first time it converges in the event it was drained
   execute 'set node to active' do
-    command "scontrol update nodename=#{myhost.call} state=UNDRAIN && touch /etc/slurm.reenabled"
+    command "scontrol update nodename=#{nodename} state=UNDRAIN && touch /etc/slurm.reenabled"
     creates '/etc/slurm.reenabled'
   end
 end
 
-include_recipe "slurm::autostop"
+#include_recipe "slurm::autostop"
