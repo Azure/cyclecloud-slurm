@@ -21,7 +21,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
 
-        [[[cluster-init cyclecloud/slurm:default:1.0.2]]]
+        [[[cluster-init cyclecloud/slurm:default:2.0.0]]]
         Optional = true
 
     [[node master]]
@@ -31,7 +31,7 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
 
-        [[[cluster-init cyclecloud/slurm:master:1.0.2]]]
+        [[[cluster-init cyclecloud/slurm:master:2.0.0]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -41,20 +41,26 @@ Autoscale = $Autoscale
         PublicPort = 8652
 
 
-    [[nodearray execute]]
+    [[nodearray ondemand]]
     MachineType = $ExecuteMachineType
     MaxCoreCount = $MaxExecuteCoreCount
-
-    Interruptible = $UseLowPrio
+    ShutdownPolicy = Deallocate
+    Interruptible = false
+    
     AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
 
 
         [[[configuration]]]
+        slurm.autoscale = true
 
-        [[[cluster-init cyclecloud/slurm:execute:1.0.2]]]
+        [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
+
+    [[nodearray lowprio]]
+    Extends = ondemand
+    Interruptible = true
 
 
 [parameters About]
@@ -146,7 +152,7 @@ Order = 20
 required = True
 label = Slurm Version
 description = Version of Slurm to install on the cluster
-defaultvalue = 17.11.12-1
+defaultvalue = 18.08.7-1
 
 
     [[parameters Software]]

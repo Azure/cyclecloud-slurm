@@ -33,19 +33,65 @@ service 'munge' do
   action [:enable, :restart]
 end
 
-template '/sched/slurm.conf' do
+cookbook_file "#{node[:cyclecloud][:bootstrap]}/writeactivenodes.sh" do
+    source "writeactivenodes.sh"
+    mode "0700"
+    owner "root"
+    group "root"
+end
+
+cron "writeactivenodes" do
+    command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/writeactivenodes.sh"
+    only_if { node['cyclecloud']['cluster']['autoscale']['start_enabled'] }
+end
+
+cookbook_file "#{node[:cyclecloud][:bootstrap]}/writenodeaddrs.sh" do
+    source "writenodeaddrs.sh"
+    mode "0700"
+    owner "root"
+    group "root"
+end
+
+cron "writenodeaddrs" do
+    command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/writenodeaddrs.sh"
+end 
+
+directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
+  user "root"
+  group "root"
+  recursive true
+end
+
+
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh"]
+scripts.each do |filename| 
+    cookbook_file "#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}" do
+        source "#{filename}"
+        mode "0755"
+        owner "root"
+        group "root"
+    end
+end
+
+# we will be appending to this file, so that the next step is monotonic
+template '/sched/slurm.conf.base' do
   owner "#{slurmuser}"
   source "slurm.conf_#{myplatform}.erb"
   action :create_if_missing
   variables lazy {{
-    :nodename => node[:machinename]
+    :nodename => node[:machinename],
+    :bootstrap => "#{node[:cyclecloud][:bootstrap]}/slurm",
+    :suspend_timeout => node[:slurm][:suspend_timeout],
+    :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs]
   }}
 end
 
 bash 'Add nodes to slurm config' do
   code <<-EOH
-    iplist=$(grep ip- /etc/hosts | awk '{print $2}' | cut -d'.' -f1 | paste -sd "," -)
-    echo "\nNodename=${iplist} State=FUTURE" >> /sched/slurm.conf
+    cp /sched/slurm.conf.base /sched/slurm.conf
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes
     touch /etc/slurm.installed
     EOH
   not_if { ::File.exist?('/etc/slurm.installed') }
@@ -53,6 +99,12 @@ end
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
+link '/etc/slurm/topology.conf' do
+  to '/sched/topology.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
@@ -74,6 +126,3 @@ defer_block "Defer starting munge until end of converge" do
     action [:enable, :restart]
   end
 end
-
-include_recipe "slurm::autostart"
-
