@@ -223,24 +223,54 @@ def format_network(network):
     return ",".join(ret)
 
 
-def parse_nodelist(nodelist_expr):
+def parse_nodelist(subprocess_module, nodelist_expr):
     nodes = []
-    for e in nodelist_expr.split(","):
+    
+    inside_bracket = False
+    
+    sub_exprs = []
+    buf = cStringIO.StringIO()
+    
+    for ch in nodelist_expr:
+        if not inside_bracket and ch == ",":
+            sub_exprs.append(buf.getvalue())
+            buf = cStringIO.StringIO()
+            continue
+        
+        if ch == "[":
+            inside_bracket = True
+        elif ch == "]":
+            inside_bracket = False
+        
+        buf.write(ch)
+    
+    sub_exprs.append(buf.getvalue())
+    
+    for e in sub_exprs:
+
         def expand(expr):
             if "[" not in expr:
                 nodes.append(expr)
                 return
-            
-            leftb = expr.rindex("[") 
-            rightb = expr.rindex("]") 
-            range_expr = expr[leftb + 1: rightb]
-            start, stop = range_expr.split("-")
-            
-            while int(start) <= int(stop):
-                node = expr[0: leftb] + start + expr[rightb + 1:]
-                expand(node)
-                formatexpr = "%0" + str(len(start)) + "d"
-                start = formatexpr % (int(start) + 1)
+            try:
+                leftb = expr.rindex("[") 
+                rightb = expr.rindex("]") 
+                range_expr = expr[leftb + 1: rightb]
+                
+                for start_stop_expr in range_expr.split(","):
+                    if "-" in start_stop_expr:
+                        start, stop = range_expr.split("-")
+                    else:
+                        start = stop = start_stop_expr
+                
+                    while int(start) <= int(stop):
+                        node = expr[0: leftb] + start + expr[rightb + 1:]
+                        expand(node)
+                        formatexpr = "%0" + str(len(start)) + "d"
+                        start = formatexpr % (int(start) + 1)
+            except Exception:
+                logging.error("Failed while parsing '%s' as part of '%s'", expr, nodelist_expr)
+                raise
                 
         expand(e)
     return nodes
