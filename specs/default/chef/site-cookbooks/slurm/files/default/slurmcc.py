@@ -5,7 +5,14 @@
 import datetime
 import logging
 import numbers
+import os
+import random
 from subprocess import check_call, check_output
+
+import requests
+import re
+import cStringIO
+import subprocess
 
 
 SLURM_NULL = "(null)"
@@ -209,6 +216,7 @@ def parse_network(expr):
             logging.exception("Could not parse the number of instances for network expr %s", expr)
             
         network_spec.sn_single = network_args.get("sn_single", False)
+        network_spec.exclusive = network_args.get("exclusive", False)
     
     return network_spec
 
@@ -221,59 +229,6 @@ def format_network(network):
         else:
             ret.append("{}={}".format(key, value))
     return ",".join(ret)
-
-
-def parse_nodelist(subprocess_module, nodelist_expr):
-    nodes = []
-    
-    inside_bracket = False
-    
-    sub_exprs = []
-    buf = cStringIO.StringIO()
-    
-    for ch in nodelist_expr:
-        if not inside_bracket and ch == ",":
-            sub_exprs.append(buf.getvalue())
-            buf = cStringIO.StringIO()
-            continue
-        
-        if ch == "[":
-            inside_bracket = True
-        elif ch == "]":
-            inside_bracket = False
-        
-        buf.write(ch)
-    
-    sub_exprs.append(buf.getvalue())
-    
-    for e in sub_exprs:
-
-        def expand(expr):
-            if "[" not in expr:
-                nodes.append(expr)
-                return
-            try:
-                leftb = expr.rindex("[") 
-                rightb = expr.rindex("]") 
-                range_expr = expr[leftb + 1: rightb]
-                
-                for start_stop_expr in range_expr.split(","):
-                    if "-" in start_stop_expr:
-                        start, stop = range_expr.split("-")
-                    else:
-                        start = stop = start_stop_expr
-                
-                    while int(start) <= int(stop):
-                        node = expr[0: leftb] + start + expr[rightb + 1:]
-                        expand(node)
-                        formatexpr = "%0" + str(len(start)) + "d"
-                        start = formatexpr % (int(start) + 1)
-            except Exception:
-                logging.error("Failed while parsing '%s' as part of '%s'", expr, nodelist_expr)
-                raise
-                
-        expand(e)
-    return nodes
 
 
 class HostStates:
@@ -301,10 +256,20 @@ class HostStates:
 
 class NetworkSpecification:
     
-    def __init__(self):
-        self.sn_single = False
-        self.instances = 0
-        self.sn_single = False
+    def __init__(self, sn_single=False, instances=0, exclusive=False):
+        self.sn_single = sn_single
+        self.instances = instances
+        self.exclusive = exclusive
+        
+    def __eq__(self, other):
+        return self.sn_single == other.sn_single and self.instances == other.instances \
+            and self.exclusive == other.exclusive
+            
+    def __str__(self):
+        return "Network(sn_single=%s, instances=%d, exclusive=%s)" % (self.sn_single, self.instances, self.exclusive)
+    
+    def __repr__(self):
+        return str(self)
         
         
 class InvalidSizeExpressionError(RuntimeError):
@@ -344,3 +309,28 @@ def parse_gb_size(attr, value):
         return value
     except ValueError:
         raise InvalidSizeExpressionError("Unsupported size for {} - {}".format(attr, value))
+
+
+def custom_chaos_mode(action):
+    def wrapped(func):
+        return chaos_mode(func, action)
+    return wrapped
+
+
+def chaos_mode(func, action=None):
+    def default_action():
+        raise random.choice([RuntimeError, ValueError, requests.exceptions.ConnectionError])("Random failure")
+    
+    action = action or default_action
+    
+    def wrapped(*args, **kwargs):
+        if is_chaos_mode():
+            return action()
+            
+        return func(*args, **kwargs)
+    
+    return wrapped
+
+
+def is_chaos_mode():
+    return random.random() < float(os.getenv("CYCLECLOUD_SLURM_CHAOS_MODE", 0))
