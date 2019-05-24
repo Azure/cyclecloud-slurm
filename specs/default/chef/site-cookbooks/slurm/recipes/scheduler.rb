@@ -81,6 +81,7 @@ template '/sched/slurm.conf.base' do
   variables lazy {{
     :nodename => node[:machinename],
     :bootstrap => "#{node[:cyclecloud][:bootstrap]}/slurm",
+    :resume_timeout => node[:slurm][:resume_timeout],
     :suspend_timeout => node[:slurm][:suspend_timeout],
     :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs]
   }}
@@ -88,10 +89,10 @@ end
 
 bash 'Add nodes to slurm config' do
   code <<-EOH
-    cp /sched/slurm.conf.base /sched/slurm.conf
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes
+    cp /sched/slurm.conf.base /sched/slurm.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes || exit 1;
     touch /etc/slurm.installed
     EOH
   not_if { ::File.exist?('/etc/slurm.installed') }

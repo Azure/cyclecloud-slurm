@@ -1,3 +1,4 @@
 #!/bin/bash
 
-/bin/sinfo -N -O nodeaddr,nodelist --noheader > /sched/nodeaddrs
+# yes, nodehost is the ip address and nodeaddr is the hostname...
+/bin/sinfo -N -O nodehost,nodelist --noheader > /sched/nodeaddrs
