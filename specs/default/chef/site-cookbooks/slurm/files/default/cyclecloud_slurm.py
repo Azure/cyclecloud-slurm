@@ -4,55 +4,59 @@
 
 import argparse
 from collections import OrderedDict
+from getpass import getpass
 import json
 import logging
 from math import ceil, floor
 import os
-import subprocess
 import sys
 import time
 from uuid import uuid4
 
-from cyclecloud import autoscale_util
-from cyclecloud.machine import MachineRequest
-from slurmcc import SLURMDriver
-from getpass import getpass
-from cyclecloud.client import Client, Record
 from clusterwrapper import ClusterWrapper
-from cyclecloud.model.ClusterNodearrayStatusModule import ClusterNodearrayStatus
+from cyclecloud.client import Client, Record
 from cyclecloud.model.NodeCreationRequestModule import NodeCreationRequest
-from cyclecloud.model.NodeCreationRequestSetModule import NodeCreationRequestSet
 from cyclecloud.model.NodeCreationRequestSetDefinitionModule import NodeCreationRequestSetDefinition
+from cyclecloud.model.NodeCreationRequestSetModule import NodeCreationRequestSet
 import slurmcc
+from slurmcc import chaos_mode, custom_chaos_mode
+import random
 
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, max_scaleset_size, vcpus_total, memory, quota_count):
+    def __init__(self, name, nodearray, machine_type, is_default, max_scaleset_size, vcpu_count, memory, max_vm_count):
         self.name = name
         self.nodearray = nodearray
         self.machine_type = machine_type
         self.is_default = is_default
         self.max_scaleset_size = max_scaleset_size
-        self.vcpus_total = vcpus_total
+        self.vcpu_count = vcpu_count
         self.memory = memory
-        self.quota_count = quota_count
-        self.node_list = "{}-[{}-{}]".format(self.name, 1, quota_count)
+        self.max_vm_count = max_vm_count
+        self.node_list = None
 
 
-def fetch_partitions(cluster_wrapper):
+def fetch_partitions(cluster_wrapper, subprocess_module):
     '''
     Construct a mapping of SLURM partition name -> relevant nodearray information.
     There must be a one-to-one mapping of partition name to nodearray. If not, first one wins.
     '''
     partitions = OrderedDict()
     
-    ClusterNodearrayStatus
-    _, status_response = cluster_wrapper.get_cluster_status()
+    _, status_response = cluster_wrapper.get_cluster_status(nodes=True)
     
     for nodearray_status in status_response.nodearrays:
         nodearray_name = nodearray_status.name
+        if not nodearray_name:
+            logging.error("Name is not defined for nodearray. Skipping")
+            continue
+        
         nodearray_record = nodearray_status.nodearray
+        if not nodearray_record:
+            logging.error("Nodearray record is not defined for nodearray status. Skipping")
+            continue
+            
         slurm_config = nodearray_record.get("Configuration", {}).get("slurm", {})
         is_autoscale = slurm_config.get("autoscale", False)
         partition_name = slurm_config.get("partition", nodearray_name)
@@ -92,10 +96,43 @@ def fetch_partitions(cluster_wrapper):
             logging.error("Invalid status response - missing virtualMachine definition with machinetype=='%s', %s", machine_type, json.dumps(status_response))
             return 1
         
-        max_scaleset_size = nodearray_record.get("Azure", {}).get("MaxScalesetSize", 40)
-        partitions[partition_name] = Partition(partition_name, nodearray_name, machine_type, slurm_config.get("default_partition", False), max_scaleset_size,
-                                               vm.vcpu_count, vm.memory, bucket.quota_count)
+        if bucket.max_count is None:
+            logging.error("No max_count defined for  machinetype=='%s'. Skipping", machine_type)
+            continue
         
+        if bucket.max_count <= 0:
+            logging.info("Bucket has a max_count <= 0, defined for machinetype=='%s'. Skipping", machine_type)
+            continue
+        
+        max_scaleset_size = nodearray_record.get("Azure", {}).get("MaxScalesetSize", 40)
+        
+        partitions[partition_name] = Partition(partition_name,
+                                               nodearray_name,
+                                               machine_type,
+                                               slurm_config.get("default_partition", False),
+                                               max_scaleset_size,
+                                               vm.vcpu_count,
+                                               vm.memory,
+                                               bucket.max_count)
+        
+        existing_nodes = []
+        for node in status_response.nodes:
+            if node.get("Template") == nodearray_name:
+                existing_nodes.append(node.get("Name"))
+        
+        if existing_nodes:
+            partitions[partition_name].node_list = _to_hostlist(subprocess_module, ",".join(existing_nodes))
+    
+    partitions_list = partitions.values()
+    default_partitions = [p for p in partitions_list if p.is_default]
+    if len(default_partitions) == 0:
+        logging.warn("slurm.default_partition was not set on any nodearray.")
+        if len(partitions_list) == 1:
+            logging.info("Only one nodearray was defined, setting as default.")
+            partitions_list[0].is_default = True
+    elif len(default_partitions) > 1:
+        logging.warn("slurm.default_partition was set on more than one nodearray!")
+    
     return partitions
 
 
@@ -122,49 +159,53 @@ def _get_cluster_wrapper(username=None, password=None, web_server=None):
         }
         
         client = Client(config)
-        _cluster_wrapper = ClusterWrapper(client.clusters.get(cluster_name))
+        cluster = client.clusters.get(cluster_name)
+        _cluster_wrapper = ClusterWrapper(cluster.name, cluster._client.session, cluster._client)
         
     return _cluster_wrapper
 
 
-def _generate_slurm_conf(partitions, writer):
-    partitions_list = partitions.values()
-    default_partitions = [p for p in partitions_list if p.is_default]
-    if len(default_partitions) == 0:
-        logging.warn("slurm.default_partition was not set on any nodearray.")
-        if len(partitions_list) == 1:
-            logging.info("Only one nodearray was defined, setting as default.")
-            partitions_list[0].is_default = True
-    elif len(default_partitions) > 1:
-        logging.warn("slurm.default_partition was set on more than one nodearray!")
-    
-    for partition in partitions_list:
-        num_placement_groups = int(ceil(float(partition.quota_count) / partition.max_scaleset_size))
+def _generate_slurm_conf(partitions, writer, subprocess_module):
+    for partition in partitions.values():
+        num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
         default_yn = "YES" if partition.is_default else "NO"
         writer.write("PartitionName={} Nodes={} Default={} MaxTime=INFINITE State=UP\n".format(partition.name, partition.node_list, default_yn))
+        
+        def sort_by_node_index(nodename):
+            try:
+                return int(nodename.split("-")[-1])
+            except Exception:
+                return nodename
+            
+        all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=sort_by_node_index) 
+        
         for pg_index in range(num_placement_groups):
-            start = pg_index * partition.max_scaleset_size + 1
-            end = min(partition.quota_count, (pg_index + 1) * partition.max_scaleset_size)
-            node_list = "{}-[{}-{}]".format(partition.name, start, end)
-            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} RealMemory={}\n".format(node_list, partition.vcpus_total, int(floor(partition.memory * 1024))))
+            start = pg_index * partition.max_scaleset_size
+            end = min(partition.max_vm_count - 1, (pg_index + 1) * partition.max_scaleset_size)
+            subset_of_nodes = all_nodes[start:end]
+            
+            node_list = _to_hostlist(subprocess_module, ",".join(subset_of_nodes))
+            
+            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} RealMemory={}\n".format(node_list, partition.vcpu_count, int(floor(partition.memory * 1024))))
 
 
 def generate_slurm_conf():
-    partitions = fetch_partitions(_get_cluster_wrapper())
-    _generate_slurm_conf(partitions, sys.stdout)
+    subprocess = _subprocess_module()
+    partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
+    _generate_slurm_conf(partitions, sys.stdout, subprocess)
             
 
 def _generate_switches(partitions):
     switches = OrderedDict()
     
     for partition in partitions.itervalues():
-        num_placement_groups = int(ceil(float(partition.quota_count) / partition.max_scaleset_size))
+        num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
         placement_group_base = "{}-{}-{}-pg".format(partition.name, partition.nodearray, partition.machine_type)
         pg_list = "{}[0-{}]".format(placement_group_base, num_placement_groups - 1)
         for pg_index in range(num_placement_groups): 
             start = pg_index * partition.max_scaleset_size + 1
-            end = min(partition.quota_count, (pg_index + 1) * partition.max_scaleset_size)
-            node_list = "{}-[{}-{}]".format(partition.name, start, end)
+            end = min(partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size)
+            node_list = "{}-[{}-{}]".format(partition.nodearray, start, end)
             
             placement_group_id = placement_group_base + str(pg_index)
             parent_switch = "{}-{}".format(partition.name, partition.nodearray)
@@ -190,7 +231,9 @@ def _generate_topology(partitions, writer):
 
 
 def generate_topology():
-    return _generate_topology(fetch_partitions(_get_cluster_wrapper()), sys.stdout)
+    subprocess = _subprocess_module()
+    partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
+    return _generate_topology(partitions, sys.stdout)
         
         
 def _shutdown(node_list, cluster_wrapper):
@@ -208,31 +251,65 @@ def shutdown(node_list):
     return _shutdown(node_list, _get_cluster_wrapper())
 
 
-def _resume(node_list, cluster_wrapper):
+def _resume(node_list, cluster_wrapper, subprocess_module):
     _, start_response = cluster_wrapper.start_nodes(names=node_list)
-    _wait_for_resume(cluster_wrapper, start_response.operation_id)
+    _wait_for_resume(cluster_wrapper, start_response.operation_id, node_list, subprocess_module)
 
 
-def _wait_for_resume(cluster_wrapper, operation_id):
+def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module):
     updated_node_addrs = set()
     
-    while True:
+    previous_states = {}
+    
+    nodes_str = ",".join(node_list[:5])
+    omega = time.time() + 3600 
+    
+    while time.time() < omega:
         states = {}
         _, nodes_response = cluster_wrapper.get_nodes(operation_id=operation_id)
         for node in nodes_response.nodes:
             name = node.get("Name")
-            states[node.get("State")] = states.get(node.get("State"), 0) + 1
-            private_ip = node.get("Hostname")
+            state = node.get("State")
+            
+            if node.get("TargetState") != "Started":
+                states["UNKNOWN"] = states.get("UNKNOWN", {})
+                states["UNKNOWN"][state] = states["UNKNOWN"].get(state, 0) + 1
+                continue
+            
+            private_ip = node.get("PrivateIp")
+            if state == "Started" and not private_ip:
+                state = "WaitingOnIPAddress"
+            
+            states[state] = states.get(state, 0) + 1
             
             if private_ip and name not in updated_node_addrs:
-                subprocess.check_call(["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "State=Power_Up"])
+                cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostname=%s" % private_ip]
+                logging.info("Running %s", " ".join(cmd))
+                subprocess_module.check_call(cmd)
+                updated_node_addrs.add(name)
+                
+        terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).itervalues()) + states.get("Failed", 0)
+        
+        if states != previous_states:
+            states_messages = []
+            for key in sorted(states.keys()):
+                if key != "UNKNOWN":
+                    states_messages.append("{}={}".format(key, states[key]))
+                else:
+                    for ukey in sorted(states["UNKNOWN"].keys()):
+                        states_messages.append("{}={}".format(ukey, states["UNKNOWN"][key]))
+                        
+            states_message = " , ".join(states_messages)
+            logging.info("OperationId=%s NodeList=%s: Number of nodes in each state: %s", operation_id, nodes_str, states_message)
             
-        num_with_ip = len([x for x in nodes_response.nodes if x.get("PrivateIp")])
-        if num_with_ip == len(nodes_response.nodes):
+        if terminal_states == len(nodes_response.nodes):
             break
         
-        logging.info("Number of nodes in each state: %s", str(states))
+        previous_states = states
+        
         time.sleep(5)
+        
+    logging.info("OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting", operation_id, nodes_str)
         
         
 def resume(node_list):
@@ -240,44 +317,21 @@ def resume(node_list):
     return _resume(node_list, cluster_wrapper)
 
 
-def _create_nodes(node_list, partitions, cluster_wrapper):
-    if len(node_list) == 1 and node_list[0] == "all":
-        node_list = []
-        for partition in partitions.itervalues():
-            node_list.extend(parse_nodelist(partition.node_list))
-    
-    print "creating node_list", node_list
+def _create_nodes(partitions, cluster_wrapper):
     request = NodeCreationRequest()
     request.request_id = str(uuid4())
     nodearray_counts = {}
      
-    for node in node_list:
-        if "-" not in node:
-            logging.error("Invalid node name - expected 'nodearrayname-index', i.e. execute-100. Got %s", node)
-            return 1
-         
-        partition_name, index = node.rsplit("-", 2)
-        if partition_name not in partitions:
-            logging.error("Unknown partition %s. Maybe the same partition was used for multiple arrays?", partition_name)
-            return 1
-         
-        try:
-            index = int(index)
-        except Exception:
-            logging.exception("Could not convert index in node name to an integer - %s", node)
-            return 1
-         
-        partition = partitions[partition_name]
-        machine_type = partition.machine_type
- 
-        placement_group_index = (index - 1) / partition.max_scaleset_size
-        placement_group = "%s-%s-pg%d" % (partition_name, machine_type, placement_group_index)
-        key = (partition_name, placement_group)
-        nodearray_counts[key] = nodearray_counts.get(key, 0) + 1
+    for partition in partitions.itervalues():
+        for index in range(partition.max_vm_count):
+            placement_group_index = index / partition.max_scaleset_size
+            placement_group = "%s-%s-pg%d" % (partition.name, partition.machine_type, placement_group_index)
+            key = (partition.name, placement_group)
+            nodearray_counts[key] = nodearray_counts.get(key, 0) + 1
         
     request.sets = []
      
-    for key, instance_count in nodearray_counts.iteritems():
+    for key, instance_count in sorted(nodearray_counts.iteritems(), key=lambda x: x[0]):
         partition_name, pg = key
         partition = partitions[partition_name]
         
@@ -293,7 +347,6 @@ def _create_nodes(node_list, partitions, cluster_wrapper):
         request_set.definition.machine_type = partition.machine_type
         
         request_set.node_attributes = Record()
-        request_set.node_attributes["Name"] = node_list[0]
         request_set.node_attributes["StartAutomatically"] = False
         request_set.node_attributes["State"] = "Off"
         request_set.node_attributes["TargetState"] = "Terminated"
@@ -305,7 +358,8 @@ def _create_nodes(node_list, partitions, cluster_wrapper):
 
 def create_nodes(node_list):
     cluster_wrapper = _get_cluster_wrapper()
-    partitions = fetch_partitions(cluster_wrapper)
+    subprocess = _subprocess_module()
+    partitions = fetch_partitions(cluster_wrapper, subprocess)
     _create_nodes(node_list, partitions, cluster_wrapper)
         
         
@@ -332,38 +386,6 @@ def _init_logging(logfile):
     logging.getLogger().setLevel(logging.DEBUG)
     
     
-def _submit_prolog(driver, slurm_job_id):
-    if not slurm_job_id:
-        logging.error("SLURM_JOB_ID is not defined!")
-        return 1
-    
-    jobs = driver.get_jobs([slurm_job_id])
-    
-    if not jobs:
-        logging.error("Unknown SLURM_JOB_ID %s", slurm_job_id)
-        return 1
-    
-    assert len(jobs) == 1
-    job = jobs[0]
-    print json.dumps(job, indent=2, default=str)
-    
-    if job.get("reqswitch", 0) > 0:
-        logging.debug("User specified --switches, skipping.")
-        return 0
-    else:
-        network = slurmcc.parse_network(job.get("network", slurmcc.SLURM_NULL))
-        if network.sn_single:
-            logging.debug("User specified --network=SN_Single, skipping.")
-            return 0
-                     
-        logging.info("Job does not declare SN_Single or --switches. Setting Switches=1.")
-        driver.update_job(slurm_job_id, "Switches", "1")
-        
-
-def submit_prolog(slurm_job_id):
-    _submit_prolog(SLURMDriver({}), slurm_job_id)
-    
-    
 def _sync_nodes(cluster_wrapper, subprocess_module, partitions):
     nodes = cluster_wrapper.get_nodes()["nodes"]
     existing_nodes = subprocess_module.check_output(["sinfo", "-N", "-O", "NODELIST", "--noheader"]).splitlines()
@@ -382,34 +404,44 @@ def _sync_nodes(cluster_wrapper, subprocess_module, partitions):
 
 def sync_nodes():
     cluster_wrapper = _get_cluster_wrapper()
-    partitions = fetch_partitions(cluster_wrapper)
+    subprocess = _subprocess_module()
+    partitions = fetch_partitions(cluster_wrapper, subprocess)
     return _sync_nodes(cluster_wrapper, subprocess, partitions)
+
+
+def _to_hostlist(subprocess_module, nodes):
+    return subprocess_module.check_output(["scontrol", "show", "hostlist", nodes]).strip()
+
+
+def _from_hostlist(subprocess_module, hostlist_expr):
+    stdout = subprocess_module.check_output(["scontrol", "show", "hostnames", hostlist_expr])
+    return [x.strip() for x in stdout.split()]
+
+
+def _subprocess_module():
+    import subprocess
     
+    def raise_exception():
+        raise random.choice([OSError, subprocess.CalledProcessError])("Random failure")
     
-def parse_nodelist(nodelist_expr):
-    nodes = []
-    for e in nodelist_expr.split(","):
-        def expand(expr):
-            if "[" not in expr:
-                nodes.append(expr)
-                return
-            
-            leftb = expr.rindex("[") 
-            rightb = expr.rindex("]") 
-            range_expr = expr[leftb + 1: rightb]
-            start, stop = range_expr.split("-")
-            
-            while int(start) <= int(stop):
-                node = expr[0: leftb] + start + expr[rightb + 1:]
-                expand(node)
-                formatexpr = "%0" + str(len(start)) + "d"
-                start = formatexpr % (int(start) + 1)
-                
-        expand(e)
-    return nodes
+    class SubprocessModuleWithChaosMode:
+        @custom_chaos_mode(raise_exception)
+        def check_call(self, *args, **kwargs):
+            return subprocess.check_call(*args, **kwargs)
+        
+        @custom_chaos_mode(raise_exception)
+        def check_output(self, *args, **kwargs):
+            return subprocess.check_output(*args, **kwargs)
+        
+    return SubprocessModuleWithChaosMode()
 
     
 def main(argv=None):
+    
+    def hostlist(hostlist_expr):
+        import subprocess
+        return _from_hostlist(subprocess, hostlist_expr)
+    
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
     
@@ -421,23 +453,19 @@ def main(argv=None):
     
     create_nodes_parser = subparsers.add_parser("create_nodes")
     create_nodes_parser.set_defaults(func=create_nodes, logfile="create_nodes.log")
-    create_nodes_parser.add_argument("--node-list", type=parse_nodelist, default=["all"])
+    create_nodes_parser.add_argument("--node-list", type=_from_hostlist, default=["all"])
     
     resume_parser = subparsers.add_parser("resume")
     resume_parser.set_defaults(func=resume, logfile="resume.log")
-    resume_parser.add_argument("--node-list", type=parse_nodelist, required=True)
+    resume_parser.add_argument("--node-list", type=hostlist, required=True)
     
     resume_fail_parser = subparsers.add_parser("resume_fail")
     resume_fail_parser.set_defaults(func=shutdown, logfile="resume_fail.log")
-    resume_fail_parser.add_argument("--node-list", type=parse_nodelist, required=True)
+    resume_fail_parser.add_argument("--node-list", type=hostlist, required=True)
     
     suspend_parser = subparsers.add_parser("suspend")
     suspend_parser.set_defaults(func=shutdown, logfile="suspend.log")
-    suspend_parser.add_argument("--node-list", type=parse_nodelist, required=True)
-    
-    submit_prolog_parser = subparsers.add_parser("submit_prolog")
-    submit_prolog_parser.set_defaults(func=submit_prolog, logfile="submit_prolog.log")
-    submit_prolog_parser.add_argument("--slurm-job-id", required=True)
+    suspend_parser.add_argument("--node-list", type=hostlist, required=True)
     
     sync_nodes_parser = subparsers.add_parser("sync_nodes")
     sync_nodes_parser.set_defaults(func=sync_nodes, logfile="sync_nodes.log")
