@@ -105,6 +105,20 @@ directory "/sched/munge" do
   mode 0700
 end
 
+# Set up slurm 
+user slurmuser do
+  comment 'User to run slurmd'
+  shell '/bin/false'
+  action :create
+end
+
+# add slurm to cyclecloud so it has access to jetpack / userdata
+group 'cyclecloud' do
+    members [slurmuser]
+    append true
+    action :modify
+end    
+
 directory '/var/spool/slurmd' do
   owner slurmuser
   action :create
