@@ -30,9 +30,9 @@ link '/etc/slurm/topology.conf' do
 end
 
 defer_block "Defer starting slurmd until end of converge" do
-  nodename=shell_out("grep '#{node[:ipaddress]} ' /sched/nodeaddrs | cut -d' ' -f2-").stdout
+  nodename=shell_out("grep $(hostname) /sched/nodeaddrs | cut -d' ' -f2-").stdout
   if nodename.nil? || nodename.strip().empty?() then
-    raise "Waiting for nodeaddr to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
+    raise "Waiting for hostname to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
   end
 
   nodename=nodename.strip()
@@ -54,7 +54,6 @@ defer_block "Defer starting slurmd until end of converge" do
     action [:enable, :restart]
   end
 
-  myhost = lambda { node[:hostname] }
   # Re-enable a host the first time it converges in the event it was drained
   execute 'set node to active' do
     command "scontrol update nodename=#{nodename} state=UNDRAIN && touch /etc/slurm.reenabled"

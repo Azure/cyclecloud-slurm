@@ -21,6 +21,7 @@ SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
 SlurmdDebug=5
 SlurmdLogFile=/var/log/slurmd/slurmd.log
 TopologyPlugin=topology/tree
+ResumeTimeout=<%= @resume_timeout %>
 SuspendTimeout=<%= @suspend_timeout %>
 SuspendTime=<%= @suspend_time %>
 ResumeProgram=<%= @bootstrap %>/resume_program.sh

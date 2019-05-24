@@ -10,3 +10,5 @@ default[:munge][:user][:uid] = 11101
 default[:munge][:user][:gid] = 11101
 # Time between a suspend call and when that node can be used again - i.e. 10 minutes to shutdown 
 default[:slurm][:suspend_timeout] = 600
+# Boot timeout
+default[:slurm][:resume_timeout] = 1800

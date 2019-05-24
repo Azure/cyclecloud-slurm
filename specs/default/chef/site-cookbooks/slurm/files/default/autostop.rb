@@ -3,7 +3,6 @@
 # Licensed under the MIT License.
 require 'json'
 
-myhost=`hostname`
 # Arguments
 AUTOSTOP_ENABLED = `jetpack config cyclecloud.cluster.autoscale.stop_enabled`.downcase.strip == "true"
 if not AUTOSTOP_ENABLED
@@ -22,7 +21,7 @@ def IsActive()
    activejobs=system("ps -ef | grep [s]lurmstepd > /dev/null 2>&1")
    # Scheduler makes a list of all active nodes every minute
    # so we aren't querying it directly and DDOSing at scale
-   activenode=system("grep -q \"$(hostname -s)\" /sched/activenodes")
+   activenode=system("grep -q $(hostname) /sched/activenodes")
    if activejobs || activenode
      return true
    else
@@ -71,8 +70,15 @@ file = File.new(AUTOSCALE_DATA, "w")
 file.puts JSON.pretty_generate(runtime_config)
 file.close
 
+nodename=shell_out("grep $(hostname) /sched/nodeaddrs | cut -d' ' -f2-").stdout
+if nodename.nil? || nodename.strip().empty?() then
+  raise "Waiting for hostname to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
+end
+
+nodename=nodename.strip()
+
 # Do the shutdown
 if idle_long_enough
-  system("scontrol update nodename=$(hostname) state=DRAIN reason='autostop'")
+  system("scontrol update nodename=#{nodename} state=DRAIN reason='autostop'")
   system("jetpack shutdown --idle")
 end
