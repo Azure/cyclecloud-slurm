@@ -63,7 +63,7 @@ directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh"]
 scripts.each do |filename| 
     cookbook_file "#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}" do
         source "#{filename}"
@@ -72,6 +72,26 @@ scripts.each do |filename|
         group "root"
     end
 end
+
+# TODO either change name to cyclecloud-api.tar.gz or make the name configurable
+bash 'Install cyclecloud python api' do
+  code <<-EOH
+    jetpack download --project slurm cyclecloud-api-7.8.0.tar.gz cyclecloud-api.tar.gz || exit 1;
+    /opt/cycle/jetpack/system/embedded/bin/pip install cyclecloud-api.tar.gz || exit 1;
+    rm -f cyclecloud-api.tar.gz;
+    touch /etc/cyclecloud-api.installed
+    EOH
+  not_if { ::File.exist?('/etc/cyclecloud-api.installed') }
+end
+
+bash 'Install job_submit/cyclecloud' do
+  code <<-EOH
+    jetpack download --project slurm job_submit_cyclecloud.so /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
+    touch /etc/cyclecloud-job-submit.installed
+    EOH
+  not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
+end
+
 
 # we will be appending to this file, so that the next step is monotonic
 template '/sched/slurm.conf.base' do
@@ -87,22 +107,24 @@ template '/sched/slurm.conf.base' do
   }}
 end
 
-bash 'Add nodes to slurm config' do
-  code <<-EOH
-    cp /sched/slurm.conf.base /sched/slurm.conf || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes || exit 1;
-    touch /etc/slurm.installed
-    EOH
-  not_if { ::File.exist?('/etc/slurm.installed') }
-end
-
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
+
+bash 'Add nodes to slurm config' do
+  code <<-EOH
+    cp /sched/slurm.conf.base /sched/slurm.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
+    touch /etc/slurm.installed
+    EOH
+  not_if { ::File.exist?('/etc/slurm.installed') }
+end
+
+
 
 link '/etc/slurm/topology.conf' do
   to '/sched/topology.conf'

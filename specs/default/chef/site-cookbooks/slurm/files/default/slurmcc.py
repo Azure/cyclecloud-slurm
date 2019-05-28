@@ -10,9 +10,6 @@ import random
 from subprocess import check_call, check_output
 
 import requests
-import re
-import cStringIO
-import subprocess
 
 
 SLURM_NULL = "(null)"

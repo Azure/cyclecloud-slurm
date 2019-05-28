@@ -4,6 +4,7 @@
 ################################
 
 [cluster Slurm]
+IconUrl = static/cloud/cluster/ui/ClusterIcon/ryan_slurm.png
 FormLayout = selectionpanel
 Category = Schedulers
 
@@ -43,7 +44,7 @@ Autoscale = $Autoscale
 
     [[nodearray ondemand]]
     MachineType = $ExecuteMachineType
-    MaxCoreCount = $MaxExecuteCoreCount
+    MaxCoreCount = ${MaxExecuteCoreCount/2}
     ShutdownPolicy = Deallocate
     Interruptible = false
     
@@ -52,6 +53,7 @@ Autoscale = $Autoscale
 
         [[[configuration]]]
         slurm.autoscale = true
+        slurm.default_partition=true
 
         [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
 
@@ -61,6 +63,9 @@ Autoscale = $Autoscale
     [[nodearray lowprio]]
     Extends = ondemand
     Interruptible = true
+
+        [[[configuration]]]
+        slurm.default_partition=false
 
 
 [parameters About]
@@ -113,7 +118,7 @@ Order = 10
         [[[parameter MaxExecuteCoreCount]]]
         Label = Max Cores
         Description = The total number of execute cores to start
-        DefaultValue = 100
+        DefaultValue = 200
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
