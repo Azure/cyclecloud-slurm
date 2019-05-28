@@ -1,5 +1,5 @@
 import unittest
-from slurmcc import parse_network, parse_nodelist, NetworkSpecification
+from slurmcc import parse_network, NetworkSpecification
 
 
 class SlurmCCTest(unittest.TestCase):

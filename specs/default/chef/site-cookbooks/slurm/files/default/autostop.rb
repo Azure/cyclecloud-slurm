@@ -70,9 +70,10 @@ file = File.new(AUTOSCALE_DATA, "w")
 file.puts JSON.pretty_generate(runtime_config)
 file.close
 
-nodename=shell_out("grep $(hostname) /sched/nodeaddrs | cut -d' ' -f2-").stdout
+# be careful - we want to find 10.1.0.10 _not_ 10.1.0.100!
+nodename=shell_out("grep -e '^#{node[:ipaddress]} ' /sched/nodeaddrs | cut -d' ' -f2-").stdout
 if nodename.nil? || nodename.strip().empty?() then
-  raise "Waiting for hostname to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
+  raise "Waiting for ip address to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
 end
 
 nodename=nodename.strip()
