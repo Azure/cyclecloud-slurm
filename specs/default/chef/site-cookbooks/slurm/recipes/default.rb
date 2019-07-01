@@ -8,6 +8,36 @@
 slurmver = node[:slurm][:version]
 slurmarch = node[:slurm][:arch]
 slurmuser = node[:slurm][:user][:name]
+mungeuser = node[:munge][:user][:name]
+
+# Set up users for Slurm and Munge
+group slurmuser do
+  gid node[:slurm][:user][:gid]
+  not_if "getent group #{slurmuser}"  
+end
+
+user slurmuser do
+  comment 'User to run slurmd'
+  shell '/bin/false'
+  uid node[:slurm][:user][:uid]
+  gid node[:slurm][:user][:gid]
+  action :create
+end
+
+
+group mungeuser do
+  gid node[:munge][:user][:gid]
+  not_if "getent group #{mungeuser}"  
+end
+
+user mungeuser do
+  comment 'User to run munged'
+  shell '/bin/false'
+  uid node[:munge][:user][:uid]
+  gid node[:munge][:user][:gid]
+  action :create
+end
+
 
 myplatform=node[:platform]
 case myplatform
@@ -21,8 +51,8 @@ when 'ubuntu'
   # Add symlink because config path is different on ubuntu
   link '/etc/slurm' do
     to '/etc/slurm-llnl'
-    owner "#{slurmuser}"
-    group "#{slurmuser}"
+    owner slurmuser
+    group slurmuser
   end
 
   link '/bin/sinfo' do
@@ -49,50 +79,43 @@ end
 
 #Fix munge permissions and create key
 directory "/etc/munge" do
-  owner 'munge'
-  group 'munge'
+  owner mungeuser
+  group mungeuser
   mode 0700
 end
 directory "/var/lib/munge" do
-  owner 'munge'
-  group 'munge'
+  owner mungeuser
+  group mungeuser
   mode 0711
 end
 directory "/var/log/munge" do
-  owner 'munge'
-  group 'munge'
+  owner mungeuser
+  group mungeuser
   mode 0700
 end
 directory "/run/munge" do
-  owner 'munge'
-  group 'munge'
+  owner mungeuser
+  group mungeuser
   mode 0755
 end
 
 directory "/sched/munge" do
-  owner 'munge'
-  group 'munge'
+  owner mungeuser
+  group mungeuser
   mode 0700
 end
 
-# Set up slurm 
-user slurmuser do
-  comment 'User to run slurmd'
-  shell '/bin/false'
-  action :create
-end
-
 directory '/var/spool/slurmd' do
-  owner "#{slurmuser}"
+  owner slurmuser
   action :create
 end
   
 directory '/var/log/slurmd' do
-  owner "#{slurmuser}"
+  owner slurmuser
   action :create
 end
 
 directory '/var/log/slurmctld' do
-  owner "#{slurmuser}"
+  owner slurmuser
   action :create
 end
