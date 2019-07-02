@@ -29,11 +29,12 @@ class CyclecloudSlurmError(RuntimeError):
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, max_scaleset_size, vcpu_count, memory, max_vm_count):
+    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vcpu_count, memory, max_vm_count):
         self.name = name
         self.nodearray = nodearray
         self.machine_type = machine_type
         self.is_default = is_default
+        self.is_hpc = is_hpc
         self.max_scaleset_size = max_scaleset_size
         self.vcpu_count = vcpu_count
         self.memory = memory
@@ -116,10 +117,16 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         
         max_scaleset_size = Record(nodearray_record.get("Azure", {})).get("MaxScalesetSize", 40)
         
+        is_hpc = str(slurm_config.get("hpc", True)).lower() == "true"
+        
+        if not is_hpc:
+            max_scaleset_size = 2**31
+        
         partitions[partition_name] = Partition(partition_name,
                                                nodearray_name,
                                                machine_type,
                                                slurm_config.get("default_partition", False),
+                                               is_hpc,
                                                max_scaleset_size,
                                                vm.vcpu_count,
                                                vm.memory,
@@ -132,16 +139,22 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                 existing_nodes.append(node.get("Name"))
         
         if existing_nodes:
-            partitions[partition_name].node_list = _to_hostlist(subprocess_module, ",".join(sorted(existing_nodes, key=_sort_by_node_index)))
+            sorted_nodes = sorted(existing_nodes, key=_get_sort_key_func(partitions[partition_name].is_hpc))
+            partitions[partition_name].node_list = _to_hostlist(subprocess_module, ",".join(sorted_nodes))
     
     partitions_list = partitions.values()
     default_partitions = [p for p in partitions_list if p.is_default]
+    
     if len(default_partitions) == 0:
         logging.warn("slurm.default_partition was not set on any nodearray.")
+        
+        # one nodearray, just assume it is the default
         if len(partitions_list) == 1:
             logging.info("Only one nodearray was defined, setting as default.")
             partitions_list[0].is_default = True
+            
     elif len(default_partitions) > 1:
+        # no partition is default
         logging.warn("slurm.default_partition was set on more than one nodearray!")
     
     return partitions
@@ -185,21 +198,39 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         default_yn = "YES" if partition.is_default else "NO"
         writer.write("PartitionName={} Nodes={} Default={} MaxTime=INFINITE State=UP\n".format(partition.name, partition.node_list, default_yn))
         
-        all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_sort_by_node_index) 
+        all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_get_sort_key_func(partition.is_hpc)) 
         
         for pg_index in range(num_placement_groups):
             start = pg_index * partition.max_scaleset_size
             end = min(partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size)
             subset_of_nodes = all_nodes[start:end]
-            
-            node_list = _to_hostlist(subprocess_module, ",".join(_sort_by_node_index(subset_of_nodes)))
+            node_list = _to_hostlist(subprocess_module, ",".join((subset_of_nodes)))
             
             writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} RealMemory={}\n".format(node_list, partition.vcpu_count, int(floor(partition.memory * 1024))))
 
 
-def _sort_by_node_index(nodename):
+def _get_sort_key_func(is_hpc):
+    return _node_index_and_pg_as_sort_key if is_hpc else _node_index_as_sort_key
+
+
+def _node_index_as_sort_key(nodename):
+    '''
+    Used to get the key to sort names that don't have name-pg#-# format
+    '''
     try:
         return int(nodename.split("-")[-1])
+    except Exception:
+        return nodename
+    
+
+def _node_index_and_pg_as_sort_key(nodename):
+    '''
+        Used to get the key to sort names that have name-pg#-# format
+    '''
+    try:
+        node_index = int(nodename.split("-")[-1])
+        pg = int(nodename.split("-")[-2].replace("pg", "")) * 100000
+        return pg + node_index
     except Exception:
         return nodename
             
@@ -210,45 +241,35 @@ def generate_slurm_conf():
     _generate_slurm_conf(partitions, sys.stdout, subprocess)
             
 
-def _generate_switches(partitions):
-    switches = OrderedDict()
+def _generate_topology(cluster_wrapper, subprocess_module, writer):
+    _, node_list = _retry_rest(cluster_wrapper.get_nodes)
     
-    for partition in partitions.itervalues():
-        num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
-        placement_group_base = "{}-{}-pg".format(partition.nodearray, partition.machine_type)
-        pg_list = "{}[0-{}]".format(placement_group_base, num_placement_groups - 1)
-        for pg_index in range(num_placement_groups): 
-            start = pg_index * partition.max_scaleset_size + 1
-            end = min(partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size)
-            node_list = "{}-pg{}-[{}-{}]".format(partition.nodearray, pg_index, start, end)
-            
-            placement_group_id = placement_group_base + str(pg_index)
-            parent_switch = "{}-{}".format(partition.name, partition.nodearray)
-            switches[parent_switch] = switches.get(parent_switch, OrderedDict({"pg_list": pg_list,
-                                                                   "children": OrderedDict()}))
-            switches[parent_switch]["children"][placement_group_id] = node_list
-            
-    return switches
+    nodes_by_pg = {}
+    for node in node_list.nodes:
+        is_autoscale = node.get("Configuration", {}).get("slurm", {}).get("autoscale", False)
+        if not is_autoscale:
+            continue
         
+        pg = node.get("PlacementGroupId") or "htc"
 
-def _store_topology(switches, fw):
-    for parent_switch, parent_switch_dict in switches.iteritems():
+        if pg not in nodes_by_pg:
+            nodes_by_pg[pg] = []
         
-        fw.write("SwitchName={} Switches={}\n".format(parent_switch, parent_switch_dict["pg_list"]))
-        for placement_group_id, node_list in parent_switch_dict["children"].iteritems():
-            fw.write("SwitchName={} Nodes={}\n".format(placement_group_id, node_list))
-
-
-def _generate_topology(partitions, writer):
-    logging.info("Checking for topology updates")
-    new_switches = _generate_switches(partitions)
-    _store_topology(new_switches, writer)
+        nodes_by_pg[pg].append(node.get("Name"))
+    
+    if not nodes_by_pg:
+        raise CyclecloudSlurmError("No nodes found to create topology! Do you need to run create_nodes first?")
+        
+    for pg in sorted(nodes_by_pg.keys()):
+        nodes = nodes_by_pg[pg]
+        nodes = sorted(nodes, key=_get_sort_key_func(pg != "htc"))
+        slurm_node_expr = _to_hostlist(subprocess_module, ",".join(nodes))
+        writer.write("SwitchName={} Nodes={}\n".format(pg, slurm_node_expr))
 
 
 def generate_topology():
     subprocess = _subprocess_module()
-    partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
-    return _generate_topology(partitions, sys.stdout)
+    return _generate_topology(_get_cluster_wrapper(), subprocess, sys.stdout)
         
         
 def _shutdown(node_list, cluster_wrapper):
@@ -329,7 +350,7 @@ def resume(node_list):
 class ExistingNodePolicy:
     Error = "Error"
     AllowExisting = "AllowExisting"
-    Recreate = "Recreate"
+    # TODO need a Recreate - shutdown, remove and recreate...
     
 
 def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error):
@@ -341,7 +362,10 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
      
     for partition in partitions.itervalues():
         placement_group_base = "{}-{}-pg".format(partition.nodearray, partition.machine_type)
-        name_format = "{}-pg{}-%d"
+        if partition.is_hpc:
+            name_format = "{}-pg{}-%d"
+        else:
+            name_format = "{}-%d"
         
         current_name_offset = None
         current_pg_index = None
@@ -349,8 +373,6 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         expanded_node_list = []
         if partition.node_list:
             expanded_node_list = _from_hostlist(subprocess_module, partition.node_list)
-        
-        logging.info("RDH expanded node_list %s", expanded_node_list)
         
         for index in range(partition.max_vm_count):
             placement_group_index = index / partition.max_scaleset_size
@@ -363,9 +385,9 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
             name_index = (index % partition.max_scaleset_size) + 1
             node_name = name_format.format(partition.nodearray, placement_group_index) % (name_index)
             if node_name in expanded_node_list:
+                # Don't allow recreation of nodes
                 if existing_policy == ExistingNodePolicy.Error:
                     raise CyclecloudSlurmError("Node %s already exists. Please pass in --policy AllowExisting if you want to go ahead and create the nodes anyways." % node_name)
-                logging.warn("RDH resetting offset from %s to %s", current_name_offset, name_index)
                 current_name_offset = name_index + 1
                 continue
             
@@ -375,8 +397,6 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
             key = (partition.name, placement_group, placement_group_index, name_offset)
             nodearray_counts[key] = nodearray_counts.get(key, 0) + 1
             
-            logging.info("RDH name_offset=%d pg=%d name=%s count=%s key=%s", name_offset, placement_group_index, node_name, nodearray_counts[key], key)
-        
     for key, instance_count in sorted(nodearray_counts.iteritems(), key=lambda x: x[0]):
         partition_name, pg, pg_index, name_offset = key
         partition = partitions[partition_name]
@@ -385,16 +405,21 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         
         request_set.nodearray = partition.nodearray
         
-        request_set.placement_group_id = pg
+        if partition.is_hpc:
+            request_set.placement_group_id = pg
         
         request_set.count = instance_count
         
         request_set.definition = NodeCreationRequestSetDefinition()
         request_set.definition.machine_type = partition.machine_type
         
-        request_set.name_format = "{}-pg{}-%d".format(partition.nodearray, pg_index)
+        # TODO should probably make this a util function
+        if partition.is_hpc:
+            request_set.name_format = "{}-pg{}-%d".format(partition.nodearray, pg_index)
+        else:
+            request_set.name_format = "{}-%d".format(partition.nodearray)
+            
         request_set.name_offset = name_offset
-        logging.info("RDH name_format=%s name_offset=%s count=%s", request_set.name_format, request_set.name_offset, request_set.count)
         request_set.node_attributes = Record()
         request_set.node_attributes["StartAutomatically"] = False
         request_set.node_attributes["Fixed"] = True
@@ -402,7 +427,11 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         request.sets.append(request_set)
     
     if not request.sets:
-        logging.info("No new nodes to create.")
+        # they must have been attempting to create at least one node.
+        if existing_policy == ExistingNodePolicy.Error:
+            raise CyclecloudSlurmError("No nodes were created!")
+        
+        logging.info("No new nodes to create with policy %s", existing_policy)
         return
     
     # one shot, don't retry as this is not monotonic.
@@ -412,6 +441,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
     except Exception as e:
         logging.debug(traceback.format_exc())
         try:
+            # attempt to parse the json response from cyclecloud to give a better message
             response = json.loads(str(e))
             message = "%s: %s" % (response["Message"], response["Detail"])
         except:
@@ -420,11 +450,13 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
             
         raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
     
+    num_created = sum([s.added for s in result.sets])
+    
+    if num_created == 0 and existing_policy == ExistingNodePolicy.Error:
+        raise CyclecloudSlurmError("Did not create a single node!")
+    
     for set_result in result.sets:
-        if set_result.message:
-            logging.warn("Result message %s", set_result.message)
-        else:
-            logging.info("Added %s nodes." % set_result.added)
+        logging.info("Added %s nodes. %s", set_result.added, set_result.message)
         
 
 def create_nodes(existing_policy):
@@ -459,7 +491,7 @@ def _init_logging(logfile):
     log_file.setLevel(log_file_level)
     
     stderr = logging.StreamHandler(sys.stderr)
-    stderr.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    stderr.setFormatter(logging.Formatter("%(message)s"))
     stderr.setLevel(stderr_level)
     
     logging.getLogger().addHandler(log_file)
@@ -494,15 +526,24 @@ def _retry_subprocess(func, attempts=5):
 
 
 def _to_hostlist(subprocess_module, nodes):
+    '''
+        convert name-[1-5] into name-1 name-2 name-3 name-4 name-5
+    '''
     return _retry_subprocess(lambda: subprocess_module.check_output(["scontrol", "show", "hostlist", nodes])).strip()
 
 
 def _from_hostlist(subprocess_module, hostlist_expr):
+    '''
+        convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
+    '''
     stdout = _retry_subprocess(lambda: subprocess_module.check_output(["scontrol", "show", "hostnames", hostlist_expr]))
     return [x.strip() for x in stdout.split()]
 
 
 def _subprocess_module():
+    '''
+    Wrapper so we can attach chaos mode to the subprocess module
+    '''
     import subprocess
     
     def raise_exception():
