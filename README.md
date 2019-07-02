@@ -55,11 +55,12 @@ The first step is to configure the project for use with your storage locker:
   2. Switch to the Slurm sample directory.
 
   3. Upload the project (including any local changes) to your target locker, run the
-`cyclecloud project upload` command from the project directory.  The expected output looks like
-this:::
+`cyclecloud project upload` command from the project directory.  The expected output looks like this:
 
+```
     $ cyclecloud project upload
     Sync completed!
+```
 
 *IMPORTANT*
 
@@ -78,6 +79,7 @@ To import the cluster:
   3. Run ``cyclecloud import_template Slurm -f templates/slurm_template.txt``.  The
      expected output looks like this:::
 
+```
        $ cyclecloud import_template Slurm -f templates/slurm_template.txt
        Importing template Slurm....
        ----------------------
@@ -87,6 +89,25 @@ To import the cluster:
        Cluster nodes:
            master: off
        Total nodes: 1
+```
+
+## Troubleshooting
+
+### UID conflicts for Slurm and Munge users
+
+CycleCloud uses a fixed UID/GID for the Slurm and Munge users to ensure they stay in sync across the whole cluster. This can occasionally lead to UID/GID conflicts, particularly when using a custom image with other users already baked in.
+
+To override this, click the edit button for both the `master` node:
+
+![Alt](/images/masternodeedit.png "Edit Master")
+
+And the `execute` nodearray:
+![Alt](/images/nodearraytab.png "Edit nodearray")
+
+ and add the following attributes to the `Configuration` section:
+
+
+![Alt](/images/nodearrayedit.png "Edit configuration")
 
 
 # Contributing
