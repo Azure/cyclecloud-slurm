@@ -113,10 +113,17 @@ link '/etc/slurm/slurm.conf' do
   group "#{slurmuser}"
 end
 
+# No nodes should exist the first time we start, but after that will because fixed=true on the nodes
 bash 'Add nodes to slurm config' do
   code <<-EOH
     cp /sched/slurm.conf.base /sched/slurm.conf || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes || exit 1;
+    num_starts=$(jetpack config cyclecloud.cluster.start_count)
+    if [ "$num_starts" == "1" ]; then
+      policy=Error
+    else
+      policy=AllowExisting
+    fi
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
     touch /etc/slurm.installed
