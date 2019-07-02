@@ -1,3 +1,7 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+#
+
 import ctypes
 import os
 import unittest
@@ -124,9 +128,10 @@ class job_descriptor(ctypes.Structure):
                 ('x11_target_port', ctypes.c_int16)]
                 
 
-
-ctypes.CDLL("libslurm.so", mode=ctypes.RTLD_GLOBAL)
-lib = ctypes.CDLL(".libs/job_submit_cyclecloud.so", mode=ctypes.RTLD_GLOBAL)
+lib = None
+if os.getenv("JOB_SUBMIT_CYCLECLOUD"):
+    ctypes.CDLL("libslurm.so", mode=ctypes.RTLD_GLOBAL)
+    lib = ctypes.CDLL(".libs/job_submit_cyclecloud.so", mode=ctypes.RTLD_GLOBAL)
 
 
 class Test(unittest.TestCase):
@@ -138,6 +143,11 @@ class Test(unittest.TestCase):
         '''
 
         def run_test(user_req_switches, user_network, expected_switches):
+            # this is only to be used when developing the job_submit_cyclecloud plugin
+            # and run under docker, we want this ignored by jetpack test.
+            if not os.getenv("JOB_SUBMIT_CYCLECLOUD"):
+                return
+
             job = job_descriptor()
             job.req_switch = user_req_switches
             job.network = ctypes.c_char_p(user_network)
