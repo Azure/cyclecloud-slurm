@@ -1,3 +1,7 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+#
+
 import ctypes
 import os
 import unittest
@@ -124,9 +128,11 @@ class job_descriptor(ctypes.Structure):
                 ('x11_target_port', ctypes.c_int16)]
                 
 
+lib = None
+if os.getenv("JOB_SUBMIT_CYCLECLOUD"):
+    ctypes.CDLL("libslurm.so", mode=ctypes.RTLD_GLOBAL)
+    lib = ctypes.CDLL(".libs/job_submit_cyclecloud.so", mode=ctypes.RTLD_GLOBAL)
 
-ctypes.CDLL("libslurm.so", mode=ctypes.RTLD_GLOBAL)
-lib = ctypes.CDLL(".libs/job_submit_cyclecloud.so", mode=ctypes.RTLD_GLOBAL)
 
 
 class Test(unittest.TestCase):
@@ -136,6 +142,9 @@ class Test(unittest.TestCase):
                       uint32_t submit_uid,
 		              char **err_msg)
         '''
+        # guard against jetpack test
+        if not os.getenv("JOB_SUBMIT_CYCLECLOUD"):
+            return
 
         def run_test(user_req_switches, user_network, expected_switches):
             job = job_descriptor()
@@ -154,7 +163,6 @@ class Test(unittest.TestCase):
 
             job_ptr = ctypes.POINTER(job_descriptor)(job)
             lib.job_submit(job_ptr, 0, "")
-
 
 
             self.assertEquals(expected_switches, job_ptr.contents.req_switch)
