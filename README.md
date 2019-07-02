@@ -95,9 +95,9 @@ To import the cluster:
 
 ### UID conflicts for Slurm and Munge users
 
-CycleCloud uses a fixed UID/GID for the Slurm and Munge users to ensure they stay in sync across the whole cluster. This can occasionally lead to UID/GID conflicts, particularly when using a custom image with other users already baked in.
+By default, this project uses a UID and GID of 11100 for the Slurm user and 11101 for the Munge user. If this causes a conflict with another user or group, these defaults may be overridden.
 
-To override this, click the edit button for both the `master` node:
+To override the UID and GID, click the edit button for both the `master` node:
 
 ![Alt](/images/masternodeedit.png "Edit Master")
 
