@@ -19,6 +19,14 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
+        slurm.user.name = $configuration_slurm_user_name
+        slurm.user.uid = $configuration_slurm_user_uid
+        slurm.user.gid = $configuration_slurm_user_gid
+        munge.user.name = $configuration_munge_user_name
+        munge.user.uid = $configuration_munge_user_uid
+        munge.user.gid = $configuration_munge_user_gid
+
+	
 
         [[[cluster-init cyclecloud/slurm:default:2.0.0]]]
         Optional = true
@@ -40,16 +48,35 @@ Autoscale = $Autoscale
         PublicPort = 8652
 
 
-    [[nodearray execute]]
-    MachineType = $ExecuteMachineType
-    MaxCoreCount = $MaxExecuteCoreCount
-
-    Interruptible = $UseLowPrio
+    [[nodearray hpc]]
+    MachineType = $HPCMachineType
+    MaxCoreCount = $MaxHPCExecuteCoreCount
+    Azure.MaxScalesetSize = $HPCMaxScalesetSize
     AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
 
 
         [[[configuration]]]
         slurm.autoscale = true
+        slurm.default_partition = true
+        slurm.hpc = true
+
+        [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
+
+        [[[network-interface eth0]]]
+        AssociatePublicIpAddress = $ExecuteNodesPublic
+
+
+    [[nodearray htc]]
+    MachineType = $HTCMachineType
+    MaxCoreCount = $MaxHTCExecuteCoreCount
+
+    Interruptible = $HTCUseLowPrio
+    AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+
+
+        [[[configuration]]]
+        slurm.autoscale = true
+        slurm.hpc = false
 
         [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
 
@@ -86,12 +113,17 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_D12_v2
 
-        [[[parameter ExecuteMachineType]]]
-        Label = Execute VM Type
-        Description = The VM type for execute nodes
+        [[[parameter HPCMachineType]]]
+        Label = HPC VM Type
+        Description = The VM type for HPC execute nodes
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
-        Config.Multiselect = true
+
+        [[[parameter HTCMachineType]]]
+        Label = HTC VM Type
+        Description = The VM type for HTC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_F2s_v2
 
 
     [[parameters Auto-Scaling]]
@@ -104,19 +136,36 @@ Order = 10
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Start and stop execute instances automatically
 
-        [[[parameter MaxExecuteCoreCount]]]
-        Label = Max Cores
-        Description = The total number of execute cores to start
+        [[[parameter MaxHPCExecuteCoreCount]]]
+        Label = Max HPC Cores
+        Description = The total number of HPC execute cores to start
         DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
 
-        [[[parameter UseLowPrio]]]
+        [[[parameter MaxHTCExecuteCoreCount]]]
+        Label = Max HTC Cores
+        Description = The total number of HTC execute cores to start
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter HPCMaxScalesetSize]]]
+        Label = Max VMs per Scaleset
+        Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
+        DefaultValue = 40
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+
+        [[[parameter HTCUseLowPrio]]]
         Label = Low Priority
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
-        Widget.Label = Use low priority instances for execute hosts
+        Widget.Label = Use low priority instances for HTC execute hosts
 
     [[parameters Networking]]
     Order = 40
