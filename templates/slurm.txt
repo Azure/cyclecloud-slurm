@@ -12,7 +12,6 @@ Autoscale = $Autoscale
     [[node defaults]]
     UsePublicNetwork = $UsePublicNetwork
     Credentials = $Credentials    
-    ImageName = $ImageName
     SubnetId = $SubnetId
     Region = $Region
     KeyPairLocation = ~/.ssh/cyclecloud.pem
@@ -33,6 +32,7 @@ Autoscale = $Autoscale
 
     [[node master]]
     MachineType = $MasterMachineType
+    ImageName = $MasterImageName
     IsReturnProxy = $ReturnProxy
     AdditionalClusterInitSpecs = $MasterClusterInitSpecs
     
@@ -50,6 +50,7 @@ Autoscale = $Autoscale
 
     [[nodearray hpc]]
     MachineType = $HPCMachineType
+    ImageName = $HPCImageName
     MaxCoreCount = $MaxHPCExecuteCoreCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
     AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
@@ -68,6 +69,7 @@ Autoscale = $Autoscale
 
     [[nodearray htc]]
     MachineType = $HTCMachineType
+    ImageName = $HTCImageName
     MaxCoreCount = $MaxHTCExecuteCoreCount
 
     Interruptible = $HTCUseLowPrio
@@ -240,12 +242,32 @@ Order = 20
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
     Order = 10
 
-        [[[parameter ImageName]]]
-        Label = Base OS
+        [[[parameter MasterImageName]]]
+        Label = Master OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
+        # TODO restore ubuntu 
+        #Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7"}
+
+        [[[parameter HPCImageName]]]
+        Label = HPC OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        # TODO restore ubuntu 
+        #Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7"}
+
+        [[[parameter HTCImageName]]]
+        Label = HTC OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        # TODO restore ubuntu 
+        #Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7"}
 
         [[[parameter MasterClusterInitSpecs]]]
         Label = Master Cluster-Init
