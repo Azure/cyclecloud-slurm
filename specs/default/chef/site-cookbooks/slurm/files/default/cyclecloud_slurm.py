@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 #
-
 import argparse
 from collections import OrderedDict
 from getpass import getpass
@@ -9,8 +8,11 @@ import json
 import logging
 from math import ceil, floor
 import os
+import random
+import shutil
 import sys
 import time
+import traceback
 from uuid import uuid4
 
 from clusterwrapper import ClusterWrapper
@@ -19,8 +21,6 @@ from cyclecloud.model.NodeCreationRequestModule import NodeCreationRequest
 from cyclecloud.model.NodeCreationRequestSetDefinitionModule import NodeCreationRequestSetDefinition
 from cyclecloud.model.NodeCreationRequestSetModule import NodeCreationRequestSet
 from slurmcc import custom_chaos_mode
-import random
-import traceback
 
 
 class CyclecloudSlurmError(RuntimeError):
@@ -354,6 +354,10 @@ class ExistingNodePolicy:
     
 
 def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error):
+class UnreferencedNodePolicy:
+    RemoveSafely = "RemoveSafely"
+    
+
     request = NodeCreationRequest()
     request.request_id = str(uuid4())
     request.sets = []
@@ -464,7 +468,42 @@ def create_nodes(existing_policy):
     subprocess_module = _subprocess_module()
     partitions = fetch_partitions(cluster_wrapper, subprocess_module)
     _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy)
+    
+    
+def _remove_nodes(cluster_wrapper, subprocess_module, names_to_remove):
+    # this is just used for logging purposes, so fall back on a simple comma delimited list.
+    try:
+        to_remove_hostlist = _to_hostlist(subprocess_module, ",".join(names_to_remove))
+    except:
+        logging.warn(traceback.format_exc())
+        to_remove_hostlist = ",".join(names_to_remove)
         
+    logging.info("Attempting to remove the following nodes: %s", to_remove_hostlist)
+    
+    node_filter = 'ClusterName == "%s" && Name in {"%s"} && (State=="Terminated" || State is undefined)' % (cluster_wrapper.cluster_name, '","'.join(names_to_remove))
+    _, mgmt_result = _retry_rest(lambda: cluster_wrapper.remove_nodes(custom_filter=node_filter))
+    removed_nodes = [n.name for n in mgmt_result.nodes]
+    unremoved_nodes = set(names_to_remove) - set(removed_nodes)
+    if unremoved_nodes:
+        logging.warn("Warning: The following nodes could not be removed because they were not terminated - %s.", ",".join(unremoved_nodes))
+        logging.warn("Please terminate them and rerun this command or remove them manually via the cli or user interface.",)
+
+
+def remove_nodes(names_to_remove=None):
+    cluster_wrapper = _get_cluster_wrapper()
+    subprocess_module = _subprocess_module()
+    if not names_to_remove:
+        names_to_remove = []
+        _, node_list = _retry_rest(cluster_wrapper.get_nodes)
+        for node in node_list.nodes:
+            name = node.get("Name")
+            is_autoscale = node.get("Configuration", {}).get("slurm", {}).get("autoscale", False)
+            if is_autoscale:
+                names_to_remove.append(name)
+    else:
+        if isinstance(names_to_remove, basestring):
+            names_to_remove = [x.strip() for x in names_to_remove.split(",")]
+    _remove_nodes(cluster_wrapper, subprocess_module, names_to_remove)
     
     
 def _nodeaddrs(cluster_wrapper, writer):
@@ -606,6 +645,9 @@ def main(argv=None):
     create_nodes_parser = subparsers.add_parser("create_nodes")
     create_nodes_parser.add_argument("--policy", dest="existing_policy", default=ExistingNodePolicy.Error)
     create_nodes_parser.set_defaults(func=create_nodes, logfile="create_nodes.log")
+    
+    remove_nodes_parser = subparsers.add_parser("remove_nodes")
+    remove_nodes_parser.set_defaults(func=remove_nodes, logfile="remove_nodes.log")
     
     resume_parser = subparsers.add_parser("resume")
     resume_parser.set_defaults(func=resume, logfile="resume.log")
