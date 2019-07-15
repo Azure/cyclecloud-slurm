@@ -45,15 +45,8 @@ cron "writeactivenodes" do
     only_if { node['cyclecloud']['cluster']['autoscale']['start_enabled'] }
 end
 
-cookbook_file "#{node[:cyclecloud][:bootstrap]}/writenodeaddrs.sh" do
-    source "writenodeaddrs.sh"
-    mode "0700"
-    owner "root"
-    group "root"
-end
-
 cron "writenodeaddrs" do
-    command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/writenodeaddrs.sh"
+    command "AUTOSTART_LOG_FILE=#{node[:cyclecloud][:home]}/logs/nodeaddrs.log #{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh nodeaddrs > /sched/nodeaddrs"
 end 
 
 directory "#{node[:cyclecloud][:bootstrap]}/slurm" do

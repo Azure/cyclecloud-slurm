@@ -465,6 +465,27 @@ def create_nodes(existing_policy):
     partitions = fetch_partitions(cluster_wrapper, subprocess_module)
     _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy)
         
+    
+    
+def _nodeaddrs(cluster_wrapper, writer):
+    logging.debug("Nodeaddrs: querying current nodes, filtering out those without ip addresses and where slurm.autoscale is undefined or false.")
+    _, node_list = _retry_rest(cluster_wrapper.get_nodes)
+    num_wrote = 0
+    for node in node_list.nodes:
+        name = node.get("Name")
+        ip = node.get("PrivateIp")
+        is_autoscale = node.get("Configuration", {}).get("slurm", {}).get("autoscale", False)
+        if is_autoscale and ip:
+            num_wrote += 1
+            writer.write("%s %s\n" % (ip, name))
+            
+    logging.debug("Nodeaddrs: wrote %d nodes", num_wrote)
+
+
+def nodeaddrs():
+    cluster_wrapper = _get_cluster_wrapper()
+    _nodeaddrs(cluster_wrapper, sys.stdout)
+    
         
 def _init_logging(logfile):
     import logging.handlers
@@ -595,6 +616,9 @@ def main(argv=None):
     suspend_parser.add_argument("--node-list", type=hostlist, required=True)
     
     for conn_parser in [create_nodes_parser, topology_parser, slurm_conf_parser]:
+    
+    nodeaddrs_parser = subparsers.add_parser("nodeaddrs")
+    nodeaddrs_parser.set_defaults(func=nodeaddrs, logfile="nodeaddrs.log")
         conn_parser.add_argument("--web-server")
         conn_parser.add_argument("--username")
         
