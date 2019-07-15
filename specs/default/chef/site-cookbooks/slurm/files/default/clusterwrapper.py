@@ -72,7 +72,7 @@ class ClusterWrapper:
             request.ip_addresses = ip_addresses
             
         if custom_filter:
-            request.custom_filter = custom_filter
+            request.filter = custom_filter
             
         request.validate()
         
