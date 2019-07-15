@@ -490,9 +490,13 @@ def nodeaddrs():
 def _init_logging(logfile):
     import logging.handlers
     
+    # other libs will call logging.basicConfig which adds a duplicate streamHandler to the root logger.
+    # filter them out here so we can add our own.
+    logging.getLogger().handlers = [x for x in logging.getLogger().handlers if not isinstance(x, logging.StreamHandler)]
+    
     log_level_name = os.getenv('AUTOSTART_LOG_LEVEL', "INFO")
     log_file_level_name = os.getenv('AUTOSTART_LOG_FILE_LEVEL', "DEBUG")
-    log_file = os.getenv('AUTOSTART_LOG_FILE', logfile)
+    actual_log_file = os.getenv('AUTOSTART_LOG_FILE', logfile)
     
     if log_file_level_name.lower() not in ["debug", "info", "warn", "error", "critical"]:
         log_file_level = logging.DEBUG
@@ -507,7 +511,7 @@ def _init_logging(logfile):
     logging.getLogger("requests.packages.urllib3.connectionpool").setLevel(logging.WARN)
     logging.getLogger("urllib3.connectionpool").setLevel(logging.WARN)
     
-    log_file = logging.handlers.RotatingFileHandler(log_file, maxBytes=1024 * 1024 * 5, backupCount=5)
+    log_file = logging.handlers.RotatingFileHandler(actual_log_file, maxBytes=1024 * 1024 * 5, backupCount=5)
     log_file.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
     log_file.setLevel(log_file_level)
     
