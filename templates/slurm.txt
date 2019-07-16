@@ -19,7 +19,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
 
-        [[[cluster-init cyclecloud/slurm:default:2.0.0]]]
+        [[[cluster-init cyclecloud/slurm:default:2.0.1]]]
         Optional = true
 
     [[node master]]
@@ -30,7 +30,7 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
 
-        [[[cluster-init cyclecloud/slurm:master:2.0.0]]]
+        [[[cluster-init cyclecloud/slurm:master:2.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -53,7 +53,7 @@ Autoscale = $Autoscale
         slurm.default_partition = true
         slurm.hpc = true
 
-        [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
+        [[[cluster-init cyclecloud/slurm:execute:2.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -72,7 +72,7 @@ Autoscale = $Autoscale
         slurm.autoscale = true
         slurm.hpc = false
 
-        [[[cluster-init cyclecloud/slurm:execute:2.0.0]]]
+        [[[cluster-init cyclecloud/slurm:execute:2.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
