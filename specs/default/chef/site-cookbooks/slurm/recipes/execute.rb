@@ -39,7 +39,7 @@ defer_block "Defer starting slurmd until end of converge" do
   nodename=nodename.strip()
 
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
-  # TODO RDH
+  
   file '/etc/sysconfig/slurmd' do
     content slurmd_sysconfig
     mode '0700'
@@ -56,8 +56,9 @@ defer_block "Defer starting slurmd until end of converge" do
   end
 
   # Re-enable a host the first time it converges in the event it was drained
+  # set the ip as nodeaddr and hostname in slurm
   execute 'set node to active' do
-    command "scontrol update nodename=#{nodename} state=UNDRAIN && touch /etc/slurm.reenabled"
+    command "scontrol update nodename=#{nodename} NodeAddr=#{node[:ipaddress]} NodeHostname=#{node[:ipaddress]} state=UNDRAIN && touch /etc/slurm.reenabled"
     creates '/etc/slurm.reenabled'
   end
 end
