@@ -45,15 +45,8 @@ cron "writeactivenodes" do
     only_if { node['cyclecloud']['cluster']['autoscale']['start_enabled'] }
 end
 
-cookbook_file "#{node[:cyclecloud][:bootstrap]}/writenodeaddrs.sh" do
-    source "writenodeaddrs.sh"
-    mode "0700"
-    owner "root"
-    group "root"
-end
-
 cron "writenodeaddrs" do
-    command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/writenodeaddrs.sh"
+    command "AUTOSTART_LOG_FILE=#{node[:cyclecloud][:home]}/logs/nodeaddrs.log #{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh nodeaddrs > /sched/nodeaddrs"
 end 
 
 directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
@@ -120,9 +113,11 @@ bash 'Add nodes to slurm config' do
     num_starts=$(jetpack config cyclecloud.cluster.start_count)
     if [ "$num_starts" == "1" ]; then
       policy=Error
+      #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh remove_nodes || exit 1;
     else
       policy=AllowExisting
     fi
+    
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;

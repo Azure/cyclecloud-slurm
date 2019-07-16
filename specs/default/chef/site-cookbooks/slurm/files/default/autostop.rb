@@ -73,7 +73,7 @@ file.close
 # be careful - we want to find 10.1.0.10 _not_ 10.1.0.100!
 nodename=shell_out("grep -e '^#{node[:ipaddress]} ' /sched/nodeaddrs | cut -d' ' -f2-").stdout
 if nodename.nil? || nodename.strip().empty?() then
-  raise "Waiting for ip address to appear in /sched/nodeaddrs. If this persists, check that writenodeaddrs.sh is running on the master"
+  raise "Waiting for ip address to appear in /sched/nodeaddrs. If this persists, please see /opt/cycle/jetpack/logs/nodeaddrs.log on the master."
 end
 
 nodename=nodename.strip()
