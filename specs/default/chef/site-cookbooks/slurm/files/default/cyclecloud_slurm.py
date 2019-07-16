@@ -235,10 +235,10 @@ def _node_index_and_pg_as_sort_key(nodename):
         return nodename
             
 
-def generate_slurm_conf():
+def generate_slurm_conf(writer=sys.stdout):
     subprocess = _subprocess_module()
     partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
-    _generate_slurm_conf(partitions, sys.stdout, subprocess)
+    _generate_slurm_conf(partitions, writer, subprocess)
             
 
 def _generate_topology(cluster_wrapper, subprocess_module, writer):
@@ -267,9 +267,9 @@ def _generate_topology(cluster_wrapper, subprocess_module, writer):
         writer.write("SwitchName={} Nodes={}\n".format(pg, slurm_node_expr))
 
 
-def generate_topology():
+def generate_topology(writer=sys.stdout):
     subprocess = _subprocess_module()
-    return _generate_topology(_get_cluster_wrapper(), subprocess, sys.stdout)
+    return _generate_topology(_get_cluster_wrapper(), subprocess, writer)
         
         
 def _shutdown(node_list, cluster_wrapper):
@@ -353,11 +353,11 @@ class ExistingNodePolicy:
     # TODO need a Recreate - shutdown, remove and recreate...
     
 
-def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error):
 class UnreferencedNodePolicy:
     RemoveSafely = "RemoveSafely"
     
 
+def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error, unreferenced_policy=UnreferencedNodePolicy.RemoveSafely):
     request = NodeCreationRequest()
     request.request_id = str(uuid4())
     request.sets = []
@@ -378,6 +378,8 @@ class UnreferencedNodePolicy:
         if partition.node_list:
             expanded_node_list = _from_hostlist(subprocess_module, partition.node_list)
         
+        valid_node_names = set()
+        
         for index in range(partition.max_vm_count):
             placement_group_index = index / partition.max_scaleset_size
             placement_group = placement_group_base + str(placement_group_index)
@@ -388,6 +390,9 @@ class UnreferencedNodePolicy:
                 
             name_index = (index % partition.max_scaleset_size) + 1
             node_name = name_format.format(partition.nodearray, placement_group_index) % (name_index)
+            
+            valid_node_names.add(node_name)
+            
             if node_name in expanded_node_list:
                 # Don't allow recreation of nodes
                 if existing_policy == ExistingNodePolicy.Error:
@@ -400,6 +405,10 @@ class UnreferencedNodePolicy:
             
             key = (partition.name, placement_group, placement_group_index, name_offset)
             nodearray_counts[key] = nodearray_counts.get(key, 0) + 1
+            
+        unreferenced_nodes = sorted(list(set(expanded_node_list) - valid_node_names))
+        if unreferenced_nodes and unreferenced_policy == UnreferencedNodePolicy.RemoveSafely:
+            _remove_nodes(cluster_wrapper, subprocess_module, unreferenced_nodes)
             
     for key, instance_count in sorted(nodearray_counts.iteritems(), key=lambda x: x[0]):
         partition_name, pg, pg_index, name_offset = key
@@ -435,7 +444,7 @@ class UnreferencedNodePolicy:
         if existing_policy == ExistingNodePolicy.Error:
             raise CyclecloudSlurmError("No nodes were created!")
         
-        logging.info("No new nodes to create with policy %s", existing_policy)
+        logging.info("No new nodes are required.")
         return
     
     # one shot, don't retry as this is not monotonic.
@@ -458,9 +467,18 @@ class UnreferencedNodePolicy:
     
     if num_created == 0 and existing_policy == ExistingNodePolicy.Error:
         raise CyclecloudSlurmError("Did not create a single node!")
-    
-    for set_result in result.sets:
-        logging.info("Added %s nodes. %s", set_result.added, set_result.message)
+
+    for n, set_result in enumerate(result.sets):
+        request_set = request.sets[n]
+        if set_result.added == 0:
+            logging.warn("No nodes were created for nodearray %s using name format %s and offset %s: %s", request_set.nodearray, request_set.name_format,
+                                                                                                          request_set.name_offset, set_result.message)
+        else:
+        
+            message = "Added %s nodes to %s using name format %s and offset %s." % (set_result.added, request_set.nodearray, request_set.name_format, request_set.name_offset)
+            if set_result.message:
+                message += " Note: %s" % set_result.message
+            logging.info(message)
         
 
 def create_nodes(existing_policy):
@@ -504,6 +522,80 @@ def remove_nodes(names_to_remove=None):
         if isinstance(names_to_remove, basestring):
             names_to_remove = [x.strip() for x in names_to_remove.split(",")]
     _remove_nodes(cluster_wrapper, subprocess_module, names_to_remove)
+    
+    
+def rescale(subprocess_module=None):
+    subprocess_module = subprocess_module or _subprocess_module()
+    
+    create_nodes(ExistingNodePolicy.AllowExisting)
+    
+    backup_dir = None
+    while backup_dir is None or os.path.exists(backup_dir):
+        now = time.time()
+        backup_dir = os.path.expanduser("~/slurm_backups/%s" % now)
+    
+    logging.debug("Using backup directory %s for topology.conf and slurm.conf", backup_dir)
+    os.makedirs(backup_dir)
+    
+    slurm_conf = "/etc/slurm/slurm.conf"
+    target_slurm_conf = "/etc/slurm/slurm.conf"
+    
+    if not os.path.exists(slurm_conf):
+        logging.warn("Slurm conf does not exist at %s", slurm_conf)
+        slurm_conf = "/sched/slurm.conf.base"
+        logging.warn("Attempting to use %s as the base for the slurm config", slurm_conf)
+        if not os.path.exists(slurm_conf):
+            raise CyclecloudSlurmError("Neither %s nor %s exists!" % (slurm_conf, target_slurm_conf))
+    
+    topology_conf = "/etc/slurm/topology.conf"
+    
+    backup_slurm_conf = os.path.join(backup_dir, "slurm.conf")
+    backup_topology_conf = os.path.join(backup_dir, "topology.conf")
+    
+    shutil.copyfile(slurm_conf, backup_slurm_conf)
+    
+    if os.path.exists(topology_conf):
+        shutil.copyfile(topology_conf, backup_topology_conf)
+    else:
+        logging.warn("No topology file exists at %s", topology_conf)
+        
+    shutil.copyfile(slurm_conf, backup_slurm_conf)
+    shutil.copyfile(topology_conf, backup_topology_conf)
+        
+    with open(target_slurm_conf + ".tmp", "w") as fw:
+        with open(backup_slurm_conf) as fr:
+            ends_in_newline = False
+            for line in fr:
+                line_lower = line.lower().strip()
+                if line_lower.startswith("partitionname=") or line_lower.startswith("nodename="):
+                    continue
+                ends_in_newline = line.endswith("\n")
+                fw.write(line)
+        
+        if not ends_in_newline:
+            fw.write("\n")
+        logging.debug("Stripped partition and node declarations from %s", target_slurm_conf + ".tmp")
+        logging.debug("Appending new partition and node declarations to %s", target_slurm_conf + ".tmp")
+        generate_slurm_conf(fw)
+                
+    logging.debug("Moving %s to %s", target_slurm_conf + ".tmp", target_slurm_conf)
+    shutil.move(target_slurm_conf + ".tmp", target_slurm_conf)
+    
+    logging.debug("Writing new topology to %s", topology_conf + ".tmp")
+    with open(topology_conf + ".tmp", "w") as fw:
+        generate_topology(fw)
+    
+    logging.debug("Moving %s to %s", topology_conf + ".tmp", topology_conf)    
+    shutil.move(topology_conf + ".tmp", topology_conf)
+    
+    logging.info("Restarting slurmctld...")
+    subprocess_module.check_call(["slurmctld", "restart"])
+    
+    new_topology = _retry_subprocess(lambda: subprocess_module.check_output(["scontrol", "show", "topology"]))
+    logging.info("New topology:\n%s", new_topology)
+    
+    logging.info("")
+    logging.info("Re-scaling cluster complete.")
     
     
 def _nodeaddrs(cluster_wrapper, writer):
@@ -661,10 +753,13 @@ def main(argv=None):
     suspend_parser.set_defaults(func=shutdown, logfile="suspend.log")
     suspend_parser.add_argument("--node-list", type=hostlist, required=True)
     
-    for conn_parser in [create_nodes_parser, topology_parser, slurm_conf_parser]:
+    scale_parser = subparsers.add_parser("scale")
+    scale_parser.set_defaults(func=rescale, logfile="scale.log")
     
     nodeaddrs_parser = subparsers.add_parser("nodeaddrs")
     nodeaddrs_parser.set_defaults(func=nodeaddrs, logfile="nodeaddrs.log")
+    
+    for conn_parser in [create_nodes_parser, remove_nodes_parser, topology_parser, slurm_conf_parser, nodeaddrs_parser]:
         conn_parser.add_argument("--web-server")
         conn_parser.add_argument("--username")
         
