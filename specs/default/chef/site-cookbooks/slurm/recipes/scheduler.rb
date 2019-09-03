@@ -77,6 +77,8 @@ bash 'Install cyclecloud python api' do
   not_if { ::File.exist?('/etc/cyclecloud-api.installed') }
 end
 
+
+
 bash 'Install job_submit/cyclecloud' do
   code <<-EOH
     jetpack download --project slurm job_submit_cyclecloud.so /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;

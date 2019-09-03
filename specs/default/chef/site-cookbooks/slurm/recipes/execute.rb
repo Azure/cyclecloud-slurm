@@ -39,12 +39,27 @@ defer_block "Defer starting slurmd until end of converge" do
   nodename=nodename.strip()
 
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
-  
-  file '/etc/sysconfig/slurmd' do
-    content slurmd_sysconfig
-    mode '0700'
-    owner 'slurm'
-    group 'slurm'
+
+  myplatform=node[:platform]
+  case myplatform
+  when 'ubuntu'
+    directory '/etc/sysconfig' do
+      action :create
+    end
+    
+    file '/etc/sysconfig/slurmd' do
+      content slurmd_sysconfig
+      mode '0700'
+      owner 'slurm'
+      group 'slurm'
+    end
+  when 'centos'
+    file '/etc/sysconfig/slurmd' do
+      content slurmd_sysconfig
+      mode '0700'
+      owner 'slurm'
+      group 'slurm'
+    end
   end
 
   service 'slurmd' do
