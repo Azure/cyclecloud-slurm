@@ -326,7 +326,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                     states_messages.append("{}={}".format(key, states[key]))
                 else:
                     for ukey in sorted(states["UNKNOWN"].keys()):
-                        states_messages.append("{}={}".format(ukey, states["UNKNOWN"][key]))
+                        states_messages.append("{}={}".format(ukey, states["UNKNOWN"][ukey]))
                         
             states_message = " , ".join(states_messages)
             logging.info("OperationId=%s NodeList=%s: Number of nodes in each state: %s", operation_id, nodes_str, states_message)
