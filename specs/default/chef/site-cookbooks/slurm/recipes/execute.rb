@@ -23,6 +23,12 @@ link '/etc/slurm/slurm.conf' do
   group "#{slurmuser}"
 end
 
+link '/etc/slurm/cgroup.conf' do
+  to '/sched/cgroup.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
 link '/etc/slurm/topology.conf' do
   to '/sched/topology.conf'
   owner "#{slurmuser}"

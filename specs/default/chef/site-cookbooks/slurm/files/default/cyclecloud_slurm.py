@@ -196,7 +196,11 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         
         num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
         default_yn = "YES" if partition.is_default else "NO"
-        writer.write("PartitionName={} Nodes={} Default={} MaxTime=INFINITE State=UP\n".format(partition.name, partition.node_list, default_yn))
+        
+        memory = max(1, int(floor((partition.memory - 1)))) * 1024
+        cpus_with_ht = partition.vcpu_count / _get_thread_count(partition)
+        def_mem_per_cpu = memory / cpus_with_ht
+        writer.write("PartitionName={} Nodes={} Default={} DefMemPerCPU={} MaxTime=INFINITE State=UP\n".format(partition.name, partition.node_list, default_yn, def_mem_per_cpu))
         
         all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_get_sort_key_func(partition.is_hpc)) 
         
@@ -205,8 +209,13 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
             end = min(partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size)
             subset_of_nodes = all_nodes[start:end]
             node_list = _to_hostlist(subprocess_module, ",".join((subset_of_nodes)))
+            # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
             
-            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} RealMemory={}\n".format(node_list, partition.vcpu_count, int(floor(partition.memory * 1024))))
+            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} RealMemory={}\n".format(node_list, cpus_with_ht, memory))
+
+
+def _get_thread_count(partition):
+    return 1
 
 
 def _get_sort_key_func(is_hpc):

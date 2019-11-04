@@ -102,11 +102,27 @@ template '/sched/slurm.conf.base' do
   }}
 end
 
+
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
+
+
+template '/sched/cgroup.conf' do
+  owner "#{slurmuser}"
+  source "cgroup.conf.erb"
+  action :create_if_missing
+end
+
+
+link '/etc/slurm/cgroup.conf' do
+  to '/sched/cgroup.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
 
 # No nodes should exist the first time we start, but after that will because fixed=true on the nodes
 bash 'Add nodes to slurm config' do
