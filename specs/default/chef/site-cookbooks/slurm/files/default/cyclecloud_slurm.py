@@ -21,6 +21,7 @@ from cyclecloud.model.NodeCreationRequestModule import NodeCreationRequest
 from cyclecloud.model.NodeCreationRequestSetDefinitionModule import NodeCreationRequestSetDefinition
 from cyclecloud.model.NodeCreationRequestSetModule import NodeCreationRequestSet
 from slurmcc import custom_chaos_mode
+from cyclecloud.model.NodeListModule import NodeList
 
 
 class CyclecloudSlurmError(RuntimeError):
@@ -533,8 +534,52 @@ def remove_nodes(names_to_remove=None):
     _remove_nodes(cluster_wrapper, subprocess_module, names_to_remove)
     
     
+def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
+    subprocess_module = subprocess_module or _subprocess_module()
+    cluster_wrapper = cluster_wrapper or _get_cluster_wrapper()
+    _, node_list = cluster_wrapper.get_nodes()
+    nodes_by_name = {}
+    for node in node_list.nodes:
+        nodes_by_name[node["Name"]] = node
+        
+    partitions = fetch_partitions(cluster_wrapper, subprocess_module)
+    to_remove = []
+    can_not_remove = []
+    
+    for partition in partitions.values():
+        if not partition.node_list:
+            continue
+        node_list = _from_hostlist(subprocess_module, partition.node_list)
+
+        for node_name in node_list:
+            node = nodes_by_name[node_name]
+            mt = str(node.get("MachineType"))
+            if str(partition.machine_type).lower() != mt.lower():
+                if node.get("State") not in [None, "Terminated"]:
+                    can_not_remove.append(node)
+                    continue
+                to_remove.append(node_name)
+    
+    if can_not_remove:
+        any_node = can_not_remove[0]
+        node_name = any_node.get("Name")
+        node_list_expr = ",".join(sorted([x.get("Name") for x in can_not_remove]))
+        to_shutdown = _to_hostlist(subprocess_module, node_list_expr)
+        raise CyclecloudSlurmError(("Machine type is now %s for %s nodes but at least one node is not terminated that has the old machine type - %s in state %s with machine type %s.\n" +
+                                   "Please terminate these via the UI or 'suspend_program.sh %s' then rerun the scale command.")
+                                               % (partition.machine_type, partition.name, node_name, node.get("State"), mt, to_shutdown))
+    
+    if to_remove:
+        to_remove = sorted(to_remove)
+        to_remove_hostlist = _from_hostlist(subprocess_module, ",".join(to_remove))
+        logging.info("Deleting %s nodes because their machine type changed - %s" % (len(to_remove), to_remove_hostlist))
+        cluster_wrapper.remove_nodes(names=to_remove)
+    
+    
 def rescale(subprocess_module=None):
     subprocess_module = subprocess_module or _subprocess_module()
+    
+    delete_nodes_if_out_of_date(subprocess_module)
     
     create_nodes(ExistingNodePolicy.AllowExisting)
     
