@@ -19,7 +19,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
 
-        [[[cluster-init cyclecloud/slurm:default:2.0.1]]]
+        [[[cluster-init cyclecloud/slurm:default:2.0.2]]]
         Optional = true
 
     [[node master]]
@@ -30,7 +30,7 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
 
-        [[[cluster-init cyclecloud/slurm:master:2.0.1]]]
+        [[[cluster-init cyclecloud/slurm:master:2.0.2]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -45,7 +45,7 @@ Autoscale = $Autoscale
     ImageName = $HPCImageName
     MaxCoreCount = $MaxHPCExecuteCoreCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
-    AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+    AdditionalClusterInitSpecs = $HPCClusterInitSpecs
 
 
         [[[configuration]]]
@@ -53,7 +53,7 @@ Autoscale = $Autoscale
         slurm.default_partition = true
         slurm.hpc = true
 
-        [[[cluster-init cyclecloud/slurm:execute:2.0.1]]]
+        [[[cluster-init cyclecloud/slurm:execute:2.0.2]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -65,14 +65,14 @@ Autoscale = $Autoscale
     MaxCoreCount = $MaxHTCExecuteCoreCount
 
     Interruptible = $HTCUseLowPrio
-    AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+    AdditionalClusterInitSpecs = $HTCClusterInitSpecs
 
 
         [[[configuration]]]
         slurm.autoscale = true
         slurm.hpc = false
 
-        [[[cluster-init cyclecloud/slurm:execute:2.0.1]]]
+        [[[cluster-init cyclecloud/slurm:execute:2.0.2]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -149,7 +149,7 @@ Order = 10
         [[[parameter HPCMaxScalesetSize]]]
         Label = Max VMs per Scaleset
         Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
-        DefaultValue = 40
+        DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
@@ -202,7 +202,7 @@ Order = 20
         DefaultValue = cycle.image.centos7
         # TODO restore ubuntu 
         #Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
-        Config.Filter := Package in {"cycle.image.centos7"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
@@ -228,10 +228,16 @@ Order = 20
         Description = Cluster init specs to apply to the master node
         ParameterType = Cloud.ClusterInitSpecs
     
-        [[[parameter ExecuteClusterInitSpecs]]]
-        Label = Execute Cluster-Init
+        [[[parameter HTCClusterInitSpecs]]]
+        Label = HTC Cluster-Init
         DefaultValue = =undefined
-        Description = Cluster init specs to apply to execute nodes
+        Description = Cluster init specs to apply to HTC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+        
+        [[[parameter HPCClusterInitSpecs]]]
+        Label = HPC Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to HPC execute nodes
         ParameterType = Cloud.ClusterInitSpecs
 	
 
