@@ -21,7 +21,6 @@ from cyclecloud.model.NodeCreationRequestModule import NodeCreationRequest
 from cyclecloud.model.NodeCreationRequestSetDefinitionModule import NodeCreationRequestSetDefinition
 from cyclecloud.model.NodeCreationRequestSetModule import NodeCreationRequestSet
 from slurmcc import custom_chaos_mode
-from cyclecloud.model.NodeListModule import NodeList
 
 
 class CyclecloudSlurmError(RuntimeError):
@@ -574,66 +573,73 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
         to_remove_hostlist = _from_hostlist(subprocess_module, ",".join(to_remove))
         logging.info("Deleting %s nodes because their machine type changed - %s" % (len(to_remove), to_remove_hostlist))
         cluster_wrapper.remove_nodes(names=to_remove)
+        
+        
+def _init_slurm_conf(slurm_conf, sched_dir="/sched"):
+    '''
+    Handle upgrades - we used to use slurm.conf.base and then append to it.
+    Now we include cyclecloud.conf, so make sure we see that declaration.
+    '''
+    base_slurm_conf = slurm_conf
+    
+    if not os.path.exists(base_slurm_conf):
+        base_slurm_conf = os.path.join(sched_dir, "slurm.conf.base")
+        if not os.path.exists(base_slurm_conf):
+            raise CyclecloudSlurmError("Slurm conf does not exist at %s" % slurm_conf)
+        shutil.copyfile(base_slurm_conf, slurm_conf)
+    
+    found_include = False
+    
+    # backwards compat - if a slurm.conf does not include cyclecloud.conf, include it
+    with open(slurm_conf) as fr:
+        for line in fr:
+            if line.strip().lower().startswith("include cyclecloud.conf"):
+                found_include = True
+                break
+    
+    if not found_include:
+        with open(slurm_conf, "a") as fw:
+            fw.write("\ninclude cyclecloud.conf")
     
     
-def rescale(subprocess_module=None):
+def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None):
+    slurm_conf = os.path.join(sched_dir, "slurm.conf")
+    
+    _init_slurm_conf(slurm_conf, sched_dir)
+    
     subprocess_module = subprocess_module or _subprocess_module()
+    cluster_wrapper = cluster_wrapper or _get_cluster_wrapper()
     
-    delete_nodes_if_out_of_date(subprocess_module)
+    delete_nodes_if_out_of_date(subprocess_module, cluster_wrapper)
     
     create_nodes(ExistingNodePolicy.AllowExisting)
     
-    backup_dir = None
     while backup_dir is None or os.path.exists(backup_dir):
         now = time.time()
-        backup_dir = os.path.expanduser("~/slurm_backups/%s" % now)
+        backup_dir = os.path.join(backup_dir, str(now))
     
     logging.debug("Using backup directory %s for topology.conf and slurm.conf", backup_dir)
     os.makedirs(backup_dir)
     
-    slurm_conf = "/etc/slurm/slurm.conf"
-    target_slurm_conf = "/etc/slurm/slurm.conf"
+    topology_conf = os.path.join(sched_dir, "topology.conf")
+    cyclecloud_slurm_conf = os.path.join(sched_dir, "cyclecloud.conf")
     
-    if not os.path.exists(slurm_conf):
-        logging.warn("Slurm conf does not exist at %s", slurm_conf)
-        slurm_conf = "/sched/slurm.conf.base"
-        logging.warn("Attempting to use %s as the base for the slurm config", slurm_conf)
-        if not os.path.exists(slurm_conf):
-            raise CyclecloudSlurmError("Neither %s nor %s exists!" % (slurm_conf, target_slurm_conf))
-    
-    topology_conf = "/etc/slurm/topology.conf"
-    
-    backup_slurm_conf = os.path.join(backup_dir, "slurm.conf")
+    backup_cyclecloud_conf = os.path.join(backup_dir, "slurm.conf")
     backup_topology_conf = os.path.join(backup_dir, "topology.conf")
-    
-    shutil.copyfile(slurm_conf, backup_slurm_conf)
     
     if os.path.exists(topology_conf):
         shutil.copyfile(topology_conf, backup_topology_conf)
     else:
         logging.warn("No topology file exists at %s", topology_conf)
         
-    shutil.copyfile(slurm_conf, backup_slurm_conf)
+    shutil.copyfile(slurm_conf, backup_cyclecloud_conf)
     shutil.copyfile(topology_conf, backup_topology_conf)
         
-    with open(target_slurm_conf + ".tmp", "w") as fw:
-        with open(backup_slurm_conf) as fr:
-            ends_in_newline = False
-            for line in fr:
-                line_lower = line.lower().strip()
-                if line_lower.startswith("partitionname=") or line_lower.startswith("nodename="):
-                    continue
-                ends_in_newline = line.endswith("\n")
-                fw.write(line)
-        
-        if not ends_in_newline:
-            fw.write("\n")
-        logging.debug("Stripped partition and node declarations from %s", target_slurm_conf + ".tmp")
-        logging.debug("Appending new partition and node declarations to %s", target_slurm_conf + ".tmp")
+    with open(cyclecloud_slurm_conf + ".tmp", "w") as fw:
         generate_slurm_conf(fw)
                 
-    logging.debug("Moving %s to %s", target_slurm_conf + ".tmp", target_slurm_conf)
-    shutil.move(target_slurm_conf + ".tmp", target_slurm_conf)
+    logging.debug("Moving %s to %s", cyclecloud_slurm_conf + ".tmp", cyclecloud_slurm_conf)
+    shutil.move(cyclecloud_slurm_conf + ".tmp", cyclecloud_slurm_conf)
     
     logging.debug("Writing new topology to %s", topology_conf + ".tmp")
     with open(topology_conf + ".tmp", "w") as fw:
