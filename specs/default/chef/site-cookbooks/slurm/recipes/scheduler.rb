@@ -142,6 +142,10 @@ bash 'Create cyclecloud.conf' do
   code <<-EOH
     # we want the file to exist, as we are going to do an include and it will complain that it is empty.
     touch /etc/slurm/cyclecloud.conf
+    
+    # upgrade the old slurm.conf
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh upgrade_conf || exit 1
+    
     num_starts=$(jetpack config cyclecloud.cluster.start_count)
     if [ "$num_starts" == "1" ]; then
       policy=Error

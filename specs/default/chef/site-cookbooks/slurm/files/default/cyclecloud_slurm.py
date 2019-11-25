@@ -584,11 +584,20 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
         cluster_wrapper.remove_nodes(names=to_remove)
         
         
-def _init_slurm_conf(slurm_conf, sched_dir="/sched"):
+def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.backups"):
     '''
     Handle upgrades - we used to use slurm.conf.base and then append to it.
-    Now we include cyclecloud.conf, so make sure we see that declaration.
+    1) make sure we include cyclecloud.conf
+    2) Ignore partition / nodename definitions we used to append to slurm.conf
+    3) Remove deprecated ControlMachine
     '''
+    
+    slurm_conf = slurm_conf or os.path.join(sched_dir, "slurm.conf")
+    
+    if os.getenv("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE", ""):
+        logging.warn("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE is defined, skipping upgrade.")
+        return
+        
     base_slurm_conf = slurm_conf
     
     if not os.path.exists(base_slurm_conf):
@@ -597,24 +606,61 @@ def _init_slurm_conf(slurm_conf, sched_dir="/sched"):
             raise CyclecloudSlurmError("Slurm conf does not exist at %s" % slurm_conf)
         shutil.copyfile(base_slurm_conf, slurm_conf)
     
-    found_include = False
+    deprecated = ["partitionname", "nodename", "controlmachine"]
     
-    # backwards compat - if a slurm.conf does not include cyclecloud.conf, include it
+    requires_upgrade = False
+    found_include = False
     with open(slurm_conf) as fr:
         for line in fr:
-            if line.strip().lower().startswith("include cyclecloud.conf"):
-                found_include = True
-                break
+            for prefix in deprecated:
+                if line.lower().startswith(prefix):
+                    logging.warn("Found line starting with %s. Will upgrade old slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1" % prefix)
+                    requires_upgrade = True
+                    continue
+                if line.lower().strip().split() == ["include", "cyclecloud.conf"]:
+                    found_include = True
+                    
+    if not found_include and not requires_upgrade:
+        logging.warn("Did not find include cyclecloud.conf, so will upgrade slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
+        requires_upgrade = True
+        
+    if not requires_upgrade:
+        logging.info("Upgrade not required!")
+        return
     
-    if not found_include:
-        with open(slurm_conf, "a") as fw:
+    # make sure .backups exists
+    now = time.time()
+    backup_dir = os.path.join(backup_dir, str(now))
+    
+    logging.info("Using backup directory %s for slurm.conf", backup_dir)
+    os.makedirs(backup_dir)
+    
+    shutil.copyfile(slurm_conf, os.path.join(backup_dir, "slurm.conf"))
+    
+    logging.warn("Upgrading slurm.conf by removing ControlHost, PartitionName and NodeName definitions. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
+    # backwards compat - if a slurm.conf does not include cyclecloud.conf, include it
+    with open(slurm_conf) as fr:
+        with open(slurm_conf + ".tmp", "w") as fw:
+            skip_entries = (deprecated + ["include cyclecloud.conf"])
+            for line in fr:
+                line_lower = line.lower()
+                
+                skip_this_line = False
+                
+                for prefix in skip_entries:
+                    if line_lower.startswith(prefix):
+                        skip_this_line = True
+                
+                if not skip_this_line:
+                    fw.write(line)
             fw.write("\ninclude cyclecloud.conf")
+            
+    shutil.move(slurm_conf + ".tmp", slurm_conf)
+    logging.info("Upgrade success! Please restart slurmctld")
     
     
 def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None):
     slurm_conf = os.path.join(sched_dir, "slurm.conf")
-    
-    _init_slurm_conf(slurm_conf, sched_dir)
     
     subprocess_module = subprocess_module or _subprocess_module()
     cluster_wrapper = cluster_wrapper or _get_cluster_wrapper()
@@ -623,9 +669,9 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     
     create_nodes(ExistingNodePolicy.AllowExisting)
     
-    while backup_dir is None or os.path.exists(backup_dir):
-        now = time.time()
-        backup_dir = os.path.join(backup_dir, str(now))
+    # make sure .backups exists
+    now = time.time()
+    backup_dir = os.path.join(backup_dir, str(now))
     
     logging.debug("Using backup directory %s for topology.conf and slurm.conf", backup_dir)
     os.makedirs(backup_dir)
@@ -813,6 +859,9 @@ def main(argv=None):
     resume_parser = subparsers.add_parser("resume")
     resume_parser.set_defaults(func=resume, logfile="resume.log")
     resume_parser.add_argument("--node-list", type=hostlist, required=True)
+    
+    upgrade_conf_parser = subparsers.add_parser("upgrade_conf")
+    upgrade_conf_parser.set_defaults(func=upgrade_conf, logfile="upgrade_conf.log")
     
     resume_fail_parser = subparsers.add_parser("resume_fail")
     resume_fail_parser.set_defaults(func=shutdown, logfile="resume_fail.log")
