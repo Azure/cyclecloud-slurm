@@ -289,7 +289,8 @@ class CycleCloudSlurmTest(unittest.TestCase):
     def test_generate_slurm_conf(self):
         writer = cStringIO.StringIO()
         partitions = OrderedDict()
-        partitions["hpc"] = Partition("custom_partition_name", "hpc", "Standard_D2_v2", is_default=True, is_hpc=True, max_scaleset_size=3, vcpu_count=2, memory=4, max_vm_count=8)
+        # use dampen_memory = .02 to test overriding this
+        partitions["hpc"] = Partition("custom_partition_name", "hpc", "Standard_D2_v2", is_default=True, is_hpc=True, max_scaleset_size=3, vcpu_count=2, memory=128, max_vm_count=8, dampen_memory=.02)
         partitions["htc"] = Partition("htc", "htc", "Standard_D2_v3", is_default=False, max_scaleset_size=100, is_hpc=False, vcpu_count=2, memory=3.5, max_vm_count=8)
 
         partitions["hpc"].node_list = "hpc-10[1-8]"
@@ -304,12 +305,18 @@ class CycleCloudSlurmTest(unittest.TestCase):
             cyclecloud_slurm._generate_slurm_conf(partitions, writer, mock_subprocess)
         result = writer.getvalue().strip()
         expected = '''
-PartitionName=custom_partition_name Nodes=hpc-10[1-8] Default=YES MaxTime=INFINITE State=UP
-Nodename=hpc-10[1-3] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=4096
-Nodename=hpc-10[4-6] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=4096
-Nodename=hpc-10[7-8] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=4096
-PartitionName=htc Nodes=htc-[1-8] Default=NO MaxTime=INFINITE State=UP
-Nodename=htc-[1-8] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=3584'''.strip()
+# Note: CycleCloud reported a RealMemory of 131072 but we reduced it by 2621 (i.e. max(1gb, 2%)) to account for OS/VM overhead which
+# would result in the nodes being rejected by Slurm if they report a number less than defined here.
+# To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).
+PartitionName=custom_partition_name Nodes=hpc-10[1-8] Default=YES DefMemPerCPU=64225 MaxTime=INFINITE State=UP
+Nodename=hpc-10[1-3] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=128450
+Nodename=hpc-10[4-6] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=128450
+Nodename=hpc-10[7-8] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=128450
+# Note: CycleCloud reported a RealMemory of 3584 but we reduced it by 1024 (i.e. max(1gb, 5%)) to account for OS/VM overhead which
+# would result in the nodes being rejected by Slurm if they report a number less than defined here.
+# To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).
+PartitionName=htc Nodes=htc-[1-8] Default=NO DefMemPerCPU=1280 MaxTime=INFINITE State=UP
+Nodename=htc-[1-8] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=2560'''.strip()
         for e, a in zip(result.splitlines(), expected.splitlines()):
             assert e == a, "\n%s\n%s" % (e, a)
         

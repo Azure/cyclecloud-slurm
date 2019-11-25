@@ -21,7 +21,6 @@ from cyclecloud.model.NodeCreationRequestModule import NodeCreationRequest
 from cyclecloud.model.NodeCreationRequestSetDefinitionModule import NodeCreationRequestSetDefinition
 from cyclecloud.model.NodeCreationRequestSetModule import NodeCreationRequestSet
 from slurmcc import custom_chaos_mode
-from cyclecloud.model.NodeListModule import NodeList
 
 
 class CyclecloudSlurmError(RuntimeError):
@@ -30,7 +29,7 @@ class CyclecloudSlurmError(RuntimeError):
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vcpu_count, memory, max_vm_count):
+    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vcpu_count, memory, max_vm_count, dampen_memory=.05):
         self.name = name
         self.nodearray = nodearray
         self.machine_type = machine_type
@@ -41,6 +40,7 @@ class Partition:
         self.memory = memory
         self.max_vm_count = max_vm_count
         self.node_list = None
+        self.dampen_memory = dampen_memory
 
 
 def fetch_partitions(cluster_wrapper, subprocess_module):
@@ -118,6 +118,8 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         
         max_scaleset_size = Record(nodearray_record.get("Azure", {})).get("MaxScalesetSize", 40)
         
+        dampen_memory = float(slurm_config.get("dampen_memory") or 5) / 100
+        
         is_hpc = str(slurm_config.get("hpc", True)).lower() == "true"
         
         if not is_hpc:
@@ -131,7 +133,8 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                                                max_scaleset_size,
                                                vm.vcpu_count,
                                                vm.memory,
-                                               bucket.max_count)
+                                               bucket.max_count,
+                                               dampen_memory=dampen_memory)
         
         existing_nodes = []
         
@@ -198,9 +201,14 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
         default_yn = "YES" if partition.is_default else "NO"
         
-        memory = max(1, int(floor((partition.memory - 1)))) * 1024
+        memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
+        memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
         cpus_with_ht = partition.vcpu_count / _get_thread_count(partition)
         def_mem_per_cpu = memory / cpus_with_ht
+        writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
+                     % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
+        writer.write("# would result in the nodes being rejected by Slurm if they report a number less than defined here.\n")
+        writer.write("# To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).\n")
         writer.write("PartitionName={} Nodes={} Default={} DefMemPerCPU={} MaxTime=INFINITE State=UP\n".format(partition.name, partition.node_list, default_yn, def_mem_per_cpu))
         
         all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_get_sort_key_func(partition.is_hpc)) 
@@ -574,66 +582,119 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
         to_remove_hostlist = _from_hostlist(subprocess_module, ",".join(to_remove))
         logging.info("Deleting %s nodes because their machine type changed - %s" % (len(to_remove), to_remove_hostlist))
         cluster_wrapper.remove_nodes(names=to_remove)
+        
+        
+def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.backups"):
+    '''
+    Handle upgrades - we used to use slurm.conf.base and then append to it.
+    1) make sure we include cyclecloud.conf
+    2) Ignore partition / nodename definitions we used to append to slurm.conf
+    3) Remove deprecated ControlMachine
+    '''
+    
+    slurm_conf = slurm_conf or os.path.join(sched_dir, "slurm.conf")
+    
+    if os.getenv("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE", ""):
+        logging.warn("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE is defined, skipping upgrade.")
+        return
+        
+    base_slurm_conf = slurm_conf
+    
+    if not os.path.exists(base_slurm_conf):
+        base_slurm_conf = os.path.join(sched_dir, "slurm.conf.base")
+        if not os.path.exists(base_slurm_conf):
+            raise CyclecloudSlurmError("Slurm conf does not exist at %s" % slurm_conf)
+        shutil.copyfile(base_slurm_conf, slurm_conf)
+    
+    deprecated = ["partitionname", "nodename", "controlmachine"]
+    
+    requires_upgrade = False
+    found_include = False
+    with open(slurm_conf) as fr:
+        for line in fr:
+            for prefix in deprecated:
+                if line.lower().startswith(prefix):
+                    logging.warn("Found line starting with %s. Will upgrade old slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1" % prefix)
+                    requires_upgrade = True
+                    continue
+                if line.lower().strip().split() == ["include", "cyclecloud.conf"]:
+                    found_include = True
+                    
+    if not found_include and not requires_upgrade:
+        logging.warn("Did not find include cyclecloud.conf, so will upgrade slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
+        requires_upgrade = True
+        
+    if not requires_upgrade:
+        logging.info("Upgrade not required!")
+        return
+    
+    # make sure .backups exists
+    now = time.time()
+    backup_dir = os.path.join(backup_dir, str(now))
+    
+    logging.info("Using backup directory %s for slurm.conf", backup_dir)
+    os.makedirs(backup_dir)
+    
+    shutil.copyfile(slurm_conf, os.path.join(backup_dir, "slurm.conf"))
+    
+    logging.warn("Upgrading slurm.conf by removing ControlHost, PartitionName and NodeName definitions. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
+    # backwards compat - if a slurm.conf does not include cyclecloud.conf, include it
+    with open(slurm_conf) as fr:
+        with open(slurm_conf + ".tmp", "w") as fw:
+            skip_entries = (deprecated + ["include cyclecloud.conf"])
+            for line in fr:
+                line_lower = line.lower()
+                
+                skip_this_line = False
+                
+                for prefix in skip_entries:
+                    if line_lower.startswith(prefix):
+                        skip_this_line = True
+                
+                if not skip_this_line:
+                    fw.write(line)
+            fw.write("\ninclude cyclecloud.conf")
+            
+    shutil.move(slurm_conf + ".tmp", slurm_conf)
+    logging.info("Upgrade success! Please restart slurmctld")
     
     
-def rescale(subprocess_module=None):
+def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None):
+    slurm_conf = os.path.join(sched_dir, "slurm.conf")
+    
     subprocess_module = subprocess_module or _subprocess_module()
+    cluster_wrapper = cluster_wrapper or _get_cluster_wrapper()
     
-    delete_nodes_if_out_of_date(subprocess_module)
+    delete_nodes_if_out_of_date(subprocess_module, cluster_wrapper)
     
     create_nodes(ExistingNodePolicy.AllowExisting)
     
-    backup_dir = None
-    while backup_dir is None or os.path.exists(backup_dir):
-        now = time.time()
-        backup_dir = os.path.expanduser("~/slurm_backups/%s" % now)
+    # make sure .backups exists
+    now = time.time()
+    backup_dir = os.path.join(backup_dir, str(now))
     
     logging.debug("Using backup directory %s for topology.conf and slurm.conf", backup_dir)
     os.makedirs(backup_dir)
     
-    slurm_conf = "/etc/slurm/slurm.conf"
-    target_slurm_conf = "/etc/slurm/slurm.conf"
+    topology_conf = os.path.join(sched_dir, "topology.conf")
+    cyclecloud_slurm_conf = os.path.join(sched_dir, "cyclecloud.conf")
     
-    if not os.path.exists(slurm_conf):
-        logging.warn("Slurm conf does not exist at %s", slurm_conf)
-        slurm_conf = "/sched/slurm.conf.base"
-        logging.warn("Attempting to use %s as the base for the slurm config", slurm_conf)
-        if not os.path.exists(slurm_conf):
-            raise CyclecloudSlurmError("Neither %s nor %s exists!" % (slurm_conf, target_slurm_conf))
-    
-    topology_conf = "/etc/slurm/topology.conf"
-    
-    backup_slurm_conf = os.path.join(backup_dir, "slurm.conf")
+    backup_cyclecloud_conf = os.path.join(backup_dir, "slurm.conf")
     backup_topology_conf = os.path.join(backup_dir, "topology.conf")
-    
-    shutil.copyfile(slurm_conf, backup_slurm_conf)
     
     if os.path.exists(topology_conf):
         shutil.copyfile(topology_conf, backup_topology_conf)
     else:
         logging.warn("No topology file exists at %s", topology_conf)
         
-    shutil.copyfile(slurm_conf, backup_slurm_conf)
+    shutil.copyfile(slurm_conf, backup_cyclecloud_conf)
     shutil.copyfile(topology_conf, backup_topology_conf)
         
-    with open(target_slurm_conf + ".tmp", "w") as fw:
-        with open(backup_slurm_conf) as fr:
-            ends_in_newline = False
-            for line in fr:
-                line_lower = line.lower().strip()
-                if line_lower.startswith("partitionname=") or line_lower.startswith("nodename="):
-                    continue
-                ends_in_newline = line.endswith("\n")
-                fw.write(line)
-        
-        if not ends_in_newline:
-            fw.write("\n")
-        logging.debug("Stripped partition and node declarations from %s", target_slurm_conf + ".tmp")
-        logging.debug("Appending new partition and node declarations to %s", target_slurm_conf + ".tmp")
+    with open(cyclecloud_slurm_conf + ".tmp", "w") as fw:
         generate_slurm_conf(fw)
                 
-    logging.debug("Moving %s to %s", target_slurm_conf + ".tmp", target_slurm_conf)
-    shutil.move(target_slurm_conf + ".tmp", target_slurm_conf)
+    logging.debug("Moving %s to %s", cyclecloud_slurm_conf + ".tmp", cyclecloud_slurm_conf)
+    shutil.move(cyclecloud_slurm_conf + ".tmp", cyclecloud_slurm_conf)
     
     logging.debug("Writing new topology to %s", topology_conf + ".tmp")
     with open(topology_conf + ".tmp", "w") as fw:
@@ -798,6 +859,9 @@ def main(argv=None):
     resume_parser = subparsers.add_parser("resume")
     resume_parser.set_defaults(func=resume, logfile="resume.log")
     resume_parser.add_argument("--node-list", type=hostlist, required=True)
+    
+    upgrade_conf_parser = subparsers.add_parser("upgrade_conf")
+    upgrade_conf_parser.set_defaults(func=upgrade_conf, logfile="upgrade_conf.log")
     
     resume_fail_parser = subparsers.add_parser("resume_fail")
     resume_fail_parser.set_defaults(func=shutdown, logfile="resume_fail.log")

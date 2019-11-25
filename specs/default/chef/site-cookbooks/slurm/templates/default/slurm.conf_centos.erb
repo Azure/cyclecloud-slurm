@@ -1,4 +1,3 @@
-ControlMachine="<%= @nodename %>"
 MpiDefault=none
 ProctrackType=proctrack/cgroup
 ReturnToService=2
@@ -30,3 +29,4 @@ ResumeProgram=<%= @bootstrap %>/resume_program.sh
 ResumeFailProgram=<%= @bootstrap %>/resume_fail_program.sh
 SuspendProgram=<%= @bootstrap %>/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
+Include cyclecloud.conf

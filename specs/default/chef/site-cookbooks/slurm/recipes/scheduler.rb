@@ -89,7 +89,7 @@ end
 
 
 # we will be appending to this file, so that the next step is monotonic
-template '/sched/slurm.conf.base' do
+template '/sched/slurm.conf' do
   owner "#{slurmuser}"
   source "slurm.conf_#{myplatform}.erb"
   action :create_if_missing
@@ -102,6 +102,19 @@ template '/sched/slurm.conf.base' do
   }}
 end
 
+
+# Note - we used to use ControlMachine, but this is deprecated. We actually do not need to 
+# remove it from upgraded slurm.conf's, as simply appending SlurmctldHost will override ControlMachine
+# which is especially useful if ControlMachine is pointed at a stale hostname.
+bash 'Set SlurmctldHost' do
+    code <<-EOH
+    host=$(hostname -s)
+    grep -q "SlurmctldHost=$host" /sched/slurm.conf && exit 0
+    grep -v SlurmctldHost /sched/slurm.conf > /sched/slurm.conf.tmp
+    printf "\nSlurmctldHost=$host\n" >> /sched/slurm.conf.tmp
+    mv /sched/slurm.conf.tmp /sched/slurm.conf
+    EOH
+end
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
@@ -125,9 +138,14 @@ end
 
 
 # No nodes should exist the first time we start, but after that will because fixed=true on the nodes
-bash 'Add nodes to slurm config' do
+bash 'Create cyclecloud.conf' do
   code <<-EOH
-    cp /sched/slurm.conf.base /sched/slurm.conf || exit 1;
+    # we want the file to exist, as we are going to do an include and it will complain that it is empty.
+    touch /etc/slurm/cyclecloud.conf
+    
+    # upgrade the old slurm.conf
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh upgrade_conf || exit 1
+    
     num_starts=$(jetpack config cyclecloud.cluster.start_count)
     if [ "$num_starts" == "1" ]; then
       policy=Error
@@ -137,7 +155,7 @@ bash 'Add nodes to slurm config' do
     fi
     
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf >> /sched/slurm.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
     touch /etc/slurm.installed
     EOH
@@ -145,9 +163,14 @@ bash 'Add nodes to slurm config' do
 end
 
 
-
 link '/etc/slurm/topology.conf' do
   to '/sched/topology.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
+link '/etc/slurm/cyclecloud.conf' do
+  to '/sched/cyclecloud.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
@@ -162,6 +185,10 @@ end
 
 service 'slurmctld' do
   action [:enable, :start]
+end
+
+service 'munge' do
+  action [:enable, :restart]
 end
 
 defer_block "Defer starting munge until end of converge" do
