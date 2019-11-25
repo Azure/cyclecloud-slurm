@@ -29,7 +29,7 @@ class CyclecloudSlurmError(RuntimeError):
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vcpu_count, memory, max_vm_count):
+    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vcpu_count, memory, max_vm_count, dampen_memory=.05):
         self.name = name
         self.nodearray = nodearray
         self.machine_type = machine_type
@@ -40,6 +40,7 @@ class Partition:
         self.memory = memory
         self.max_vm_count = max_vm_count
         self.node_list = None
+        self.dampen_memory = dampen_memory
 
 
 def fetch_partitions(cluster_wrapper, subprocess_module):
@@ -117,6 +118,8 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         
         max_scaleset_size = Record(nodearray_record.get("Azure", {})).get("MaxScalesetSize", 40)
         
+        dampen_memory = float(slurm_config.get("dampen_memory") or 5) / 100
+        
         is_hpc = str(slurm_config.get("hpc", True)).lower() == "true"
         
         if not is_hpc:
@@ -130,7 +133,8 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                                                max_scaleset_size,
                                                vm.vcpu_count,
                                                vm.memory,
-                                               bucket.max_count)
+                                               bucket.max_count,
+                                               dampen_memory=dampen_memory)
         
         existing_nodes = []
         
@@ -197,9 +201,14 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
         default_yn = "YES" if partition.is_default else "NO"
         
-        memory = max(1, int(floor((partition.memory - 1)))) * 1024
+        memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
+        memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
         cpus_with_ht = partition.vcpu_count / _get_thread_count(partition)
         def_mem_per_cpu = memory / cpus_with_ht
+        writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
+                     % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
+        writer.write("# would result in the nodes being rejected by Slurm if they report a number less than defined here.\n")
+        writer.write("# To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).\n")
         writer.write("PartitionName={} Nodes={} Default={} DefMemPerCPU={} MaxTime=INFINITE State=UP\n".format(partition.name, partition.node_list, default_yn, def_mem_per_cpu))
         
         all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_get_sort_key_func(partition.is_hpc)) 
