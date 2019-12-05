@@ -47,6 +47,12 @@ end
 
 cron "writenodeaddrs" do
     command "AUTOSTART_LOG_FILE=#{node[:cyclecloud][:home]}/logs/nodeaddrs.log #{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh nodeaddrs > /sched/nodeaddrs"
+end
+
+# mimic v19+ ReturnToIdle behavior in v18
+cron "return_to_idle" do
+    command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/return_to_idle.sh 2>&1 >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log"
+    only_if { node[:slurm][:version] < "19." }
 end 
 
 directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
@@ -56,7 +62,7 @@ directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh"]
 scripts.each do |filename| 
     cookbook_file "#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}" do
         source "#{filename}"
