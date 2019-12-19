@@ -162,6 +162,7 @@ bash 'Create cyclecloud.conf' do
   not_if { ::File.exist?('/etc/slurm.installed') }
 end
 
+<<<<<<< HEAD
 
 link '/etc/slurm/topology.conf' do
   to '/sched/topology.conf'
@@ -173,6 +174,13 @@ link '/etc/slurm/cyclecloud.conf' do
   to '/sched/cyclecloud.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
+=======
+link '/etc/slurm/slurm.conf' do
+  to '/sched/slurm.conf'
+  #owner "#{slurmuser}"
+  #group "#{slurmuser}"
+  #mode '0700'
+>>>>>>> 298bd7e970714db1f5b5336d76ac3a9d3d981f1d
 end
 
 cookbook_file "/etc/security/limits.d/slurm-limits.conf" do

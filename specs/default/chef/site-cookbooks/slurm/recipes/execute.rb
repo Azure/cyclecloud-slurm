@@ -19,6 +19,7 @@ end
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'
+<<<<<<< HEAD
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
@@ -39,6 +40,11 @@ link '/etc/slurm/topology.conf' do
   to '/sched/topology.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
+=======
+  #owner "#{slurmuser}"
+  #group "#{slurmuser}"
+  #mode '0700'
+>>>>>>> 298bd7e970714db1f5b5336d76ac3a9d3d981f1d
 end
 
 defer_block "Defer starting slurmd until end of converge" do
@@ -82,10 +88,19 @@ defer_block "Defer starting slurmd until end of converge" do
     action [:enable, :restart]
   end
 
+<<<<<<< HEAD
+=======
+  myhost = lambda { node[:hostname] }
+  slurmfeature = node[:slurm][:feature][:name]
+>>>>>>> 298bd7e970714db1f5b5336d76ac3a9d3d981f1d
   # Re-enable a host the first time it converges in the event it was drained
   # set the ip as nodeaddr and hostname in slurm
   execute 'set node to active' do
+<<<<<<< HEAD
     command "scontrol update nodename=#{nodename} NodeAddr=#{node[:ipaddress]} NodeHostname=#{node[:ipaddress]} state=UNDRAIN && touch /etc/slurm.reenabled"
+=======
+    command "scontrol update nodename=#{myhost.call} availablefeature=#{slurmfeature} state=IDLE && touch /etc/slurm.reenabled"
+>>>>>>> 298bd7e970714db1f5b5336d76ac3a9d3d981f1d
     creates '/etc/slurm.reenabled'
   end
 end
