@@ -56,7 +56,7 @@ directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh"]
 scripts.each do |filename| 
     cookbook_file "#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}" do
         source "#{filename}"
@@ -189,6 +189,13 @@ end
 
 service 'munge' do
   action [:enable, :restart]
+end
+
+# Convert our stop interval into a number of minutes rounded up and run the script on that interval
+cron "autostop" do
+  minute "*/5"
+  command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
+  only_if { node[:cyclecloud][:cluster][:autoscale][:stop_enabled] }
 end
 
 defer_block "Defer starting munge until end of converge" do
