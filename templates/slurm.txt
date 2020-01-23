@@ -189,7 +189,7 @@ Order = 20
         required = True
         label = Slurm Version
         description = Version of Slurm to install on the cluster
-        defaultvalue = 18.08.7-1
+        defaultvalue = 18.08.9-1
 
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
