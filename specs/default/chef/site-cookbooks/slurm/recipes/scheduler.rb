@@ -70,7 +70,7 @@ end
 # TODO either change name to cyclecloud-api.tar.gz or make the name configurable
 bash 'Install cyclecloud python api' do
   code <<-EOH
-    jetpack download --project slurm cyclecloud-api-7.8.0.tar.gz cyclecloud-api.tar.gz || exit 1;
+    jetpack download --project slurm cyclecloud-api-7.9.2.tar.gz cyclecloud-api.tar.gz || exit 1;
     /opt/cycle/jetpack/system/embedded/bin/pip install cyclecloud-api.tar.gz || exit 1;
     rm -f cyclecloud-api.tar.gz;
     touch /etc/cyclecloud-api.installed
@@ -82,7 +82,7 @@ end
 
 bash 'Install job_submit/cyclecloud' do
   code <<-EOH
-    jetpack download --project slurm job_submit_cyclecloud.so /usr/lib64/slurm/job_submit_cyclecloud_#{node[:platform]}_#{node[:slurm][:version]}.so || exit 1;
+    jetpack download --project slurm job_submit_cyclecloud_#{node[:platform]}_#{slurmver}.so  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
     touch /etc/cyclecloud-job-submit.installed
     EOH
   not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
@@ -95,6 +95,7 @@ template '/sched/slurm.conf' do
   source "slurm.conf_#{myplatform}.erb"
   action :create_if_missing
   variables lazy {{
+    :slurmver => slurmver,
     :nodename => node[:machinename],
     :bootstrap => "#{node[:cyclecloud][:bootstrap]}/slurm",
     :resume_timeout => node[:slurm][:resume_timeout],
@@ -137,6 +138,16 @@ link '/etc/slurm/cgroup.conf' do
   group "#{slurmuser}"
 end
 
+cluster_name = node[:cyclecloud][:cluster][:name]
+username = node[:cyclecloud][:config][:username]
+password = node[:cyclecloud][:config][:password]
+url = node[:cyclecloud][:config][:web_server]
+bash 'Initialize autoscale.json' do
+    code <<-EOH
+     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' --username='#{username}' --password='#{password}' --url='#{url}' || exit 1
+    EOH
+    not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
+end
 
 # No nodes should exist the first time we start, but after that will because fixed=true on the nodes
 bash 'Create cyclecloud.conf' do
@@ -199,7 +210,7 @@ if slurmver < "19." then
       command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
       only_if { node[:cyclecloud][:cluster][:autoscale][:stop_enabled] }
     end
-fi
+end
 
 defer_block "Defer starting munge until end of converge" do
   service 'munge' do

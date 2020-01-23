@@ -1,3 +1,4 @@
+
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 #
@@ -19,6 +20,9 @@ from cyclecloud_slurm import Partition, ExistingNodePolicy, CyclecloudSlurmError
 import cyclecloud_slurm
 from cyclecloud.model.NodeCreationResultModule import NodeCreationResult
 from cyclecloud.model.NodeCreationResultSetModule import NodeCreationResultSet
+import tempfile
+import os
+import json
 
 
 logging.basicConfig(level=logging.DEBUG, format="%(message)s")
@@ -379,3 +383,26 @@ SwitchName=htc Nodes=htc-[1-8]'''.strip()
             subprocess_module.expect("scontrol update NodeName=hpc-44 NodeAddr=10.1.0.1 NodeHostname=10.1.0.1".split())
             mock_cluster.expected_start_nodes_request = {'names': ['hpc-1', 'hpc-44']}
             cyclecloud_slurm._resume(["hpc-1", "hpc-44"], cluster_wrapper, subprocess_module)
+            
+    def test_iniitialize(self):
+        tmp = tempfile.mktemp()
+        try:
+            #  create the config
+            cyclecloud_slurm.initialize_config(tmp, cluster_name="c1", username="u1", password="p1", url="https://url1", force=False)
+            self.assertEquals(json.load(open(tmp)), {"cluster_name": "c1", "username": "u1", "password": "p1", "url": "https://url1"})
+            try:
+                # try to recreate the config without --force
+                cyclecloud_slurm.initialize_config(tmp, cluster_name="c2", username="u2", password="p2", url="https://url2", force=False)
+                self.fail("should have raise an error")
+            except CyclecloudSlurmError as e:
+                # ensure --force is in there
+                self.assertIn("--force", str(e))
+            # make sure nothing changed
+            self.assertEquals(json.load(open(tmp)), {"cluster_name": "c1", "username": "u1", "password": "p1", "url": "https://url1"})
+            
+            # now force the change and make sure things are updated
+            cyclecloud_slurm.initialize_config(tmp, cluster_name="c2", username="u2", password="p2", url="https://url2", force=True)
+            self.assertEquals(json.load(open(tmp)), {"cluster_name": "c2", "username": "u2", "password": "p2", "url": "https://url2"})
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
