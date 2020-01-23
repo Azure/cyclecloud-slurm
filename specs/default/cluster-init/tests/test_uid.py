@@ -6,13 +6,13 @@ import jetpack.config
 
 
 def test_slurm_uid():
-    suid = jetpack.config.get('slurm.user.uid').strip()
+    suid = str(jetpack.config.get('slurm.user.uid')).strip()
     suser = jetpack.config.get('slurm.user.name').strip()
-    muid = jetpack.config.get('munge.user.uid').strip()
+    muid = str(jetpack.config.get('munge.user.uid')).strip()
     muser = jetpack.config.get('munge.user.name').strip()
 
     # Check that slurm uid and username match what is in data store
-    subprocess.check_call(['grep', suid, '|', 'grep', suser])
+    assert suser in subprocess.check_output(['grep', suid, '/etc/passwd'])
 
     # Check that munge uid and username match what is in data store
-    subprocess.check_call(['grep', muid, '|', 'grep', muser])
+    assert muser in subprocess.check_output(['grep', muid, '/etc/passwd'])
