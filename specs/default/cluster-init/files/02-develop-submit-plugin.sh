@@ -1,6 +1,6 @@
 #!/bin/bash -e
 cd ~
-SLURM_VERSION="18.08.7"
+SLURM_VERSION="18.08.9"
 SLURM_FOLDER="slurm-${SLURM_VERSION}"
 SLURM_PKG="slurm-${SLURM_VERSION}.tar.bz2"
 DOWNLOAD_URL="https://download.schedmd.com/slurm"
@@ -29,7 +29,5 @@ rsync -a /source/JobSubmitPlugin/ .
 cd ~/${SLURM_FOLDER}
 make
 cd ~/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-#CYCLECLOUD_TOPOLOGY_FILE=test.csv python topology_cyclecloud_test.py
+CYCLECLOUD_TOPOLOGY_FILE=test.csv python job_submit_cyclecloud_test.py
 rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/
-
-#ssh -i /opt/cycle_server/.ssh/cyclecloud.pem $node 'sudo bash /mnt/cluster-init/slurm/default/scripts/99-install-topology.sh'
