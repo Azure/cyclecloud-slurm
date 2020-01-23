@@ -17,9 +17,9 @@ ClusterName=cluster
 JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=debug
 SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
-<%= if @slurmver > "18" %>
+<% if @slurmver > "18" %>
 SlurmctldParameters=idle_on_node_suspend
-<%= end %>
+<% end %>
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurmd/slurmd.log
 TopologyPlugin=topology/tree
