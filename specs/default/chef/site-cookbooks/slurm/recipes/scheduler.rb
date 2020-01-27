@@ -46,10 +46,6 @@ cron "writeactivenodes" do
     only_if { node['cyclecloud']['cluster']['autoscale']['start_enabled'] }
 end
 
-cron "writenodeaddrs" do
-    command "AUTOSTART_LOG_FILE=#{node[:cyclecloud][:home]}/logs/nodeaddrs.log #{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh nodeaddrs > /sched/nodeaddrs"
-end 
-
 directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
   user "root"
   group "root"
