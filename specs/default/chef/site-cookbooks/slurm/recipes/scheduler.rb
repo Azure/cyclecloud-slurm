@@ -34,22 +34,6 @@ service 'munge' do
   action [:enable, :restart]
 end
 
-cookbook_file "#{node[:cyclecloud][:bootstrap]}/writeactivenodes.sh" do
-    source "writeactivenodes.sh"
-    mode "0700"
-    owner "root"
-    group "root"
-end
-
-cron "writeactivenodes" do
-    command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/writeactivenodes.sh"
-    only_if { node['cyclecloud']['cluster']['autoscale']['start_enabled'] }
-end
-
-cron "writenodeaddrs" do
-    command "AUTOSTART_LOG_FILE=#{node[:cyclecloud][:home]}/logs/nodeaddrs.log #{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh nodeaddrs > /sched/nodeaddrs"
-end 
-
 directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
   user "root"
   group "root"
