@@ -87,6 +87,12 @@ when 'ubuntu'
 
 
 when 'centos'
+  # Required for munge
+  package 'epel-release'
+
+  # slurm package depends on munge
+  package 'munge'
+
   slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
   slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
