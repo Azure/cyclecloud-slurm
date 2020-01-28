@@ -82,5 +82,3 @@ defer_block "Defer starting slurmd until end of converge" do
     creates '/etc/slurm.reenabled'
   end
 end
-
-#include_recipe "slurm::autostop"
