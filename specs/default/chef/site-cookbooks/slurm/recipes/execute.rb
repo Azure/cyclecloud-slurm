@@ -49,7 +49,7 @@ defer_block "Defer starting slurmd until end of converge" do
     end
 
   nodename=nodename.strip()
-  
+ 
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
 
   myplatform=node[:platform]
