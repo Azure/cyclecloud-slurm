@@ -21,6 +21,8 @@ if [ ! -e ~/${SLURM_FOLDER} ]; then
     # first check if autogen.sh is there; removed in 19.05.5
     if [ -e ./autogen.sh ]; then
        ./autogen.sh
+    else
+      autoreconf
     fi
     ./configure
     make
@@ -29,7 +31,7 @@ fi;
 
 cd ~/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
 rsync -a /source/JobSubmitPlugin/ .
-cd ~/${SLURM_FOLDER}
+#cd ~/${SLURM_FOLDER}
 make
 cd ~/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
 #CYCLECLOUD_TOPOLOGY_FILE=test.csv python topology_cyclecloud_test.py
