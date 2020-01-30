@@ -85,7 +85,7 @@ defer_block "Defer starting slurmd until end of converge" do
   # Re-enable a host the first time it converges in the event it was drained
   # set the ip as nodeaddr and hostname in slurm
   execute 'set node to active' do
-    command "scontrol update nodename=#{nodename} NodeAddr=#{node[:ipaddress]} NodeHostname=#{node[:ipaddress]} state=UNDRAIN && touch /etc/slurm.reenabled"
+    command "hostnamectl set-hostname #{nodename} && scontrol update nodename=#{nodename} NodeAddr=#{node[:ipaddress]} NodeHostname=#{node[:ipaddress]} state=UNDRAIN && touch /etc/slurm.reenabled"
     creates '/etc/slurm.reenabled'
   end
 end
