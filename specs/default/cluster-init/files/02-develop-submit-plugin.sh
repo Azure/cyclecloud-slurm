@@ -18,7 +18,12 @@ if [ ! -e ~/${SLURM_FOLDER} ]; then
     cp /source/JobSubmitPlugin/Makefile.am ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
     sed -i 's/src\/plugins\/job_submit\/Makefile/src\/plugins\/job_submit\/Makefile\n                 src\/plugins\/job_submit\/cyclecloud\/Makefile/g'  ${SLURM_FOLDER}/configure.ac
     cd ${SLURM_FOLDER}
-    ./autogen.sh
+    # slurm 19 branch has no autogen; fix by using autoreconf first
+    if [ -e ./autogen.sh ]; then
+      autoreconf
+    else
+      ./autogen.sh
+    fi
     ./configure
     make
     cd ..
@@ -26,7 +31,8 @@ fi;
 
 cd ~/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
 rsync -a /source/JobSubmitPlugin/ .
-cd ~/${SLURM_FOLDER}
+#only make library for plugin
+#cd ~/${SLURM_FOLDER}
 make
 cd ~/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
 #CYCLECLOUD_TOPOLOGY_FILE=test.csv python topology_cyclecloud_test.py
