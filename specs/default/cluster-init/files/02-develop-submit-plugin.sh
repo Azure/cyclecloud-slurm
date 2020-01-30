@@ -18,7 +18,10 @@ if [ ! -e ~/${SLURM_FOLDER} ]; then
     cp /source/JobSubmitPlugin/Makefile.am ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
     sed -i 's/src\/plugins\/job_submit\/Makefile/src\/plugins\/job_submit\/Makefile\n                 src\/plugins\/job_submit\/cyclecloud\/Makefile/g'  ${SLURM_FOLDER}/configure.ac
     cd ${SLURM_FOLDER}
-    ./autogen.sh
+    # first check if autogen.sh is there; removed in 19.05.5
+    if [ -e ./autogen.sh ]; then
+       ./autogen.sh
+    fi
     ./configure
     make
     cd ..
