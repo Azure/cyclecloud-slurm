@@ -57,10 +57,10 @@ when 'ubuntu'
   slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-torque slurm-openlava]
   slurmrpms.each do |slurmpkg|
     log "Package #{slurmpkg} already installed" do
-      only_if "rpm -q #{slurmpkg}"
+      only_if "dpkg -l | grep -q #{slurmpkg}"
     end
     log "Package #{slurmpkg} NOT installed" do
-      not_if "rpm -q #{slurmpkg}"
+      not_if "dpkg -l | grep -q #{slurmpkg}"
     end
   end
     
