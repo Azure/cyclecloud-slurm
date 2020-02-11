@@ -15,9 +15,15 @@ Autoscale = $Autoscale
     SubnetId = $SubnetId
     Region = $Region
     KeyPairLocation = ~/.ssh/cyclecloud.pem
-    
+
+    # Slurm autoscaling supports both Terminate and Deallocate shutdown policies
+    ShutdownPolicy = $configuration_slurm_shutdown_policy
+
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
+
+        # For fast spin-up after Deallocate, force an immediate re-converge on boot
+	cyclecloud.converge_on_boot = true
 
         [[[cluster-init cyclecloud/slurm:default]]]
         Optional = true
@@ -194,6 +200,19 @@ Order = 20
         Config.FreeForm = true
         Config.Entries := {[Value="19.05.5-1"], [Value="18.08.9-1"]}
         DefaultValue = 19.05.5-1
+
+        [[[parameter configuration_slurm_shutdown_policy]]]
+	Label = ShutdownPolicy
+        description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.
+        DefaultValue = Terminate
+        config.plugin = pico.control.AutoCompleteDropdown
+            [[[[list Config.Entries]]]]
+            Name = Terminate
+            Label = Terminate
+            [[[[list Config.Entries]]]]
+            Name = Deallocate
+            Label = Deallocate
+	
 
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."

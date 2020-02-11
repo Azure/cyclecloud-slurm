@@ -309,6 +309,14 @@ def shutdown(node_list):
     return _shutdown(node_list, _get_cluster_wrapper())
 
 
+def _terminate_nodes(node_list, cluster_wrapper):
+    _retry_rest(lambda: cluster_wrapper.terminate_nodes(names=node_list))
+
+def terminate_nodes(node_list):
+    # Forces termination even if autoscale ShutdownPolicy is Deallocate
+    return _terminate(node_list, _get_cluster_wrapper())
+
+
 def _resume(node_list, cluster_wrapper, subprocess_module):
     _, start_response = _retry_rest(lambda: cluster_wrapper.start_nodes(names=node_list))
     _wait_for_resume(cluster_wrapper, start_response.operation_id, node_list, subprocess_module)
@@ -585,7 +593,7 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
         node_list_expr = ",".join(sorted([x.get("Name") for x in can_not_remove]))
         to_shutdown = _to_hostlist(subprocess_module, node_list_expr)
         raise CyclecloudSlurmError(("Machine type is now %s for %s nodes but at least one node is not terminated that has the old machine type - %s in state %s with machine type %s.\n" +
-                                   "Please terminate these via the UI or 'suspend_program.sh %s' then rerun the scale command.")
+                                   "Please terminate these via the UI or 'terminate_nodes.sh %s' then rerun the scale command.")
                                                % (partition.machine_type, partition.name, node_name, node.get("State"), mt, to_shutdown))
     
     if to_remove:
