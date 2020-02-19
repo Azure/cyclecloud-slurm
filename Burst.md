@@ -5,28 +5,41 @@ It is possible to configure a Slurm scheduler not provisioned by CycleCloud to a
 ## In CycleCloud/Initializing a headless cluster
 
 1) Download the latest slurm project and upload it to your storage locker
-    wget https://ahowardinternal.blob.core.windows.net/releases/cyclecloud-slurm-204.tgz
-    tar xvzf cyclecloud-slurm-204.tgz
-    cd cyclecloud-slurm
-    cyclecloud project upload
+
+```bash
+wget https://ahowardinternal.blob.core.windows.net/releases/cyclecloud-slurm-204.tgz
+tar xvzf cyclecloud-slurm-204.tgz
+cd cyclecloud-slurm
+cyclecloud project upload
+```
 
 2) Import the headless cluster template:
-    cyclecloud import_template slurm-headless -f templates/slurm-headless.txt -c slurm
+
+```bash
+cyclecloud import_template slurm-headless -f templates/slurm-headless.txt -c slurm
+```
 
 3) Create a cluster in CycleCloud using the slurm-headless template and start it. No execute nodes will be created yet; that will happen after the cluster is joined to the on-prem scheduler.
 
 ## On the scheduler
+
 1) Ensure that the Slurm scheduler is installed and configured properly for a basic on-prem setup
+
 2) Copy the slurm_bootstrap tarball (https://ahowardinternal.blob.core.windows.net/releases/slurm_bootstrap.tgz) tarball contents to /opt/cycle/jetpack/system/bootstrap/slurm:
 
-    mkdir -p /opt/cycle/jetpack/system/bootstrap/slurm
-    cd !$
-    tar xvzf /tmp/bootstrap_slurm.tgz
+```bash
+mkdir -p /opt/cycle/jetpack/system/bootstrap/slurm
+cd !$
+tar xvzf /tmp/bootstrap_slurm.tgz
+```
 
 3) Install python and python-pip if they aren't already installed
+
 4) Install the cyclecloud-api Python package using pip:
     
+```bash
     sudo pip install cyclecloud-api-7.9.2.tar.gz
+```
 
 5) Copy job_submit_cyclecloud.so  to /usr/lib64/slurm/
 
@@ -42,6 +55,7 @@ It is possible to configure a Slurm scheduler not provisioned by CycleCloud to a
 
 9) Update /etc/slurm/slurm.conf to have the following settings:
 
+```
 TopologyPlugin=topology/tree
 JobSubmitPlugins=job_submit/cyclecloud
 ResumeTimeout=1800
@@ -53,6 +67,7 @@ SuspendProgram=/opt/cycle/jetpack/system/bootstrap/slurm/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
 Include cyclecloud.conf
 SlurmctldHost=ljhvr50kzwv
+```
 
 
 ## Additional notes:
