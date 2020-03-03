@@ -295,6 +295,11 @@ def _shutdown(node_list, cluster_wrapper):
 
 
 def shutdown(node_list):
+    for node in node_list:
+        subprocess_module = _subprocess_module()
+        cmd = ["scontrol", "update", "NodeName=%s" % node, "NodeAddr=%s" % node, "NodeHostname=%s" % node]
+        logging.info("Running %s", " ".join(cmd))
+        _retry_subprocess(lambda: subprocess_module.check_call(cmd))
     return _shutdown(node_list, _get_cluster_wrapper())
 
 
