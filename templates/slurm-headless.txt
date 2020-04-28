@@ -1,0 +1,251 @@
+
+################################
+## Cluster Configuration File ##
+################################
+
+[cluster Slurm]
+FormLayout = selectionpanel
+Category = Schedulers
+
+Autoscale = $Autoscale
+
+    [[node defaults]]
+    UsePublicNetwork = $UsePublicNetwork
+    Credentials = $Credentials    
+    SubnetId = $SubnetId
+    Region = $Region
+    KeyPairLocation = ~/.ssh/cyclecloud.pem
+    
+        [[[configuration]]]
+        slurm.version = $configuration_slurm_version
+        # Disable normal NFS exports and mounts
+        cyclecloud.mounts.shared.disabled = true
+        cyclecloud.exports.shared.disabled = true
+        cyclecloud.exports.shared.samba.enabled = false
+        cyclecloud.mounts.sched.disabled = true
+        cyclecloud.exports.sched.disabled = true
+        cyclecloud.exports.sched.samba.enabled = false
+        cyclecloud.exports.defaults.samba.enabled = false
+        cshared.server.legacy_links_disabled = true
+
+        [[[configuration cyclecloud.mounts.anf_shared]]]
+        type = nfs
+        mountpoint = $ANFSharedMountpoint
+        export_path = $ANFSharedExport
+        address = $ANFSharedAddress
+        options = defaults,rw,hard,rsize=65536,wsize=65536,vers=3,tcp
+
+        [[[configuration cyclecloud.mounts.anf_sched]]]
+        type = nfs
+        mountpoint = $ANFSchedMountpoint
+        export_path = $ANFSchedExport
+        address = $ANFSchedAddress
+        options = defaults,rw,hard,rsize=65536,wsize=65536,vers=3,tcp
+
+        [[[cluster-init cyclecloud/slurm:default]]]
+        Optional = true
+        run_list = recipe[cyclecloud], recipe[cshared::client], recipe[cuser], recipe[slurm::execute]
+
+    [[nodearray hpc]]
+    MachineType = $HPCMachineType
+    ImageName = $HPCImageName
+    MaxCoreCount = $MaxHPCExecuteCoreCount
+    Azure.MaxScalesetSize = $HPCMaxScalesetSize
+    AdditionalClusterInitSpecs = $HPCClusterInitSpecs
+
+
+        [[[configuration]]]
+        slurm.autoscale = true
+        slurm.default_partition = true
+        slurm.hpc = true
+
+        [[[cluster-init slurm:execute]]]
+
+        [[[network-interface eth0]]]
+        AssociatePublicIpAddress = $ExecuteNodesPublic
+
+
+[parameters About]
+Order = 1
+
+    [[parameters About Slurm]]
+
+        [[[parameter slurm]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<table><tr><td><img src='static/cloud/cluster/ui/ClusterIcon/slurm.png' width='192' height='192'></td></tr><tr><td><p>Slurm is a highly configurable open source workload manager. See the <a href=\"https://www.schedmd.com/\" target=\"_blank\">Slurm project site</a> for an overview.</p><p>Follow the instructions in the <a href=\"https://github.com/azure/cyclecloud-slurm/\" target=\"_blank\">README</a> for details on instructions on extending and configuring the Project for your environment.</p></td></tr></table>"
+
+[parameters Required Settings]
+Order = 10
+
+    [[parameters Virtual Machines ]]
+    Description = "The cluster, in this case, has two roles: the scheduler master-node with shared filer and the execute hosts. Configure which VM types to use based on the requirements of your application."
+    Order = 20
+
+        [[[parameter Region]]]
+        Label = Region
+        Description = Deployment Location
+        ParameterType = Cloud.Region
+        DefaultValue = westus2
+
+        [[[parameter MasterMachineType]]]
+        Label = Master VM Type
+        Description = The VM type for scheduler master and shared filer.
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_D12_v2
+
+        [[[parameter HPCMachineType]]]
+        Label = HPC VM Type
+        Description = The VM type for HPC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_F2s_v2
+
+    [[parameters Auto-Scaling]]
+    Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster"
+    Order = 30
+
+        [[[parameter Autoscale]]]
+        Label = Autoscale
+        DefaultValue = true
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Start and stop execute instances automatically
+
+        [[[parameter MaxHPCExecuteCoreCount]]]
+        Label = Max HPC Cores
+        Description = The total number of HPC execute cores to start
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter HPCMaxScalesetSize]]]
+        Label = Max VMs per Scaleset
+        Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+
+
+    [[parameters Networking]]
+    Order = 40
+
+        [[[parameter SubnetId]]]
+        Label = Subnet ID
+        Description = Subnet Resource Path (ResourceGroup/VirtualNetwork/Subnet)
+        ParameterType = Azure.Subnet
+        Required = True
+
+[parameters FileSystem]
+
+    [[parameter ANFSharedMountpoint]]
+    Label = ANF Shared Mountpoint
+    Config.Label = Path to mount ANF shared volume
+    DefaultValue = /shared
+
+    [[parameter ANFSharedExport]]
+    Label = ANF Shared Export
+    Config.Label = ANF Shared export to mount
+    DefaultValue = /shared
+
+    [[parameter ANFSharedAddress]]
+    Label = ANF Shared Filer Address
+    Config.Label = ANF IP or hostname
+    DefaultValue = localhost
+
+    [[parameter ANFSchedMountpoint]]
+    Label = ANF Scheduler Mountpoint
+    Config.Label = Path to mount ANF scheduler volume
+    DefaultValue = /sched
+
+    [[parameter ANFSchedExport]]
+    Label = ANF Sched Export
+    Config.Label = ANF Sched export to mount
+    DefaultValue = /sched
+
+    [[parameter ANFSchedAddress]]
+    Label = ANF Sched Filer Address
+    Config.Label = ANF IP or hostname
+    DefaultValue = localhost
+
+
+
+[parameters Advanced Settings]
+Order = 20
+
+    [[parameters Azure Settings]]
+    Order = 10 
+
+        [[[parameter Credentials]]]
+        Description = The credentials for the cloud provider
+        ParameterType = Cloud.Credentials
+
+    [[parameters Slurm Settings ]]
+    Description = "Section for configuring Slurm"
+    Order = 5
+
+        [[[parameter configuration_slurm_version]]]
+        required = True
+        label = Slurm Version
+        description = Version of Slurm to install on the cluster
+        defaultvalue = 19.05.5-1
+
+    [[parameters Software]]
+    Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
+    Order = 10
+
+        [[[parameter MasterImageName]]]
+        Label = Master OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        # TODO restore ubuntu 
+        #Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+
+        [[[parameter HPCImageName]]]
+        Label = HPC OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        # TODO restore ubuntu 
+        #Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu16", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7"}
+
+
+        [[[parameter MasterClusterInitSpecs]]]
+        Label = Master Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to the master node
+        ParameterType = Cloud.ClusterInitSpecs
+    
+   
+        [[[parameter HPCClusterInitSpecs]]]
+        Label = HPC Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to HPC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+	
+
+    [[parameters Advanced Networking]]
+    Description = Advanced networking settings
+
+        [[[parameter ReturnProxy]]]
+        Label = Return Proxy
+        DefaultValue = true
+        ParameterType = Boolean
+        Config.Label = Use SSH tunnel to connect to CycleCloud (required if direct access is blocked)
+
+        [[[parameter UsePublicNetwork]]]
+        Label = Public Head Node
+        DefaultValue = true
+        ParameterType = Boolean
+        Config.Label = Access master node from the Internet
+
+        [[[parameter ExecuteNodesPublic]]]
+        Label = Public Execute
+        DefaultValue = false
+        ParameterType = Boolean
+        Config.Label = Access execute nodes from the Internet
+        Conditions.Excluded := UsePublicNetwork isnt true
