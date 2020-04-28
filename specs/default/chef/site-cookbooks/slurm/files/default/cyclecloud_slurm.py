@@ -3,7 +3,6 @@
 #
 import argparse
 from collections import OrderedDict
-from getpass import getpass
 import json
 import logging
 from math import ceil, floor
@@ -167,26 +166,33 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
 _cluster_wrapper = None
 
 
-def _get_cluster_wrapper(username=None, password=None, web_server=None):
+def _get_cluster_wrapper(config_path=None):
     global _cluster_wrapper
     if _cluster_wrapper is None:
-        try:
-            import jetpack.config as jetpack_config
-        except ImportError:
-            jetpack_config = {}
+        assert config_path
+        if not os.path.exists(config_path):
+            raise CyclecloudSlurmError("{} does not exist! Please see 'cyclecloud_slurm.sh initialize'")
+        
+        with open(config_path) as fr:
+            autoscale_config = json.load(fr)
+        
+        def _get(k):
+            if not autoscale_config.get(k):
+                raise CyclecloudSlurmError("Please define {} in {}".format(k, config_path))
+            return autoscale_config.get(k)
             
-        cluster_name = jetpack_config.get("cyclecloud.cluster.name")
-            
-        config = {"verify_certificates": False,
-                  "username": username or jetpack_config.get("cyclecloud.config.username"),
-                  "password": password or jetpack_config.get("cyclecloud.config.password"),
-                  "url": web_server or jetpack_config.get("cyclecloud.config.web_server"),
+        cluster_name = _get("cluster_name")
+        
+        connection_config = {"verify_certificates": autoscale_config.get("verify_certificates", False),
+                  "username": _get("username"),
+                  "password": _get("password"),
+                  "url": _get("url"),
                   "cycleserver": {
-                      "timeout": 60
+                      "timeout": autoscale_config.get("timeout", 60)
                   }
         }
         
-        client = Client(config)
+        client = Client(connection_config)
         cluster = client.clusters.get(cluster_name)
         _cluster_wrapper = ClusterWrapper(cluster.name, cluster._client.session, cluster._client)
         
@@ -295,6 +301,11 @@ def _shutdown(node_list, cluster_wrapper):
 
 
 def shutdown(node_list):
+    for node in node_list:
+        subprocess_module = _subprocess_module()
+        cmd = ["scontrol", "update", "NodeName=%s" % node, "NodeAddr=%s" % node, "NodeHostname=%s" % node]
+        logging.info("Running %s", " ".join(cmd))
+        _retry_subprocess(lambda: subprocess_module.check_call(cmd))
     return _shutdown(node_list, _get_cluster_wrapper())
 
 
@@ -833,6 +844,21 @@ def _subprocess_module():
         
     return SubprocessModuleWithChaosMode()
 
+
+def initialize_config(path, cluster_name, username, password, url, force=False):
+    if os.path.exists(path) and not force:
+        raise CyclecloudSlurmError("{} already exists. To force reinitialization, please pass in --force".format(path))
+    
+    with open(path + ".tmp", "w") as fw:
+        json.dump({
+            "cluster_name": cluster_name,
+            "username": username,
+            "password": password,
+            "url": url.rstrip("/")
+        }, fw, indent=2)
+    shutil.move(path + ".tmp", path)
+    logging.info("Initialized config ({})".format(path))
+
     
 def main(argv=None):
     
@@ -843,60 +869,60 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
     
-    slurm_conf_parser = subparsers.add_parser("slurm_conf")
-    slurm_conf_parser.set_defaults(func=generate_slurm_conf, logfile="slurm_conf.log")
+    def add_parser(name, func):
+        new_parser = subparsers.add_parser(name)
+        new_parser.set_defaults(func=func, logfile="{}.log".format(name))
+        autoscale_path = os.path.join(os.getenv("CYCLECLOUD_HOME", "/opt/cycle/jetpack"), "config", "autoscale.json")
+        new_parser.add_argument("-c", "--config", default=autoscale_path)
+        return new_parser
     
-    topology_parser = subparsers.add_parser("topology")
-    topology_parser.set_defaults(func=generate_topology, logfile="topology.log")
+    add_parser("slurm_conf", generate_slurm_conf)
     
-    create_nodes_parser = subparsers.add_parser("create_nodes")
+    add_parser("topology", generate_topology)
+    
+    create_nodes_parser = add_parser("create_nodes", create_nodes)
     create_nodes_parser.add_argument("--policy", dest="existing_policy", default=ExistingNodePolicy.Error)
-    create_nodes_parser.set_defaults(func=create_nodes, logfile="create_nodes.log")
     
-    remove_nodes_parser = subparsers.add_parser("remove_nodes")
-    remove_nodes_parser.set_defaults(func=remove_nodes, logfile="remove_nodes.log")
+    add_parser("remove_nodes", remove_nodes)
     
-    resume_parser = subparsers.add_parser("resume")
-    resume_parser.set_defaults(func=resume, logfile="resume.log")
+    resume_parser = add_parser("resume", resume)
     resume_parser.add_argument("--node-list", type=hostlist, required=True)
     
-    upgrade_conf_parser = subparsers.add_parser("upgrade_conf")
-    upgrade_conf_parser.set_defaults(func=upgrade_conf, logfile="upgrade_conf.log")
+    add_parser("upgrade_conf", upgrade_conf)
     
-    resume_fail_parser = subparsers.add_parser("resume_fail")
-    resume_fail_parser.set_defaults(func=shutdown, logfile="resume_fail.log")
+    resume_fail_parser = add_parser("resume_fail", shutdown)
     resume_fail_parser.add_argument("--node-list", type=hostlist, required=True)
     
-    suspend_parser = subparsers.add_parser("suspend")
-    suspend_parser.set_defaults(func=shutdown, logfile="suspend.log")
+    suspend_parser = add_parser("suspend", shutdown)
     suspend_parser.add_argument("--node-list", type=hostlist, required=True)
     
-    scale_parser = subparsers.add_parser("scale")
-    scale_parser.set_defaults(func=rescale, logfile="scale.log")
+    add_parser("scale", rescale)
     
-    nodeaddrs_parser = subparsers.add_parser("nodeaddrs")
-    nodeaddrs_parser.set_defaults(func=nodeaddrs, logfile="nodeaddrs.log")
+    add_parser("nodeaddrs", nodeaddrs)
     
-    for conn_parser in [create_nodes_parser, remove_nodes_parser, topology_parser, slurm_conf_parser, nodeaddrs_parser]:
-        conn_parser.add_argument("--web-server")
-        conn_parser.add_argument("--username")
-        
+    init_parser = add_parser("initialize", initialize_config)
+    init_parser.add_argument("--cluster-name", required=True)
+    init_parser.add_argument("--username", required=True)
+    init_parser.add_argument("--password", required=True)
+    init_parser.add_argument("--url", required=True)
+    init_parser.add_argument("--force", action="store_true", default=False, required=False)
+    
     args = parser.parse_args(argv)
     _init_logging(args.logfile)
     
-    if hasattr(args, "username"):
-        password = None
-        if args.username:
-            password = getpass()
-            
-        _get_cluster_wrapper(args.username, password, args.web_server)
-    
-    kwargs = {}
-    for argname in dir(args):
-        if argname[0].islower() and argname not in ["logfile", "func", "username", "password", "web_server"]:
-            kwargs[argname] = getattr(args, argname)
-    
-    args.func(**kwargs)
+    if args.func != initialize_config:
+        if not os.path.exists(args.config):
+            raise CyclecloudSlurmError("Please run cyclecloud_slurm.sh initialize")
+        else:
+            _get_cluster_wrapper(args.config)
+        kwargs = {}
+        for argname in dir(args):
+            if argname[0].islower() and argname not in ["config", "logfile", "func"]:
+                kwargs[argname] = getattr(args, argname)
+        
+        args.func(**kwargs)
+    else:
+        initialize_config(args.config, args.cluster_name, args.username, args.password, args.url, args.force)
 
 
 if __name__ == "__main__":

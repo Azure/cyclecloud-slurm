@@ -50,13 +50,13 @@ when 'ubuntu'
   slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}_#{slurmver}_amd64.deb" do
       project "slurm"
-      not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmpkg}_#{slurmver}_amd64.deb") }
+      not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmpkg}_#{slurmver}_#{slurmarch}.deb") }
     end
   end
 
   slurmrpms.each do |slurmpkg|
     execute "Install #{slurmpkg}_#{slurmver}_amd64.deb" do
-      command "apt install -y #{node[:jetpack][:downloads]}/#{slurmpkg}_#{slurmver}_amd64.deb"
+      command "apt install -y #{node[:jetpack][:downloads]}/#{slurmpkg}_#{slurmver}_#{slurmarch}.deb"
       action :run
       not_if { ::File.exist?("/var/spool/slurmd") }
     end
