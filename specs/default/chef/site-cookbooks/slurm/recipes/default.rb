@@ -43,14 +43,32 @@ myplatform=node[:platform]
 case myplatform
 when 'ubuntu'
 
+  log "Package munge already installed" do
+    only_if "dpkg -l | grep -q munge"
+  end
+  log "Package munge NOT installed" do
+    not_if "dpkg -l | grep -q munge"
+  end
+
   package 'Install munge' do
     package_name 'munge'
+    not_if "dpkg -l | grep -q munge"
   end
   slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-torque slurm-openlava]
+  slurmrpms.each do |slurmpkg|
+    log "Package #{slurmpkg} already installed" do
+      only_if "dpkg -l | grep -q #{slurmpkg}"
+    end
+    log "Package #{slurmpkg} NOT installed" do
+      not_if "dpkg -l | grep -q #{slurmpkg}"
+    end
+  end
+      
   slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}_#{slurmver}_amd64.deb" do
       project "slurm"
       not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmpkg}_#{slurmver}_#{slurmarch}.deb") }
+      not_if "dpkg -l | grep -q #{slurmpkg}"      
     end
   end
 
@@ -59,6 +77,7 @@ when 'ubuntu'
       command "apt install -y #{node[:jetpack][:downloads]}/#{slurmpkg}_#{slurmver}_#{slurmarch}.deb"
       action :run
       not_if { ::File.exist?("/var/spool/slurmd") }
+      not_if "dpkg -l | grep -q #{slurmpkg}"      
     end
   end
 
@@ -95,15 +114,27 @@ when 'centos'
 
   slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
   slurmrpms.each do |slurmpkg|
+    log "Package #{slurmpkg} already installed" do
+      only_if "rpm -q #{slurmpkg}"
+    end
+    log "Package #{slurmpkg} NOT installed" do
+      not_if "rpm -q #{slurmpkg}"
+    end
+  end
+  
+  
+  slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
       project "slurm"
       not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm") }
+      not_if "rpm -q #{slurmpkg}"
     end
   end
 
   slurmrpms.each do |slurmpkg|
     package "#{node[:jetpack][:downloads]}/#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
       action :install
+      not_if "rpm -q #{slurmpkg}"
     end
   end
 end
