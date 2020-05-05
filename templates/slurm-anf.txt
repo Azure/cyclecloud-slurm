@@ -208,10 +208,14 @@ Order = 20
     Order = 5
 
         [[[parameter configuration_slurm_version]]]
-        required = True
-        label = Slurm Version
-        description = Version of Slurm to install on the cluster
-        defaultvalue = 18.08.7-1
+        Required = True
+        Label = Slurm Version
+        Description = Version of Slurm to install on the cluster
+        ParameterType = StringList
+        Config.Plugin = pico.form.Dropdown
+        Config.FreeForm = true
+        Config.Entries := {[Value="19.05.5-1"], [Value="18.08.9-1"]}
+        DefaultValue = 19.05.5-1
 
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
