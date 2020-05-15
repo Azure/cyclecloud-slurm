@@ -41,7 +41,7 @@ directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh"]
 scripts.each do |filename| 
     cookbook_file "#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}" do
         source "#{filename}"
