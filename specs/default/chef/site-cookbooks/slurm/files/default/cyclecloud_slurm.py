@@ -314,7 +314,7 @@ def _terminate_nodes(node_list, cluster_wrapper):
 
 def terminate_nodes(node_list):
     # Forces termination even if autoscale ShutdownPolicy is Deallocate
-    return _terminate(node_list, _get_cluster_wrapper())
+    return _terminate_nodes(node_list, _get_cluster_wrapper())
 
 
 def _resume(node_list, cluster_wrapper, subprocess_module):
@@ -892,6 +892,9 @@ def main(argv=None):
     create_nodes_parser.add_argument("--policy", dest="existing_policy", default=ExistingNodePolicy.Error)
     
     add_parser("remove_nodes", remove_nodes)
+    
+    terminate_parser = add_parser("terminate_nodes", terminate_nodes)
+    terminate_parser.add_argument("--node-list", type=hostlist, required=True)
     
     resume_parser = add_parser("resume", resume)
     resume_parser.add_argument("--node-list", type=hostlist, required=True)
