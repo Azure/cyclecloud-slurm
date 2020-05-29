@@ -27,6 +27,7 @@ Autoscale = $Autoscale
         cyclecloud.exports.sched.samba.enabled = false
         cyclecloud.exports.defaults.samba.enabled = false
         cshared.server.legacy_links_disabled = true
+        ganglia.install	= false
 
         [[[configuration cyclecloud.mounts.anf_shared]]]
         type = nfs
