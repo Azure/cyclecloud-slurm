@@ -179,8 +179,10 @@ cookbook_file "/etc/security/limits.d/slurm-limits.conf" do
   action :create
 end
 
+include_recipe 'slurm::accounting'
+
 service 'slurmctld' do
-  action [:enable, :start]
+  action [:enable, :restart]
 end
 
 service 'munge' do
