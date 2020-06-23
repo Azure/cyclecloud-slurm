@@ -76,7 +76,7 @@ end
 # we will be appending to this file, so that the next step is monotonic
 template '/sched/slurm.conf' do
   owner "#{slurmuser}"
-  source "slurm.conf_#{myplatform}.erb"
+  source "slurm.conf.erb"
   action :create_if_missing
   variables lazy {{
     :slurmver => slurmver,
