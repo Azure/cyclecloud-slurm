@@ -49,7 +49,8 @@ template '/sched/slurmdbd.conf' do
     variables lazy {{
         :accountdb => node[:slurm][:accounting][:url],
         :dbuser => node[:slurm][:accounting][:user],
-        :dbpass => node[:slurm][:accounting][:password]
+        :dbpass => node[:slurm][:accounting][:password],
+        :slurmver => slurmver
     }}
 end
 
@@ -58,6 +59,13 @@ link '/etc/slurm/slurmdbd.conf' do
     to '/sched/slurmdbd.conf'
     owner "#{slurmuser}"
     group "#{slurmuser}"
+end
+
+remote_file '/etc/slurm/StorageParameters=SSL_CA=/etc/slurm/BaltimoreCyberTrustRoot.crt.pem' do
+    source 'https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem'
+    owner 'slurm'
+    group 'slurm'
+    mode 0644
 end
 
 # Start slurmdbd service

@@ -1,6 +1,4 @@
 #
-# Example slurmdbd.conf file.
-#
 # See the slurmdbd.conf man page for more information.
 #
 # Archive info
@@ -32,7 +30,8 @@ PidFile=/var/run/slurmdbd.pid
 # Database info
 StorageType=accounting_storage/mysql
 StorageHost=<%= @accountdb %>
-#StoragePort=1234
 StoragePass=<%= @dbpass %>
 StorageUser=<%= @dbuser %>
-#StorageLoc=slurm_acct_db
+<% if @slurmver > "19" %>
+StorageParameters=SSL_CA=/etc/slurm/BaltimoreCyberTrustRoot.crt.pem
+<% end %>
