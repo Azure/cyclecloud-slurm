@@ -20,45 +20,33 @@ Autoscale = $Autoscale
         # Disable normal NFS exports and mounts
         cyclecloud.mounts.shared.disabled = ${NFSType != "Builtin"}
         cyclecloud.exports.shared.disabled = ${NFSType != "Builtin"}
-        cyclecloud.exports.shared.samba.enabled = ${NFSType == "Builtin"}
-        cyclecloud.mounts.sched.disabled = ${NFSType != "Builtin"}
-        cyclecloud.exports.sched.disabled = ${NFSType != "Builtin"}
-        cyclecloud.exports.sched.samba.enabled = ${NFSType == "Builtin"}
-        cyclecloud.exports.defaults.samba.enabled = ${NFSType == "Builtin"}       
+
+        cyclecloud.mounts.sched.disabled = false
+        cyclecloud.exports.sched.disabled = false
+        cyclecloud.exports.sched.samba.enabled = false
+        cyclecloud.exports.shared.samba.enabled = false
+        cyclecloud.exports.defaults.samba.enabled = false      
+
         cshared.server.legacy_links_disabled = ${NFSType != "Builtin"}
 
         [[[cluster-init cyclecloud/slurm:default]]]
         Optional = true
 
-        [[[configuration cyclecloud.mounts.anf_shared]]]
-        disabled = ${NFSType != "ANF"}
-        type = nfs
-        mountpoint = $ANFSharedMountpoint
-        export_path = $ANFSharedExport
-        address = $ANFSharedAddress
-        options = defaults,rw,hard,rsize=65536,wsize=65536,vers=3,tcp
-
-        [[[configuration cyclecloud.mounts.anf_sched]]]
-        disabled = ${NFSType != "ANF"}
-        type = nfs
-        mountpoint = $ANFSchedMountpoint
-        export_path = $ANFSchedExport
-        address = $ANFSchedAddress
-        options = defaults,rw,hard,rsize=65536,wsize=65536,vers=3,tcp
-
         [[[configuration cyclecloud.mounts.nfs_shared]]]
-        disabled = ${NFSType != "NFS"}
+        disabled = ${NFSType != "External"}
         type = nfs
         export_path = $NFSSharedExportPath
         mountpoint = $NFSSharedMountPoint
-        address = ${ifThenElse(NFSType == "NFS", regexps("^([^ ]+) .+$", NFSAddress, "\\1"), "")}
+        address = ${ifThenElse(NFSType == "External", regexps("^([^ ]+) .+$", NFSAddress, "\\1"), "")}
+        options = $NFSSharedMountOptions
 
-        [[[configuration cyclecloud.mounts.nfs_sched]]]
-        disabled = ${NFSType != "NFS"}
+        [[[configuration cyclecloud.mounts.additional_nfs]]]
+        disabled = ${AdditionalNAS isnt true}
         type = nfs
-        export_path = $NFSSchedExportPath
-        mountpoint = $NFSSchedMountPoint
-        address = ${ifThenElse(NFSType == "NFS", regexps("^([^ ]+) .+$", NFSAddress, "\\1"), "")}
+        address = $AdditonalNFSAddress
+        mountpoint = $AdditionalNFSMountPoint
+        export_path = $AdditionalNFSExportPath
+        options = $AdditionalNFSMountOptions
 
     [[node master]]
     MachineType = $MasterMachineType
@@ -73,9 +61,38 @@ Autoscale = $Autoscale
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
 
-        [[[input-endpoint ganglia]]]
-        PrivatePort = 8652
-        PublicPort = 8652
+        [[[volume sched]]]
+        Size = 1024
+        SSD = True
+        Mount = sched
+        Persistent = False
+
+        [[[configuration cyclecloud.mounts.nfs_sched]]]
+        mountpoint = /mnt/exports/sched
+        fs_type = xfs
+
+        [[[configuration cyclecloud.exports.nfs_sched]]]
+        export_path = /mnt/exports/sched
+        options = no_root_squash
+        samba.enabled = false
+        type = nfs
+
+        [[[volume nfs-shared]]]
+        Size = $FilesystemSize
+        SSD = True
+        Mount = shared
+        Persistent = $FileSystemPersistence
+
+        [[[configuration cyclecloud.mounts.shared]]]
+        disabled = ${NFSType != "Builtin"}
+        mountpoint = /shared
+        fs_type = xfs
+
+        [[[configuration cyclecloud.exports.shared]]]
+        disabled = ${NFSType != "Builtin"}
+        export_path = /shared
+        samba.enabled = false
+        type = nfs
 
 
     [[nodearray hpc]]
@@ -208,19 +225,25 @@ Order = 10
         ParameterType = Azure.Subnet
         Required = True
 
-[parameters Filer]
+[parameters Network Attached Storage]
 Order = 15
 
-    [[parameter NFSType]]
+    [[parameters /shared]]
+        [[[parameter About shared]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>The directory <code>/shared</code> is a network attached mount and exists in all nodes of the cluster.<br><br>There are two options for providing this mount:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.</p>"
+        Order = 20
+
+    [[[parameter NFSType]]]
     Label = NFS Type
     ParameterType = StringList
     Config.Label = Type of NFS to use for this cluster
     Config.Plugin = pico.form.Dropdown
-    Config.Entries := {[Label="Azure NetApp Files (Medium to Large)"; Value="ANF"], [Label="NFS Cluster (Small to Medium)"; Value="NFS"], [Label="Use scheduler (Small)"; Value="Builtin"]}
+    Config.Entries := {[Label="External NFS"; Value="External"], [Label="Use Builtin"; Value="Builtin"]}
     DefaultValue = Builtin
-    #DefaultValue := {"ANF", "NFS", "Built-in"}
 
-    [[parameter NFSAddress]]
+    [[[parameter NFSAddress]]]
     Label = NFS IP Address
     Description = The ip address of the NFS serve
     Config.Plugin = pico.form.QueryDropdown
@@ -229,68 +252,84 @@ Order = 15
     Config.ParameterType = String
     Config.PlaceHolderText = "Select or enter an IP address"
     Config.FreeForm = true
-    Conditions.Excluded := NFSType != "NFS"
+    Conditions.Excluded := NFSType != "External"
 
-    [[parameter NFSSharedMountPoint]]
+    [[[parameter NFSSharedMountPoint]]]
     Label = Shared Mount Point
     Description = The path at which to mount the Filesystem
     DefaultValue = /shared
-    Conditions.Excluded := NFSType != "NFS"
+    Conditions.Excluded := NFSType != "External"
 
-    [[parameter NFSSharedExportPath]]
+    [[[parameter NFSSharedExportPath]]]
     Label = Shared Export Path
     Description = The path exported by the file system
-    DefaultValue = /mnt/exports/data/shared
-    Conditions.Excluded := NFSType != "NFS"
+    DefaultValue = /mnt/exports/shared
+    Conditions.Excluded := NFSType != "External"
 
-    [[parameter NFSSchedMountPoint]]
-    Label = Sched Mount Point
+    [[[parameter NFSSharedMountOptions]]]
+    Label = NFS Mount Options
+    Description = NFS Client Mount Options
+    Conditions.Excluded := NFSType != "External"
+
+    [[[parameter FilesystemSize]]]
+    Label = Size (GB)
+    Description = The filesystem size
+    DefaultValue = 100
+
+    Config.Plugin = pico.form.NumberTextBox
+    Config.MinValue = 10
+    Config.MaxValue = 10240
+    Config.IntegerOnly = true
+    Conditions.Excluded := NFSType != "Builtin"
+
+    [[[parameter FileSystemPersistence]]]
+    Conditions.Excluded := NFSType != "Builtin"
+    Label = Filesystem Persistence
+    DefaultValue = true
+    Config.Plugin = pico.form.RadioButtonsControl
+        [[[[list Config.Entries]]]]
+        Name = false
+        Label = Ephemeral
+        [[[[list Config.Entries]]]]
+        Name = true
+        Label = Persistent
+
+    [[parameters Additional NFS Mount]]
+        [[[parameter Additional NFS Mount Readme]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>Mount another NFS endpoint on the cluster nodes</p>"
+        Order = 20
+
+        [[[parameter AdditionalNAS]]]
+        HideLabel = true
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Add NFS mount
+
+    [[[parameter AdditonalNFSAddress]]]
+    Label = NFS IP Address or hostname
+    Description = The ip address or hostname of the NFS server
+    Config.ParameterType = String
+    Conditions.Excluded := AdditionalNAS isnt true
+
+    [[[parameter AdditionalNFSMountPoint]]]
+    Label = NFS Mount Point
     Description = The path at which to mount the Filesystem
-    DefaultValue = /sched
-    Conditions.Excluded := NFSType != "NFS"
+    DefaultValue = /data
+    Conditions.Excluded := AdditionalNAS isnt true
 
-    [[parameter NFSSchedExportPath]]
-    Label = Sched Export Path
+    [[[parameter AdditionalNFSExportPath]]]
+    Label = NFS Server Export Path
     Description = The path exported by the file system
-    DefaultValue = /mnt/exports/data/sched
-    Conditions.Excluded := NFSType != "NFS"
+    DefaultValue = /data
+    Conditions.Excluded := AdditionalNAS isnt true
 
-    [[parameter ANFSharedMountpoint]]
-    Label = ANF Shared Mountpoint
-    Config.Label = Path to mount ANF shared volume
-    DefaultValue = /shared
-    Conditions.Excluded := NFSType != "ANF"
-
-    [[parameter ANFSharedExport]]
-    Label = ANF Shared Export
-    Config.Label = ANF Shared export to mount
-    DefaultValue = /shared
-    Conditions.Excluded := NFSType != "ANF"
-
-    [[parameter ANFSharedAddress]]
-    Label = ANF Shared Filer Address
-    Config.Label = ANF IP or hostname
-    DefaultValue = localhost
-    Conditions.Excluded := NFSType != "ANF"
-
-    [[parameter ANFSchedMountpoint]]
-    Label = ANF Scheduler Mountpoint
-    Config.Label = Path to mount ANF scheduler volume
-    DefaultValue = /sched
-    Conditions.Excluded := NFSType != "ANF"
-
-    [[parameter ANFSchedExport]]
-    Label = ANF Sched Export
-    Config.Label = ANF Sched export to mount
-    DefaultValue = /sched
-    Conditions.Excluded := NFSType != "ANF"
-
-    [[parameter ANFSchedAddress]]
-    Label = ANF Sched Filer Address
-    Config.Label = ANF IP or hostname
-    DefaultValue = localhost
-    Conditions.Excluded := NFSType != "ANF"
-
+    [[[parameter AdditionalNFSMountOptions]]]
+    Label = NFS Mount Options
+    Description = NFS Client Mount Options
+    Conditions.Excluded := AdditionalNAS isnt true
+  
 
 [parameters Advanced Settings]
 Order = 20
