@@ -1,3 +1,4 @@
+
 ################################
 ## Cluster Configuration File ##
 ################################
@@ -15,10 +16,16 @@ Autoscale = $Autoscale
     Region = $Region
     KeyPairLocation = ~/.ssh/cyclecloud.pem
     
+    # Slurm autoscaling supports both Terminate and Deallocate shutdown policies
+    ShutdownPolicy = $configuration_slurm_shutdown_policy
+
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
-        # Disable normal NFS exports and mounts
 
+        # For fast spin-up after Deallocate, force an immediate re-converge on boot
+        cyclecloud.converge_on_boot = true
+
+        # Disable normal NFS exports and mounts
         cyclecloud.mounts.sched.disabled = true
         cyclecloud.mounts.shared.disabled = true
         cyclecloud.exports.sched.disabled = true
@@ -105,7 +112,7 @@ Autoscale = $Autoscale
     ImageName = $HPCImageName
     MaxCoreCount = $MaxHPCExecuteCoreCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
-    AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+    AdditionalClusterInitSpecs = $HPCClusterInitSpecs
 
 
         [[[configuration]]]
@@ -126,7 +133,7 @@ Autoscale = $Autoscale
     MaxCoreCount = $MaxHTCExecuteCoreCount
 
     Interruptible = $HTCUseLowPrio
-    AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+    AdditionalClusterInitSpecs = $HTCClusterInitSpecs
 
 
         [[[configuration]]]
@@ -341,6 +348,20 @@ Order = 20
         Config.Entries := {[Value="19.05.5-1"], [Value="18.08.9-1"]}
         DefaultValue = 19.05.5-1
 
+        [[[parameter configuration_slurm_shutdown_policy]]]
+	Label = ShutdownPolicy
+        description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.
+        DefaultValue = Terminate
+        config.plugin = pico.control.AutoCompleteDropdown
+            [[[[list Config.Entries]]]]
+            Name = Terminate
+            Label = Terminate
+            [[[[list Config.Entries]]]]
+            Name = Deallocate
+            Label = Deallocate
+	
+
+
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
     Order = 10
@@ -350,7 +371,6 @@ Order = 20
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.centos7
-        # TODO restore ubuntu 
         Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
 
         [[[parameter HPCImageName]]]
@@ -373,11 +393,18 @@ Order = 20
         Description = Cluster init specs to apply to the master node
         ParameterType = Cloud.ClusterInitSpecs
     
-        [[[parameter ExecuteClusterInitSpecs]]]
-        Label = Execute Cluster-Init
+        [[[parameter HTCClusterInitSpecs]]]
+        Label = HTC Cluster-Init
         DefaultValue = =undefined
-        Description = Cluster init specs to apply to execute nodes
+        Description = Cluster init specs to apply to HTC execute nodes
         ParameterType = Cloud.ClusterInitSpecs
+        
+        [[[parameter HPCClusterInitSpecs]]]
+        Label = HPC Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to HPC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+	
 
     [[parameters Advanced Networking]]
     Description = Advanced networking settings
