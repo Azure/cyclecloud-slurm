@@ -137,6 +137,7 @@ Autoscale = $Autoscale
     MaxCoreCount = $MaxHTCExecuteCoreCount
 
     Interruptible = $HTCUseLowPrio
+    MaxPrice = $HTCSpotMaxPrice
     AdditionalClusterInitSpecs = $HTCClusterInitSpecs
 
 
@@ -229,10 +230,19 @@ Order = 10
 
 
         [[[parameter HTCUseLowPrio]]]
-        Label = Low Priority
+        Label = Spot
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
-        Widget.Label = Use low priority instances for HTC execute hosts
+        Widget.Label = Use Spot VMs for HTC execute hosts
+
+        [[[parameter HTCSpotMaxPrice]]]
+        Label = Max Price
+        DefaultValue = -1
+        Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
+        Config.Plugin = pico.form.NumberTextBox
+        Conditions.Excluded := HTCUseLowPrio isnt true
+        Config.MinValue = -1
+
 
     [[parameters Networking]]
     Order = 40
