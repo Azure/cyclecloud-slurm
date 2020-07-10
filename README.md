@@ -51,10 +51,10 @@ To override the UID and GID, click the edit button for both the `scheduler` node
 
 ![Alt](/images/schedulernodeedit.png "Edit Scheduler Node")
 
-And the `execute` nodearray:
+And for each nodearray, for example the `htc` array:
 ![Alt](/images/nodearraytab.png "Edit nodearray")
 
- and add the following attributes to the `Configuration` section:
+ and add the following attributes at the end of the `Configuration` section:
 
 
 ![Alt](/images/nodearrayedit.png "Edit configuration")
