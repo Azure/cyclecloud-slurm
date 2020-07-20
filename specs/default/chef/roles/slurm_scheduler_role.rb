@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-name "slurm_master_role"
-description "Slurm Master Role"
+name "slurm_scheduler_role"
+description "Slurm Scheduler Role"
 run_list("role[scheduler]",
   "recipe[cyclecloud]",
   "recipe[cshared::directories]",
