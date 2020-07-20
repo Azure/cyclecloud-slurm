@@ -24,7 +24,7 @@ Autoscale = $Autoscale
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
         slurm.accounting.url = $configuration_slurm_accounting_url
         slurm.accounting.user = $configuration_slurm_accounting_user
-        slurm.accounting.password = $configuration_slurm_accounting_passwor
+        slurm.accounting.password = $configuration_slurm_accounting_password
 
         # For fast spin-up after Deallocate, force an immediate re-converge on boot
         cyclecloud.converge_on_boot = true
