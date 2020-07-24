@@ -54,7 +54,7 @@ end
 # TODO either change name to cyclecloud-api.tar.gz or make the name configurable
 bash 'Install cyclecloud python api' do
   code <<-EOH
-    jetpack download --project slurm cyclecloud-api-7.9.2.tar.gz cyclecloud-api.tar.gz || exit 1;
+    jetpack download --project slurm cyclecloud-api-7.9.7.tar.gz cyclecloud-api.tar.gz || exit 1;
     /opt/cycle/jetpack/system/embedded/bin/pip install cyclecloud-api.tar.gz || exit 1;
     rm -f cyclecloud-api.tar.gz;
     touch /etc/cyclecloud-api.installed
