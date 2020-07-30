@@ -28,18 +28,31 @@ class CyclecloudSlurmError(RuntimeError):
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vcpu_count, memory, max_vm_count, dampen_memory=.05):
+    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vm, max_vm_count, dampen_memory=.05):
         self.name = name
         self.nodearray = nodearray
         self.machine_type = machine_type
         self.is_default = is_default
         self.is_hpc = is_hpc
         self.max_scaleset_size = max_scaleset_size
-        self.vcpu_count = vcpu_count
-        self.memory = memory
+        self.vcpu_count = vm.vcpu_count
+        self.memory = vm.memory
         self.max_vm_count = max_vm_count
         self.node_list = None
         self.dampen_memory = dampen_memory
+        self.vm = vm
+
+    @property
+    def pcpu_count(self):
+        if hasattr(self.vm, "pcpu_count"):
+            return self.vm.pcpu_count
+        return self.vcpu_count
+
+    @property
+    def gpu_count(self):
+        if hasattr(self.vm, "gpu_count"):
+            return self.vm.gpu_count
+        return 0
 
 
 def fetch_partitions(cluster_wrapper, subprocess_module):
@@ -77,7 +90,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
             continue
         
         machine_types = nodearray_record.get("MachineType", "")
-        if isinstance(machine_types, basestring):
+        if not isinstance(machine_types, list):
             machine_types = machine_types.split(",")
         
         if len(machine_types) > 1:
@@ -99,13 +112,13 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                 break
         
         if bucket is None:
-            logging.error("Invalid status response - missing bucket with machinetype=='%s', %s", machine_type, json.dumps(status_response))
-            return 1
+            logging.error("Invalid status response - missing bucket with machinetype=='%s', %s", machine_type, _dump_response(status_response))
+            sys.exit(1)
         
         vm = bucket.virtual_machine
         if not vm:
-            logging.error("Invalid status response - missing virtualMachine definition with machinetype=='%s', %s", machine_type, json.dumps(status_response))
-            return 1
+            logging.error("Invalid status response - missing virtualMachine definition with machinetype=='%s', %s", machine_type, _dump_response(status_response))
+            sys.exit(1)
         
         if bucket.max_count is None:
             logging.error("No max_count defined for  machinetype=='%s'. Skipping", machine_type)
@@ -130,8 +143,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                                                slurm_config.get("default_partition", False),
                                                is_hpc,
                                                max_scaleset_size,
-                                               vm.vcpu_count,
-                                               vm.memory,
+                                               vm,
                                                bucket.max_count,
                                                dampen_memory=dampen_memory)
         
@@ -145,7 +157,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
             sorted_nodes = sorted(existing_nodes, key=_get_sort_key_func(partitions[partition_name].is_hpc))
             partitions[partition_name].node_list = _to_hostlist(subprocess_module, ",".join(sorted_nodes))
     
-    partitions_list = partitions.values()
+    partitions_list = list(partitions.values())
     default_partitions = [p for p in partitions_list if p.is_default]
     
     if len(default_partitions) == 0:
@@ -209,8 +221,9 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         
         memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
         memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
-        cpus_with_ht = partition.vcpu_count / _get_thread_count(partition)
-        def_mem_per_cpu = memory / cpus_with_ht
+        def_mem_per_cpu = memory / partition.pcpu_count
+        cores_per_socket = max(1, partition.pcpu_count / partition.vcpu_count)
+
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
         writer.write("# would result in the nodes being rejected by Slurm if they report a number less than defined here.\n")
@@ -226,11 +239,13 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
             node_list = _to_hostlist(subprocess_module, ",".join((subset_of_nodes)))
             # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
             
-            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} RealMemory={}\n".format(node_list, cpus_with_ht, memory))
+            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} CoresPerSocket={} RealMemory={}".format(
+                         node_list, partition.pcpu_count, cores_per_socket, memory))
+            
+            if partition.gpu_count:
+                writer.write(" Gres=gpu:{}".format(partition.gpu_count))
 
-
-def _get_thread_count(partition):
-    return 1
+            writer.write("\n")
 
 
 def _get_sort_key_func(is_hpc):
@@ -725,7 +740,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     logging.info("Restarting slurmctld...")
     subprocess_module.check_call(["slurmctld", "restart"])
     
-    new_topology = _retry_subprocess(lambda: subprocess_module.check_output(["scontrol", "show", "topology"]))
+    new_topology = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "topology"]))
     logging.info("New topology:\n%s", new_topology)
     
     logging.info("")
@@ -791,15 +806,17 @@ def _init_logging(logfile):
 
 def _retry_rest(func, attempts=5):
     attempts = max(1, attempts)
+    last_exception = None
     for attempt in range(1, attempts + 1):
         try:
             return func()
         except Exception as e:
+            last_exception = e
             logging.debug(traceback.format_exc())
             
             time.sleep(attempt * attempt)
     
-    raise CyclecloudSlurmError(str(e))
+    raise CyclecloudSlurmError(str(last_exception))
 
 
 def _retry_subprocess(func, attempts=5):
@@ -819,14 +836,14 @@ def _to_hostlist(subprocess_module, nodes):
     '''
         convert name-[1-5] into name-1 name-2 name-3 name-4 name-5
     '''
-    return _retry_subprocess(lambda: subprocess_module.check_output(["scontrol", "show", "hostlist", nodes])).strip()
+    return _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "hostlist", nodes])).strip()
 
 
 def _from_hostlist(subprocess_module, hostlist_expr):
     '''
         convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
     '''
-    stdout = _retry_subprocess(lambda: subprocess_module.check_output(["scontrol", "show", "hostnames", hostlist_expr]))
+    stdout = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "hostnames", hostlist_expr]))
     return [x.strip() for x in stdout.split()]
 
 
@@ -935,6 +952,22 @@ def main(argv=None):
     else:
         initialize_config(args.config, args.cluster_name, args.username, args.password, args.url, args.force)
 
+
+def _check_output(subprocess_module, *args, **kwargs):
+    ret = subprocess_module.check_output(*args, **kwargs)
+    if not isinstance(ret, str):
+        ret = ret.decode()
+    return ret
+
+
+def _dump_response(status_response):
+
+    def default_to_json(r):
+        if hasattr(r, "to_dict"):
+            return r.to_dict()
+        return str(x)
+
+    return json.dumps(status_response, default=default_to_json)
 
 if __name__ == "__main__":
     try:
