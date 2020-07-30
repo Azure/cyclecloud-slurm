@@ -21,10 +21,6 @@ Autoscale = $Autoscale
 
         [[[configuration]]]
         slurm.version = $configuration_slurm_version
-        slurm.accounting.enabled = $configuration_slurm_accounting_enabled
-        slurm.accounting.url = $configuration_slurm_accounting_url
-        slurm.accounting.user = $configuration_slurm_accounting_user
-        slurm.accounting.password = $configuration_slurm_accounting_password
 
         # For fast spin-up after Deallocate, force an immediate re-converge on boot
         cyclecloud.converge_on_boot = true
@@ -177,6 +173,7 @@ Order = 10
         Label = Region
         Description = Deployment Location
         ParameterType = Cloud.Region
+        DefaultValue = westus2
 
         [[[parameter SchedulerMachineType]]]
         Label = Scheduler VM Type
@@ -365,28 +362,6 @@ Order = 20
         Config.Entries := {[Value="19.05.5-1"], [Value="18.08.9-1"]}
         DefaultValue = 19.05.5-1
 
-        [[[parameter configuration_slurm_accounting_enabled]]]
-        Label = Job Accounting
-        DefaultValue = false
-        Widget.Plugin = pico.form.BooleanCheckBox
-        Widget.Label = Configure Slurm job accounting
-
-        [[[parameter configuration_slurm_accounting_url]]]
-        Label = Slurm DBD URL
-        Description = URL of the database to use for Slurm job accounting
-        Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-
-        [[[parameter configuration_slurm_accounting_user]]]
-        Label = Slurm DBD User
-        Description = User for Slurm DBD admin
-        Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-
-        [[[parameter configuration_slurm_accounting_password]]]
-        Label = Slurm DBD Password
-        Description = Password for Slurm DBD admin
-        ParameterType = Password
-        Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-        
         [[[parameter configuration_slurm_shutdown_policy]]]
 	Label = ShutdownPolicy
         description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.

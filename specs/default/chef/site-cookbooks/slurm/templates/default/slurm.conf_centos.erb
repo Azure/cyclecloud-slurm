@@ -1,0 +1,36 @@
+MpiDefault=none
+ProctrackType=proctrack/cgroup
+ReturnToService=2
+PropagateResourceLimits=ALL
+SlurmctldPidFile=/var/run/slurmctld.pid
+SlurmdPidFile=/var/run/slurmd.pid
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmUser="<%= node[:slurm][:user][:name] %>"
+StateSaveLocation=/var/spool/slurmd
+SwitchType=switch/none
+TaskPlugin=task/affinity,task/cgroup
+SchedulerType=sched/backfill
+SelectType=select/cons_res
+SelectTypeParameters=CR_Core_Memory
+AccountingStorageType=accounting_storage/none
+ClusterName=cluster
+JobAcctGatherType=jobacct_gather/none
+SlurmctldDebug=debug
+SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
+<% if @slurmver > "18" %>
+SlurmctldParameters=idle_on_node_suspend
+<% end %>
+SlurmdDebug=debug
+SlurmdLogFile=/var/log/slurmd/slurmd.log
+TopologyPlugin=topology/tree
+JobSubmitPlugins=job_submit/cyclecloud
+PrivateData=cloud
+TreeWidth=65533
+ResumeTimeout=<%= @resume_timeout %>
+SuspendTimeout=<%= @suspend_timeout %>
+SuspendTime=<%= @suspend_time %>
+ResumeProgram=<%= @bootstrap %>/resume_program.sh
+ResumeFailProgram=<%= @bootstrap %>/resume_fail_program.sh
+SuspendProgram=<%= @bootstrap %>/suspend_program.sh
+SchedulerParameters=max_switch_wait=24:00:00
+Include cyclecloud.conf
