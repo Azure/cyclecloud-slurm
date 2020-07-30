@@ -61,7 +61,7 @@ link '/etc/slurm/slurmdbd.conf' do
     group "#{slurmuser}"
 end
 
-remote_file '/etc/slurm/StorageParameters=SSL_CA=/etc/slurm/BaltimoreCyberTrustRoot.crt.pem' do
+remote_file '/etc/slurm/BaltimoreCyberTrustRoot.crt.pem' do
     source 'https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem'
     owner 'slurm'
     group 'slurm'
