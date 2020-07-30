@@ -76,7 +76,7 @@ end
 # we will be appending to this file, so that the next step is monotonic
 template '/sched/slurm.conf' do
   owner "#{slurmuser}"
-  source "slurm.conf_#{myplatform}.erb"
+  source "slurm.conf.erb"
   action :create_if_missing
   variables lazy {{
     :slurmver => slurmver,
@@ -179,8 +179,10 @@ cookbook_file "/etc/security/limits.d/slurm-limits.conf" do
   action :create
 end
 
+include_recipe 'slurm::accounting'
+
 service 'slurmctld' do
-  action [:enable, :start]
+  action [:enable, :restart]
 end
 
 service 'munge' do
