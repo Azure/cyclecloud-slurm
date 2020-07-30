@@ -20,8 +20,3 @@ default[:munge][:user][:gid] = 11101
 default[:slurm][:suspend_timeout] = 600
 # Boot timeout
 default[:slurm][:resume_timeout] = 1800
-
-default[:slurm][:accounting][:enabled] = false
-default[:slurm][:accounting][:user] = 'admin'
-default[:slurm][:accounting][:password] = 'admin'
-default[:slurm][:accounting][:url] = 'localhost'
