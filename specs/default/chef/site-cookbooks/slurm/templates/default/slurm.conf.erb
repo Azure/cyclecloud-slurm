@@ -33,7 +33,7 @@ ResumeProgram=<%= @bootstrap %>/resume_program.sh
 ResumeFailProgram=<%= @bootstrap %>/resume_fail_program.sh
 SuspendProgram=<%= @bootstrap %>/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
-<% if @accountingenabled = true %>
+<% if @accountingenabled == true %>
 AccountingStorageType=accounting_storage/slurmdbd
 AccountingStorageHost="localhost"
 <% else %>

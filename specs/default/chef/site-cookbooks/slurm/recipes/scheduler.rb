@@ -84,7 +84,8 @@ template '/sched/slurm.conf' do
     :bootstrap => "#{node[:cyclecloud][:bootstrap]}/slurm",
     :resume_timeout => node[:slurm][:resume_timeout],
     :suspend_timeout => node[:slurm][:suspend_timeout],
-    :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs]
+    :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
+    :accountingenabled => node[:slurm][:accounting][:enabled]
   }}
 end
 
