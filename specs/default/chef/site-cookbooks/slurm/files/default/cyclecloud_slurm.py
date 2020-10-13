@@ -221,8 +221,8 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         
         memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
         memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
-        def_mem_per_cpu = memory / partition.pcpu_count
-        cores_per_socket = max(1, partition.pcpu_count / partition.vcpu_count)
+        def_mem_per_cpu = memory // partition.pcpu_count
+        cores_per_socket = max(1, partition.pcpu_count // partition.vcpu_count)
 
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
@@ -369,7 +369,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 _retry_subprocess(lambda: subprocess_module.check_call(cmd))
                 updated_node_addrs.add(name)
                 
-        terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).itervalues()) + states.get("Failed", 0)
+        terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).values()) + states.get("Failed", 0)
         
         if states != previous_states:
             states_messages = []
@@ -416,7 +416,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
     
     nodearray_counts = {}
      
-    for partition in partitions.itervalues():
+    for partition in partitions.values():
         placement_group_base = "{}-{}-pg".format(partition.nodearray, partition.machine_type)
         if partition.is_hpc:
             name_format = "{}-pg{}-%d"
@@ -433,7 +433,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         valid_node_names = set()
         
         for index in range(partition.max_vm_count):
-            placement_group_index = index / partition.max_scaleset_size
+            placement_group_index = index // partition.max_scaleset_size
             placement_group = placement_group_base + str(placement_group_index)
             
             if current_pg_index != placement_group_index:
@@ -462,7 +462,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         if unreferenced_nodes and unreferenced_policy == UnreferencedNodePolicy.RemoveSafely:
             _remove_nodes(cluster_wrapper, subprocess_module, unreferenced_nodes)
             
-    for key, instance_count in sorted(nodearray_counts.iteritems(), key=lambda x: x[0]):
+    for key, instance_count in sorted(nodearray_counts.items(), key=lambda x: x[0]):
         partition_name, pg, pg_index, name_offset = key
         partition = partitions[partition_name]
         
@@ -936,7 +936,8 @@ def main(argv=None):
     init_parser.add_argument("--force", action="store_true", default=False, required=False)
     
     args = parser.parse_args(argv)
-    _init_logging(args.logfile)
+    if hasattr(args, "logfile"):
+        _init_logging(args.logfile)
     
     if args.func != initialize_config:
         if not os.path.exists(args.config):

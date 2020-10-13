@@ -3,7 +3,6 @@
 # Licensed under the MIT License.
 #
 
-import cStringIO
 from collections import OrderedDict
 import logging
 import unittest
@@ -24,6 +23,11 @@ import tempfile
 import os
 import json
 
+
+try:
+    import cStringIO
+except ImportError:
+    from io import StringIO as cStringIO
 
 logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
