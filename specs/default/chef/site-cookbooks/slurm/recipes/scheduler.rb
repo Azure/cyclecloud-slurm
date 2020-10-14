@@ -180,6 +180,21 @@ cookbook_file "/etc/security/limits.d/slurm-limits.conf" do
   action :create
 end
 
+directory "/etc/systemd/system/slurmctld.service.d" do
+  owner "root"
+  group "root"
+  mode "0755"
+end 
+
+cookbook_file "/etc/systemd/system/slurmctld.service.d/override.conf" do
+  source "slurmctld.override"
+  owner "root"
+  group "root"
+  mode "0644"
+  action :create
+end
+
+
 include_recipe 'slurm::accounting'
 
 service 'slurmctld' do
