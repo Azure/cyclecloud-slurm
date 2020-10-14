@@ -12,6 +12,7 @@ import shutil
 import sys
 import time
 import traceback
+import csv
 from uuid import uuid4
 
 from clusterwrapper import ClusterWrapper
@@ -765,7 +766,70 @@ def _nodeaddrs(cluster_wrapper, writer):
 def nodeaddrs():
     cluster_wrapper = _get_cluster_wrapper()
     _nodeaddrs(cluster_wrapper, sys.stdout)
+
+def _nodeinfo_sinfo(subprocess_module, nodelist=None):
+    cmd = ["sinfo", "-N", "-h", "-o", '"%N %T"']
     
+    if nodelist is not None:
+        cmd.extend(["--nodes", ",".join(nodelist)])
+ 
+    return _retry_subprocess(lambda: subprocess_module.check_output(cmd)).decode("utf-8").replace('"','').splitlines()
+    
+
+def _nodeinfo(cluster_wrapper, nodelist, subprocess_module, writer, show_all=False, list_nodes=False):
+
+    writer.writerow(["Node-Name", "Slurm-State", "IpAddr", "Hostname",  "CC-Node-State", "CC-Node-Status", "Azure-VM-SKU" ])
+
+    _, cluster_node_list = _retry_rest(cluster_wrapper.get_nodes)
+    
+    nodes_by_name = {}
+    for node in cluster_node_list.nodes:
+        nodes_by_name[node["Name"]] = node
+    
+    aggregated_node_status = {}
+    for [node_name, slurm_status] in  [x.split(" ") for x in _nodeinfo_sinfo(subprocess_module, nodelist)]:
+        node = nodes_by_name[node_name]
+        ip = node.get("PrivateIp","-")
+        hostname = node.get("Hostname","-")
+        vmsku = node.get("MachineType","-")
+        node_state = node.get("State","-")
+        node_status = node.get("Status","-")
+        target_state = node.get("TargetState","-")
+
+        show = True
+
+        if (node_status == "Off"):
+            if ((node_state != '-') and (node_state != 'Terminated')) or (show_all): 
+                # cyclecloud caches info nodes that have not been removed 
+                # Clear out these values if node is in the "Off" state
+                ip = "-"
+                hostname = "-"
+                show = True
+            else:
+                show = False
+        
+        if show:
+            if list_nodes:
+                writer.writerow([node_name, slurm_status, ip, hostname,  node_state, node_status, vmsku ])
+            else:
+                if aggregated_node_status.get((slurm_status, ip, hostname,  node_state, node_status, vmsku)):
+                    aggregated_node_status[(slurm_status, ip, hostname,  node_state, node_status, vmsku)].append(node_name)
+                else:
+                    aggregated_node_status[(slurm_status, ip, hostname,  node_state, node_status, vmsku)]=[node_name]    
+    
+    if not list_nodes:
+        for (slurm_status, ip, hostname,  node_state, node_status, vmsku) in aggregated_node_status:
+            node_name_list = ",".join(aggregated_node_status[(slurm_status, ip, hostname,  node_state, node_status, vmsku)])
+            hostlist = _to_hostlist(subprocess_module,node_name_list)
+            writer.writerow([hostlist, slurm_status, ip, hostname,  node_state, node_status, vmsku ])
+
+
+def nodeinfo(node_list, show_all, list_nodes):
+    cluster_wrapper = _get_cluster_wrapper()
+    subprocess = _subprocess_module()
+    _nodeinfo(cluster_wrapper, node_list, subprocess, csv.writer(sys.stdout, delimiter="\t"), show_all, list_nodes)
+
+
         
 def _init_logging(logfile):
     import logging.handlers
@@ -928,6 +992,11 @@ def main(argv=None):
     
     add_parser("nodeaddrs", nodeaddrs)
     
+    nodeinfo_parser = add_parser("nodeinfo", nodeinfo)
+    nodeinfo_parser.add_argument("--node-list", type=hostlist, required=False)
+    nodeinfo_parser.add_argument("-a","--all", dest="show_all", action='store_true', required=False)
+    nodeinfo_parser.add_argument("-N", dest="list_nodes", action='store_true', required=False)
+
     init_parser = add_parser("initialize", initialize_config)
     init_parser.add_argument("--cluster-name", required=True)
     init_parser.add_argument("--username", required=True)
