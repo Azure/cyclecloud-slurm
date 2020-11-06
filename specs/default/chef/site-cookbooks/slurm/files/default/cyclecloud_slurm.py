@@ -12,6 +12,7 @@ import shutil
 import sys
 import time
 import traceback
+import csv
 from uuid import uuid4
 
 from clusterwrapper import ClusterWrapper
@@ -221,8 +222,8 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         
         memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
         memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
-        def_mem_per_cpu = memory / partition.pcpu_count
-        cores_per_socket = max(1, partition.pcpu_count / partition.vcpu_count)
+        def_mem_per_cpu = memory // partition.pcpu_count
+        cores_per_socket = max(1, partition.pcpu_count // partition.vcpu_count)
 
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
@@ -369,7 +370,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 _retry_subprocess(lambda: subprocess_module.check_call(cmd))
                 updated_node_addrs.add(name)
                 
-        terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).itervalues()) + states.get("Failed", 0)
+        terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).values()) + states.get("Failed", 0)
         
         if states != previous_states:
             states_messages = []
@@ -416,7 +417,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
     
     nodearray_counts = {}
      
-    for partition in partitions.itervalues():
+    for partition in partitions.values():
         placement_group_base = "{}-{}-pg".format(partition.nodearray, partition.machine_type)
         if partition.is_hpc:
             name_format = "{}-pg{}-%d"
@@ -433,7 +434,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         valid_node_names = set()
         
         for index in range(partition.max_vm_count):
-            placement_group_index = index / partition.max_scaleset_size
+            placement_group_index = index // partition.max_scaleset_size
             placement_group = placement_group_base + str(placement_group_index)
             
             if current_pg_index != placement_group_index:
@@ -462,7 +463,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         if unreferenced_nodes and unreferenced_policy == UnreferencedNodePolicy.RemoveSafely:
             _remove_nodes(cluster_wrapper, subprocess_module, unreferenced_nodes)
             
-    for key, instance_count in sorted(nodearray_counts.iteritems(), key=lambda x: x[0]):
+    for key, instance_count in sorted(nodearray_counts.items(), key=lambda x: x[0]):
         partition_name, pg, pg_index, name_offset = key
         partition = partitions[partition_name]
         
@@ -765,7 +766,70 @@ def _nodeaddrs(cluster_wrapper, writer):
 def nodeaddrs():
     cluster_wrapper = _get_cluster_wrapper()
     _nodeaddrs(cluster_wrapper, sys.stdout)
+
+def _nodeinfo_sinfo(subprocess_module, nodelist=None):
+    cmd = ["sinfo", "-N", "-h", "-o", '"%N %T"']
     
+    if nodelist is not None:
+        cmd.extend(["--nodes", ",".join(nodelist)])
+ 
+    return _retry_subprocess(lambda: subprocess_module.check_output(cmd)).decode("utf-8").replace('"','').splitlines()
+    
+
+def _nodeinfo(cluster_wrapper, nodelist, subprocess_module, writer, show_all=False, list_nodes=False):
+
+    writer.writerow(["Node-Name", "Slurm-State", "IpAddr", "Hostname",  "CC-Node-State", "CC-Node-Status", "Azure-VM-SKU" ])
+
+    _, cluster_node_list = _retry_rest(cluster_wrapper.get_nodes)
+    
+    nodes_by_name = {}
+    for node in cluster_node_list.nodes:
+        nodes_by_name[node["Name"]] = node
+    
+    aggregated_node_status = {}
+    for [node_name, slurm_status] in  [x.split(" ") for x in _nodeinfo_sinfo(subprocess_module, nodelist)]:
+        node = nodes_by_name[node_name]
+        ip = node.get("PrivateIp","-")
+        hostname = node.get("Hostname","-")
+        vmsku = node.get("MachineType","-")
+        node_state = node.get("State","-")
+        node_status = node.get("Status","-")
+        target_state = node.get("TargetState","-")
+
+        show = True
+
+        if (node_status == "Off"):
+            if ((node_state != '-') and (node_state != 'Terminated')) or (show_all): 
+                # cyclecloud caches info nodes that have not been removed 
+                # Clear out these values if node is in the "Off" state
+                ip = "-"
+                hostname = "-"
+                show = True
+            else:
+                show = False
+        
+        if show:
+            if list_nodes:
+                writer.writerow([node_name, slurm_status, ip, hostname,  node_state, node_status, vmsku ])
+            else:
+                if aggregated_node_status.get((slurm_status, ip, hostname,  node_state, node_status, vmsku)):
+                    aggregated_node_status[(slurm_status, ip, hostname,  node_state, node_status, vmsku)].append(node_name)
+                else:
+                    aggregated_node_status[(slurm_status, ip, hostname,  node_state, node_status, vmsku)]=[node_name]    
+    
+    if not list_nodes:
+        for (slurm_status, ip, hostname,  node_state, node_status, vmsku) in aggregated_node_status:
+            node_name_list = ",".join(aggregated_node_status[(slurm_status, ip, hostname,  node_state, node_status, vmsku)])
+            hostlist = _to_hostlist(subprocess_module,node_name_list)
+            writer.writerow([hostlist, slurm_status, ip, hostname,  node_state, node_status, vmsku ])
+
+
+def nodeinfo(node_list, show_all, list_nodes):
+    cluster_wrapper = _get_cluster_wrapper()
+    subprocess = _subprocess_module()
+    _nodeinfo(cluster_wrapper, node_list, subprocess, csv.writer(sys.stdout, delimiter="\t"), show_all, list_nodes)
+
+
         
 def _init_logging(logfile):
     import logging.handlers
@@ -928,6 +992,11 @@ def main(argv=None):
     
     add_parser("nodeaddrs", nodeaddrs)
     
+    nodeinfo_parser = add_parser("nodeinfo", nodeinfo)
+    nodeinfo_parser.add_argument("--node-list", type=hostlist, required=False)
+    nodeinfo_parser.add_argument("-a","--all", dest="show_all", action='store_true', required=False)
+    nodeinfo_parser.add_argument("-N", dest="list_nodes", action='store_true', required=False)
+
     init_parser = add_parser("initialize", initialize_config)
     init_parser.add_argument("--cluster-name", required=True)
     init_parser.add_argument("--username", required=True)
@@ -936,7 +1005,8 @@ def main(argv=None):
     init_parser.add_argument("--force", action="store_true", default=False, required=False)
     
     args = parser.parse_args(argv)
-    _init_logging(args.logfile)
+    if hasattr(args, "logfile"):
+        _init_logging(args.logfile)
     
     if args.func != initialize_config:
         if not os.path.exists(args.config):

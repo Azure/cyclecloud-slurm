@@ -11,8 +11,8 @@ class ClusterWrapper:
     
     def __init__(self, cluster_name, session=None, client=None, clusters_module=None):
         self.cluster_name = cluster_name
-        self.session = session or self.cluster._client._session
-        self.client = client or self.cluster._client
+        self.session = session
+        self.client = client
         self.clusters_module = clusters_module or cyclecloud.api.clusters
     
     @chaos_mode

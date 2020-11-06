@@ -220,7 +220,7 @@ def parse_network(expr):
 
 def format_network(network):
     ret = []
-    for key, value in network.iteritems():
+    for key, value in network.items():
         if value is True:
             ret.append(key)
         else:
