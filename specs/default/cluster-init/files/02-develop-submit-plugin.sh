@@ -1,6 +1,6 @@
 #!/bin/bash -e
 cd ~
-SLURM_VERSION="18.08.9"
+SLURM_VERSION="19.05.5-1"
 SLURM_FOLDER="slurm-${SLURM_VERSION}"
 SLURM_PKG="slurm-${SLURM_VERSION}.tar.bz2"
 DOWNLOAD_URL="https://download.schedmd.com/slurm"
