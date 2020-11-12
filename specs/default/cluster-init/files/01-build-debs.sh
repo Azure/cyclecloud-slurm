@@ -1,5 +1,6 @@
 #!/bin/bash -e
 apt-get update
 apt-get install -y alien
-cd ~/rpmbuild/RPMS/x86_64/
-alien *.rpm --bump 0
+
+alien --bump 0 --scripts ~/rpmbuild/RPMS/x86_64/*.rpm 
+mv *.deb ~/rpmbuild/RPMS/x86_64/

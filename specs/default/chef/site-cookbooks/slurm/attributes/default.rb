@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-default[:slurm][:version] = "19.05.5-1"
+default[:slurm][:version] = "19.05.8-1"
 default[:slurm][:user][:name] = 'slurm'
 default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.1.0-py2.py3-none-any.whl"
 myplatform=node[:platform]
@@ -10,7 +10,11 @@ when 'ubuntu'
   default[:slurm][:user][:uid] = 64030
   default[:slurm][:user][:gid] = 64030
 when 'centos'
-  default[:slurm][:arch] = "el7.x86_64"
+  if node[:platform_version] < "8";
+    default[:slurm][:arch] = "el7.x86_64"
+  else
+    default[:slurm][:arch] = "el8.x86_64"
+  end
   default[:slurm][:user][:uid] = 11100
   default[:slurm][:user][:gid] = 11100
 end

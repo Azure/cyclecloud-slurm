@@ -217,8 +217,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="19.05.5-1"], [Value="18.08.9-1"]}
-        DefaultValue = 19.05.5-1
+        Config.Entries := {[Value="19.05.8-1"], [Value="18.08.9-1"]}
+        DefaultValue = 19.05.8-1
 
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
