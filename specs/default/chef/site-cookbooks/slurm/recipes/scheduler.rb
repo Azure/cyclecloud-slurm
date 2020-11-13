@@ -113,6 +113,9 @@ link '/etc/slurm/slurm.conf' do
 end
 
 
+
+
+
 template '/sched/cgroup.conf' do
   owner "#{slurmuser}"
   source "cgroup.conf.erb"
@@ -156,12 +159,19 @@ bash 'Create cyclecloud.conf' do
     
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
+    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh gres_conf > /sched/gres.conf || exit 1;
     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
     touch /etc/slurm.installed
     EOH
   not_if { ::File.exist?('/etc/slurm.installed') }
 end
 
+link '/etc/slurm/gres.conf' do
+  to '/sched/gres.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+  only_if { ::File.exist?('/sched/gres.conf') }
+end
 
 link '/etc/slurm/topology.conf' do
   to '/sched/topology.conf'

@@ -310,7 +310,36 @@ def _generate_topology(cluster_wrapper, subprocess_module, writer):
 def generate_topology(writer=sys.stdout):
     subprocess = _subprocess_module()
     return _generate_topology(_get_cluster_wrapper(), subprocess, writer)
+
+def _generate_gres_conf(partitions, writer, subprocess_module):
+    for partition in partitions.values():
+        if partition.node_list is None:
+            raise RuntimeError("No nodes found for nodearray %s. Please run 'cyclecloud_slurm.sh create_nodes' first!" % partition.nodearray)
+
+        num_placement_groups = int(ceil(float(partition.max_vm_count) / partition.max_scaleset_size))
+        all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_get_sort_key_func(partition.is_hpc)) 
+
+        for pg_index in range(num_placement_groups):
+            start = pg_index * partition.max_scaleset_size
+            end = min(partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size)
+            subset_of_nodes = all_nodes[start:end]
+            node_list = _to_hostlist(subprocess_module, ",".join((subset_of_nodes)))
+            # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
+            
+            if partition.gpu_count:
+                if partition.gpu_count > 1:
+                    nvidia_devices = "/dev/nvidia[0-{}]".format(partition.gpu_count-1)
+                else:
+                    nvidia_devices = "/dev/nvidia0"
+                writer.write("Nodename={} Name=gpu Count={} File={}".format(node_list, partition.gpu_count, nvidia_devices))
+
+            writer.write("\n")
         
+def generate_gres_conf(writer=sys.stdout):
+    subprocess = _subprocess_module()
+    partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
+    _generate_gres_conf(partitions, writer, subprocess)
+
         
 def _shutdown(node_list, cluster_wrapper):
     _retry_rest(lambda: cluster_wrapper.shutdown_nodes(names=node_list))
@@ -966,6 +995,7 @@ def main(argv=None):
         return new_parser
     
     add_parser("slurm_conf", generate_slurm_conf)
+    add_parser("gres_conf", generate_gres_conf)
     
     add_parser("topology", generate_topology)
     

@@ -41,6 +41,13 @@ link '/etc/slurm/topology.conf' do
   group "#{slurmuser}"
 end
 
+link '/etc/slurm/gres.conf' do
+  to '/sched/gres.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+  only_if { ::File.exist?('/sched/gres.conf') }
+end
+
 defer_block "Defer starting slurmd until end of converge" do
   nodename = node[:cyclecloud][:node][:name]
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
