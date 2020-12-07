@@ -10,6 +10,7 @@ Category = Schedulers
 Autoscale = $Autoscale
 
     [[node defaults]]
+
     UsePublicNetwork = $UsePublicNetwork
     Credentials = $Credentials    
     SubnetId = $SubnetId
@@ -362,8 +363,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="19.05.8-1"], [Value="20.11.0-0rc2"]}
-        DefaultValue = 19.05.8-1
+        Config.Entries := {[Value="20.11.0-1"], [Value="19.05.8-1"]}
+        DefaultValue = 20.11.0-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]
         Label = Job Accounting
@@ -405,26 +406,32 @@ Order = 20
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
     Order = 10
 
+        [[[parameter centos8_warning]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<table role=\"presentation\"><tr><td><b>Attention: CentOS 8 is only supported on Slurm 20+</b></td></tr></table>"
+        Conditions.Hidden := configuration_slurm_version >= "20"
+
         [[[parameter SchedulerImageName]]]
         Label = Scheduler OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+        DefaultValue = cycle.image.centos8
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init
