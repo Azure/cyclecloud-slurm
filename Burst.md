@@ -20,7 +20,7 @@ cd cyclecloud-slurm
 cyclecloud project upload
 ```
 
-2) Import the headless cluster template (available here)[https://raw.githubusercontent.com/Azure/cyclecloud-slurm/feature/burst/templates/slurm-headless.txt]:
+2) Import the headless cluster template (available here)[https://raw.githubusercontent.com/Azure/cyclecloud-slurm/feature/burst8/templates/slurm-headless.txt]:
 
 ```bash
 cyclecloud import_template slurm-headless -f templates/slurm-headless.txt -c slurm
@@ -32,12 +32,12 @@ cyclecloud import_template slurm-headless -f templates/slurm-headless.txt -c slu
 
 1) Ensure that the Slurm scheduler is installed and configured properly for a basic on-prem setup
 
-2) Copy the slurm_bootstrap tarball (https://ahowardinternal.blob.core.windows.net/releases/slurm_bootstrap.tgz) tarball contents to /opt/cycle/jetpack/system/bootstrap/slurm:
+2) Copy the slurm_bootstrap tarball (https://ahowardinternal.blob.core.windows.net/releases/slurm8_bootstrap.tgz) tarball contents to /opt/cycle/jetpack/system/bootstrap/slurm:
 
 ```bash
 mkdir -p /opt/cycle/jetpack/system/bootstrap/slurm
 cd !$
-tar xvzf /tmp/bootstrap_slurm.tgz
+tar xvzf /tmp/bootstrap8_slurm.tgz
 ```
 
 3) Install python and python-pip if they aren't already installed
@@ -45,10 +45,10 @@ tar xvzf /tmp/bootstrap_slurm.tgz
 4) Install the cyclecloud-api Python package using pip:
 
 ```bash
-sudo pip install cyclecloud-api-7.9.2.tar.gz
+sudo pip install cyclecloud_api-8.1.0-py2.py3-none-any.whl
 ```
 
-5) Copy job_submit_cyclecloud.so  to /usr/lib64/slurm/
+5) Copy job_submit_cyclecloud_<os>.so to /usr/lib64/slurm/
 
 ```bash
 sudo cp /opt/cycle/jetpack/system/bootstrap/job_submit_cyclecloud.so /usr/lib64/slurm/
@@ -64,7 +64,7 @@ mkdir /opt/cycle/jetpack/config
 
 ```bash
 cd /opt/cycle/jetpack/system/bootstrap/slurm
-./cyclecloud_slurm.sh initialize --cluster-name slurmmpi --username myuser --password mypass --url https://mycyclecloud.eastus.cloudapp.azure.com 
+./cyclecloud_slurm.sh initialize --cluster-name slurmmpi --username myuser --password mypass --url https://<cyclecloud_url> 
 ```
 
 8) Create/move `/sched/{topology,cyclecloud,cgroups}.conf` if they don't already exist and link them to `/etc/slurm/{topology,cyclecloud,cgroups}.conf`
@@ -85,7 +85,7 @@ TreeWidth=65533
 SchedulerParameters=max_switch_wait=24:00:00
 
 Include cyclecloud.conf
-SlurmctldHost=ljhvr50kzwv
+SlurmctldHost=<SchedulerIP>
 ```
 
 
