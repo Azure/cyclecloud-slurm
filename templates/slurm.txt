@@ -25,6 +25,9 @@ Autoscale = $Autoscale
         # For fast spin-up after Deallocate, force an immediate re-converge on boot
 	cyclecloud.converge_on_boot = true
 
+        # disable maintenance converges
+        cyclecloud.maintenance_converge.enabled = false
+
         [[[cluster-init cyclecloud/slurm:default]]]
         Optional = true
 
