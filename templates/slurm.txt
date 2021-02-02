@@ -39,6 +39,9 @@ Autoscale = $Autoscale
         cyclecloud.exports.defaults.samba.enabled = false      
         cshared.server.legacy_links_disabled = true
 
+        # disable maintenance converges
+        cyclecloud.maintenance_converge.enabled = false
+
         [[[cluster-init cyclecloud/slurm:default]]]
         Optional = true
 
