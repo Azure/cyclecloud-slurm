@@ -189,14 +189,15 @@ service 'munge' do
   action [:enable, :restart]
 end
 
-# v19 does this for us automatically
-if slurmver < "19." then
-    cron "return_to_idle" do
-      minute "*/5"
-      command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
-      only_if { node[:cyclecloud][:cluster][:autoscale][:stop_enabled] }
-    end
+# v19 does this for us automatically BUT only for nodes that were suspended
+# nodes that hit ResumeTimeout, however, remain in down~
+
+cron "return_to_idle" do
+  minute "*/5"
+  command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
+  only_if { node[:cyclecloud][:cluster][:autoscale][:stop_enabled] }
 end
+
 
 defer_block "Defer starting munge until end of converge" do
   service 'munge' do
