@@ -18,22 +18,13 @@ It's also expected that any firewalls between the on-prem and cloud environment 
 
 ## In CycleCloud/Initializing a headless cluster
 
-1) Download the latest slurm project and upload it to your storage locker
-
-```bash
-wget https://ahowardinternal.blob.core.windows.net/releases/cyclecloud-slurm-204.tgz
-tar xvzf cyclecloud-slurm-204.tgz
-cd cyclecloud-slurm
-cyclecloud project upload
-```
-
-2) Import the headless cluster template (available here)[https://raw.githubusercontent.com/Azure/cyclecloud-slurm/feature/burst8/templates/slurm-headless.txt]:
+1) Import the headless cluster template (available here)[https://raw.githubusercontent.com/Azure/cyclecloud-slurm/feature/burst8/templates/slurm-headless.txt]:
 
 ```bash
 cyclecloud import_template slurm-headless -f templates/slurm-headless.txt -c slurm
 ```
 
-3) Create a cluster in CycleCloud using the slurm-headless template and start it. No execute nodes will be created yet; that will happen after the cluster is joined to the on-prem scheduler.
+2) Create a cluster in CycleCloud using the slurm-headless template and start it. No execute nodes will be created yet; that will happen after the cluster is joined to the on-prem scheduler.
 
 ## On the scheduler
 
