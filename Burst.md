@@ -5,6 +5,13 @@ It is possible to configure a Slurm scheduler not provisioned by CycleCloud to a
 ## Prerequisites and assumptions
 Due to the complexity of a hybrid Slurm setup, some familiarity with Slurm administration is expected. See the [Slurm Documentation](https://slurm.schedmd.com/) for more information.
 
+---
+**NOTE**
+
+Burst support for Slurm is only supported and tested with Slurm 19.05 and 20.11. Older versions of Slurm are no longer supported by SchedMD and are not tested by Microsoft.
+
+---
+
 The scheduler and execute nodes need to have the same NFS mounts available. This can either be done with shared NFS export from something like Azure NetApp Files that's mounted on both the scheduler and the execute nodes, or by exporting NFS from the on-prem scheduler to the execute nodes. The default shares that the Slurm project expects are `/shared` for home directories and `/sched` for Slurm configuration.
 
 It's also expected that any firewalls between the on-prem and cloud environment allow the slurmd's to connect back to the scheduler via ports 6817 and 6818, as well as any additional Slurm ports that may be configured in your cluster.
