@@ -40,7 +40,7 @@ cd !$
 tar xvzf /tmp/bootstrap8_slurm.tgz
 ```
 
-3) Install python and python-pip if they aren't already installed
+3) Install `python3` and `python3-pip` packages if they aren't already installed
 
 4) Install the cyclecloud-api Python package using pip:
 
@@ -48,7 +48,7 @@ tar xvzf /tmp/bootstrap8_slurm.tgz
 sudo pip install cyclecloud_api-8.1.0-py2.py3-none-any.whl
 ```
 
-5) Copy job_submit_cyclecloud_<os>.so to /usr/lib64/slurm/
+5) Copy `job_submit_cyclecloud_<os>.so` to `/usr/lib64/slurm/`
 
 ```bash
 sudo cp /opt/cycle/jetpack/system/bootstrap/job_submit_cyclecloud.so /usr/lib64/slurm/
@@ -69,7 +69,9 @@ cd /opt/cycle/jetpack/system/bootstrap/slurm
 
 8) Create/move `/sched/{topology,cyclecloud,cgroups}.conf` if they don't already exist and link them to `/etc/slurm/{topology,cyclecloud,cgroups}.conf`
 
-9) Update /etc/slurm/slurm.conf to have the following settings:
+9) Move `/etc/slurm/slurm.conf` to `/sched/slurm.conf` and create a symlink back to `/etc/slurm/slurm.conf`
+
+10) Update `/etc/slurm/slurm.conf` to have the following settings:
 
 ```ini
 TopologyPlugin=topology/tree
@@ -86,6 +88,13 @@ SchedulerParameters=max_switch_wait=24:00:00
 
 Include cyclecloud.conf
 SlurmctldHost=<SchedulerIP>
+```
+
+11) Run the scale command to create the cyclecloud.conf, topology.conf, and gres.conf files and create the nodes in CycleCloud:
+
+```bash
+cd /opt/cycle/jetpack/system/bootstrap/slurm
+./cyclecloud_slurm.sh scale
 ```
 
 
