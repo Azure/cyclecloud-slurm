@@ -65,7 +65,7 @@ defer_block "Defer starting slurmd until end of converge" do
       owner 'slurm'
       group 'slurm'
     end
-  when 'centos'
+  when 'centos', 'rhel'
     file '/etc/sysconfig/slurmd' do
       content slurmd_sysconfig
       mode '0700'
