@@ -28,7 +28,7 @@ when 'ubuntu'
         not_if { ::File.exist?("/var/spool/slurmdbd") }
     end
 
-when 'centos'
+when 'centos', 'rhel'
     slurmdbdpackage = "slurm-slurmdbd-#{slurmver}.#{slurmarch}.rpm"
     jetpack_download "#{slurmdbdpackage}" do
         project "slurm"
