@@ -9,7 +9,7 @@ when 'ubuntu'
   default[:slurm][:arch] = "amd64"
   default[:slurm][:user][:uid] = 64030
   default[:slurm][:user][:gid] = 64030
-when 'centos'
+when 'centos', 'rhel'
   if node[:platform_version] < "8";
     default[:slurm][:arch] = "el7.x86_64"
   else
