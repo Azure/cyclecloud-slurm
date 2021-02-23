@@ -362,7 +362,7 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="19.05.8-1"], [Value="20.11.0-0rc2"]}
+        Config.Entries := {[Value="19.05.8-1"], [Value="20.11.3-1"]}
         DefaultValue = 19.05.8-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]

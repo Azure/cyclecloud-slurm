@@ -223,7 +223,7 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
         memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
         def_mem_per_cpu = memory // partition.pcpu_count
-        cores_per_socket = max(1, partition.pcpu_count // partition.vcpu_count)
+        cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
 
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
