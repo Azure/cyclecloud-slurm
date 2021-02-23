@@ -768,7 +768,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     shutil.move(topology_conf + ".tmp", topology_conf)
     
     logging.info("Restarting slurmctld...")
-    subprocess_module.check_call(["slurmctld", "restart"])
+    subprocess_module.check_call(["systemctl", "restart", "slurmctld"])
     
     new_topology = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "topology"]))
     logging.info("New topology:\n%s", new_topology)
