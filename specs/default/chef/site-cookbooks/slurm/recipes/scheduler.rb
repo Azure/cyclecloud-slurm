@@ -67,9 +67,20 @@ end
 
 
 
+case node[:platform]
+when 'ubuntu'
+  plugin_name = "job_submit_cyclecloud_ubuntu_#{slurmver}.so"
+when 'centos', 'rhel'
+  if node[:platform_version] >= '8' then
+    plugin_name = "job_submit_cyclecloud_centos8_#{slurmver}.so"
+  else
+    plugin_name = "job_submit_cyclecloud_centos_#{slurmver}.so"
+  end
+end
+
 bash 'Install job_submit/cyclecloud' do
   code <<-EOH
-    jetpack download --project slurm job_submit_cyclecloud_#{node[:platform]}_#{slurmver}.so  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
+    jetpack download --project slurm #{plugin_name}  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
     touch /etc/cyclecloud-job-submit.installed
     EOH
   not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
