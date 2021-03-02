@@ -47,4 +47,4 @@ function build_slurm() {
     rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_ubuntu_${SLURM_VERSION}-1.so
 }
 
-build_slurm 19.05.5
+build_slurm 20.11.3

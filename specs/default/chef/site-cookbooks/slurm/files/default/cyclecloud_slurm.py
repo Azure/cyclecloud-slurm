@@ -223,7 +223,7 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
         memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
         def_mem_per_cpu = memory // partition.pcpu_count
-        cores_per_socket = max(1, partition.pcpu_count // partition.vcpu_count)
+        cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
 
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
@@ -768,7 +768,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     shutil.move(topology_conf + ".tmp", topology_conf)
     
     logging.info("Restarting slurmctld...")
-    subprocess_module.check_call(["slurmctld", "restart"])
+    subprocess_module.check_call(["systemctl", "restart", "slurmctld"])
     
     new_topology = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "topology"]))
     logging.info("New topology:\n%s", new_topology)
