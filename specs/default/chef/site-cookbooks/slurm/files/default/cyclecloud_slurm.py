@@ -29,7 +29,7 @@ class CyclecloudSlurmError(RuntimeError):
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vm, max_vm_count, dampen_memory=.05):
+    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vm, max_vm_count, dampen_memory=.05, use_pcpu=False):
         self.name = name
         self.nodearray = nodearray
         self.machine_type = machine_type
@@ -42,6 +42,7 @@ class Partition:
         self.node_list = None
         self.dampen_memory = dampen_memory
         self.vm = vm
+        self.use_pcpu = use_pcpu
 
     @property
     def pcpu_count(self):
@@ -137,6 +138,8 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         
         if not is_hpc:
             max_scaleset_size = 2**31
+
+        use_pcpu = str(slurm_config.get("use_pcpu", True)).lower() == "true"
         
         partitions[partition_name] = Partition(partition_name,
                                                nodearray_name,
@@ -146,7 +149,8 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                                                max_scaleset_size,
                                                vm,
                                                bucket.max_count,
-                                               dampen_memory=dampen_memory)
+                                               dampen_memory=dampen_memory,
+                                               use_pcpu=use_pcpu)
         
         existing_nodes = []
         
@@ -223,8 +227,14 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
         memory_to_reduce = max(1, partition.memory * partition.dampen_memory)
         memory = max(1024, int(floor((partition.memory - memory_to_reduce) * 1024)))
         def_mem_per_cpu = memory // partition.pcpu_count
-        cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
 
+        if partition.use_pcpu:
+            cpus = partition.pcpu_count
+            cores_per_socket = 1
+        else:
+            cpus = partition.vcpu_count
+            cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
+        
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
         writer.write("# would result in the nodes being rejected by Slurm if they report a number less than defined here.\n")
@@ -240,8 +250,13 @@ def _generate_slurm_conf(partitions, writer, subprocess_module):
             node_list = _to_hostlist(subprocess_module, ",".join((subset_of_nodes)))
             # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
             
-            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} CoresPerSocket={} RealMemory={}".format(
-                         node_list, partition.pcpu_count, cores_per_socket, memory))
+            if partition.use_pcpu:
+                cpus = partition.pcpu_count
+                threads = max(1, partition.vcpu_count // partition.pcpu_count)
+            else:
+                cpus = partition.vcpu_count
+                threads = 1
+            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} ThreadsPerCore={} RealMemory={}".format(node_list, cpus, threads, memory))
             
             if partition.gpu_count:
                 writer.write(" Gres=gpu:{}".format(partition.gpu_count))

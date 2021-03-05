@@ -46,7 +46,7 @@ when 'ubuntu'
   package 'Install munge' do
     package_name 'munge'
   end
-  slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-torque slurm-openlava]
+  slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd]
   slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}_#{slurmver}_amd64.deb" do
       project "slurm"
@@ -92,6 +92,12 @@ when 'centos', 'rhel'
 
   # slurm package depends on munge
   package 'munge'
+
+  execute 'Install perl-Switch' do
+    command "dnf --enablerepo=PowerTools install -y perl-Switch"
+    action :run
+    only_if { node[:platform_version] >= '8' }
+  end
 
   slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
   slurmrpms.each do |slurmpkg|
