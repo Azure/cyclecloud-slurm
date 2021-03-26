@@ -120,6 +120,8 @@ Autoscale = $Autoscale
     ImageName = $HPCImageName
     MaxCoreCount = $MaxHPCExecuteCoreCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
+    Interruptible = $HPCUseLowPrio
+    MaxPrice = $HPCSpotMaxPrice
     AdditionalClusterInitSpecs = $HPCClusterInitSpecs
 
 
@@ -232,14 +234,28 @@ Order = 10
         Config.IntegerOnly = true
 
 
+        [[[parameter HPCUseLowPrio]]]
+        Label = HPC Spot
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Use Spot VMs for HPC execute hosts
+
+        [[[parameter HPCSpotMaxPrice]]]
+        Label = HPC Max Price
+        DefaultValue = -1
+        Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
+        Config.Plugin = pico.form.NumberTextBox
+        Conditions.Excluded := HPCUseLowPrio isnt true
+        Config.MinValue = -1
+
         [[[parameter HTCUseLowPrio]]]
-        Label = Spot
+        Label = HTC Spot
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Use Spot VMs for HTC execute hosts
 
         [[[parameter HTCSpotMaxPrice]]]
-        Label = Max Price
+        Label = HTC Max Price
         DefaultValue = -1
         Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
         Config.Plugin = pico.form.NumberTextBox
