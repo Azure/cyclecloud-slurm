@@ -70,7 +70,7 @@ end
 case node[:platform]
 when 'ubuntu'
   plugin_name = "job_submit_cyclecloud_ubuntu_#{slurmver}.so"
-when 'centos', 'rhel'
+when 'centos', 'rhel', 'redhat'
   if node[:platform_version] >= '8' then
     plugin_name = "job_submit_cyclecloud_centos8_#{slurmver}.so"
   else
