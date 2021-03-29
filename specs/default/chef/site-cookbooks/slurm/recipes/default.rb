@@ -86,7 +86,7 @@ when 'ubuntu'
 
 
 
-when 'centos', 'rhel'
+when 'centos', 'rhel', 'redhat'
   # Required for munge
   package 'epel-release'
 
