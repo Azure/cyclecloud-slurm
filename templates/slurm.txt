@@ -114,6 +114,17 @@ Autoscale = $Autoscale
         samba.enabled = false
         type = nfs
 
+    [[nodearray login]]
+        InitialCount = $NumberLoginNodes
+        MachineType = $loginMachineType
+        ImageName = $SchedulerImageName
+            
+        [[[cluster-init cyclecloud/slurm:login]]]
+        [[[configuration]]]
+        autoscale.enabled = false
+
+
+
 
     [[nodearray hpc]]
     MachineType = $HPCMachineType
@@ -184,6 +195,12 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_D12_v2
 
+        [[[parameter loginMachineType]]]
+        Label = Login node VM Type
+        Description = The VM type for login nodes.
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_D8as_v4
+
         [[[parameter HPCMachineType]]]
         Label = HPC VM Type
         Description = The VM type for HPC execute nodes
@@ -245,6 +262,15 @@ Order = 10
         Config.Plugin = pico.form.NumberTextBox
         Conditions.Excluded := HTCUseLowPrio isnt true
         Config.MinValue = -1
+
+        [[[parameter NumberLoginNodes]]]
+        Label = Num Login Nodes
+        DefaultValue = 0
+        Description = Number of optional login nodes to create.
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 0
+        Config.MaxValue = 10000
+        Config.IntegerOnly = true
 
 
     [[parameters Networking]]
