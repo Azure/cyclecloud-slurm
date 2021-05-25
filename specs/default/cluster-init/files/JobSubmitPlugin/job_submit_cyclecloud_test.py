@@ -75,7 +75,7 @@ def generate_job_descriptor_class(lines):
     return job_descriptor
 
 
-SLURM_H_PATH = os.path.expanduser("~/job_submit/slurm-20.11.3/slurm/slurm.h")
+SLURM_H_PATH = os.path.expanduser("~/job_submit/slurm-20.11.7/slurm/slurm.h")
 if os.getenv("SLURM_H_PATH", ""):
     SLURM_H_PATH = os.environ["SLURM_H_PATH"]
 
@@ -104,7 +104,7 @@ class Test(unittest.TestCase):
 
             job = job_descriptor()
             job.req_switch = user_req_switches
-            job.network = ctypes.c_char_p(user_network)
+            job.network = ctypes.c_char_p(user_network if user_network is None else user_network.encode())
             args = []
             
             if user_req_switches:
@@ -114,7 +114,7 @@ class Test(unittest.TestCase):
                 args.append("--network={}".format(user_network))
 
             job.argc = len(args)
-            job.argv = (ctypes.c_char_p * job.argc)(*args)
+            job.argv = (ctypes.c_char_p * job.argc)(*[a.encode() for a in args])
 
             job_ptr = ctypes.POINTER(job_descriptor)(job)
             lib.job_submit(job_ptr, 0, "")
