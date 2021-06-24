@@ -13,7 +13,7 @@ The Slurm cluster deployed in CycleCloud contains a script that facilitates this
 
 ```
       $ sudo -i
-      # cd /opt/cycle/jetpack/system/bootstrap/slurm
+      # cd /opt/cycle/slurm
       # ./cyclecloud_slurm.sh scale
 ```
 

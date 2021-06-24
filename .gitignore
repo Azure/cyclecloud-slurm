@@ -332,3 +332,6 @@ ASALocalRun/
 
 # rpmbuild output
 *.rpm
+
+**/*.mypy_cache/
+.DS_Store
