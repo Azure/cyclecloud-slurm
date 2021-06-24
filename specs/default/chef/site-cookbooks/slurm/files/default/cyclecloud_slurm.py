@@ -627,6 +627,11 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
     
     deprecated = ["partitionname", "nodename", "controlmachine"]
     
+    replace = {}
+    
+    if os.path.exists("/opt/cycle/slurm"):
+        replace["/opt/cycle/jetpack/system/bootstrap/slurm"] = "/opt/cycle/slurm"
+    
     requires_upgrade = False
     found_include = False
     with open(slurm_conf) as fr:
@@ -638,6 +643,9 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
                     continue
                 if line.lower().strip().split() == ["include", "cyclecloud.conf"]:
                     found_include = True
+            for old, new in replace.items():
+                if old in line:
+                    requires_upgrade = True
                     
     if not found_include and not requires_upgrade:
         logging.warn("Did not find include cyclecloud.conf, so will upgrade slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
@@ -669,6 +677,10 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
                 for prefix in skip_entries:
                     if line_lower.startswith(prefix):
                         skip_this_line = True
+
+                for old, new in replace.items():
+                    if old in line:
+                        line = line.replace(old, new)
                 
                 if not skip_this_line:
                     fw.write(line)

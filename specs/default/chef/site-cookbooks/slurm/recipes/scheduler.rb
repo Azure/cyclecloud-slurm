@@ -9,6 +9,7 @@ include_recipe 'slurm::default'
 slurmuser = node[:slurm][:user][:name]
 slurmver = node[:slurm][:version]
 myplatform = node[:platform]
+autoscale_dir = node[:slurm][:autoscale_dir]
 
 execute 'Create munge key' do
   command "dd if=/dev/urandom bs=1 count=1024 >/sched/munge/munge.key"
@@ -34,7 +35,7 @@ service 'munge' do
   action [:enable, :restart]
 end
 
-directory "#{node[:cyclecloud][:bootstrap]}/slurm" do
+directory "#{autoscale_dir}" do
   user "root"
   group "root"
   recursive true
@@ -43,7 +44,7 @@ end
 
 scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh"]
 scripts.each do |filename| 
-    cookbook_file "#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}" do
+    cookbook_file "#{autoscale_dir}/#{filename}" do
         source "#{filename}"
         mode "0755"
         owner "root"
@@ -81,7 +82,7 @@ template '/sched/slurm.conf' do
   variables lazy {{
     :slurmver => slurmver,
     :nodename => node[:machinename],
-    :bootstrap => "#{node[:cyclecloud][:bootstrap]}/slurm",
+    :autoscale_dir => "#{autoscale_dir}",
     :resume_timeout => node[:slurm][:resume_timeout],
     :suspend_timeout => node[:slurm][:suspend_timeout],
     :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs]
@@ -128,7 +129,7 @@ password = node[:cyclecloud][:config][:password]
 url = node[:cyclecloud][:config][:web_server]
 bash 'Initialize autoscale.json' do
     code <<-EOH
-     #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' --username='#{username}' --password='#{password}' --url='#{url}' || exit 1
+     #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' --username='#{username}' --password='#{password}' --url='#{url}' || exit 1
     EOH
     not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
 end
@@ -140,19 +141,19 @@ bash 'Create cyclecloud.conf' do
     touch /etc/slurm/cyclecloud.conf
     
     # upgrade the old slurm.conf
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh upgrade_conf || exit 1
+    #{autoscale_dir}/cyclecloud_slurm.sh upgrade_conf || exit 1
     
     num_starts=$(jetpack config cyclecloud.cluster.start_count)
     if [ "$num_starts" == "1" ]; then
       policy=Error
-      #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh remove_nodes || exit 1;
+      #{autoscale_dir}/cyclecloud_slurm.sh remove_nodes || exit 1;
     else
       policy=AllowExisting
     fi
     
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
-    #{node[:cyclecloud][:bootstrap]}/slurm/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
     touch /etc/slurm.installed
     EOH
   not_if { ::File.exist?('/etc/slurm.installed') }
@@ -192,7 +193,7 @@ end
 
 cron "return_to_idle" do
   minute "*/5"
-  command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{node[:cyclecloud][:bootstrap]}/slurm/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
+  command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{autoscale_dir}/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
   only_if { node[:cyclecloud][:cluster][:autoscale][:stop_enabled] }
 end
 

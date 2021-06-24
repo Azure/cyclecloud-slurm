@@ -29,8 +29,8 @@ TreeWidth=65533
 ResumeTimeout=<%= @resume_timeout %>
 SuspendTimeout=<%= @suspend_timeout %>
 SuspendTime=<%= @suspend_time %>
-ResumeProgram=<%= @bootstrap %>/resume_program.sh
-ResumeFailProgram=<%= @bootstrap %>/resume_fail_program.sh
-SuspendProgram=<%= @bootstrap %>/suspend_program.sh
+ResumeProgram=<%= @autoscale_dir %>/sbin/resume_program.sh
+ResumeFailProgram=<%= @autoscale_dir %>/sbin/resume_fail_program.sh
+SuspendProgram=<%= @autoscale_dir %>/sbin/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
 Include cyclecloud.conf

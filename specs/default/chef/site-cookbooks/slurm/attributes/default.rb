@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 default[:slurm][:version] = "18.08.9-1"
 default[:slurm][:user][:name] = 'slurm'
+default[:slurm][:autoscale_dir] = "/opt/cycle/slurm"
 myplatform=node[:platform]
 case myplatform
 when 'ubuntu'
