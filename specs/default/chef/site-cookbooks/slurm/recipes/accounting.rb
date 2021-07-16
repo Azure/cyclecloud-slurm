@@ -79,7 +79,7 @@ bash 'Add cluster to slurmdbd' do
         sacctmgr -i add cluster #{clustername} && touch /etc/slurmdbd.configured 
         EOH
     not_if { ::File.exist?('/etc/slurmdbd.configured') }
-    not_if "sleep 5 && sacctmgr show cluster | grep #{clustername}" 
+    not_if "sleep 5 && sacctmgr show cluster -p | grep -i #{clustername}" 
 end
 
 #end
