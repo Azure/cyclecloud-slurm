@@ -82,7 +82,7 @@ Autoscale = $Autoscale
         PublicPort = 8652
 
         [[[volume sched]]]
-        Size = 1024
+        Size = 30
         SSD = True
         Mount = builtinsched
         Persistent = False
