@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 export PATH=$PATH:/usr/bin
-jetpack_path=$(which jetpack 2>/dev/null || echo /opt/cycle/jetpack/bin/jetpack)
-bootstrap=$(${jetpack_path} config cyclecloud.bootstrap)/slurm
+bootstrap=/opt/cycle/slurm
 # Slurm used to start processes in /var/log/slurmctld
 # As backup, just kick off the process in the bootstrap dir
 cd /var/log/slurmctld || cd $bootstrap
