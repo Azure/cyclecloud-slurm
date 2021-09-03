@@ -7,6 +7,8 @@ CENTOS_MAJOR=$(echo $CENTOS_VERSION | cut -d. -f1)
 function build_slurm() {
     set -e
     
+    install_pmix
+
     SLURM_VERSION=$1
     SLURM_FOLDER="slurm-${SLURM_VERSION}"
     SLURM_PKG="slurm-${SLURM_VERSION}.tar.bz2"
@@ -69,6 +71,24 @@ function build_slurm() {
     LD_LIBRARY_PATH=/root/job_submit/${SLURM_FOLDER}/src/api/.libs/ JOB_SUBMIT_CYCLECLOUD=1 python3 job_submit_cyclecloud_test.py
     rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_centos${CENTOS_MAJOR}_${SLURM_VERSION}-1.so
     rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_ubuntu_${SLURM_VERSION}-1.so
+}
+
+function install_pmix() {
+    cd ~/
+    mkdir -p /opt/pmix/v3
+    yum install -y libevent-devel
+    mkdir -p pmix/build/v3 pmix/install/v3
+    cd pmix
+    git clone https://github.com/openpmix/openpmix.git source
+    cd source/
+    git branch -a
+    git checkout v3.1
+    git pull
+    ./autogen.sh
+    cd ../build/v3/
+    ../../source/configure --prefix=/opt/pmix/v3
+    make -j install >/dev/null
+    cd ../../install/v3/
 }
 
 build_slurm 20.11.7
