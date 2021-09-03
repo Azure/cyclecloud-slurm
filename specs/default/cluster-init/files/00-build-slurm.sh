@@ -76,7 +76,7 @@ function build_slurm() {
 function install_pmix() {
     cd ~/
     mkdir -p /opt/pmix/v3
-    yum install -y libevent-devel
+    yum install -y libevent-devel git
     mkdir -p pmix/build/v3 pmix/install/v3
     cd pmix
     git clone https://github.com/openpmix/openpmix.git source
