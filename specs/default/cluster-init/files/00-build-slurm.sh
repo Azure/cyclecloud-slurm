@@ -28,7 +28,7 @@ function build_slurm() {
     else
         LIBTOOL=libtool
         yum install -y dnf-plugins-core
-        yum config-manager --set-enabled powertools
+        yum config-manager --set-enabled PowerTools
         yum install -y make
     fi
 
