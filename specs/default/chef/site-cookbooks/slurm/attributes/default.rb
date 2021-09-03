@@ -4,6 +4,7 @@ default[:slurm][:version] = "19.05.8-1"
 default[:slurm][:user][:name] = 'slurm'
 default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.1.0-py2.py3-none-any.whl"
 default[:slurm][:autoscale_dir] = "/opt/cycle/slurm"
+default[:slurm][:install] = true
 
 myplatform=node[:platform]
 case myplatform
