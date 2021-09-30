@@ -29,9 +29,10 @@ class CyclecloudSlurmError(RuntimeError):
 
 class Partition:
     
-    def __init__(self, name, nodearray, machine_type, is_default, is_hpc, max_scaleset_size, vm, max_vm_count, dampen_memory=.05, use_pcpu=False):
+    def __init__(self, name, nodearray, nodename_prefix, machine_type, is_default, is_hpc, max_scaleset_size, vm, max_vm_count, dampen_memory=.05, use_pcpu=False):
         self.name = name
         self.nodearray = nodearray
+        self.nodename_prefix = nodename_prefix
         self.machine_type = machine_type
         self.is_default = is_default
         self.is_hpc = is_hpc
@@ -82,6 +83,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         slurm_config = nodearray_record.get("Configuration", {}).get("slurm", {})
         is_autoscale = slurm_config.get("autoscale")
         partition_name = slurm_config.get("partition", nodearray_name)
+        nodename_prefix = slurm_config.get("node_prefix", "")
         
         if is_autoscale is None:
             logging.warn("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
@@ -143,6 +145,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         
         partitions[partition_name] = Partition(partition_name,
                                                nodearray_name,
+                                               nodename_prefix,
                                                machine_type,
                                                slurm_config.get("default_partition", False),
                                                is_hpc,
@@ -464,9 +467,11 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
     for partition in partitions.values():
         placement_group_base = "{}-{}-pg".format(partition.nodearray, partition.machine_type)
         if partition.is_hpc:
-            name_format = "{}-pg{}-%d"
+            # prefix, nodearray, placement group index, index
+            name_format = "{}{}-pg{}-%d"
         else:
-            name_format = "{}-%d"
+            # prefix, nodearray, index
+            name_format = "{}{}-%d"
         
         current_name_offset = None
         current_pg_index = None
@@ -486,7 +491,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
                 current_pg_index = placement_group_index
                 
             name_index = (index % partition.max_scaleset_size) + 1
-            node_name = name_format.format(partition.nodearray, placement_group_index) % (name_index)
+            node_name = name_format.format(partition.nodename_prefix, partition.nodearray, placement_group_index) % (name_index)
             
             valid_node_names.add(node_name)
             
@@ -525,9 +530,9 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
         
         # TODO should probably make this a util function
         if partition.is_hpc:
-            request_set.name_format = "{}-pg{}-%d".format(partition.nodearray, pg_index)
+            request_set.name_format = "{}{}-pg{}-%d".format(partition.nodename_prefix, partition.nodearray, pg_index)
         else:
-            request_set.name_format = "{}-%d".format(partition.nodearray)
+            request_set.name_format = "{}{}-%d".format(partition.nodename_prefix, partition.nodearray)
             
         request_set.name_offset = name_offset
         request_set.node_attributes = Record()
