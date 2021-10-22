@@ -752,6 +752,7 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
     
 def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None):
     slurm_conf = os.path.join(sched_dir, "slurm.conf")
+    gres_conf = os.path.join(sched_dir, "gres.conf")
     
     subprocess_module = subprocess_module or _subprocess_module()
     cluster_wrapper = cluster_wrapper or _get_cluster_wrapper()
@@ -772,6 +773,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     
     backup_cyclecloud_conf = os.path.join(backup_dir, "slurm.conf")
     backup_topology_conf = os.path.join(backup_dir, "topology.conf")
+    backup_gres_conf = os.path.join(backup_dir, "gres.conf")
     
     if os.path.exists(topology_conf):
         shutil.copyfile(topology_conf, backup_topology_conf)
@@ -779,7 +781,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
         logging.warn("No topology file exists at %s", topology_conf)
         
     shutil.copyfile(slurm_conf, backup_cyclecloud_conf)
-    shutil.copyfile(topology_conf, backup_topology_conf)
+
         
     with open(cyclecloud_slurm_conf + ".tmp", "w") as fw:
         generate_slurm_conf(fw)
@@ -793,6 +795,16 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     
     logging.debug("Moving %s to %s", topology_conf + ".tmp", topology_conf)    
     shutil.move(topology_conf + ".tmp", topology_conf)
+
+    # gres.conf
+    if os.path.exists(gres_conf):
+        shutil.copyfile(gres_conf, backup_gres_conf)
+    logging.debug("Writing new gres to %s", gres_conf + ".tmp")
+    with open(gres_conf + ".tmp", "w") as fw:
+        generate_gres_conf(fw)
+
+    logging.debug("Moving %s to %s", gres_conf + ".tmp", gres_conf)   
+    shutil.move(gres_conf + ".tmp", gres_conf)
     
     logging.info("Restarting slurmctld...")
     subprocess_module.check_call(["systemctl", "restart", "slurmctld"])
