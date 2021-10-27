@@ -93,7 +93,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                              nodearray_name, unescaped_nodename_prefix, nodename_prefix)
         
         if is_autoscale is None:
-            logging.warn("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
+            logging.warning("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
             continue
         
         if is_autoscale is False:
@@ -105,15 +105,15 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
             machine_types = machine_types.split(",")
         
         if len(machine_types) > 1:
-            logging.warn("Ignoring multiple machine types for nodearray %s", nodearray_name)
+            logging.warning("Ignoring multiple machine types for nodearray %s", nodearray_name)
             
         machine_type = machine_types[0]
         if not machine_type:
-            logging.warn("MachineType not defined for nodearray %s. Skipping", nodearray_name)
+            logging.warning("MachineType not defined for nodearray %s. Skipping", nodearray_name)
             continue
         
         if partition_name in partitions:
-            logging.warn("Same partition defined for two different nodearrays. Ignoring nodearray %s", nodearray_name)
+            logging.warning("Same partition defined for two different nodearrays. Ignoring nodearray %s", nodearray_name)
             continue
         
         bucket = None
@@ -176,7 +176,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
     default_partitions = [p for p in partitions_list if p.is_default]
     
     if len(default_partitions) == 0:
-        logging.warn("slurm.default_partition was not set on any nodearray.")
+        logging.warning("slurm.default_partition was not set on any nodearray.")
         
         # one nodearray, just assume it is the default
         if len(partitions_list) == 1:
@@ -185,7 +185,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
             
     elif len(default_partitions) > 1:
         # no partition is default
-        logging.warn("slurm.default_partition was set on more than one nodearray!")
+        logging.warning("slurm.default_partition was set on more than one nodearray!")
     
     return partitions
 
@@ -624,7 +624,7 @@ def _create_nodes(partitions, cluster_wrapper, subprocess_module, existing_polic
     for n, set_result in enumerate(result.sets):
         request_set = request.sets[n]
         if set_result.added == 0:
-            logging.warn("No nodes were created for nodearray %s using name format %s and offset %s: %s", request_set.nodearray, request_set.name_format,
+            logging.warning("No nodes were created for nodearray %s using name format %s and offset %s: %s", request_set.nodearray, request_set.name_format,
                                                                                                           request_set.name_offset, set_result.message)
         else:
         
@@ -646,7 +646,7 @@ def _remove_nodes(cluster_wrapper, subprocess_module, names_to_remove):
     try:
         to_remove_hostlist = _to_hostlist(subprocess_module, ",".join(names_to_remove))
     except:
-        logging.warn(traceback.format_exc())
+        logging.warning(traceback.format_exc())
         to_remove_hostlist = ",".join(names_to_remove)
         
     logging.info("Attempting to remove the following nodes: %s", to_remove_hostlist)
@@ -656,8 +656,8 @@ def _remove_nodes(cluster_wrapper, subprocess_module, names_to_remove):
     removed_nodes = [n.name for n in mgmt_result.nodes]
     unremoved_nodes = set(names_to_remove) - set(removed_nodes)
     if unremoved_nodes:
-        logging.warn("Warning: The following nodes could not be removed because they were not terminated - %s.", ",".join(unremoved_nodes))
-        logging.warn("Please terminate them and rerun this command or remove them manually via the cli or user interface.",)
+        logging.warning("Warning: The following nodes could not be removed because they were not terminated - %s.", ",".join(unremoved_nodes))
+        logging.warning("Please terminate them and rerun this command or remove them manually via the cli or user interface.",)
 
 
 def remove_nodes(names_to_remove=None):
@@ -730,7 +730,7 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
     slurm_conf = slurm_conf or os.path.join(sched_dir, "slurm.conf")
     
     if os.getenv("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE", ""):
-        logging.warn("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE is defined, skipping upgrade.")
+        logging.warning("CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE is defined, skipping upgrade.")
         return
         
     base_slurm_conf = slurm_conf
@@ -754,7 +754,7 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
         for line in fr:
             for prefix in deprecated:
                 if line.lower().startswith(prefix):
-                    logging.warn("Found line starting with %s. Will upgrade old slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1" % prefix)
+                    logging.warning("Found line starting with %s. Will upgrade old slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1" % prefix)
                     requires_upgrade = True
                     continue
                 if line.lower().strip().split() == ["include", "cyclecloud.conf"]:
@@ -764,7 +764,7 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
                     requires_upgrade = True
                     
     if not found_include and not requires_upgrade:
-        logging.warn("Did not find include cyclecloud.conf, so will upgrade slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
+        logging.warning("Did not find include cyclecloud.conf, so will upgrade slurm.conf. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
         requires_upgrade = True
         
     if not requires_upgrade:
@@ -780,7 +780,7 @@ def upgrade_conf(slurm_conf=None, sched_dir="/sched", backup_dir="/etc/slurm/.ba
     
     shutil.copyfile(slurm_conf, os.path.join(backup_dir, "slurm.conf"))
     
-    logging.warn("Upgrading slurm.conf by removing ControlHost, PartitionName and NodeName definitions. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
+    logging.warning("Upgrading slurm.conf by removing ControlHost, PartitionName and NodeName definitions. To disable, define CYCLECLOUD_SLURM_DISABLE_CONF_UPGRADE=1")
     # backwards compat - if a slurm.conf does not include cyclecloud.conf, include it
     with open(slurm_conf) as fr:
         with open(slurm_conf + ".tmp", "w") as fw:
@@ -832,7 +832,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     if os.path.exists(topology_conf):
         shutil.copyfile(topology_conf, backup_topology_conf)
     else:
-        logging.warn("No topology file exists at %s", topology_conf)
+        logging.warning("No topology file exists at %s", topology_conf)
         
     shutil.copyfile(slurm_conf, backup_cyclecloud_conf)
     shutil.copyfile(topology_conf, backup_topology_conf)
