@@ -3,6 +3,14 @@
 # Recipe:: execute
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
+nodename = node[:cyclecloud][:node][:name]
+
+if node[:slurm][:use_nodename_as_hostname] then
+  execute 'set hostname' do
+    command "hostname #{nodename}"
+    creates '/etc/slurm.hostname.#{nodename}.enabled'
+  end
+end
 
 include_recipe "slurm::default"
 require 'chef/mixin/shell_out'
@@ -48,8 +56,8 @@ link '/etc/slurm/gres.conf' do
   only_if { ::File.exist?('/sched/gres.conf') }
 end
 
+
 defer_block "Defer starting slurmd until end of converge" do
-  nodename = node[:cyclecloud][:node][:name]
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
 
   myplatform=node[:platform]
@@ -85,7 +93,8 @@ defer_block "Defer starting slurmd until end of converge" do
   # Re-enable a host the first time it converges in the event it was drained
   # set the ip as nodeaddr and hostname in slurm
   execute 'set node to active' do
-    command "scontrol update nodename=#{nodename} NodeAddr=#{node[:ipaddress]} NodeHostname=#{node[:ipaddress]} state=UNDRAIN && touch /etc/slurm.reenabled"
+    # no longer set hostname/nodeaddr. cyclecloud_slurm.py on the slurmctld host will do this.
+    command "scontrol update nodename=#{nodename} state=UNDRAIN && touch /etc/slurm.reenabled"
     creates '/etc/slurm.reenabled'
   end
 end

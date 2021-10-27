@@ -5,6 +5,9 @@ default[:slurm][:user][:name] = 'slurm'
 default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.1.0-py2.py3-none-any.whl"
 default[:slurm][:autoscale_dir] = "/opt/cycle/slurm"
 default[:slurm][:install] = true
+default[:slurm][:use_nodename_as_hostname] = false
+default[:cyclecloud][:hosts][:simple_vpc_dns][:enabled] = false
+default[:cyclecloud][:hosts][:standalone_dns][:enabled] = false
 
 myplatform=node[:platform]
 case myplatform

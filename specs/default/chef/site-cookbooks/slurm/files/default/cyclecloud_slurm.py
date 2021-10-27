@@ -8,6 +8,7 @@ import logging
 from math import ceil, floor
 import os
 import random
+import re
 import shutil
 import sys
 import time
@@ -65,7 +66,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
     '''
     partitions = OrderedDict()
     
-    _, status_response = _retry_rest(cluster_wrapper.get_cluster_status, True)
+    _, status_response = _retry_rest(lambda: cluster_wrapper.get_cluster_status(nodes=True))
     # TODO status_response's nodes doesn't include off nodes...
     _, nodes_response = _retry_rest(cluster_wrapper.get_nodes)
             
@@ -83,7 +84,13 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         slurm_config = nodearray_record.get("Configuration", {}).get("slurm", {})
         is_autoscale = slurm_config.get("autoscale")
         partition_name = slurm_config.get("partition", nodearray_name)
-        nodename_prefix = slurm_config.get("node_prefix", "")
+        unescaped_nodename_prefix = slurm_config.get("node_prefix") or ""
+
+        nodename_prefix = re.sub("[^a-zA-Z0-9-]", "-", unescaped_nodename_prefix)
+
+        if unescaped_nodename_prefix != nodename_prefix:
+            logging.warning("slurm.node_prefix for partition %s was converted from '%s' to '%s' due to invalid hostname characters.",
+                             nodearray_name, unescaped_nodename_prefix, nodename_prefix)
         
         if is_autoscale is None:
             logging.warn("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
@@ -391,14 +398,37 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     previous_states = {}
     
     nodes_str = ",".join(node_list[:5])
-    omega = time.time() + 3600 
+    omega = time.time() + 3600
+    
+    failed_nodes = set()
     
     while time.time() < omega:
         states = {}
-        _, nodes_response = _retry_rest(lambda: cluster_wrapper.get_nodes(operation_id=operation_id))
-        for node in nodes_response.nodes:
+        _, cluster_response = _retry_rest(lambda: cluster_wrapper.get_cluster_status(True))
+
+        relevant_nodes = []
+        
+        recovered_nodes = set()
+
+        newly_failed_nodes = []
+        
+        for node in cluster_response.nodes:
             name = node.get("Name")
-            state = node.get("State")
+            if name not in node_list:
+                continue
+            relevant_nodes.append(node)
+            state = node.get("Status")
+
+            if state and state.lower() == "failed":
+                if name not in failed_nodes:
+                    newly_failed_nodes.append(name)
+                    failed_nodes.add(name)
+                continue
+
+            if name in failed_nodes:
+                recovered_nodes.add(name)
+
+            hostname = node.get("Hostname")
             
             if node.get("TargetState") != "Started":
                 states["UNKNOWN"] = states.get("UNKNOWN", {})
@@ -412,11 +442,32 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
             states[state] = states.get(state, 0) + 1
             
             if private_ip and name not in updated_node_addrs:
-                cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostname=%s" % private_ip]
+                cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip]
                 logging.info("Running %s", " ".join(cmd))
                 _retry_subprocess(lambda: subprocess_module.check_call(cmd))
                 updated_node_addrs.add(name)
-                
+
+        if newly_failed_nodes:
+            try:
+                failed_node_names_str = ",".join(failed_nodes)
+                logging.error("The following nodes failed to start: %s", failed_node_names_str)
+                cmd = ["scontrol", "update", "NodeName=%s" % name, "State=down", "Reason=cyclecloud_failure"]
+                logging.info("Running %s", " ".join(cmd))
+                subprocess_module.check_call(cmd)
+            except Exception:
+                logging.exception("Failed to mark the following nodes as down: %s. Will re-attempt next iteration.", failed_node_names_str)
+
+        if recovered_nodes:
+            try:
+                recovered_node_names_str = ",".join(recovered_nodes)
+                logging.error("The following nodes have recovered from failure: %s", recovered_node_names_str)
+                cmd = ["scontrol", "update", "NodeName=%s" % name, "State=idle", "Reason=cyclecloud_recovery"]
+                logging.info("Running %s", " ".join(cmd))
+                subprocess_module.check_call(cmd)
+                failed_nodes.pop(name)
+            except Exception:
+                logging.exception("Failed to mark the following nodes as recovered: %s. Will re-attempt next iteration.", recovered_node_names_str)
+
         terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).values()) + states.get("Failed", 0)
         
         if states != previous_states:
@@ -431,7 +482,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
             states_message = " , ".join(states_messages)
             logging.info("OperationId=%s NodeList=%s: Number of nodes in each state: %s", operation_id, nodes_str, states_message)
             
-        if terminal_states == len(nodes_response.nodes):
+        if terminal_states == len(relevant_nodes):
             break
         
         previous_states = states
@@ -439,7 +490,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
         time.sleep(5)
         
     logging.info("OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting", operation_id, nodes_str)
-        
+
         
 def resume(node_list):
     cluster_wrapper = _get_cluster_wrapper()
@@ -647,7 +698,7 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
             node = nodes_by_name[node_name]
             mt = str(node.get("MachineType"))
             if str(partition.machine_type).lower() != mt.lower():
-                if node.get("State") not in [None, "Terminated"]:
+                if node.get("Status") not in [None, "Terminated"]:
                     can_not_remove.append(node)
                     continue
                 to_remove.append(node_name)
@@ -659,7 +710,7 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
         to_shutdown = _to_hostlist(subprocess_module, node_list_expr)
         raise CyclecloudSlurmError(("Machine type is now %s for %s nodes but at least one node is not terminated that has the old machine type - %s in state %s with machine type %s.\n" +
                                    "Please terminate these via the UI or 'terminate_nodes.sh %s' then rerun the scale command.")
-                                               % (partition.machine_type, partition.name, node_name, node.get("State"), mt, to_shutdown))
+                                               % (partition.machine_type, partition.name, node_name, node.get("Status"), mt, to_shutdown))
     
     if to_remove:
         to_remove = sorted(to_remove)
