@@ -227,7 +227,7 @@ Order = 10
         [[[parameter HPCMaxScalesetSize]]]
         Label = Max VMs per Scaleset
         Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
-        DefaultValue = 40
+        DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
