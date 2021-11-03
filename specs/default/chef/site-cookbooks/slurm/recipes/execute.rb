@@ -4,6 +4,25 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 nodename = node[:cyclecloud][:node][:name]
+autoscale_dir = node[:slurm][:autoscale_dir]
+
+directory "#{autoscale_dir}" do
+  user "root"
+  group "root"
+  recursive true
+end
+
+
+filenames = ["slurm_healthcheck.py", "healthcheck.logging.conf"]
+filenames.each do |filename| 
+    cookbook_file "#{autoscale_dir}/#{filename}" do
+        source "#{filename}"
+        mode "0644"
+        owner "root"
+        group "root"
+        not_if { ::File.exist?("#{node[:cyclecloud][:bootstrap]}/slurm/#{filename}")}
+    end
+end
 
 if node[:slurm][:use_nodename_as_hostname] then
   execute 'set hostname' do
