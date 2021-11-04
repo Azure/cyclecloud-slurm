@@ -71,7 +71,15 @@ Autoscale = $Autoscale
     ImageName = $SchedulerImageName
     IsReturnProxy = $ReturnProxy
     AdditionalClusterInitSpecs = $SchedulerClusterInitSpecs
-    ComputerName = ${ifThenElse(SchedulerHostName=="Cluster Prefix", StrJoin("-", ClusterName, "scheduler"), ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated", undefined, SchedulerHostName))}
+    ComputerName = ${regexps("([^a-zA-Z0-9-])", ifThenElse(SchedulerHostName=="Cluster Prefix", StrJoin("-", ClusterName, "scheduler"), ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated", undefined, SchedulerHostName)), "-")}
+    # indented version, for clarity.
+    # ${regexps("([^a-zA-Z0-9-])",
+    #     ifThenElse(SchedulerHostName=="Cluster Prefix",
+    #         StrJoin("-", ClusterName, "scheduler"),
+    #         ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated",
+    #             undefined,
+    #             SchedulerHostName)),
+    # "-")}
     
         [[[configuration]]]
         cyclecloud.mounts.nfs_sched.disabled = true
