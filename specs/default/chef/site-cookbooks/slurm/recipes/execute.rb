@@ -26,7 +26,7 @@ end
 
 if node[:slurm][:use_nodename_as_hostname] then
   execute 'set hostname' do
-    command "hostname #{nodename}"
+    command "hostnamectl set-hostname #{nodename}"
     creates '/etc/slurm.hostname.#{nodename}.enabled'
   end
 end
@@ -78,6 +78,20 @@ end
 
 defer_block "Defer starting slurmd until end of converge" do
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
+
+  cmd_str = "getent hosts #{node[:cyclecloud][:instance][:ipv4]} | grep -q #{nodename}"
+  cmd = Mixlib::ShellOut.new(cmd_str)
+  cmd.run_command
+  if !cmd.exitstatus.zero?
+    raise "Hostname has not registered in DNS yet."
+  end
+
+  cmd_str = "hostname | grep -q #{nodename}"
+  cmd = Mixlib::ShellOut.new(cmd_str)
+  cmd.run_command
+  if !cmd.exitstatus.zero?
+    raise "Hostname has not registered locally yet."
+  end
 
   myplatform=node[:platform]
   case myplatform
