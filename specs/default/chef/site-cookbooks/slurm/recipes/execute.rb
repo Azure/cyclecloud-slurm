@@ -4,6 +4,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 nodename = node[:cyclecloud][:node][:name]
+dns_suffix = node[:slurm][:node_domain_suffix]
+if !dns_suffix.empty? && dns_suffix[0] != "." then
+  dns_suffix = "." + dns_suffix
+end
+
 autoscale_dir = node[:slurm][:autoscale_dir]
 
 directory "#{autoscale_dir}" do
@@ -26,7 +31,7 @@ end
 
 if node[:slurm][:use_nodename_as_hostname] then
   execute 'set hostname' do
-    command "hostnamectl set-hostname #{nodename}"
+    command "hostnamectl set-hostname #{nodename}#{dns_suffix}"
     creates '/etc/slurm.hostname.#{nodename}.enabled'
   end
 end
