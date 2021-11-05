@@ -8,6 +8,7 @@ default[:slurm][:install] = true
 default[:slurm][:use_nodename_as_hostname] = false
 default[:cyclecloud][:hosts][:simple_vpc_dns][:enabled] = false
 default[:cyclecloud][:hosts][:standalone_dns][:enabled] = false
+default[:slurm][:additional][:config] = ""
 
 myplatform=node[:platform]
 case myplatform
