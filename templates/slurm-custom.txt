@@ -26,10 +26,6 @@ Autoscale = $Autoscale
         slurm.accounting.user = $configuration_slurm_accounting_user
         slurm.accounting.password = $configuration_slurm_accounting_password
         slurm.additional.config = $additional_slurm_config
-        
-        # Disable ip-XXXXXXXX hostname generation
-        cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
-        cyclecloud.hosts.simple_vpc_dns.enabled = ${NodeNameIsHostname==false}
 
         # For fast spin-up after Deallocate, force an immediate re-converge on boot
         cyclecloud.converge_on_boot = true
@@ -44,7 +40,7 @@ Autoscale = $Autoscale
         cyclecloud.exports.defaults.samba.enabled = false      
         cshared.server.legacy_links_disabled = true
 
-        [[[cluster-init cyclecloud/slurm:default]]]
+        [[[cluster-init slurm:default:2.4.8]]]
         Optional = true
 
         [[[configuration cyclecloud.mounts.nfs_shared]]]
@@ -61,32 +57,23 @@ Autoscale = $Autoscale
         [[[configuration cyclecloud.mounts.additional_nfs]]]
         disabled = ${AdditionalNAS isnt true}
         type = nfs
-        address = ${ifThenElse(AdditionalNAS, AdditonalNFSAddress, undefined)}
-        mountpoint = ${ifThenElse(AdditionalNAS, AdditionalNFSMountPoint, undefined)}
-        export_path = ${ifThenElse(AdditionalNAS, AdditionalNFSExportPath, undefined)}
-        options = ${ifThenElse(AdditionalNAS, AdditionalNFSMountOptions, undefined)}
+        address = $AdditonalNFSAddress
+        mountpoint = $AdditionalNFSMountPoint
+        export_path = $AdditionalNFSExportPath
+        options = $AdditionalNFSMountOptions
 
     [[node scheduler]]
     MachineType = $SchedulerMachineType
     ImageName = $SchedulerImageName
     IsReturnProxy = $ReturnProxy
     AdditionalClusterInitSpecs = $SchedulerClusterInitSpecs
-    ComputerName = ${regexps("([^a-zA-Z0-9-])", ifThenElse(SchedulerHostName=="Cluster Prefix", StrJoin("-", ClusterName, "scheduler"), ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated", undefined, SchedulerHostName)), "-")}
-    # indented version, for clarity.
-    # ${regexps("([^a-zA-Z0-9-])",
-    #     ifThenElse(SchedulerHostName=="Cluster Prefix",
-    #         StrJoin("-", ClusterName, "scheduler"),
-    #         ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated",
-    #             undefined,
-    #             SchedulerHostName)),
-    # "-")}
     
         [[[configuration]]]
         cyclecloud.mounts.nfs_sched.disabled = true
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
 
 
-        [[[cluster-init cyclecloud/slurm:scheduler]]]
+        [[[cluster-init slurm:scheduler:2.4.8]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -128,21 +115,8 @@ Autoscale = $Autoscale
         samba.enabled = false
         type = nfs
 
-    [[node nodearraybase]]
-    Abstract = true
-        [[[configuration]]]
-        slurm.autoscale = true
-        
-        slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
-        slurm.use_nodename_as_hostname = $NodeNameIsHostname
-
-        [[[cluster-init cyclecloud/slurm:execute]]]
-
-        [[[network-interface eth0]]]
-        AssociatePublicIpAddress = $ExecuteNodesPublic
 
     [[nodearray hpc]]
-    Extends = nodearraybase
     MachineType = $HPCMachineType
     ImageName = $HPCImageName
     MaxCoreCount = $MaxHPCExecuteCoreCount
@@ -151,13 +125,18 @@ Autoscale = $Autoscale
 
 
         [[[configuration]]]
+        slurm.autoscale = true
         slurm.default_partition = true
         slurm.hpc = true
-        slurm.partition = hpc
+
+
+        [[[cluster-init slurm:execute:2.4.8]]]
+
+        [[[network-interface eth0]]]
+        AssociatePublicIpAddress = $ExecuteNodesPublic
 
 
     [[nodearray htc]]
-    Extends = nodearraybase
     MachineType = $HTCMachineType
     ImageName = $HTCImageName
     MaxCoreCount = $MaxHTCExecuteCoreCount
@@ -166,9 +145,17 @@ Autoscale = $Autoscale
     MaxPrice = $HTCSpotMaxPrice
     AdditionalClusterInitSpecs = $HTCClusterInitSpecs
 
+
         [[[configuration]]]
+        slurm.autoscale = true
         slurm.hpc = false
-        slurm.partition = htc
+
+
+        [[[cluster-init slurm:execute:2.4.8]]]
+
+        [[[network-interface eth0]]]
+        AssociatePublicIpAddress = $ExecuteNodesPublic
+
 
 [parameters About]
 Order = 1
@@ -240,7 +227,7 @@ Order = 10
         [[[parameter HPCMaxScalesetSize]]]
         Label = Max VMs per Scaleset
         Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
-        DefaultValue = 100
+        DefaultValue = 40
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
@@ -423,32 +410,6 @@ Order = 20
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
     Order = 10
-
-        [[[parameter NodeNameIsHostname]]]
-        Label = Name As Hostname
-        Description = Should the hostname match the nodename for execute nodes?
-        ParameterType = Boolean
-        DefaultValue = true
-
-        [[[parameter NodeNamePrefix]]]
-        Label = Node Prefix
-        Description = Prefix for generated node names, i.e. "prefix-" generates prefix-nodearray-1. Use 'Cluster Prefix' to get $ClusterName-nodearray-1
-        ParameterType = StringList
-        Config.Plugin = pico.form.Dropdown
-        Config.FreeForm = true
-        DefaultValue = "Cluster Prefix"
-        Config.Entries := {[Value=""], [Value="Cluster Prefix"]}
-        Conditions.Hidden := NodeNameIsHostname != true
-
-        [[[parameter SchedulerHostName]]]
-        Label = Scheduler Hostname
-        Description = Hostname of scheduler. 'Generated' uses the default generated hostname. 'Cluster Prefix' will generate $ClusterName-scheduler.
-        ParameterType = StringList
-        Config.Plugin = pico.form.Dropdown
-        Config.FreeForm = true
-        DefaultValue = "Cluster Prefix"
-        Config.Entries := {[Value="Generated"], [Value="Cluster Prefix"]}
-        Conditions.Hidden := NodeNameIsHostname != true
 
         [[[parameter SchedulerImageName]]]
         Label = Scheduler OS

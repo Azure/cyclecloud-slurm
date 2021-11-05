@@ -27,7 +27,12 @@ import json
 try:
     import cStringIO
 except ImportError:
-    from io import StringIO as cStringIO
+    import io as cStringIO
+
+try:
+    basestring
+except NameError:
+    basestring = str
 
 logging.basicConfig(level=logging.DEBUG, format="%(message)s")
 
@@ -36,6 +41,14 @@ class DoNotUse:
     
     def __getattribute__(self, key):
         raise RuntimeError()
+
+
+class MockVM:
+    def __init__(self, vcpu_count, pcpu_count, gpu_count, memory) -> None:
+        self.vcpu_count = vcpu_count
+        self.pcpu_count = pcpu_count
+        self.gpu_count = gpu_count
+        self.memory = memory
     
     
 class MockClusterModule:
@@ -221,8 +234,8 @@ class CycleCloudSlurmTest(unittest.TestCase):
             
     def test_create_nodes(self):
         partitions = {}
-        partitions["hpc"] = Partition("hpc", "hpc", "Standard_D2_v2", is_default=True, is_hpc=True, max_scaleset_size=3, vcpu_count=2, memory=4, max_vm_count=8)
-        partitions["htc"] = Partition("htc", "htc", "Standard_D2_v2", is_default=False, is_hpc=False, max_scaleset_size=100, vcpu_count=2, memory=4, max_vm_count=8)
+        partitions["hpc"] = Partition("hpc", "hpc", "", "Standard_D2_v2", is_default=True, is_hpc=True, max_scaleset_size=3, vm=MockVM(2, 2, 0, 4), max_vm_count=8)
+        partitions["htc"] = Partition("htc", "htc", "pre-", "Standard_D2_v2", is_default=False, is_hpc=False, max_scaleset_size=100, vm=MockVM(2, 2, 0, 4), max_vm_count=8)
         
         mock_cluster = MockClusterModule()
         cluster_wrapper = clusterwrapper.ClusterWrapper(mock_cluster.name, DoNotUse(), DoNotUse(), mock_cluster)
@@ -255,7 +268,7 @@ class CycleCloudSlurmTest(unittest.TestCase):
              'nodearray': 'hpc',
              'placementGroupId': 'hpc-Standard_D2_v2-pg2'},
             {'count': 8,
-             'nameFormat': 'htc-%d',
+             'nameFormat': 'pre-htc-%d',
              'nameOffset': 1,
              'definition': {'machineType': 'Standard_D2_v2'},
              'nodeAttributes': {'StartAutomatically': False,
@@ -286,7 +299,7 @@ class CycleCloudSlurmTest(unittest.TestCase):
              'nodearray': 'hpc',
              'placementGroupId': 'hpc-Standard_D2_v2-pg2'},
              {'count': 8,
-             'nameFormat': 'htc-%d',
+             'nameFormat': 'pre-htc-%d',
              'nameOffset': 1,
              'definition': {'machineType': 'Standard_D2_v2'},
              'nodeAttributes': {'StartAutomatically': False,
@@ -298,18 +311,18 @@ class CycleCloudSlurmTest(unittest.TestCase):
         writer = cStringIO.StringIO()
         partitions = OrderedDict()
         # use dampen_memory = .02 to test overriding this
-        partitions["hpc"] = Partition("custom_partition_name", "hpc", "Standard_D2_v2", is_default=True, is_hpc=True, max_scaleset_size=3, vcpu_count=2, memory=128, max_vm_count=8, dampen_memory=.02)
-        partitions["htc"] = Partition("htc", "htc", "Standard_D2_v3", is_default=False, max_scaleset_size=100, is_hpc=False, vcpu_count=2, memory=3.5, max_vm_count=8)
+        partitions["hpc"] = Partition("custom_partition_name", "hpc", "", "Standard_D2_v2", is_default=True, is_hpc=True, max_scaleset_size=3, vm=MockVM(4, 2, 0, 128), max_vm_count=8, dampen_memory=.02, use_pcpu=True)
+        partitions["htc"] = Partition("htc", "htc", "Standard_D2_v3", "pre-", is_default=False, max_scaleset_size=100, is_hpc=False, vm=MockVM(2, 1, 0, 3.5), max_vm_count=8, use_pcpu=False)
 
         partitions["hpc"].node_list = "hpc-10[1-8]"
-        partitions["htc"].node_list = "htc-[1-8]"
+        partitions["htc"].node_list = "pre-htc-[1-8]"
         with MockSubprocessModule() as mock_subprocess:
             mock_subprocess.expect(['scontrol', 'show', 'hostnames', 'hpc-10[1-8]'], "hpc-101 hpc-102 hpc-103 hpc-104 hpc-105 hpc-106 hpc-107 hpc-108")
             mock_subprocess.expect(['scontrol', 'show', 'hostlist', "hpc-101,hpc-102,hpc-103"], 'hpc-10[1-3]')
             mock_subprocess.expect(['scontrol', 'show', 'hostlist', "hpc-104,hpc-105,hpc-106"], 'hpc-10[4-6]')
             mock_subprocess.expect(['scontrol', 'show', 'hostlist', "hpc-107,hpc-108"], 'hpc-10[7-8]')
-            mock_subprocess.expect(['scontrol', 'show', 'hostnames', 'htc-[1-8]'], "htc-1 htc-2 htc-3 htc-4 htc-5 htc-6 htc-7 htc-8")
-            mock_subprocess.expect(['scontrol', 'show', 'hostlist', "htc-1,htc-2,htc-3,htc-4,htc-5,htc-6,htc-7,htc-8"], 'htc-[1-8]')
+            mock_subprocess.expect(['scontrol', 'show', 'hostnames', 'pre-htc-[1-8]'], "pre-htc-1 pre-htc-2 pre-htc-3 pre-htc-4 pre-htc-5 pre-htc-6 pre-htc-7 pre-htc-8")
+            mock_subprocess.expect(['scontrol', 'show', 'hostlist', "pre-htc-1,pre-htc-2,pre-htc-3,pre-htc-4,pre-htc-5,pre-htc-6,pre-htc-7,pre-htc-8"], 'pre-htc-[1-8]')
             cyclecloud_slurm._generate_slurm_conf(partitions, writer, mock_subprocess)
         result = writer.getvalue().strip()
         expected = '''
@@ -317,14 +330,14 @@ class CycleCloudSlurmTest(unittest.TestCase):
 # would result in the nodes being rejected by Slurm if they report a number less than defined here.
 # To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).
 PartitionName=custom_partition_name Nodes=hpc-10[1-8] Default=YES DefMemPerCPU=64225 MaxTime=INFINITE State=UP
-Nodename=hpc-10[1-3] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=128450
-Nodename=hpc-10[4-6] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=128450
-Nodename=hpc-10[7-8] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=128450
+Nodename=hpc-10[1-3] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
+Nodename=hpc-10[4-6] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
+Nodename=hpc-10[7-8] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
 # Note: CycleCloud reported a RealMemory of 3584 but we reduced it by 1024 (i.e. max(1gb, 5%)) to account for OS/VM overhead which
 # would result in the nodes being rejected by Slurm if they report a number less than defined here.
 # To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).
-PartitionName=htc Nodes=htc-[1-8] Default=NO DefMemPerCPU=1280 MaxTime=INFINITE State=UP
-Nodename=htc-[1-8] Feature=cloud STATE=CLOUD CPUs=2 RealMemory=2560'''.strip()
+PartitionName=htc Nodes=pre-htc-[1-8] Default=NO DefMemPerCPU=2560 MaxTime=INFINITE State=UP
+Nodename=pre-htc-[1-8] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=1 RealMemory=2560'''.strip()
         for e, a in zip(result.splitlines(), expected.splitlines()):
             assert e == a, "\n%s\n%s" % (e, a)
         

@@ -235,7 +235,7 @@ end
 
 cron "return_to_idle" do
   minute "*/5"
-  command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{autoscale_dir}/return_to_idle.sh >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log 1>&2"
+  command "#{node[:cyclecloud][:bootstrap]}/cron_wrapper.sh #{autoscale_dir}/return_to_idle.sh 1>&2 >> #{node[:cyclecloud][:home]}/logs/return_to_idle.log"
   only_if { node[:cyclecloud][:cluster][:autoscale][:stop_enabled] }
 end
 
