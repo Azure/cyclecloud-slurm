@@ -430,9 +430,11 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
             state = node.get("Status")
 
             if state and state.lower() == "failed":
+                states["Failed"] = states.get("Failed", 0) + 1
                 if name not in failed_nodes:
                     newly_failed_nodes.append(name)
                     failed_nodes.add(name)
+                    
                 continue
 
             if name in failed_nodes:
@@ -498,7 +500,6 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     for node in ready_nodes:
         name = node.get("Name")
         use_nodename_as_hostname = node.get("Configuration", {}).get("slurm", {}).get("use_nodename_as_hostname", False)
-        logging.info("%s use_nodename_as_hostname=%s", name, use_nodename_as_hostname)
         # backwards compatibility - set NodeAddr=private ip address
         if not use_nodename_as_hostname:
             private_ip = node.get("PrivateIp")
@@ -687,7 +688,7 @@ class DryRunResult:
         self.sets.append(Added(amount))
         
 
-def create_nodes(existing_policy, node_list, dry_run=False):
+def create_nodes(existing_policy, node_list=None, dry_run=False):
     cluster_wrapper = _get_cluster_wrapper()
     subprocess_module = _subprocess_module()
     partitions = fetch_partitions(cluster_wrapper, subprocess_module)
