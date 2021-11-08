@@ -5,7 +5,7 @@
 # Licensed under the MIT License.
 nodename = node[:cyclecloud][:node][:name]
 dns_suffix = node[:slurm][:node_domain_suffix]
-if !dns_suffix.empty? && dns_suffix[0] != "." then
+if !dns_suffix.nil? && !dns_suffix.empty? && dns_suffix[0] != "." then
   dns_suffix = "." + dns_suffix
 end
 
