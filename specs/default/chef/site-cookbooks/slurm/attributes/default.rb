@@ -9,6 +9,7 @@ default[:slurm][:use_nodename_as_hostname] = false
 default[:cyclecloud][:hosts][:simple_vpc_dns][:enabled] = false
 default[:cyclecloud][:hosts][:standalone_dns][:enabled] = false
 default[:slurm][:additional][:config] = ""
+default[:slurm][:ensure_waagent_monitor_hostname] = true
 
 myplatform=node[:platform]
 case myplatform
