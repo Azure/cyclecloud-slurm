@@ -40,7 +40,7 @@ Autoscale = $Autoscale
         cyclecloud.exports.defaults.samba.enabled = false      
         cshared.server.legacy_links_disabled = true
 
-        [[[cluster-init slurm:default:2.4.8]]]
+        [[[cluster-init slurm:default:2.5.1]]]
         Optional = true
 
         [[[configuration cyclecloud.mounts.nfs_shared]]]
@@ -73,7 +73,7 @@ Autoscale = $Autoscale
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
 
 
-        [[[cluster-init slurm:scheduler:2.4.8]]]
+        [[[cluster-init slurm:scheduler:2.5.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -130,7 +130,7 @@ Autoscale = $Autoscale
         slurm.hpc = true
 
 
-        [[[cluster-init slurm:execute:2.4.8]]]
+        [[[cluster-init slurm:execute:2.5.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -151,7 +151,7 @@ Autoscale = $Autoscale
         slurm.hpc = false
 
 
-        [[[cluster-init slurm:execute:2.4.8]]]
+        [[[cluster-init slurm:execute:2.5.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
