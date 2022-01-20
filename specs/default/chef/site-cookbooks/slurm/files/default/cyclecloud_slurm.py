@@ -247,7 +247,7 @@ def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=Fals
             cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
         
         # use cores to find DefMemPerCPU to accurately configure HT VMs with "slurm.use_pcpu = false"
-        def_mem_per_cpu = memory // cores
+        def_mem_per_cpu = memory // cpus
             
         
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
