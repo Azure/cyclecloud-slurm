@@ -38,3 +38,5 @@ default[:slurm][:accounting][:enabled] = false
 default[:slurm][:accounting][:user] = 'admin'
 default[:slurm][:accounting][:password] = 'admin'
 default[:slurm][:accounting][:url] = 'localhost'
+
+default[:slurm][:ha][:enabled] = true
