@@ -10,6 +10,30 @@ slurmuser = node[:slurm][:user][:name]
 slurmver = node[:slurm][:version]
 myplatform = node[:platform]
 autoscale_dir = node[:slurm][:autoscale_dir]
+# schedint = cluster.scheduler
+# scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id']).select { |n|
+#   if not n['slurm'].nil? and n['slurm']['is_scheduler'] == true
+#     scheduler_nodes << n
+#   end
+# }
+scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id'], :is_scheduler => true)
+
+scheduler_nodes = scheduler_nodes.sort {|a,b| a[1] <=> b[1]}
+Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
+
+scheduler_hosts = scheduler_nodes.map { |n|
+  n['cyclecloud']['instance']['hostname']
+}
+scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
+  fqdn.split(".", 2)[0]
+}
+scheduler_hosts_shortnames = scheduler_hosts_shortnames.join(',')
+
+Chef::Log.info("Management Nodes: #{scheduler_hosts_shortnames}")
+
+scheduler_primary = scheduler_hosts_shortnames.split(",", 2)[0]
+scheduler_backup = scheduler_hosts_shortnames.split(",", 2)[1]
+
 
 
 
