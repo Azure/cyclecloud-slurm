@@ -49,13 +49,12 @@ require 'chef/mixin/shell_out'
 
 slurmuser = node[:slurm][:user][:name]
 
-remote_file '/etc/munge/munge.key' do
-  source 'file:///sched/munge/munge.key'
+link '/etc/munge/munge.key' do
+  to '/sched/munge/munge.key'
   owner 'munge'
   group 'munge'
-  mode '0700'
-  action :create
 end
+
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'

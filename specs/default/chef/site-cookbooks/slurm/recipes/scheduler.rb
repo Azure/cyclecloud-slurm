@@ -23,12 +23,16 @@ file '/sched/munge/munge.key' do
   mode 0700
 end
 
-remote_file '/etc/munge/munge.key' do
-  source 'file:///sched/munge/munge.key'
+link '/etc/munge/munge.key' do
+  to '/sched/munge/munge.key'
   owner 'munge'
   group 'munge'
-  mode '0700'
-  action :create
+end
+
+link '/etc/slurm/slurm.conf' do
+  to '/sched/slurm.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
 end
 
 service 'munge' do
