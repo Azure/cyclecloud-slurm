@@ -92,14 +92,14 @@ end
 defer_block "Defer starting slurmd until end of converge" do
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
   if node[:slurm][:use_nodename_as_hostname] then
-    cmd_str = "getent hosts #{node[:cyclecloud][:instance][:ipv4]} | grep -q #{nodename}"
+    cmd_str = "getent hosts #{node[:cyclecloud][:instance][:ipv4]} | grep -qi #{nodename}"
     cmd = Mixlib::ShellOut.new(cmd_str)
     cmd.run_command
     if !cmd.exitstatus.zero?
       raise "Hostname has not registered in DNS yet."
     end
 
-    cmd_str = "hostname | grep -q #{nodename}"
+    cmd_str = "hostname | grep -qi #{nodename}"
     cmd = Mixlib::ShellOut.new(cmd_str)
     cmd.run_command
     if !cmd.exitstatus.zero?
