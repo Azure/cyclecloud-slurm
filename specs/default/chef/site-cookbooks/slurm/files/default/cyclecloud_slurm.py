@@ -86,7 +86,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         partition_name = slurm_config.get("partition", nodearray_name)
         unescaped_nodename_prefix = slurm_config.get("node_prefix") or ""
 
-        nodename_prefix = re.sub("[^a-zA-Z0-9-]", "-", unescaped_nodename_prefix)
+        nodename_prefix = re.sub("[^a-zA-Z0-9-]", "-", unescaped_nodename_prefix).lower()
 
         if unescaped_nodename_prefix != nodename_prefix:
             logging.warning("slurm.node_prefix for partition %s was converted from '%s' to '%s' due to invalid hostname characters.",
