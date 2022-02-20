@@ -89,7 +89,7 @@ function install_pmix() {
     cd ../build/v3/
     ../../source/configure --prefix=/opt/pmix/v3
     make -j install >/dev/null
-    cd ../../install/v3/
+    cd ~/
 }
 
 build_slurm 20.11.7
