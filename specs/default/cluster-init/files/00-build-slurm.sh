@@ -6,8 +6,6 @@ CENTOS_MAJOR=$(echo $CENTOS_VERSION | cut -d. -f1)
 
 function build_slurm() {
     set -e
-    
-    install_pmix
 
     SLURM_VERSION=$1
     SLURM_FOLDER="slurm-${SLURM_VERSION}"
@@ -33,6 +31,9 @@ function build_slurm() {
     fi
 
     yum install -y make $PYTHON which rpm-build munge-devel munge-libs readline-devel openssl openssl-devel pam-devel perl-ExtUtils-MakeMaker gcc mysql mysql-devel wget gtk2-devel.x86_64 glib2-devel.x86_64 $LIBTOOL m4 automake rsync
+    
+    install_pmix
+    
     if [ ! -e ~/bin ]; then
         mkdir -p ~/bin
     fi
