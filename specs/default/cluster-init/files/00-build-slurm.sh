@@ -12,6 +12,13 @@ function build_slurm() {
     SLURM_PKG="slurm-${SLURM_VERSION}.tar.bz2"
     DOWNLOAD_URL="https://download.schedmd.com/slurm"
 
+    # Since EoL of Centos 8 (31st Dec 2021), need to use archived repo.
+    if [ $CENTOS_MAJOR -eq 8 ]; then
+        cd /etc/yum.repos.d/
+        sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+        sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+    fi
+
     # munge is in EPEL
     yum -y install epel-release && yum -q makecache
 
@@ -26,7 +33,7 @@ function build_slurm() {
     else
         LIBTOOL=libtool
         yum install -y dnf-plugins-core
-        yum config-manager --set-enabled PowerTools
+        yum config-manager --set-enabled powertools
         yum install -y make
     fi
 
