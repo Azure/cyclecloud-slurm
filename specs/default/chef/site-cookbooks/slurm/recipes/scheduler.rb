@@ -10,6 +10,32 @@ slurmuser = node[:slurm][:user][:name]
 slurmver = node[:slurm][:version]
 myplatform = node[:platform]
 autoscale_dir = node[:slurm][:autoscale_dir]
+# schedint = cluster.scheduler
+# scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id']).select { |n|
+#   if not n['slurm'].nil? and n['slurm']['is_scheduler'] == true
+#     scheduler_nodes << n
+#   end
+# }
+scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id'], :is_scheduler => true)
+
+scheduler_nodes = scheduler_nodes.sort {|a,b| a[1] <=> b[1]}
+Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
+
+scheduler_hosts = scheduler_nodes.map { |n|
+  n['cyclecloud']['instance']['hostname']
+}
+scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
+  fqdn.split(".", 2)[0]
+}
+scheduler_hosts_shortnames = scheduler_hosts_shortnames.join(',')
+
+Chef::Log.info("Management Nodes: #{scheduler_hosts_shortnames}")
+
+scheduler_primary = scheduler_hosts_shortnames.split(",", 2)[0]
+scheduler_backup = scheduler_hosts_shortnames.split(",", 2)[1]
+
+
+
 
 execute 'Create munge key' do
   command "dd if=/dev/urandom bs=1 count=1024 >/sched/munge/munge.key"
@@ -88,27 +114,65 @@ bash 'Install job_submit/cyclecloud' do
 end
 
 
-# we will be appending to this file, so that the next step is monotonic
-template '/sched/slurm.conf' do
-  owner "#{slurmuser}"
-  source "slurm.conf.erb"
-  action :create_if_missing
-  variables lazy {{
-    :slurmver => slurmver,
-    :nodename => node[:machinename],
-    :autoscale_dir => "#{autoscale_dir}",
-    :resume_timeout => node[:slurm][:resume_timeout],
-    :suspend_timeout => node[:slurm][:suspend_timeout],
-    :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
-    :accountingenabled => node[:slurm][:accounting][:enabled]
-  }}
-end
 
-
-# Note - we used to use ControlMachine, but this is deprecated. We actually do not need to 
-# remove it from upgraded slurm.conf's, as simply appending SlurmctldHost will override ControlMachine
-# which is especially useful if ControlMachine is pointed at a stale hostname.
-bash 'Set SlurmctldHost' do
+if node[:slurm][:haenabled]
+  #TODO: Split to its own recipe
+  #include_recipe 'slurm::_haconf'
+  scheduler_nodes = Slurm::Helpers.wait_for_master(29) do
+    mgmt_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id'], :is_scheduler => true)
+  end
+        
+  scheduler_nodes = scheduler_nodes.sort {|a,b| a[0] <=> b[1]}
+  Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
+      
+  scheduler_hosts = scheduler_nodes.map { |n|
+    n['cyclecloud']['instance']['hostname']
+  }
+  scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
+    fqdn.split(".", 1)[0]
+  }
+  scheduler_hosts_shortnames = scheduler_hosts_shortnames.join(',')
+        
+  Chef::Log.info("Management Nodes: #{scheduler_hosts_shortnames}")
+  
+  # we will be appending to this file, so that the next step is monotonic
+  template '/sched/slurm.conf' do
+    owner "#{slurmuser}"
+    source "slurm.conf.erb"
+    action :create_if_missing
+    variables lazy {{
+      :slurmver => slurmver,
+      :nodename => node[:machinename],
+      :autoscale_dir => "#{autoscale_dir}",
+      :resume_timeout => node[:slurm][:resume_timeout],
+      :suspend_timeout => node[:slurm][:suspend_timeout],
+      :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
+      :accountingenabled => node[:slurm][:accounting][:enabled],
+      :scheduler_nodes => scheduler_hosts_shortnames.split(",")[0],
+      :backup_slurmctld => scheduler_hosts_shortnames.split(",")[1],
+      :haenabled => node[:slurm][:ha][:enabled]
+    }}
+  end
+else
+  # we will be appending to this file, so that the next step is monotonic
+  template '/sched/slurm.conf' do
+    owner "#{slurmuser}"
+    source "slurm.conf.erb"
+    action :create_if_missing
+    variables lazy {{
+      :slurmver => slurmver,
+      :nodename => node[:machinename],
+      :autoscale_dir => "#{autoscale_dir}",
+      :resume_timeout => node[:slurm][:resume_timeout],
+      :suspend_timeout => node[:slurm][:suspend_timeout],
+      :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
+      :accountingenabled => node[:slurm][:accounting][:enabled]
+    }}
+  end
+  # Note - we used to use ControlMachine, but this is deprecated. We actually do not need to 
+  # remove it from upgraded slurm.conf's, as simply appending SlurmctldHost will override ControlMachine
+  # which is especially useful if ControlMachine is pointed at a stale hostname.
+  bash 'Set SlurmctldHost' do
     code <<-EOH
     host=$(hostname -s)
     grep -q "SlurmctldHost=$host" /sched/slurm.conf && exit 0
@@ -116,7 +180,9 @@ bash 'Set SlurmctldHost' do
     printf "\nSlurmctldHost=$host\n" >> /sched/slurm.conf.tmp
     mv /sched/slurm.conf.tmp /sched/slurm.conf
     EOH
+  end
 end
+
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'

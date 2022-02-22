@@ -1,21 +1,24 @@
 #!/bin/bash -e
+set +x
 cd ~/
 
-CENTOS_VERSION=$(cat /etc/centos-release | cut -d" " -f4)
-CENTOS_MAJOR=$(echo $CENTOS_VERSION | cut -d. -f1)
+CENTOS_VERSION=8.5
+CENTOS_MAJOR=8
 
 function build_slurm() {
     set -e
+    cd ~/
     
-    install_pmix
+    
 
     SLURM_VERSION=$1
     SLURM_FOLDER="slurm-${SLURM_VERSION}"
     SLURM_PKG="slurm-${SLURM_VERSION}.tar.bz2"
     DOWNLOAD_URL="https://download.schedmd.com/slurm"
-
+    
     # munge is in EPEL
     yum -y install epel-release && yum -q makecache
+    
 
     if [ "$SLURM_VERSION" \> "20" ]; then
         PYTHON=python3
@@ -28,7 +31,7 @@ function build_slurm() {
     else
         LIBTOOL=libtool
         yum install -y dnf-plugins-core
-        yum config-manager --set-enabled PowerTools
+        dnf config-manager --set-enabled powertools
         yum install -y make
     fi
 
@@ -36,6 +39,9 @@ function build_slurm() {
     if [ ! -e ~/bin ]; then
         mkdir -p ~/bin
     fi
+    
+    install_pmix
+
     
     ln -s `which $PYTHON` ~/bin/python
     export PATH=$PATH:~/bin
@@ -45,6 +51,8 @@ function build_slurm() {
     # make the plugin
     rm -rf ~/job_submit
     mkdir -p ~/job_submit
+    cd ~/
+    wget "${DOWNLOAD_URL}/${SLURM_PKG}"
     cd ~/job_submit
     tar xjf ~/${SLURM_PKG}
     mkdir -p ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
@@ -74,6 +82,7 @@ function build_slurm() {
 }
 
 function install_pmix() {
+    yum -y install autoconf flex
     cd ~/
     mkdir -p /opt/pmix/v3
     yum install -y libevent-devel git

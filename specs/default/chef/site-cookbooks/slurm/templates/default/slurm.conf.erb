@@ -41,4 +41,9 @@ AccountingStorageType=accounting_storage/none
 <% end %>
 Include cyclecloud.conf
 
+<% if @haenabled == true %>
+SlurmctldHost=<%= @scheduler_nodes %>
+SlurmctldHost=<%= @backup_slurmctld %>
+<% end %>
+
 <%= node[:slurm][:additional][:config] %>

@@ -86,7 +86,7 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
         partition_name = slurm_config.get("partition", nodearray_name)
         unescaped_nodename_prefix = slurm_config.get("node_prefix") or ""
 
-        nodename_prefix = re.sub("[^a-zA-Z0-9-]", "-", unescaped_nodename_prefix)
+        nodename_prefix = re.sub("[^a-zA-Z0-9-]", "-", unescaped_nodename_prefix).lower()
 
         if unescaped_nodename_prefix != nodename_prefix:
             logging.warning("slurm.node_prefix for partition %s was converted from '%s' to '%s' due to invalid hostname characters.",
@@ -410,6 +410,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     failed_nodes = set()
 
     ready_nodes = []
+    ip_already_set = set()
     
     while time.time() < omega:
         ready_nodes = []
@@ -446,6 +447,13 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 continue
             
             private_ip = node.get("PrivateIp")
+            use_nodename_as_hostname = node.get("Configuration", {}).get("slurm", {}).get("use_nodename_as_hostname", False)
+            if not use_nodename_as_hostname:
+                if private_ip and private_ip not in ip_already_set:
+                    cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostName=%s" % private_ip]
+                    logging.info("Running %s", " ".join(cmd))
+                    subprocess_module.check_call(cmd)
+                    ip_already_set.add(private_ip)
             if state == "Ready":
                 if not private_ip:
                     state = "WaitingOnIPAddress"

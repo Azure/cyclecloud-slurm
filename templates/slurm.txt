@@ -26,6 +26,7 @@ Autoscale = $Autoscale
         slurm.accounting.user = $configuration_slurm_accounting_user
         slurm.accounting.password = $configuration_slurm_accounting_password
         slurm.additional.config = $additional_slurm_config
+        slurm.ha_enabled = $configuration_slurm_ha_enabled
         
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
@@ -128,6 +129,21 @@ Autoscale = $Autoscale
         samba.enabled = false
         type = nfs
 
+    [[nodearray scheduler-ha]]
+    Extends = scheduler
+    IsReturnProxy = false
+    ComputerName = ${regexps("([^a-zA-Z0-9-])", ifThenElse(SchedulerHostName=="Cluster Prefix", StrJoin("-", ClusterName, "scheduler", "-ha"), ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated", undefined, SchedulerHostName)), "-")}
+    InitialCount = $configuration_slurm_ha_enabled
+
+    [[nodearray login]]
+        InitialCount = $NumberLoginNodes
+        MachineType = $loginMachineType
+        ImageName = $SchedulerImageName
+
+        [[[cluster-init cyclecloud/slurm:login]]]
+        [[[configuration]]]
+        autoscale.enabled = false
+
     [[node nodearraybase]]
     Abstract = true
         [[[configuration]]]
@@ -198,6 +214,12 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_D12_v2
 
+        [[[parameter loginMachineType]]]
+        Label = Login node VM Type
+        Description = The VM type for login nodes.
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_D8as_v4
+
         [[[parameter HPCMachineType]]]
         Label = HPC VM Type
         Description = The VM type for HPC execute nodes
@@ -260,6 +282,14 @@ Order = 10
         Conditions.Excluded := HTCUseLowPrio isnt true
         Config.MinValue = -1
 
+        [[[parameter NumberLoginNodes]]]
+        Label = Num Login Nodes
+        DefaultValue = 0
+        Description = Number of optional login nodes to create.
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 0
+        Config.MaxValue = 10000
+        Config.IntegerOnly = true
 
     [[parameters Networking]]
     Order = 40
@@ -417,6 +447,12 @@ Order = 20
         Label = Additional Slurm configuration
         Description = Any additional lines to add to slurm.conf
         ParameterType = Text
+
+        [[[parameter configuration_slurm_ha_enabled]]]
+        Label = Deploy Slurm with HA
+        Description = Deploy Slurm with an additional HA node
+        DefaultValue = false
+        ParameterType = Boolean
 	
 
 
@@ -454,21 +490,21 @@ Order = 20
         Label = Scheduler OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos8
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
         Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos8
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
         Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos8
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
         Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
