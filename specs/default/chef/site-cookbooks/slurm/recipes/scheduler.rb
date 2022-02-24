@@ -5,10 +5,15 @@
 # Licensed under the MIT License.
 
 include_recipe 'slurm::default'
+is_array = node[:cyclecloud][:node][:template] != node[:cyclecloud][:node][:name]
+
+if is_array then
+  include_recipe "slurm::sethostname"
+end
 
 slurmuser = node[:slurm][:user][:name]
 slurmver = node[:slurm][:version]
-myplatform = node[:platform]
+myplatform = node[:platform_family]
 autoscale_dir = node[:slurm][:autoscale_dir]
 # schedint = cluster.scheduler
 # scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id']).select { |n|
@@ -21,9 +26,16 @@ scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['i
 scheduler_nodes = scheduler_nodes.sort {|a,b| a[1] <=> b[1]}
 Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
 
-scheduler_hosts = scheduler_nodes.map { |n|
-  n['cyclecloud']['instance']['hostname']
-}
+
+if node[:slurm][:use_nodename_as_hostname] then
+  scheduler_hosts = scheduler_nodes.map { |n|
+    n['cyclecloud']['node']['name']
+  }
+else
+  scheduler_hosts = scheduler_nodes.map { |n|
+    n['cyclecloud']['instance']['hostname']
+  }
+end
 scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
   fqdn.split(".", 2)[0]
 }
@@ -94,7 +106,7 @@ end
 
 
 
-case node[:platform]
+case node[:platform_family]
 when 'ubuntu'
   plugin_name = "job_submit_cyclecloud_ubuntu_#{slurmver}.so"
 when 'centos', 'rhel', 'redhat'
@@ -189,9 +201,6 @@ link '/etc/slurm/slurm.conf' do
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
-
-
-
 
 
 template '/sched/cgroup.conf' do

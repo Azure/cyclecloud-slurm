@@ -57,7 +57,7 @@ when 'ubuntu'
 
 
 
-when 'centos', 'rhel', 'redhat'
+when 'centos', 'rhel', 'redhat', 'almalinux'
   # Required for munge
   package 'epel-release'
 
@@ -65,7 +65,7 @@ when 'centos', 'rhel', 'redhat'
   package 'munge'
 
   execute 'Install perl-Switch' do
-    command "dnf --enablerepo=PowerTools install -y perl-Switch"
+    command "dnf --enablerepo=powertools install -y perl-Switch"
     action :run
     only_if { node[:platform_version] >= '8' }
   end

@@ -134,6 +134,10 @@ Autoscale = $Autoscale
     IsReturnProxy = false
     ComputerName = ${regexps("([^a-zA-Z0-9-])", ifThenElse(SchedulerHostName=="Cluster Prefix", StrJoin("-", ClusterName, "scheduler", "-ha"), ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated", undefined, SchedulerHostName)), "-")}
     InitialCount = $configuration_slurm_ha_enabled
+        [[[configuration]]]
+        autoscale.enabled = false
+        slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
+        slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
@@ -143,6 +147,8 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/slurm:login]]]
         [[[configuration]]]
         autoscale.enabled = false
+        slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
+        slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
     [[node nodearraybase]]
     Abstract = true

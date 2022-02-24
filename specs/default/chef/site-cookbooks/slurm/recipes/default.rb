@@ -20,15 +20,15 @@ user slurmuser do
   comment 'User to run slurmd'
   shell '/bin/false'
   uid node[:slurm][:user][:uid]
-  gid node[:slurm][:user][:gid]
+  group slurmuser
   action :create
 end
-
 
 group mungeuser do
   gid node[:munge][:user][:gid]
   not_if "getent group #{mungeuser}"  
 end
+
 
 user mungeuser do
   comment 'User to run munged'

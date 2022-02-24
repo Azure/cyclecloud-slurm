@@ -13,7 +13,7 @@ if !node[:slurm][:accounting][:enabled]
     return
 end 
 # Install slurmdbd
-myplatform=node[:platform]
+myplatform=node[:platform_family]
 case myplatform
 when 'ubuntu'
     slurmdbdpackage = "slurm-slurmdbd_#{slurmver}_amd64.deb"
