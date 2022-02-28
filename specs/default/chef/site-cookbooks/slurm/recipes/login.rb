@@ -6,7 +6,9 @@
 # Licensed under the MIT License.
 
 include_recipe "slurm::default"
+include_recipe "slurm::sethostname"
 require 'chef/mixin/shell_out'
+
 
 slurmuser = node[:slurm][:user][:name]
 
