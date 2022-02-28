@@ -494,22 +494,22 @@ Order = 20
         Label = Scheduler OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "almalinux:almalinux-hpc:8_5-hpc"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "almalinux:almalinux-hpc:8_5-hpc"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "almalinux:almalinux-hpc:8_5-hpc"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init
