@@ -27,6 +27,8 @@ Autoscale = $Autoscale
         slurm.accounting.password = $configuration_slurm_accounting_password
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
+        # set to slurm.install = true if using a custom image with Slurm installed
+        slurm.install = false
         
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
@@ -52,12 +54,15 @@ Autoscale = $Autoscale
         type = nfs
         mountpoint = /shared
         export_path = $NFSSharedExportPath
-        address = $NFSAddress
+        address = $NFSSharedAddress
         options = $NFSSharedMountOptions
 
         [[[configuration cyclecloud.mounts.nfs_sched]]]
         type = nfs
         mountpoint = /sched
+        export_path = $NFSSchedExportPath
+        address = $NFSSchedAddress
+        options = $NFSSchedMountOptions
 
         [[[configuration cyclecloud.mounts.additional_nfs]]]
         disabled = ${AdditionalNAS isnt true}
@@ -83,9 +88,8 @@ Autoscale = $Autoscale
     # "-")}
     
         [[[configuration]]]
-        cyclecloud.mounts.nfs_sched.disabled = true
+        cyclecloud.mounts.nfs_sched.disabled = ${NFSType != "External"}
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
-
 
         [[[cluster-init cyclecloud/slurm:scheduler]]]
 
@@ -93,18 +97,19 @@ Autoscale = $Autoscale
         AssociatePublicIpAddress = $UsePublicNetwork
 
         [[[volume sched]]]
-        Size = 30
+        Size = ${ifThenElse(NFSType == "Builtin", 30, 2)}
         SSD = True
         Mount = builtinsched
         Persistent = False
 
         [[[volume shared]]]
-        Size = ${ifThenElse(NFSType == "Builtin", FilesystemSize, 2)}
+        Size = ${ifThenElse(NFSType == "Builtin", SharedFilesystemSize, 2)}
         SSD = True
         Mount = builtinshared
         Persistent = ${NFSType == "Builtin"}
 
         [[[configuration cyclecloud.mounts.builtinsched]]]
+        disabled = ${NFSType != "Builtin"}
         mountpoint = /sched
         fs_type = xfs
 
@@ -114,6 +119,7 @@ Autoscale = $Autoscale
         fs_type = xfs
 
         [[[configuration cyclecloud.exports.builtinsched]]]
+        disabled = ${NFSType != "Builtin"}
         export_path = /sched
         options = no_root_squash
         samba.enabled = false
@@ -130,10 +136,6 @@ Autoscale = $Autoscale
     IsReturnProxy = false
     ComputerName = ${regexps("([^a-zA-Z0-9-])", ifThenElse(SchedulerHostName=="Cluster Prefix", StrJoin("-", ClusterName, "scheduler", "-ha"), ifThenElse(Size(Trim(SchedulerHostName)) == 0 || SchedulerHostName == "Generated", undefined, SchedulerHostName)), "-")}
     InitialCount = $configuration_slurm_ha_enabled
-        [[[configuration]]]
-        autoscale.enabled = false
-        slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
-        slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
@@ -143,6 +145,7 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/slurm:login]]]
         [[[configuration]]]
         autoscale.enabled = false
+
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
@@ -187,8 +190,8 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.hpc = false
         slurm.partition = htc
-	# set pcpu = false for all hyperthreaded VMs
-	slurm.use_pcpu = false
+	    # set pcpu = false for all hyperthreaded VMs
+	    slurm.use_pcpu = false
 
 [parameters About]
 Order = 1
@@ -305,14 +308,15 @@ Order = 10
         Required = True
 
 [parameters Network Attached Storage]
-Order = 15
+Order = 25
 
-    [[parameters Default NFS Share]]
-    Order = 10
-        [[[parameter About shared]]]
+    [[parameters NFS Type]]
+    Order = 5
+
+        [[[parameter About NFS Type]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template := "<p>The directory <code>/shared</code> is a network attached mount and exists in all nodes of the cluster. Users' home directories reside within this mountpoint with the base homedir <code>/shared/home</code>.<br><br>There are two options for providing this mount:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External NFS]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.</p>"
+        Config.Template := "<p>There are two options for providing NFS shared filesystem:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External NFS]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.<br><br>This setting must be set to <strong>[External NFS]</strong> when <strong>HA</strong> is configured.</p>"
         Order = 20
 
         [[[parameter NFSType]]]
@@ -321,10 +325,20 @@ Order = 15
         Config.Label = Type of NFS to use for this cluster
         Config.Plugin = pico.form.Dropdown
         Config.Entries := {[Label="External NFS"; Value="External"], [Label="Builtin"; Value="Builtin"]}
-        DefaultValue = Builtin
+        DefaultValue = External
+        #Conditions.Hidden := configuration_slurm_ha_enabled
 
-        [[[parameter NFSAddress]]]
-        Label = NFS IP Address
+    [[parameters Default NFS Share]]
+    Order = 10
+
+        [[[parameter About shared]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>The directory <code>/shared</code> is a network attached mount and exists in all nodes of the cluster. Users' home directories reside within this mountpoint with the base homedir <code>/shared/home</code>.</p>"
+        Order = 20
+
+        [[[parameter NFSSharedAddress]]]
+        Label = NFS Shared IP Address
         Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
         Config.ParameterType = String
         Conditions.Hidden := NFSType != "External"
@@ -340,16 +354,39 @@ Order = 15
         Description = NFS Client Mount Options
         Conditions.Hidden := NFSType != "External"
 
-        [[[parameter FilesystemSize]]]
+        [[[parameter SharedFilesystemSize]]]
         Label = Size (GB)
         Description = The filesystem size
         DefaultValue = 100
-
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 10
         Config.MaxValue = 10240
         Config.IntegerOnly = true
         Conditions.Excluded := NFSType != "Builtin"
+
+    [[parameters Default NFS Sched]]
+    Order = 15
+    Conditions.Hidden := NFSType != "External"
+
+        [[[parameter About sched]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>The directory <code>/sched</code> is a network attached mount and exists in all nodes of the cluster. Slurm config files reside within this mountpoint.</p>"
+        Order = 20
+
+        [[[parameter NFSSchedAddress]]]
+        Label = NFS sched IP Address
+        Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
+        Config.ParameterType = String
+
+        [[[parameter NFSSChedExportPath]]]
+        Label = Sched Export Path
+        Description = The path exported by the file system
+        DefaultValue = /sched
+
+        [[[parameter NFSSchedMountOptions]]]
+        Label = NFS Sched Mount Options
+        Description = NFS Client Mount Options
 
     [[parameters Additional NFS Mount]]
     Order = 20
@@ -494,22 +531,22 @@ Order = 20
         Label = Scheduler OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux:almalinux-hpc:8_5-hpc
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "almalinux:almalinux-hpc:8_5-hpc"}
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux:almalinux-hpc:8_5-hpc
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "almalinux:almalinux-hpc:8_5-hpc"}
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = almalinux:almalinux-hpc:8_5-hpc
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "almalinux:almalinux-hpc:8_5-hpc"}
+        DefaultValue = almalinux:almalinux-hpc:8_5-hpc:latest
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init
@@ -551,4 +588,4 @@ Order = 20
         ParameterType = Boolean
         Config.Label = Access execute nodes from the Internet
         Conditions.Excluded := UsePublicNetwork isnt true
-    
+   
