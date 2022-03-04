@@ -14,7 +14,6 @@ SelectType=select/cons_tres
 GresTypes=gpu
 SelectTypeParameters=CR_Core_Memory
 ClusterName="<%= node[:cyclecloud][:cluster][:name] %>"
-JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=debug
 SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
 <% if @slurmver > "18" %>
@@ -35,9 +34,14 @@ SuspendProgram=<%= @autoscale_dir %>/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
 <% if @accountingenabled == true %>
 AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageHost="localhost"
+JobAcctGatherType=jobacct_gather/linux
+AccountingStorageHost=<%= @scheduler_nodes %>
+<% if @haenabled == true %>
+AccountingStorageBackupHost=<%= @backup_slurmctld %>
+<% end %>
 <% else %>
 AccountingStorageType=accounting_storage/none
+JobAcctGatherType=jobacct_gather/none
 <% end %>
 Include cyclecloud.conf
 
