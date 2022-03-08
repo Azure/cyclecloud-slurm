@@ -71,7 +71,7 @@ end
 # Start slurmdbd service
 #defer_block "Defer starting slurmdbd until end of converge" do
 service 'slurmdbd' do
-    action [:enable, :restart]
+    action [:enable, :start]
 end
 
 bash 'Add cluster to slurmdbd' do
