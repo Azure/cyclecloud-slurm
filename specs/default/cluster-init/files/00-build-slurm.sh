@@ -4,6 +4,7 @@ cd ~/
 
 CENTOS_VERSION=8.5
 CENTOS_MAJOR=8
+SLURM_VERSION=$1
 
 function build_slurm() {
     set -e
@@ -76,7 +77,7 @@ function build_slurm() {
     make
 
 
-    LD_LIBRARY_PATH=/root/job_submit/${SLURM_FOLDER}/src/api/.libs/ JOB_SUBMIT_CYCLECLOUD=1 python3 job_submit_cyclecloud_test.py
+    LD_LIBRARY_PATH=/root/job_submit/${SLURM_FOLDER}/src/api/.libs/ JOB_SUBMIT_CYCLECLOUD=1 SLURM_VERSION=$SLURM_VERSION python3 job_submit_cyclecloud_test.py
     rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_centos${CENTOS_MAJOR}_${SLURM_VERSION}-1.so
     rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_ubuntu_${SLURM_VERSION}-1.so
 }
@@ -100,4 +101,4 @@ function install_pmix() {
     cd ../../install/v3/
 }
 
-build_slurm 20.11.7
+build_slurm $SLURM_VERSION
