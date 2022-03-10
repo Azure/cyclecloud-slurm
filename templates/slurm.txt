@@ -187,8 +187,6 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.hpc = false
         slurm.partition = htc
-	# set pcpu = false for all hyperthreaded VMs
-	slurm.use_pcpu = false
 
 [parameters About]
 Order = 1
