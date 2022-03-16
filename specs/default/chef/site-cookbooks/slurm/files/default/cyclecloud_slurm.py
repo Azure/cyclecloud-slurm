@@ -391,6 +391,29 @@ def terminate_nodes(node_list):
 
 
 def _resume(node_list, cluster_wrapper, subprocess_module):
+    block_for_termination = True
+
+    max_attempts = 360
+    attempt = 0
+    while block_for_termination and attempt < max_attempts:
+        attempt += 1
+        block_for_termination = False
+        _, nodes_response = _retry_rest(lambda: cluster_wrapper.get_nodes())
+
+        for node in nodes_response.nodes:
+            name = node.get("Name")
+            if name in node_list:
+                state = node.get("State")
+                if state is not None and state != node.get("TargetState") and node.get("TargetState") != "Started":
+                    logging.warning(f"{name} is still awaiting termination.")
+                    block_for_termination = True
+
+        if block_for_termination:
+            time.sleep(5)
+    
+    if block_for_termination:
+        raise RuntimeError(f"Could not terminate at least one of the following nodes: {node_list}")
+
     _, start_response = _retry_rest(lambda: cluster_wrapper.start_nodes(names=node_list))
     _wait_for_resume(cluster_wrapper, start_response.operation_id, node_list, subprocess_module)
 
@@ -410,6 +433,8 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     failed_nodes = set()
 
     ready_nodes = []
+
+    ip_already_set = set()
     
     while time.time() < omega:
         ready_nodes = []
@@ -446,6 +471,11 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 continue
             
             private_ip = node.get("PrivateIp")
+            if private_ip and private_ip not in ip_already_set:
+                cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostName=%s" % private_ip]
+                logging.info("Running %s", " ".join(cmd))
+                subprocess_module.check_call(cmd)
+                ip_already_set.add(private_ip)
             if state == "Ready":
                 if not private_ip:
                     state = "WaitingOnIPAddress"
@@ -626,9 +656,9 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
         request_set.node_attributes["StartAutomatically"] = False
         request_set.node_attributes["Fixed"] = True
         
-        request.sets.append(request_set)
+        request_sets.append(request_set)
     
-    if not request.sets:
+    if not request_sets:
         # they must have been attempting to create at least one node.
         if existing_policy == ExistingNodePolicy.Error:
             raise CyclecloudSlurmError("No nodes were created!")
@@ -649,22 +679,27 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
     except Exception as e:
         logging.debug(traceback.format_exc())
         try:
-            # attempt to parse the json response from cyclecloud to give a better message
-            response = json.loads(str(e))
-            message = "%s: %s" % (response["Message"], response["Detail"])
-        except:
+            _, sub_result = cluster_wrapper.create_nodes(sub_request)
+            result_sets.extend(sub_result.sets)
+        except Exception as e:
             logging.debug(traceback.format_exc())
-            message = str(e)
-            
-        raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
+            try:
+                # attempt to parse the json response from cyclecloud to give a better message
+                response = json.loads(str(e))
+                message = "%s: %s" % (response["Message"], response["Detail"])
+            except:
+                logging.debug(traceback.format_exc())
+                message = str(e)
+                
+            raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
     
-    num_created = sum([s.added for s in result.sets])
+    num_created = sum([s.added for s in result_sets])
     
     if num_created == 0 and existing_policy == ExistingNodePolicy.Error:
         raise CyclecloudSlurmError("Did not create a single node!")
 
-    for n, set_result in enumerate(result.sets):
-        request_set = request.sets[n]
+    for n, set_result in enumerate(result_sets):
+        request_set = request_sets[n]
         if set_result.added == 0:
             logging.warning("No nodes were created for nodearray %s using name format %s and offset %s: %s", request_set.nodearray, request_set.name_format,
                                                                                                           request_set.name_offset, set_result.message)
