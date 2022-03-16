@@ -58,6 +58,7 @@ Autoscale = $Autoscale
         [[[configuration cyclecloud.mounts.nfs_sched]]]
         type = nfs
         mountpoint = /sched
+        disabled = $NFSSchedDisable
 
         [[[configuration cyclecloud.mounts.additional_nfs]]]
         disabled = ${AdditionalNAS isnt true}
@@ -306,6 +307,23 @@ Order = 10
 
 [parameters Network Attached Storage]
 Order = 15
+
+
+    [[parameters Scheduler Mount]]
+    Order = 5
+        [[[parameter About sched]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template = ''' <p>The directory <code>/sched</code> is a network attached mount and exists in all nodes of the cluster. 
+            Slurm's configuration is linked in from this directory. It's managed by the scheduler node. 
+            To disable the mount of the /sched directory, and to supply your own for a <strong>hybrid scenario</strong>, select the checkbox below '''
+        Order = 6
+
+        [[[parameter NFSSchedDisable]]]
+        HideLabel = true
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = External Scheduler
 
     [[parameters Default NFS Share]]
     Order = 10
