@@ -11,42 +11,11 @@ if is_array then
   include_recipe "slurm::sethostname"
 end
 
+
 slurmuser = node[:slurm][:user][:name]
 slurmver = node[:slurm][:version]
 myplatform = node[:platform_family]
 autoscale_dir = node[:slurm][:autoscale_dir]
-# schedint = cluster.scheduler
-# scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id']).select { |n|
-#   if not n['slurm'].nil? and n['slurm']['is_scheduler'] == true
-#     scheduler_nodes << n
-#   end
-# }
-scheduler_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id'], :is_scheduler => true)
-
-scheduler_nodes = scheduler_nodes.sort {|a,b| a[1] <=> b[1]}
-Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
-
-
-if node[:slurm][:use_nodename_as_hostname] then
-  scheduler_hosts = scheduler_nodes.map { |n|
-    n['cyclecloud']['node']['name']
-  }
-else
-  scheduler_hosts = scheduler_nodes.map { |n|
-    n['cyclecloud']['instance']['hostname']
-  }
-end
-scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
-  fqdn.split(".", 2)[0]
-}
-scheduler_hosts_shortnames = scheduler_hosts_shortnames.join(',')
-
-Chef::Log.info("Management Nodes: #{scheduler_hosts_shortnames}")
-
-scheduler_primary = scheduler_hosts_shortnames.split(",", 2)[0]
-scheduler_backup = scheduler_hosts_shortnames.split(",", 2)[1]
-
-
 
 
 execute 'Create munge key' do
@@ -127,26 +96,66 @@ end
 
 
 
-if node[:slurm][:haenabled]
+if node[:slurm][:ha_enabled]
+  # for SaveStateLocation
+  directory "/sched/slurmd" do
+    user slurmuser
+    group "root"
+    recursive true
+    mode "0755"
+  end
+
+  # for hostnames
+  directory "/sched/run" do
+    user slurmuser
+    group "root"
+    recursive true
+    mode "0755"
+  end
+
+  execute "Create /sched/run/#{node[:cyclecloud][:instance][:id]}.hostname" do
+    command "hostname > /sched/run/#{node[:cyclecloud][:instance][:id]}.hostname"
+    creates "/sched/run/#{node[:cyclecloud][:instance][:id]}.hostname"
+    action :run
+  end
+
+
   #TODO: Split to its own recipe
   #include_recipe 'slurm::_haconf'
   scheduler_nodes = Slurm::Helpers.wait_for_master(29) do
     mgmt_nodes = cluster.search(:clusterUID => node['cyclecloud']['cluster']['id'], :is_scheduler => true)
   end
-        
-  scheduler_nodes = scheduler_nodes.sort {|a,b| a[0] <=> b[1]}
-  Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
+  scheduler_hosts_shortnames = []
+
+  ruby_block "slurmctld hostnames check" do
+    block do
+      hostname_set = scheduler_nodes.select { |n|
+        File::exists?("/sched/run/#{n[:cyclecloud][:instance][:id]}.hostname")
+      }
       
-  scheduler_hosts = scheduler_nodes.map { |n|
-    n['cyclecloud']['instance']['hostname']
-  }
-  scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
-    fqdn.split(".", 1)[0]
-  }
-  scheduler_hosts_shortnames = scheduler_hosts_shortnames.join(',')
+      Chef::Log.info("#{hostname_set.length} nodes are set")
+      
+      if hostname_set.length < 2 then 
+        raise "Waiting for hostnames to be set on schedulers."
+      end
         
-  Chef::Log.info("Management Nodes: #{scheduler_hosts_shortnames}")
-  
+      scheduler_nodes = scheduler_nodes.sort {|a,b| a[0] <=> b[1]}
+      Chef::Log.info("#{scheduler_nodes.length} Scheduler Nodes.")
+          
+      scheduler_hosts = scheduler_nodes.map { |n|
+        IO::read("/sched/run/#{n[:cyclecloud][:instance][:id]}.hostname").strip()
+      }
+
+      scheduler_hosts_shortnames = scheduler_hosts.map { |fqdn|
+        fqdn.split(".", 1)[0]
+      }
+      scheduler_hosts_shortnames_joined = scheduler_hosts_shortnames.join(',')
+            
+      Chef::Log.info("Management Nodes: #{scheduler_hosts_shortnames_joined}")
+      
+    end 
+  end
+
   # we will be appending to this file, so that the next step is monotonic
   template '/sched/slurm.conf' do
     owner "#{slurmuser}"
@@ -160,11 +169,12 @@ if node[:slurm][:haenabled]
       :suspend_timeout => node[:slurm][:suspend_timeout],
       :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
       :accountingenabled => node[:slurm][:accounting][:enabled],
-      :scheduler_nodes => scheduler_hosts_shortnames.split(",")[0],
-      :backup_slurmctld => scheduler_hosts_shortnames.split(",")[1],
-      :haenabled => node[:slurm][:ha][:enabled]
+      :scheduler_nodes => scheduler_hosts_shortnames[0],
+      :backup_slurmctld => scheduler_hosts_shortnames[1],
+      :haenabled => true
     }}
   end
+
 else
   # we will be appending to this file, so that the next step is monotonic
   template '/sched/slurm.conf' do
@@ -178,12 +188,14 @@ else
       :resume_timeout => node[:slurm][:resume_timeout],
       :suspend_timeout => node[:slurm][:suspend_timeout],
       :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
-      :accountingenabled => node[:slurm][:accounting][:enabled]
+      :accountingenabled => node[:slurm][:accounting][:enabled],
+      :haenabled => false
     }}
   end
   # Note - we used to use ControlMachine, but this is deprecated. We actually do not need to 
   # remove it from upgraded slurm.conf's, as simply appending SlurmctldHost will override ControlMachine
   # which is especially useful if ControlMachine is pointed at a stale hostname.
+  
   bash 'Set SlurmctldHost' do
     code <<-EOH
     host=$(hostname -s)
@@ -193,8 +205,8 @@ else
     mv /sched/slurm.conf.tmp /sched/slurm.conf
     EOH
   end
+  
 end
-
 
 link '/etc/slurm/slurm.conf' do
   to '/sched/slurm.conf'

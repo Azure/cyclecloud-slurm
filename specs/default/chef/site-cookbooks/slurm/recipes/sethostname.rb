@@ -14,6 +14,11 @@ if node[:slurm][:ensure_waagent_monitor_hostname] then
 end
 
 nodename = node[:cyclecloud][:node][:name]
+node_prefix = (node[:slurm][:node_prefix] || "").downcase().gsub("[^a-zA-Z0-9-]", "-")
+if node_prefix && !nodename.start_with?(node_prefix) then
+  nodename = node_prefix + nodename
+end
+
 dns_suffix = node[:slurm][:node_domain_suffix]
 if !dns_suffix.nil? && !dns_suffix.empty? && dns_suffix[0] != "." then
   dns_suffix = "." + dns_suffix

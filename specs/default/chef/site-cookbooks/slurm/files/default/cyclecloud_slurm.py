@@ -226,7 +226,7 @@ def _get_cluster_wrapper(config_path=None):
     return _cluster_wrapper
 
 
-def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=False):
+def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=False, is_autoscale_enabled=True):
     for partition in partitions.values():
         if partition.node_list is None:
             if allow_empty:
@@ -271,7 +271,11 @@ def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=Fals
             else:
                 cpus = partition.vcpu_count
                 threads = 1
-            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} ThreadsPerCore={} RealMemory={}".format(node_list, cpus, threads, memory))
+            
+            state = "CLOUD" if is_autoscale_enabled else "FUTURE"
+            feature_expr = "Feature=cloud" if is_autoscale_enabled else ""
+            writer.write(f"Nodename={node_list} {feature_expr} STATE={state} CPUs={cpus} ThreadsPerCore={threads} RealMemory={memory}")
+            # writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} ThreadsPerCore={} RealMemory={}".format(node_list, cpus, threads, memory))
             
             if partition.gpu_count:
                 writer.write(" Gres=gpu:{}".format(partition.gpu_count))
@@ -303,12 +307,37 @@ def _node_index_and_pg_as_sort_key(nodename):
         return pg + node_index
     except Exception:
         return nodename
-            
+
+
+def is_autoscale_enabled(subprocess_module=None):
+    subprocess_module = subprocess_module or _subprocess_module()
+    try:
+        lines = _check_output(subprocess_module, ["scontrol", "show", "config"]).strip().splitlines()
+    except:
+        try:
+            with open("/sched/slurm.conf") as fr:
+                lines = fr.readlines()
+        except:
+            return True
+
+    for line in lines:
+        line = line.strip()
+
+        if line.startswith("SuspendTime ") or line.startswith("SuspndTime="):
+            suspend_time = line.split("=")[1].strip()
+            try:
+                if suspend_time == "NONE" or int(suspend_time) < 0:
+                    return False
+            except Exception:
+                pass
+            return True
+    return True
+
 
 def generate_slurm_conf(writer=sys.stdout, allow_empty=False):
     subprocess = _subprocess_module()
     partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
-    _generate_slurm_conf(partitions, writer, subprocess, allow_empty=allow_empty)
+    _generate_slurm_conf(partitions, writer, subprocess, allow_empty=allow_empty, is_autoscale_enabled=is_autoscale_enabled(subprocess))
             
 
 def _generate_topology(cluster_wrapper, subprocess_module, writer):
@@ -376,9 +405,12 @@ def _shutdown(node_list, cluster_wrapper):
 
 
 def shutdown(node_list):
+    subprocess_module = _subprocess_module()
+    is_autoscale = is_autoscale_enabled(subprocess_module)
     for node in node_list:
-        subprocess_module = _subprocess_module()
         cmd = ["scontrol", "update", "NodeName=%s" % node, "NodeAddr=%s" % node, "NodeHostName=%s" % node]
+        if not is_autoscale:
+            cmd += ["State=FUTURE"]
         logging.info("Running %s", " ".join(cmd))
         _retry_subprocess(lambda: subprocess_module.check_call(cmd))
     return _shutdown(node_list, _get_cluster_wrapper())
@@ -1089,15 +1121,17 @@ def _retry_rest(func, attempts=5):
 
 def _retry_subprocess(func, attempts=5):
     attempts = max(1, attempts)
+    last_exception = None
     for attempt in range(1, attempts + 1):
         try:
             return func()
         except Exception as e:
+            last_exception = e
             logging.debug(traceback.format_exc())
             logging.warning("Command failed, retrying: %s", str(e))
             time.sleep(attempt * attempt)
     
-    raise CyclecloudSlurmError(str(e))
+    raise CyclecloudSlurmError(str(last_exception))
 
 
 def _to_hostlist(subprocess_module, nodes):

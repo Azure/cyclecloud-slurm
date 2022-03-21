@@ -41,6 +41,17 @@ The default template that ships with Azure CycleCloud has two partitions (`hpc` 
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
 
+### Manual scaling
+If cyclecloud_slurm detects that autoscale is disabled (SuspendTime=-1), it will use the FUTURE state to denote nodes that are powered down instead of relying on the power state in Slurm. i.e. When autoscale is enabled, off nodes are denoted as `idle~` in sinfo. When autoscale is disabled, the off nodes will not appear in sinfo at all. You can still see their definition with `scontrol show nodes --future`.
+
+To start new nodes, run `/opt/cycle/slurm/resume_program.sh node_list` (e.g. htc-[1-10]).
+
+To shutdown nodes, run `/opt/cycle/slurm/suspend_program.sh node_list` (e.g. htc-[1-10]).
+
+To start a cluster in this mode, simply add `SuspendTime=-1` to the additional slurm config in the template.
+
+To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `cyclecloud_slurm.sh remove_nodes && cyclecloud_slurm.sh scale`. 
+
 ## Troubleshooting
 
 ### UID conflicts for Slurm and Munge users
