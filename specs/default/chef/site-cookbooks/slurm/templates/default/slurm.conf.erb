@@ -6,7 +6,11 @@ SlurmctldPidFile=/var/run/slurmctld.pid
 SlurmdPidFile=/var/run/slurmd.pid
 SlurmdSpoolDir=/var/spool/slurmd
 SlurmUser="<%= node[:slurm][:user][:name] %>"
+<% if @haenabled == true %>
+StateSaveLocation=/sched/slurmd
+<% else %>
 StateSaveLocation=/var/spool/slurmd
+<% end %>
 SwitchType=switch/none
 TaskPlugin=task/affinity,task/cgroup
 SchedulerType=sched/backfill

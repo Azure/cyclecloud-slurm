@@ -106,6 +106,7 @@ Autoscale = $Autoscale
         Persistent = ${NFSType == "Builtin"}
 
         [[[configuration cyclecloud.mounts.builtinsched]]]
+        disabled = ${NFSType != "Builtin"}
         mountpoint = /sched
         fs_type = xfs
 
