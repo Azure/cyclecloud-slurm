@@ -10,9 +10,9 @@ slurmarch = node[:slurm][:arch]
 slurmuser = node[:slurm][:user][:name]
 mungeuser = node[:munge][:user][:name]
 
-myplatform = node[:platform]
+myplatform = node[:platform_family]
 case myplatform
-when 'ubuntu'
+when 'ubuntu', 'debian'
 
   package 'Install munge' do
     package_name 'munge'

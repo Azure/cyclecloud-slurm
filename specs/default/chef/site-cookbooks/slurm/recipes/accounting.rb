@@ -15,7 +15,7 @@ end
 # Install slurmdbd
 myplatform=node[:platform_family]
 case myplatform
-when 'ubuntu'
+when 'ubuntu', 'debian'
     slurmdbdpackage = "slurm-slurmdbd_#{slurmver}_amd64.deb"
     jetpack_download "#{slurmdbdpackage}" do
         project "slurm"

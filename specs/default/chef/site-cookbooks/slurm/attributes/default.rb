@@ -13,7 +13,7 @@ default[:slurm][:ensure_waagent_monitor_hostname] = true
 
 myplatform=node[:platform_family]
 case myplatform
-when 'ubuntu'
+when 'ubuntu', 'debian'
   default[:slurm][:arch] = "amd64"
   default[:slurm][:user][:uid] = 64030
   default[:slurm][:user][:gid] = 64030

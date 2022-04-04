@@ -98,7 +98,7 @@ defer_block "Defer starting slurmd until end of converge" do
   
   myplatform=node[:platform_family]
   case myplatform
-  when 'ubuntu'
+  when 'ubuntu', 'debian'
     directory '/etc/sysconfig' do
       action :create
     end
