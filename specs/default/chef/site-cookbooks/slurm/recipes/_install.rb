@@ -50,6 +50,15 @@ when 'ubuntu', 'debian'
     to '/lib/x86_64-linux-gnu/libtinfo.so.5'
   end
 
+  # Need these links for Ubuntu 20 support as well
+  link '/usr/lib/x86_64-linux-gnu/libreadline.so.7' do 
+    to '/usr/lib/x86_64-linux-gnu/libreadline.so.8'
+  end
+
+  link '/usr/lib/x86_64-linux-gnu/libhistory.so.7' do
+    to '/usr/lib/x86_64-linux-gnu/libhistory.so.8'
+  end
+
   # file '/etc/ld.so.conf.d/slurmlibs.conf' do
   #   content "/usr/lib/x86_64-linux-gnu/"
   #   action :create_if_missing
