@@ -13,20 +13,11 @@ The Slurm cluster deployed in CycleCloud contains a script that facilitates this
 
 ```
       $ sudo -i
-      # cd /opt/cycle/slurm
-      # ./cyclecloud_slurm.sh apply_changes
-```
-
-If you only want to make changes to certain nodearrays, you can add the `--nodearrays` argument.
-
-```
-      $ sudo -i
-      # cd /opt/cycle/slurm
-      # ./cyclecloud_slurm.sh apply_changes --nodearrays array1[,array2,array3...]
+      # azslurm scale
 ```
 
 ### Removing all execute nodes
-As all the Slurm compute nodes have to be pre-created, it's required that all nodes in a cluster be completely removed when making big changes (such as VM type or Image). It is possible to remove all nodes via the UI, but the `cyclecloud_slurm.sh` script has a `remove_nodes` option that will remove any nodes that aren't currently running jobs.
+As all the Slurm compute nodes have to be pre-created, it's required that all nodes in a cluster be completely removed when making big changes (such as VM type or Image). It is possible to remove all nodes via the UI, but the `azslurm` script has a `remove_nodes` option that will remove any nodes that aren't currently running jobs.
 
 ### Creating additional partitions
 The default template that ships with Azure CycleCloud has two partitions (`hpc` and `htc`), and you can define custom nodearrays that map directly to Slurm partitions. For example, to create a GPU partition, add the following section to your cluster template:
@@ -52,13 +43,13 @@ The default template that ships with Azure CycleCloud has two partitions (`hpc` 
 ### Manual scaling
 If cyclecloud_slurm detects that autoscale is disabled (SuspendTime=-1), it will use the FUTURE state to denote nodes that are powered down instead of relying on the power state in Slurm. i.e. When autoscale is enabled, off nodes are denoted as `idle~` in sinfo. When autoscale is disabled, the off nodes will not appear in sinfo at all. You can still see their definition with `scontrol show nodes --future`.
 
-To start new nodes, run `/opt/cycle/slurm/resume_program.sh node_list` (e.g. htc-[1-10]).
+To start new nodes, run `/opt/azurehpc/slurm/resume_program.sh node_list` (e.g. htc-[1-10]).
 
-To shutdown nodes, run `/opt/cycle/slurm/suspend_program.sh node_list` (e.g. htc-[1-10]).
+To shutdown nodes, run `/opt/azurehpc/slurm/suspend_program.sh node_list` (e.g. htc-[1-10]).
 
 To start a cluster in this mode, simply add `SuspendTime=-1` to the additional slurm config in the template.
 
-To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `cyclecloud_slurm.sh remove_nodes && cyclecloud_slurm.sh scale`. 
+To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `azslurm remove_nodes && azslurm scale`. 
 
 ## Troubleshooting
 
