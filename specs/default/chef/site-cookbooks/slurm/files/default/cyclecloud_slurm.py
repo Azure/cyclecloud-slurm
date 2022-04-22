@@ -795,7 +795,7 @@ def delete_nodes_if_out_of_date(subprocess_module=None, cluster_wrapper=None):
             node = nodes_by_name[node_name]
             mt = str(node.get("MachineType"))
             if str(partition.machine_type).lower() != mt.lower():
-                if node.get("Status") not in [None, "Terminated"]:
+                if node.get("Status") not in [None, "Terminated", "Off"]:
                     can_not_remove.append(node)
                     continue
                 to_remove.append(node_name)
