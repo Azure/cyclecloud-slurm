@@ -6,18 +6,14 @@ SlurmctldPidFile=/var/run/slurmctld.pid
 SlurmdPidFile=/var/run/slurmd.pid
 SlurmdSpoolDir=/var/spool/slurmd
 SlurmUser="<%= node[:slurm][:user][:name] %>"
-<% if @haenabled == true %>
-StateSaveLocation=/sched/slurmd
-<% else %>
 StateSaveLocation=/var/spool/slurmd
-<% end %>
 SwitchType=switch/none
 TaskPlugin=task/affinity,task/cgroup
 SchedulerType=sched/backfill
-SelectType=select/cons_tres
-GresTypes=gpu
+SelectType=select/cons_res
 SelectTypeParameters=CR_Core_Memory
-ClusterName="<%= node[:cyclecloud][:cluster][:name] %>"
+AccountingStorageType=accounting_storage/none
+ClusterName=cluster
 JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=debug
 SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
@@ -26,28 +22,15 @@ SlurmctldParameters=idle_on_node_suspend
 <% end %>
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurmd/slurmd.log
-TopologyPlugin=topology/tree
-JobSubmitPlugins=job_submit/cyclecloud
+# TopologyPlugin=topology/tree
+JobSubmitPlugins=lua
 PrivateData=cloud
 TreeWidth=65533
 ResumeTimeout=<%= @resume_timeout %>
 SuspendTimeout=<%= @suspend_timeout %>
 SuspendTime=<%= @suspend_time %>
-ResumeProgram=<%= @autoscale_dir %>/resume_program.sh
-ResumeFailProgram=<%= @autoscale_dir %>/resume_fail_program.sh
-SuspendProgram=<%= @autoscale_dir %>/suspend_program.sh
+ResumeProgram=<%= @autoscale_dir %>/sbin/resume_program.sh
+ResumeFailProgram=<%= @autoscale_dir %>/sbin/resume_fail_program.sh
+SuspendProgram=<%= @autoscale_dir %>/sbin/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
-<% if @accountingenabled == true %>
-AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageHost="localhost"
-<% else %>
-AccountingStorageType=accounting_storage/none
-<% end %>
-Include cyclecloud.conf
-
-<% if @haenabled == true %>
-SlurmctldHost=<%= @scheduler_nodes %>
-SlurmctldHost=<%= @backup_slurmctld %>
-<% end %>
-
-<%= node[:slurm][:additional][:config] %>
+Include azure.conf
