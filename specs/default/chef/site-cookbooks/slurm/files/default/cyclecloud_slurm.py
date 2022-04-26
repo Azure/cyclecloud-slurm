@@ -10,6 +10,7 @@ import os
 import random
 import re
 import shutil
+from subprocess import SubprocessError
 import sys
 import time
 import traceback
@@ -272,9 +273,9 @@ def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=Fals
                 cpus = partition.vcpu_count
                 threads = 1
             
-            state = "CLOUD" if is_autoscale_enabled else "FUTURE"
+            state_expr = "state=CLOUD" if is_autoscale_enabled else ""
             feature_expr = "Feature=cloud" if is_autoscale_enabled else ""
-            writer.write(f"Nodename={node_list} {feature_expr} STATE={state} CPUs={cpus} ThreadsPerCore={threads} RealMemory={memory}")
+            writer.write(f"Nodename={node_list} {feature_expr} {state_expr} CPUs={cpus} ThreadsPerCore={threads} RealMemory={memory}")
             # writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} ThreadsPerCore={} RealMemory={}".format(node_list, cpus, threads, memory))
             
             if partition.gpu_count:
@@ -309,7 +310,13 @@ def _node_index_and_pg_as_sort_key(nodename):
         return nodename
 
 
+_IS_AUTOSCALE_ENABLED = None
+
+
 def is_autoscale_enabled(subprocess_module=None):
+    global _IS_AUTOSCALE_ENABLED
+    if _IS_AUTOSCALE_ENABLED is not None:
+        return _IS_AUTOSCALE_ENABLED
     subprocess_module = subprocess_module or _subprocess_module()
     try:
         lines = _check_output(subprocess_module, ["scontrol", "show", "config"]).strip().splitlines()
@@ -318,20 +325,22 @@ def is_autoscale_enabled(subprocess_module=None):
             with open("/sched/slurm.conf") as fr:
                 lines = fr.readlines()
         except:
-            return True
+            _IS_AUTOSCALE_ENABLED = True
+            return _IS_AUTOSCALE_ENABLED
 
     for line in lines:
         line = line.strip()
-
-        if line.startswith("SuspendTime ") or line.startswith("SuspndTime="):
-            suspend_time = line.split("=")[1].strip()
+        # this can be defined more than once
+        if line.startswith("SuspendTime ") or line.startswith("SuspendTime="):
+            suspend_time = line.split("=")[1].strip().split()[0]
             try:
                 if suspend_time == "NONE" or int(suspend_time) < 0:
-                    return False
+                    _IS_AUTOSCALE_ENABLED = False
+                else:
+                    _IS_AUTOSCALE_ENABLED = True
             except Exception:
                 pass
-            return True
-    return True
+    return _IS_AUTOSCALE_ENABLED
 
 
 def generate_slurm_conf(writer=sys.stdout, allow_empty=False):
@@ -370,6 +379,7 @@ def generate_topology(writer=sys.stdout):
     subprocess = _subprocess_module()
     return _generate_topology(_get_cluster_wrapper(), subprocess, writer)
 
+
 def _generate_gres_conf(partitions, writer, subprocess_module):
     for partition in partitions.values():
         if partition.node_list is None:
@@ -393,7 +403,8 @@ def _generate_gres_conf(partitions, writer, subprocess_module):
                 writer.write("Nodename={} Name=gpu Count={} File={}".format(node_list, partition.gpu_count, nvidia_devices))
 
             writer.write("\n")
-        
+
+
 def generate_gres_conf(writer=sys.stdout):
     subprocess = _subprocess_module()
     partitions = fetch_partitions(_get_cluster_wrapper(), subprocess)
@@ -955,12 +966,35 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     
     logging.info("Restarting slurmctld...")
     subprocess_module.check_call(["systemctl", "restart", "slurmctld"])
+
+    _update_future_states(cluster_wrapper, subprocess_module)
     
     new_topology = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "topology"]))
     logging.info("New topology:\n%s", new_topology)
     
     logging.info("")
     logging.info("Re-scaling cluster complete.")
+
+
+def _update_future_states(cluster_wrapper, subprocess_module):
+    autoscale_enabled = is_autoscale_enabled(subprocess_module)
+    if autoscale_enabled:
+        return
+    _, node_list = _retry_rest(cluster_wrapper.get_nodes)
+
+    for node in node_list.nodes:
+        if node.get("TargetState") != "Started":
+            name = node.get("Name")
+            try:     
+                cmd = ["scontrol", "update", f"NodeName={name}", f"NodeAddr={name}", f"NodeHostName={name}", "state=FUTURE"]
+                subprocess_module.check_call(cmd)
+            except SubprocessError as e:
+                logging.warning(f"Could not set {node.get('Name')} state=FUTURE")
+    
+
+
+def sync_nodes():
+    _update_future_states(_get_cluster_wrapper(), _subprocess_module())
     
     
 def _nodeaddrs(cluster_wrapper, writer):
@@ -1136,7 +1170,7 @@ def _retry_subprocess(func, attempts=5):
 
 def _to_hostlist(subprocess_module, nodes):
     '''
-        convert name-[1-5] into name-1 name-2 name-3 name-4 name-5
+        convert name-1 name-2 name-3 name-4 name-5 into name-[1-5]
     '''
     if isinstance(nodes, list):
         nodes = ",".join(nodes)
@@ -1146,7 +1180,7 @@ def _to_hostlist(subprocess_module, nodes):
 
 def _from_hostlist(subprocess_module, hostlist_expr):
     '''
-        convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
+        convert name-[1-5] into name-1,name-2,name-3,name-4,name-5
     '''
     stdout = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "hostnames", hostlist_expr]))
     return [x.strip() for x in stdout.split()]
@@ -1245,6 +1279,8 @@ def main(argv=None):
     
     suspend_parser = add_parser("suspend", shutdown)
     suspend_parser.add_argument("--node-list", type=hostlist, required=True)
+
+    sync_nodes_parser = add_parser("sync_nodes", sync_nodes)
     
     add_parser("scale", rescale)
     add_parser("reconfigure", reconfigure)

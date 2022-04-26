@@ -331,3 +331,11 @@ defer_block "Defer starting munge until end of converge" do
     action [:enable, :restart]
   end
 end
+
+defer_block "Defer syncing node state until end of converge" do
+  bash 'Create cyclecloud.conf' do
+    code <<-EOH
+    #{autoscale_dir}/cyclecloud_slurm.sh sync_nodes
+    EOH
+  end
+end
