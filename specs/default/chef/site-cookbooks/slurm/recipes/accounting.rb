@@ -17,6 +17,28 @@ myplatform=node[:platform_family]
 case myplatform
 when 'ubuntu', 'debian'
     slurmdbdpackage = "slurm-slurmdbd_#{slurmver}_amd64.deb"
+
+    #Install for compatibility on Ubuntu
+    package 'Install libmariadbclient-dev-compat' do
+        package_name 'libmariadbclient-dev-compat'
+    end
+
+    package 'Install libssl-dev' do
+        package_name 'libssl-dev'
+    end
+
+    link '/usr/lib/x86_64-linux-gnu/libssl.so.10' do 
+        to '/usr/lib/x86_64-linux-gnu/libssl.so'
+    end
+
+    link '/usr/lib/x86_64-linux-gnu/libcrypto.so.10' do 
+        to '/usr/lib/x86_64-linux-gnu/libcrypto.so'
+    end
+
+    link '/usr/lib/x86_64-linux-gnu/libmysqlclient.so.18' do
+        to '/usr/lib/x86_64-linux-gnu/libmysqlclient.so'
+    end
+
     jetpack_download "#{slurmdbdpackage}" do
         project "slurm"
         not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmdbdpackage}") }
