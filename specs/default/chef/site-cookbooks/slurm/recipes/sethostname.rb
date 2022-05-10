@@ -14,7 +14,7 @@ if node[:slurm][:ensure_waagent_monitor_hostname] then
 end
 
 nodename = node[:cyclecloud][:node][:name]
-node_prefix = (node[:slurm][:node_prefix] || "").downcase().gsub("[^a-zA-Z0-9-]", "-")
+node_prefix = node[:slurm][:node_prefix]
 if node_prefix && !nodename.start_with?(node_prefix) then
   nodename = node_prefix + nodename
 end
@@ -27,20 +27,10 @@ end
 
 if node[:slurm][:use_nodename_as_hostname] then
   
-  execute 'unset hostname' do
-    command "hostnamectl set-hostname #{nodename}-unset#{dns_suffix}"
-    only_if "hostname | grep -qv #{nodename}-unset"
+  execute 'remove published_hostname' do
+    command "rm -f /var/lib/waagent/published_hostname && systemctl restart waagent"
     only_if "nslookup #{node[:ipaddress]} | grep -v #{nodename}"
-    # reboot detected
-    only_if { ::File.exist?("/etc/slurm.reenabled")}
-  end
-  
-  execute 'wait for hostname unset detection' do
-    command "nslookup #{node[:ipaddress]} | grep #{nodename}-unset"
-    # wait for waagent to notice the change
-    only_if "hostname | grep -q #{nodename}-unset"
-    retries 12
-    retry_delay 10
+    only_if "hostname | grep -qv #{nodename}"
   end
   
   execute 'set hostname' do
@@ -49,7 +39,7 @@ if node[:slurm][:use_nodename_as_hostname] then
   end
 
   execute 'wait for hostname detection' do
-    command "nslookup #{node[:ipaddress]} | grep #{nodename} | grep -v #{nodename}-unset"
+    command "nslookup #{node[:ipaddress]} | grep #{nodename}"
     only_if "hostname | grep -q #{nodename}"
     action :run
     retries 12
