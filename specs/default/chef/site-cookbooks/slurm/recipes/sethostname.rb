@@ -5,10 +5,16 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
+case node[:platform_family] 
+  when 'ubuntu', 'debian'
+    waagent_service_name = "walinuxagent"
+  else
+    waagent_service_name = "waagent"
+end
 
 if node[:slurm][:ensure_waagent_monitor_hostname] then
   execute 'ensure hostname monitoring' do
-    command 'sed -i s/Provisioning.MonitorHostName=n/Provisioning.MonitorHostName=y/g  /etc/waagent.conf && systemctl restart walinuxagent'
+    command "sed -i s/Provisioning.MonitorHostName=n/Provisioning.MonitorHostName=y/g  /etc/waagent.conf && systemctl restart #{waagent_service_name}"
     only_if "grep -Eq '^Provisioning.MonitorHostName=n$' /etc/waagent.conf" 
   end
 end
@@ -26,11 +32,12 @@ end
 
 
 if node[:slurm][:use_nodename_as_hostname] then
-  
+
   execute 'remove published_hostname' do
-    command "rm -f /var/lib/waagent/published_hostname && systemctl restart waagent"
+    command "rm -f /var/lib/waagent/published_hostname && systemctl restart #{waagent_service_name}"
     only_if "nslookup #{node[:ipaddress]} | grep -v #{nodename}"
     only_if "hostname | grep -qv #{nodename}"
+    only_if { ::File.exist?("/var/lib/waagent/published_hostname")}
   end
   
   execute 'set hostname' do
