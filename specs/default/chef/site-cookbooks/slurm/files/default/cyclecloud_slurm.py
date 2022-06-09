@@ -434,7 +434,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
 
     ready_nodes = []
 
-    ip_already_set = set()
+    ip_already_set = set()  # Tuple[Name, PrivateIp]
     
     while time.time() < omega:
         ready_nodes = []
@@ -471,11 +471,15 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 continue
             
             private_ip = node.get("PrivateIp")
-            if private_ip and private_ip not in ip_already_set:
+
+            if private_ip and (name, private_ip) not in ip_already_set:
+                if state in ["Validation", "Allocation", "Initialization", "Configuration"]:
+                    continue
                 cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostName=%s" % private_ip]
                 logging.info("Running %s", " ".join(cmd))
                 subprocess_module.check_call(cmd)
-                ip_already_set.add(private_ip)
+                ip_already_set.add((name, private_ip))
+
             if state == "Ready":
                 if not private_ip:
                     state = "WaitingOnIPAddress"
