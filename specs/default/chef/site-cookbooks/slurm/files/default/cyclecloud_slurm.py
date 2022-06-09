@@ -406,14 +406,12 @@ def _resume(node_list, cluster_wrapper, subprocess_module):
 
 
 def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module):
-    updated_node_addrs = set()
-    
     previous_states = {}
     
     nodes_str = ",".join(node_list[:5])
     omega = time.time() + 3600 
 
-    ip_already_set = set()
+    ip_already_set = set()  # Tuple[Name, PrivateIp]
     
     while time.time() < omega:
         states = {}
@@ -428,22 +426,20 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 continue
             
             private_ip = node.get("PrivateIp")
-            if private_ip and private_ip not in ip_already_set:
+
+            if private_ip and (name, private_ip) not in ip_already_set:
+                if state in ["Validation", "Allocation", "Initialization", "Configuration"]:
+                    continue
                 cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostName=%s" % private_ip]
                 logging.info("Running %s", " ".join(cmd))
                 subprocess_module.check_call(cmd)
-                ip_already_set.add(private_ip)
+                ip_already_set.add((name, private_ip))
+
             if state == "Ready":
                 if not private_ip:
                     state = "WaitingOnIPAddress"
             
             states[state] = states.get(state, 0) + 1
-            
-            if private_ip and name not in updated_node_addrs:
-                cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostname=%s" % private_ip]
-                logging.info("Running %s", " ".join(cmd))
-                _retry_subprocess(lambda: subprocess_module.check_call(cmd))
-                updated_node_addrs.add(name)
                 
         terminal_states = states.get("Started", 0) + sum(states.get("UNKNOWN", {}).values()) + states.get("Failed", 0)
         
