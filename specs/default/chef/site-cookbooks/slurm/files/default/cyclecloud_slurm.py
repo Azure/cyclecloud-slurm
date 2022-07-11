@@ -257,25 +257,21 @@ def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=Fals
         
         all_nodes = sorted(_from_hostlist(subprocess_module, partition.node_list), key=_get_sort_key_func(partition.is_hpc)) 
         
-        for pg_index in range(num_placement_groups):
-            start = pg_index * partition.max_scaleset_size
-            end = min(partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size)
-            subset_of_nodes = all_nodes[start:end]
-            node_list = _to_hostlist(subprocess_module, ",".join((subset_of_nodes)))
-            # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
-            
-            if partition.use_pcpu:
-                cpus = partition.pcpu_count
-                threads = max(1, partition.vcpu_count // partition.pcpu_count)
-            else:
-                cpus = partition.vcpu_count
-                threads = 1
-            writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} ThreadsPerCore={} RealMemory={}".format(node_list, cpus, threads, memory))
-            
-            if partition.gpu_count:
-                writer.write(" Gres=gpu:{}".format(partition.gpu_count))
+        node_list = _to_hostlist(subprocess_module, ",".join((all_nodes)))
+        # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
+        
+        if partition.use_pcpu:
+            cpus = partition.pcpu_count
+            threads = max(1, partition.vcpu_count // partition.pcpu_count)
+        else:
+            cpus = partition.vcpu_count
+            threads = 1
+        writer.write("Nodename={} Feature=cloud STATE=CLOUD CPUs={} ThreadsPerCore={} RealMemory={}".format(node_list, cpus, threads, memory))
+        
+        if partition.gpu_count:
+            writer.write(" Gres=gpu:{}".format(partition.gpu_count))
 
-            writer.write("\n")
+        writer.write("\n")
 
 
 def _get_sort_key_func(is_hpc):
