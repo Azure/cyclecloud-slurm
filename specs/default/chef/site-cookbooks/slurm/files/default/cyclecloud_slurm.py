@@ -589,11 +589,10 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
     if node_list:
         if unreferenced_policy == UnreferencedNodePolicy.RemoveSafely:
             unreferenced_policy = UnreferencedNodePolicy.IgnoreSafely
-    
-    request = NodeCreationRequest()
-    request.request_id = str(uuid4())
-    request.sets = []
-    
+
+    request_sets = []
+    result_sets = []
+
     nodearray_counts = {}
      
     for partition in partitions.values():
@@ -680,9 +679,9 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
         request_set.node_attributes["StartAutomatically"] = False
         request_set.node_attributes["Fixed"] = True
         
-        request.sets.append(request_set)
+        request_sets.append(request_set)
     
-    if not request.sets:
+    if not request_sets:
         # they must have been attempting to create at least one node.
         if existing_policy == ExistingNodePolicy.Error:
             raise CyclecloudSlurmError("No nodes were created!")
@@ -690,35 +689,41 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
         logging.info("No new nodes are required.")
         return
 
-    
-    # one shot, don't retry as this is not monotonic.
-    logging.debug("Creation request: %s", json.dumps(json.loads(request.json_encode()), indent=2))
-    try:
-        if dry_run:
-            result = DryRunResult()
-            for s in request.sets:
-                result.add_set(s.count)
-        else:
-            _, result = cluster_wrapper.create_nodes(request)
-    except Exception as e:
-        logging.debug(traceback.format_exc())
+    num_created = 0
+    for sub_request_set in request_sets:
+        sub_request = NodeCreationRequest()
+        sub_request.request_id = str(uuid4())
+        sub_request.sets = [sub_request_set]
+        # one shot, don't retry as this is not monotonic.
+        logging.debug("Creation request: %s", json.dumps(json.loads(sub_request.json_encode()), indent=2))
         try:
-            # attempt to parse the json response from cyclecloud to give a better message
-            response = json.loads(str(e))
-            message = "%s: %s" % (response["Message"], response["Detail"])
-        except:
+
+            if dry_run:
+                sub_result = DryRunResult()
+                for s in sub_request.sets:
+                    sub_result.add_set(s.count)
+            else:
+                _, sub_result = cluster_wrapper.create_nodes(sub_request)
+                result_sets.extend(sub_result.sets)
+        except Exception as e:
             logging.debug(traceback.format_exc())
-            message = str(e)
-            
-        raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
-    
-    num_created = sum([s.added for s in result.sets])
+            try:
+                # attempt to parse the json response from cyclecloud to give a better message
+                response = json.loads(str(e))
+                message = "%s: %s" % (response["Message"], response["Detail"])
+            except:
+                logging.debug(traceback.format_exc())
+                message = str(e)
+                
+            raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
+
+    num_created = sum([s.added for s in result_sets])
     
     if num_created == 0 and existing_policy == ExistingNodePolicy.Error:
         raise CyclecloudSlurmError("Did not create a single node!")
 
-    for n, set_result in enumerate(result.sets):
-        request_set = request.sets[n]
+    for n, set_result in enumerate(result_sets):
+        request_set = request_sets[n]
         if set_result.added == 0:
             logging.warning("No nodes were created for nodearray %s using name format %s and offset %s: %s", request_set.nodearray, request_set.name_format,
                                                                                                           request_set.name_offset, set_result.message)
