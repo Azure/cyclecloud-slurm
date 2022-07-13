@@ -567,11 +567,10 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
     if node_list:
         if unreferenced_policy == UnreferencedNodePolicy.RemoveSafely:
             unreferenced_policy = UnreferencedNodePolicy.IgnoreSafely
-    
-    request = NodeCreationRequest()
-    request.request_id = str(uuid4())
-    request.sets = []
-    
+
+    request_sets = []
+    result_sets = []
+
     nodearray_counts = {}
      
     for partition in partitions.values():
@@ -670,30 +669,34 @@ def _create_nodes(partitions, node_list, cluster_wrapper, subprocess_module, exi
 
     
     # one shot, don't retry as this is not monotonic.
-    logging.debug("Creation request: %s", json.dumps(json.loads(request.json_encode()), indent=2))
-    try:
-        if dry_run:
-            result = DryRunResult()
-            for s in request.sets:
-                result.add_set(s.count)
-        else:
-            _, result = cluster_wrapper.create_nodes(request)
-    except Exception as e:
-        logging.debug(traceback.format_exc())
+    for sub_request in request_sets:
+        request = NodeCreationRequest()
+        request.request_id = str(uuid4())
+        request.sets = [sub_request]
+        logging.debug("Creation request: %s", json.dumps(json.loads(request.json_encode()), indent=2))
         try:
-            _, sub_result = cluster_wrapper.create_nodes(sub_request)
-            result_sets.extend(sub_result.sets)
+            if dry_run:
+                result = DryRunResult()
+                for s in request.sets:
+                    result.add_set(s.count)
+            else:
+                _, result = cluster_wrapper.create_nodes(request)
         except Exception as e:
             logging.debug(traceback.format_exc())
             try:
-                # attempt to parse the json response from cyclecloud to give a better message
-                response = json.loads(str(e))
-                message = "%s: %s" % (response["Message"], response["Detail"])
-            except:
+                _, sub_result = cluster_wrapper.create_nodes(sub_request)
+                result_sets.extend(sub_result.sets)
+            except Exception as e:
                 logging.debug(traceback.format_exc())
-                message = str(e)
-                
-            raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
+                try:
+                    # attempt to parse the json response from cyclecloud to give a better message
+                    response = json.loads(str(e))
+                    message = "%s: %s" % (response["Message"], response["Detail"])
+                except:
+                    logging.debug(traceback.format_exc())
+                    message = str(e)
+                    
+                raise CyclecloudSlurmError("Creation of nodes failed: %s" % message)
     
     num_created = sum([s.added for s in result_sets])
     
