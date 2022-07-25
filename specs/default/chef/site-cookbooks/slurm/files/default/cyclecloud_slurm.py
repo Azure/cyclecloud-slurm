@@ -3,6 +3,7 @@
 #
 import argparse
 from collections import OrderedDict
+import inspect
 import json
 import logging
 from math import ceil, floor
@@ -194,15 +195,19 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
 _cluster_wrapper = None
 
 
+def _load_config(config_path):
+    assert config_path
+    if not os.path.exists(config_path):
+        raise CyclecloudSlurmError("{} does not exist! Please see 'cyclecloud_slurm.sh initialize'")
+    
+    with open(config_path) as fr:
+        return json.load(fr)
+
+
 def _get_cluster_wrapper(config_path=None):
     global _cluster_wrapper
     if _cluster_wrapper is None:
-        assert config_path
-        if not os.path.exists(config_path):
-            raise CyclecloudSlurmError("{} does not exist! Please see 'cyclecloud_slurm.sh initialize'")
-        
-        with open(config_path) as fr:
-            autoscale_config = json.load(fr)
+        autoscale_config = _load_config(config_path)
         
         def _get(k):
             if not autoscale_config.get(k):
@@ -250,7 +255,6 @@ def _generate_slurm_conf(partitions, writer, subprocess_module, allow_empty=Fals
         # use cores to find DefMemPerCPU to accurately configure HT VMs with "slurm.use_pcpu = false"
         def_mem_per_cpu = memory // cpus
             
-        
         writer.write("# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
                      % (int(partition.memory * 1024), int(memory_to_reduce * 1024), int(partition.dampen_memory * 100)))
         writer.write("# would result in the nodes being rejected by Slurm if they report a number less than defined here.\n")
@@ -436,8 +440,45 @@ def terminate_nodes(node_list):
     return _terminate_nodes(node_list, _get_cluster_wrapper())
 
 
-def _resume(node_list, cluster_wrapper, subprocess_module):
+def _resume(config, node_list, cluster_wrapper, subprocess_module):
+    # Optionally block on termination for up to attempts * delay.
+    # For example, set block_for_termination_attempts=360
+    # and block_for_termination_delay=5 for a full 1800s delay before failing.
+
+    # regardless - we will not try to start a node that has not complete terminating.
+
+    block_for_termination = True
+
+    max_attempts = config.get("resume", {}).get("block_for_termination_attempts", 1)
+    sleep_timeout = config.get("resume", {}).get("block_for_termination_delay", 5)
+    attempt = 0
+    while block_for_termination and attempt < max_attempts:
+        attempt += 1
+        block_for_termination = False
+        _, nodes_response = _retry_rest(lambda: cluster_wrapper.get_nodes())
+
+        for node in nodes_response.nodes:
+            name = node.get("Name")
+            if name in node_list:
+                state = node.get("State")
+                if state is not None and state != node.get("TargetState") and node.get("TargetState") != "Started":
+                    logging.warning(f"{name} is still awaiting termination.")
+                    block_for_termination = True
+
+        if block_for_termination:
+            time.sleep(sleep_timeout)
+    
+    if block_for_termination:
+        raise RuntimeError(f"The following nodes have not terminated yet, and cannot be started: {node_list}")
+
     _, start_response = _retry_rest(lambda: cluster_wrapper.start_nodes(names=node_list))
+
+    if not start_response.nodes:
+        raise CyclecloudSlurmError("Unknown node(s) %s" % node_list)
+    if len(start_response.nodes) != len(node_list):
+        missing_nodes = set(node_list) - set(start_response.nodes)
+        logging.error("Could only resume %s/%s nodes. The folllowing are unknown: %s" % ",".join(missing_nodes))
+
     _wait_for_resume(cluster_wrapper, start_response.operation_id, node_list, subprocess_module)
 
 
@@ -567,10 +608,10 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     logging.info("OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting", operation_id, nodes_str)
 
         
-def resume(node_list):
+def resume(config, node_list):
     cluster_wrapper = _get_cluster_wrapper()
     subprocess_module = _subprocess_module()
-    return _resume(node_list, cluster_wrapper, subprocess_module)
+    return _resume(config, node_list, cluster_wrapper, subprocess_module)
 
 
 class ExistingNodePolicy:
@@ -1323,9 +1364,12 @@ def main(argv=None):
         else:
             _get_cluster_wrapper(args.config)
         kwargs = {}
+        func_arg_names = inspect.getargs(args.func.__code__).args
         for argname in dir(args):
             if argname[0].islower() and argname not in ["config", "logfile", "func"]:
                 kwargs[argname] = getattr(args, argname)
+            if argname == "config" and argname in func_arg_names:
+                kwargs["config"] = _load_config(args.config)
         
         args.func(**kwargs)
     else:
