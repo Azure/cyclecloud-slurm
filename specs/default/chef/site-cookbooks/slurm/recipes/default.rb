@@ -38,7 +38,6 @@ user mungeuser do
   action :create
 end
 
-
 include_recipe 'slurm::_install' if node[:slurm][:install]
 
 #Fix munge permissions and create key

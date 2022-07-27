@@ -60,6 +60,12 @@ when 'centos', 'rhel', 'redhat'
     package "#{node[:jetpack][:downloads]}/#{slurmdbdpackage}" do
         action :install
     end
+
+when 'suse'
+    package 'slurm-slurmdbd' do
+        action :install
+    end
+    
 end
 
 # Configure slurmdbd.conf
