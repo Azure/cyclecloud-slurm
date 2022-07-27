@@ -48,7 +48,7 @@ function build_slurm() {
         mkdir -p ~/bin
     fi
     
-    # install_pmix ${DISTRO_FAMILY}
+    install_pmix ${DISTRO_FAMILY}
     
     WHICH_PYTHON=$(which ${PYTHON})
     if ! [[ ${WHICH_PYTHON} ]]; then
