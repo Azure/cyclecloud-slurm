@@ -84,11 +84,13 @@ when 'centos', 'rhel', 'redhat'
   else
     plugin_name = "job_submit_cyclecloud_centos_#{slurmver}.so"
   end
+when 'suse'
+  plugin_name = "job_submit_cyclecloud_suse_#{slurmver}.so"
 end
 
 bash 'Install job_submit/cyclecloud' do
   code <<-EOH
-    jetpack download --project slurm #{plugin_name}  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
+    jetpack download --project slurm #{plugin_name} /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
     touch /etc/cyclecloud-job-submit.installed
     EOH
   not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }

@@ -6,6 +6,7 @@
 # Licensed under the MIT License.
 
 slurmver = node[:slurm][:version]
+slurmsemver = node[:slurm][:version].split('-')[0]
 slurmarch = node[:slurm][:arch]
 slurmuser = node[:slurm][:user][:name]
 mungeuser = node[:munge][:user][:name]
@@ -91,5 +92,19 @@ when 'centos', 'rhel', 'redhat', 'almalinux'
     package "#{node[:jetpack][:downloads]}/#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
       action :install
     end
+  end
+
+when 'suse'
+  packages = %w{slurm slurm-devel slurm-config slurm-munge slurm-torque}
+  case node[:platform]
+    when 'suse', 'opensuseleap', 'opensuse-tumbleweed'
+      # TODO sles needs package hub
+      packages += %w{slurm-example-configs slurm-perlapi}
+    when 'sle-hpc', 'sle_hpc'
+      packages += %w{perl-slurm}
+  end
+  package packages do
+    action :install
+    version slurmsemver
   end
 end
