@@ -49,7 +49,7 @@ if node[:slurm][:use_nodename_as_hostname] then
     command "nslookup #{node[:ipaddress]} | grep #{nodename}"
     only_if "hostname | grep -q #{nodename}"
     action :run
-    retries 12
+    retries 30
     retry_delay 10
   end
 end
