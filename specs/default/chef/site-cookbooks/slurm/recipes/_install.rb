@@ -7,6 +7,8 @@
 
 slurmver = node[:slurm][:version]
 slurmsemver = node[:slurm][:version].split('-')[0]
+slurmsemver_major = slurmsemver.split('.')[0]
+slurmsemver_minor = slurmsemver.split('.')[1]
 slurmarch = node[:slurm][:arch]
 slurmuser = node[:slurm][:user][:name]
 mungeuser = node[:munge][:user][:name]
@@ -96,13 +98,26 @@ when 'centos', 'rhel', 'redhat', 'almalinux'
 
 when 'suse'
   packages = %w{slurm slurm-devel slurm-config slurm-munge slurm-torque}
-  case node[:platform]
-    when 'suse', 'opensuseleap', 'opensuse-tumbleweed'
-      # TODO sles needs package hub
-      packages += %w{slurm-example-configs slurm-perlapi}
+
+  suse_platform = node[:platform]
+
+  # SLE HPC 12 SP5 use /etc/SuSE-release, which ohai v13.13.6 uses and ignores /etc/os-release
+  if File.exist?("/etc/os-release") && File.foreach("/etc/os-release").grep(/ID="sle-hpc"/).any?
+      suse_platform = 'sle-hpc'
+  end
+
+  case suse_platform
     when 'sle-hpc', 'sle_hpc'
       packages += %w{perl-slurm}
+    when 'opensuseleap', 'opensuse-tumbleweed'
+      packages += %w{slurm-example-configs slurm-perlapi}
   end
+
+  # slurm package names differ in SLE HPC 12 SP5
+  if suse_platform == 'sle-hpc'
+    packages = packages.map{ |package| package.gsub("slurm", "slurm_#{slurmsemver_major}_#{slurmsemver_minor}") }
+  end
+
   package packages do
     action :install
     version slurmsemver
