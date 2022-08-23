@@ -11,6 +11,21 @@ default[:cyclecloud][:hosts][:standalone_dns][:enabled] = false
 default[:slurm][:additional][:config] = ""
 default[:slurm][:ensure_waagent_monitor_hostname] = true
 
+default[:munge][:user][:name] = 'munge'
+default[:munge][:user][:uid] = 11101
+default[:munge][:user][:gid] = 11101
+# Time between a suspend call and when that node can be used again - i.e. 10 minutes to shutdown 
+default[:slurm][:suspend_timeout] = 600
+# Boot timeout
+default[:slurm][:resume_timeout] = 1800
+
+default[:slurm][:accounting][:enabled] = false
+default[:slurm][:accounting][:user] = 'admin'
+default[:slurm][:accounting][:password] = 'admin'
+default[:slurm][:accounting][:url] = 'localhost'
+
+default[:slurm][:ha_enabled] = false
+
 myplatform=node[:platform_family]
 case myplatform
   when 'ubuntu', 'debian'
@@ -28,18 +43,5 @@ case myplatform
   when 'suse'
     default[:slurm][:user][:uid] = 11100
     default[:slurm][:user][:gid] = 11100
+    default[:slurm][:accounting][:user] = 'slurm'
 end
-default[:munge][:user][:name] = 'munge'
-default[:munge][:user][:uid] = 11101
-default[:munge][:user][:gid] = 11101
-# Time between a suspend call and when that node can be used again - i.e. 10 minutes to shutdown 
-default[:slurm][:suspend_timeout] = 600
-# Boot timeout
-default[:slurm][:resume_timeout] = 1800
-
-default[:slurm][:accounting][:enabled] = false
-default[:slurm][:accounting][:user] = 'admin'
-default[:slurm][:accounting][:password] = 'admin'
-default[:slurm][:accounting][:url] = 'localhost'
-
-default[:slurm][:ha_enabled] = false
