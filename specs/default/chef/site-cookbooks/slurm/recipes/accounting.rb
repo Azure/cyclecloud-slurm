@@ -13,8 +13,8 @@ if !node[:slurm][:accounting][:enabled]
     return
 end 
 # Install slurmdbd
-myplatform=node[:platform_family]
-case myplatform
+myplatformfamily=node[:platform_family]
+case myplatformfamily
 when 'ubuntu', 'debian'
     slurmdbdpackage = "slurm-slurmdbd_#{slurmver}_amd64.deb"
 
@@ -62,17 +62,40 @@ when 'centos', 'rhel', 'redhat'
     end
 
 when 'suse'
-    package 'slurm-slurmdbd' do
+    packages = ['mariadb', 'slurm-slurmdbd']
+
+    package packages do
         action :install
+      end
+end
+
+# start mariadb
+case myplatformfamily
+when 'suse'
+    service 'mariadb' do
+        action [:enable, :start]
     end
-    
+end
+
+# create mariadb db and user
+createdbcommand = "CREATE DATABASE IF NOT EXISTS slurm_acct_db;"
+createusercommand = "CREATE USER IF NOT EXISTS \'#{node[:slurm][:accounting][:user]}\'@\'#{node[:slurm][:accounting][:url]}\' IDENTIFIED BY \'#{node[:slurm][:accounting][:password]}\';"
+grantcommand = "GRANT ALL ON slurm_acct_db.* TO \'#{node[:slurm][:accounting][:user]}\'@\'#{node[:slurm][:accounting][:url]}\';"
+
+case myplatformfamily
+when 'suse'
+    bash 'create slurmdbd user/database for mariadb' do
+        code <<-EOH
+             mariadb -u root -e"#{createdbcommand} #{createusercommand} #{grantcommand}"
+             EOH
+    end
 end
 
 # Configure slurmdbd.conf
 template '/sched/slurmdbd.conf' do
     owner "#{slurmuser}"
     source "slurmdbd.conf.erb"
-    action :create_if_missing
+    action :create
     mode 0600
     variables lazy {{
         :accountdb => node[:slurm][:accounting][:url],
