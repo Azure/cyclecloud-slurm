@@ -25,6 +25,7 @@ default[:slurm][:accounting][:password] = 'admin'
 default[:slurm][:accounting][:url] = 'localhost'
 
 default[:slurm][:ha_enabled] = false
+default[:slurm][:launch_parameters] = ''
 
 myplatform=node[:platform_family]
 case myplatform

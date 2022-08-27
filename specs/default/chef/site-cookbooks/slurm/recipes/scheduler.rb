@@ -173,7 +173,8 @@ if node[:slurm][:ha_enabled]
       :accountingenabled => node[:slurm][:accounting][:enabled],
       :scheduler_nodes => scheduler_hosts_shortnames[0],
       :backup_slurmctld => scheduler_hosts_shortnames[1],
-      :haenabled => true
+      :haenabled => true,
+      :launch_parameters => node[:slurm][:launch_parameters]
     }}
   end
 
@@ -191,7 +192,8 @@ else
       :suspend_timeout => node[:slurm][:suspend_timeout],
       :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
       :accountingenabled => node[:slurm][:accounting][:enabled],
-      :haenabled => false
+      :haenabled => false,
+      :launch_parameters => node[:slurm][:launch_parameters]      
     }}
   end
   # Note - we used to use ControlMachine, but this is deprecated. We actually do not need to 

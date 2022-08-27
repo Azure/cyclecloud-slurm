@@ -27,7 +27,8 @@ Autoscale = $Autoscale
         slurm.accounting.password = $configuration_slurm_accounting_password
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
-        
+        slurm.launch_parameters = $configuration_slurm_launch_parameters
+
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
         cyclecloud.hosts.simple_vpc_dns.enabled = ${NodeNameIsHostname==false}
