@@ -37,6 +37,9 @@ ResumeProgram=<%= @autoscale_dir %>/resume_program.sh
 ResumeFailProgram=<%= @autoscale_dir %>/resume_fail_program.sh
 SuspendProgram=<%= @autoscale_dir %>/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
+<% if @launch_parameters && !@launch_parameters.empty? %>
+LaunchParameters=<%= @launch_parameters %>
+<% end %>
 <% if @accountingenabled == true %>
 AccountingStorageType=accounting_storage/slurmdbd
 AccountingStorageHost="localhost"
