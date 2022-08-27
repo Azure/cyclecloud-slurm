@@ -101,7 +101,7 @@ when 'suse'
 
   suse_platform = node[:platform]
 
-  # SLE HPC 12 SP5 use /etc/SuSE-release, which ohai v13.13.6 uses and ignores /etc/os-release
+  # SLE HPC 12 SP5 uses /etc/SuSE-release, which ohai v13.13.6 uses and ignores /etc/os-release
   if File.exist?("/etc/os-release") && File.foreach("/etc/os-release").grep(/ID="sle-hpc"/).any?
       suse_platform = 'sle-hpc'
   end
