@@ -478,6 +478,12 @@ Order = 20
         DefaultValue = false
         ParameterType = Boolean
 	
+        [[[parameter configuration_slurm_launch_parameters]]]
+        Label = Deploy Slurm with Launch Parameters
+        Description = Deploy Slurm with Launch Parameters (comma delimited)
+        DefaultValue = ''
+        ParameterType = String
+
 
 
     [[parameters Software]]
