@@ -59,8 +59,8 @@ function build_slurm() {
     if [[ ! -f ${SLURM_PKG} ]]; then
         wget "${DOWNLOAD_URL}/${SLURM_PKG}"
     fi
-
-    rpmbuild --with mysql -ta ${SLURM_PKG}
+    
+    rpmbuild --define '_with_pmix --with-pmix=/opt/pmix/v3' --with mysql -ta ${SLURM_PKG}
 
     # make the plugin
     rm -rf ~/job_submit
