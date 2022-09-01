@@ -46,7 +46,7 @@ function build_slurm() {
     ln -s `which $PYTHON` ~/bin/python
     export PATH=$PATH:~/bin
     wget "${DOWNLOAD_URL}/${SLURM_PKG}"
-    rpmbuild -ta ${SLURM_PKG}
+    rpmbuild --define '_with_pmix --with-pmix=/opt/pmix/v3' -ta ${SLURM_PKG}
 
     # make the plugin
     rm -rf ~/job_submit
