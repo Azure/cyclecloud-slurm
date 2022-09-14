@@ -23,7 +23,7 @@ function build_slurm() {
 
     case ${DISTRO_FAMILY} in
         suse)
-            zypper install --no-confirm bzip2 rpmbuild munge-devel pam-devel mysql-devel autoconf
+            zypper install --no-confirm bzip2 rpmbuild munge-devel pam-devel mysql-devel autoconf readline-devel
             ;;
         centos)
             CENTOS_VERSION=8.5
@@ -49,6 +49,8 @@ function build_slurm() {
     fi
     
     install_pmix ${DISTRO_FAMILY}
+
+    cd ~/
     
     WHICH_PYTHON=$(which ${PYTHON})
     if ! [[ ${WHICH_PYTHON} ]]; then
@@ -98,7 +100,7 @@ function build_slurm() {
 function install_pmix() {
     case ${1} in
         suse)
-            zypper install --no-confirm libtool git autoconf flex
+            zypper install --no-confirm libtool git autoconf flex libevent-devel
             ;;
         centos)
             yum -y install autoconf flex libevent-devel git
