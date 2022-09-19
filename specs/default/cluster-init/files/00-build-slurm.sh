@@ -95,6 +95,7 @@ function build_slurm() {
 
     LD_LIBRARY_PATH=/root/job_submit/${SLURM_FOLDER}/src/api/.libs/ JOB_SUBMIT_CYCLECLOUD=1 python3 job_submit_cyclecloud_test.py
     cp .libs/job_submit_cyclecloud.so job_submit_cyclecloud_${DISTRO_FAMILY}${CENTOS_MAJOR}_${SLURM_VERSION}-1.so
+    cp job_submit_cyclecloud_${DISTRO_FAMILY}${CENTOS_MAJOR}_${SLURM_VERSION}-1.so  /usr/src/packages/RPMS/x86_64/
 }
 
 function install_pmix() {
