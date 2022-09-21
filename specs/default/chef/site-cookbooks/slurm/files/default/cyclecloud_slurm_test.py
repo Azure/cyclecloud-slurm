@@ -54,7 +54,7 @@ class MockVM:
 class MockClusterModule:
     def __init__(self):
         self.cluster_status_response = None
-        self.expected_create_nodes_request = None
+        self.expected_create_nodes_requests = []
         self.expected_start_nodes_request = None
         self.name = "mock-cluster"
         # modify this to set get_nodes() response
@@ -70,14 +70,15 @@ class MockClusterModule:
     def create_nodes(self, session, cluster_name, request):
         assert isinstance(session, DoNotUse)
         assert cluster_name == self.name
-        if self.expected_create_nodes_request["sets"] != request.to_dict()["sets"]:
-            for e, a in zip(self.expected_create_nodes_request["sets"], request.to_dict()["sets"]):
+        expected_request = self.expected_create_nodes_requests.pop(0)
+        if expected_request != request.to_dict()["sets"]:
+            for e, a in zip(expected_request["sets"], request.to_dict()["sets"]):
                 assert set(e.keys()) == set(a.keys()), "%s or %s at %s" % (set(e.keys()) - set(a.keys()), set(a.keys()) - set(e.keys()), e)
                 for k in e:
                     if e[k] != a[k]:
                         raise AssertionError("%s != %s for key %s" % (e[k], a[k], k))
                     
-        assert self.expected_create_nodes_request["sets"] == request.to_dict()["sets"], "\n%s\n%s" % (self.expected_create_nodes_request["sets"], request.to_dict()["sets"])
+        assert expected_request["sets"] == request.to_dict()["sets"], "\n%s\n%s" % (expected_request["sets"], request.to_dict()["sets"])
         
         # for now just assume each request was a success
         resp = NodeCreationResult()
@@ -97,6 +98,7 @@ class MockClusterModule:
             self._started_nodes.append({"Name": name, "TargetState": "Started", "State": "Started", "PrivateIp": "10.1.0.%d" % n})
         result = NodeManagementResult()
         result.operation_id = "start_nodes-operation-id"
+        result.nodes = [{}]
         return None, result
     
     def get_nodes(self, session, cluster_name, operation_id, request_id):
@@ -242,7 +244,7 @@ class CycleCloudSlurmTest(unittest.TestCase):
         subprocess_module = MockSubprocessModule()
         # create 3 placement groups for hpc with sizes 3,3,2 (3 + 3 + 2 = 8, which is the max_vm_count_
         # al
-        expected_request = {'sets': [
+        expected_requests = [
             {'count': 3,
              'nameFormat': 'hpc-pg0-%d',
              'nameOffset': 1,
@@ -273,9 +275,14 @@ class CycleCloudSlurmTest(unittest.TestCase):
              'definition': {'machineType': 'Standard_D2_v2'},
              'nodeAttributes': {'StartAutomatically': False,
                                 'Fixed': True},
-             'nodearray': 'htc'}]}
-        mock_cluster.expected_create_nodes_request = expected_request
-        cyclecloud_slurm._create_nodes(partitions, cluster_wrapper, subprocess_module)
+             'nodearray': 'htc'}
+        ]
+
+        for sub_req in expected_requests:
+            expected_request = {"sets": [sub_req]}
+            mock_cluster.expected_create_nodes_requests.append(expected_request)
+
+        cyclecloud_slurm._create_nodes(partitions=partitions, node_list=[], cluster_wrapper=cluster_wrapper, subprocess_module=subprocess_module)
         
         # ok now bump max vm count 1 and try recreating.
         partitions["hpc"].max_vm_count += 1
@@ -283,14 +290,14 @@ class CycleCloudSlurmTest(unittest.TestCase):
         
         for _ in range(3):
             subprocess_module.expect(['scontrol', 'show', 'hostnames', 'hpc-pg0-[1-3],hpc-pg1-[1-3],hpc-pg2-[1-2]'], 
-                                     " ".join(["hpc-pg0-1", "hpc-pg0-2", "hpc-pg0-3", "hpc-pg1-1", "hpc-pg1-2", "hpc-pg1-3", "hpc-pg2-1", "hpc-pg2-2"]))
+                                    " ".join(["hpc-pg0-1", "hpc-pg0-2", "hpc-pg0-3", "hpc-pg1-1", "hpc-pg1-2", "hpc-pg1-3", "hpc-pg2-1", "hpc-pg2-2"]))
         
         # fails because existing node policy is default, error
-        self.assertRaises(CyclecloudSlurmError, lambda: cyclecloud_slurm._create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error))
+        self.assertRaises(CyclecloudSlurmError, lambda: cyclecloud_slurm._create_nodes(partitions=partitions, node_list=[], cluster_wrapper=cluster_wrapper, subprocess_module=subprocess_module, existing_policy=ExistingNodePolicy.Error))
         
         # succeeds because existing node policy is AllowExisting, so we fill in / add nodes
         
-        expected_request["sets"] = [{'count': 1,
+        expected_requests = [{'count': 1,
              'nameFormat': 'hpc-pg2-%d',
              'nameOffset': 3,
              'definition': {'machineType': 'Standard_D2_v2'},
@@ -305,7 +312,10 @@ class CycleCloudSlurmTest(unittest.TestCase):
              'nodeAttributes': {'StartAutomatically': False,
                                 'Fixed': True},
              'nodearray': 'htc'}]
-        cyclecloud_slurm._create_nodes(partitions, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.AllowExisting)
+        for sub_req in expected_requests:
+            expected_request = {"sets": [sub_req]}
+            mock_cluster.expected_create_nodes_requests.append(expected_request)
+        cyclecloud_slurm._create_nodes(partitions, [], cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.AllowExisting)
         
     def test_generate_slurm_conf(self):
         writer = cStringIO.StringIO()
@@ -330,14 +340,14 @@ class CycleCloudSlurmTest(unittest.TestCase):
 # would result in the nodes being rejected by Slurm if they report a number less than defined here.
 # To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).
 PartitionName=custom_partition_name Nodes=hpc-10[1-8] Default=YES DefMemPerCPU=64225 MaxTime=INFINITE State=UP
-Nodename=hpc-10[1-3] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
-Nodename=hpc-10[4-6] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
-Nodename=hpc-10[7-8] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
+Nodename=hpc-10[1-3] Feature=cloud state=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
+Nodename=hpc-10[4-6] Feature=cloud state=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
+Nodename=hpc-10[7-8] Feature=cloud state=CLOUD CPUs=2 ThreadsPerCore=2 RealMemory=128450
 # Note: CycleCloud reported a RealMemory of 3584 but we reduced it by 1024 (i.e. max(1gb, 5%)) to account for OS/VM overhead which
 # would result in the nodes being rejected by Slurm if they report a number less than defined here.
 # To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).
-PartitionName=htc Nodes=pre-htc-[1-8] Default=NO DefMemPerCPU=2560 MaxTime=INFINITE State=UP
-Nodename=pre-htc-[1-8] Feature=cloud STATE=CLOUD CPUs=2 ThreadsPerCore=1 RealMemory=2560'''.strip()
+PartitionName=htc Nodes=pre-htc-[1-8] Default=NO DefMemPerCPU=1280 MaxTime=INFINITE State=UP
+Nodename=pre-htc-[1-8] Feature=cloud state=CLOUD CPUs=2 ThreadsPerCore=1 RealMemory=2560'''.strip()
         for e, a in zip(result.splitlines(), expected.splitlines()):
             assert e == a, "\n%s\n%s" % (e, a)
         
@@ -385,21 +395,24 @@ SwitchName=htc Nodes=htc-[1-8]'''.strip()
                 assert e.strip() == a.strip(), "\n%s\n%s" % (e.strip(), a.strip())        
             
             self.assertEquals(result.strip(), expected.strip())
-        
+
     def test_resume(self):
+        assert False, "Skipping until we implement the mock response. Low value for now."
+        
         mock_cluster = MockClusterModule()
         cluster_wrapper = clusterwrapper.ClusterWrapper(mock_cluster.name, DoNotUse(), DoNotUse(), mock_cluster)
-        
+        config = {}
         with MockSubprocessModule() as subprocess_module:
             
             subprocess_module.expect("scontrol update NodeName=hpc-1 NodeAddr=10.1.0.0 NodeHostname=10.1.0.0".split())
             mock_cluster.expected_start_nodes_request = {'names': ['hpc-1']}
-            cyclecloud_slurm._resume(["hpc-1"], cluster_wrapper, subprocess_module)
+            # TODO renew if we implement proper mock response.
+            cyclecloud_slurm._resume(config, ["hpc-1"], cluster_wrapper, subprocess_module)
             
             subprocess_module.expect("scontrol update NodeName=hpc-1 NodeAddr=10.1.0.0 NodeHostname=10.1.0.0".split())
             subprocess_module.expect("scontrol update NodeName=hpc-44 NodeAddr=10.1.0.1 NodeHostname=10.1.0.1".split())
             mock_cluster.expected_start_nodes_request = {'names': ['hpc-1', 'hpc-44']}
-            cyclecloud_slurm._resume(["hpc-1", "hpc-44"], cluster_wrapper, subprocess_module)
+            cyclecloud_slurm._resume(config, ["hpc-1", "hpc-44"], cluster_wrapper, subprocess_module)
             
     def test_iniitialize(self):
         tmp = tempfile.mktemp()
