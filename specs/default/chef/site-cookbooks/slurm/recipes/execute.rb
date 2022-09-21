@@ -116,6 +116,13 @@ defer_block "Defer starting slurmd until end of converge" do
       owner 'slurm'
       group 'slurm'
     end
+  when 'suse'
+    file '/etc/sysconfig/slurmd' do
+      content slurmd_sysconfig
+      mode '0700'
+      owner 'slurm'
+      group 'slurm'
+    end
   end
 
   service 'slurmd' do

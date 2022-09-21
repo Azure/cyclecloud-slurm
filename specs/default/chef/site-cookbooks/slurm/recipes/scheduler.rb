@@ -84,11 +84,13 @@ when 'centos', 'rhel', 'redhat'
   else
     plugin_name = "job_submit_cyclecloud_centos_#{slurmver}.so"
   end
+when 'suse'
+  plugin_name = "job_submit_cyclecloud_suse_#{slurmver}.so"
 end
 
 bash 'Install job_submit/cyclecloud' do
   code <<-EOH
-    jetpack download --project slurm #{plugin_name}  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
+    jetpack download --project slurm #{plugin_name} /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
     touch /etc/cyclecloud-job-submit.installed
     EOH
   not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
@@ -171,7 +173,8 @@ if node[:slurm][:ha_enabled]
       :accountingenabled => node[:slurm][:accounting][:enabled],
       :scheduler_nodes => scheduler_hosts_shortnames[0],
       :backup_slurmctld => scheduler_hosts_shortnames[1],
-      :haenabled => true
+      :haenabled => true,
+      :launch_parameters => node[:slurm][:launch_parameters]
     }}
   end
 
@@ -189,7 +192,8 @@ else
       :suspend_timeout => node[:slurm][:suspend_timeout],
       :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
       :accountingenabled => node[:slurm][:accounting][:enabled],
-      :haenabled => false
+      :haenabled => false,
+      :launch_parameters => node[:slurm][:launch_parameters]      
     }}
   end
   # Note - we used to use ControlMachine, but this is deprecated. We actually do not need to 
