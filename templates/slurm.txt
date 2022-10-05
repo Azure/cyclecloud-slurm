@@ -20,6 +20,10 @@ Autoscale = $Autoscale
     ShutdownPolicy = $configuration_slurm_shutdown_policy
 
         [[[configuration]]]
+
+        slurm.install_pkg = azure-slurm-install-pkg-3.0.0.tar.gz
+        slurm.autoscale_pkg = azure-slurm-install-pkg-3.0.0.tar.gz
+        
         slurm.version = $configuration_slurm_version
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
         slurm.accounting.url = $configuration_slurm_accounting_url
