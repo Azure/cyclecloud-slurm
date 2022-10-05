@@ -10,7 +10,7 @@ from argparse import Namespace
 from subprocess import check_call
 from typing import Dict, List, Optional
 
-SCALELIB_VERSION = "0.3.0"
+SCALELIB_VERSION = "1.0.0"
 CYCLECLOUD_API_VERSION = "8.1.0"
 
 
