@@ -76,20 +76,20 @@ def munge_key() -> None:
         "/etc/munge", owner=mungeuser, group=mungeuser, mode=700, recursive=True
     )
 
-    if not os.path.exists("/sched/munge/munge.key"):
+    if not os.path.exists("/sched/munge.key"):
         with open("/dev/urandom", "rb") as fr:
             buf = bytes()
             while len(buf) < 1024:
                 buf = buf + fr.read(1024 - len(buf))
         ilib.file(
-            "/sched/munge/munge.key",
+            "/sched/munge.key",
             content=buf,
             owner="munge",
             group="munge",
             mode=700,
         )
     ilib.copy_file(
-        "/sched/munge/munge.key",
+        "/sched/munge.key",
         "/etc/munge/munge.key",
         owner="munge",
         group="munge",
@@ -97,7 +97,7 @@ def munge_key() -> None:
     )
 
 
-def accounting(node: Dict) -> None:
+def accounting(bootstrap: Dict) -> None:
     return
     if not node["slurm"]["accounting"]["enabled"]:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
