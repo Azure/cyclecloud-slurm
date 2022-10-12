@@ -22,8 +22,8 @@ Autoscale = $Autoscale
         [[[configuration]]]
 
         slurm.install_pkg = azure-slurm-install-pkg-3.0.0.tar.gz
-        slurm.autoscale_pkg = azure-slurm-install-pkg-3.0.0.tar.gz
-        
+        slurm.autoscale_pkg = azure-slurm-pkg-3.0.0.tar.gz
+
         slurm.version = $configuration_slurm_version
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
         slurm.accounting.url = $configuration_slurm_accounting_url
@@ -433,8 +433,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="20.11.7-1"]}
-        DefaultValue = 20.11.7-1
+        Config.Entries := {[Value="22.05.3-1"]}
+        DefaultValue = 22.05.3-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]
         Label = Job Accounting

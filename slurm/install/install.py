@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import subprocess
@@ -71,7 +72,7 @@ def fix_permissions() -> None:
 
 
 def munge_key() -> None:
-    
+
     ilib.directory(
         "/etc/munge", owner=mungeuser, group=mungeuser, mode=700, recursive=True
     )
@@ -98,21 +99,56 @@ def munge_key() -> None:
 
 
 def accounting(bootstrap: Dict) -> None:
-    return
-    if not node["slurm"]["accounting"]["enabled"]:
+    ilib.link(
+        "/sched/accounting.conf",
+        "/etc/slurm/accounting.conf",
+        owner=slurmuser,
+        group=slurmuser,
+    )
+
+    if not bootstrap["slurm"]["accounting"]["enabled"]:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
+        ilib.file(
+            "/sched/accounting.conf",
+            owner=slurmuser,
+            group=slurmuser,
+            content="AccountingStorageType=accounting_storage/none",
+        )
         return
+
+    ilib.file(
+        "/sched/accounting.conf",
+        owner=slurmuser,
+        group=slurmuser,
+        content="""
+AccountingStorageType=accounting_storage/slurmdbd
+AccountingStorageHost="localhost"
+""",
+    )
+
+    subprocess.check_call(["wget", "-O", "/sched/BaltimoreCyberTrustRoot.crt.pem"])
+    ilib.chown(
+        "/sched/BaltimoreCyberTrustRoot.crt.pem", owner=slurmuser, group=slurmuser
+    )
+    ilib.chown("/sched/BaltimoreCyberTrustRoot.crt.pem", mode="0600")
+    ilib.link(
+        "/sched/BaltimoreCyberTrustRoot.crt.pem",
+        "/etc/slurm/BaltimoreCyberTrustRoot.crt.pem",
+        owner=slurmuser,
+        group=slurmuser,
+    )
+
     # Configure slurmdbd.conf
     ilib.template(
         "/sched/slurmdbd.conf",
-        owner=f"{slurmuser}",
-        group=f"{slurmuser}",
+        owner=slurmuser,
+        group=slurmuser,
         source="templates/slurmdbd.conf.template",
-        mode=644,
+        mode=600,
         variables={
-            "accountdb": node["slurm"]["accounting"]["url"],
-            "dbuser": node["slurm"]["accounting"]["user"],
-            "dbpass": node["slurm"]["accounting"]["password"],
+            "accountdb": bootstrap["slurm"]["accounting"]["url"],
+            "dbuser": bootstrap["slurm"]["accounting"]["user"],
+            "dbpass": bootstrap["slurm"]["accounting"]["password"],
             "slurmver": slurmver,
         },
     )
@@ -150,7 +186,7 @@ def complete_install(node: Dict) -> None:
         owner=f"{slurmuser}",
         group=f"{slurmuser}",
     )
-    
+
     ilib.template(
         "/sched/cgroup.conf",
         owner=slurmuser,
@@ -173,7 +209,7 @@ def complete_install(node: Dict) -> None:
             owner=f"{slurmuser}",
             group=f"{slurmuser}",
         )
-    
+
     ilib.link(
         "/sched/azure.conf",
         "/etc/slurm/azure.conf",
@@ -216,40 +252,53 @@ def complete_install(node: Dict) -> None:
     #     printf "\nSlurmctldHost=$host\n" >> /sched/slurm.conf.tmp
     #     mv /sched/slurm.conf.tmp /sched/slurm.conf
 
-    # accounting(node)
+    accounting(node)
 
     # ilib.create_service("slurmctld")
     ilib.create_service("munged", user=mungeuser, exec_start="/sbin/munged")
 
     # v19 does this for us automatically BUT only for nodes that were susped
-    # nodes that hit ResumeTimeout, however, remain in down~    
+    # nodes that hit ResumeTimeout, however, remain in down~
 
     ilib.start_service("munge")
 
 
+def _load_config(bootstrap_config: str) -> Dict:
+    if bootstrap_config == "jetpack":
+        config = json.loads(subprocess.check_output(["jetpack", "config", "--json"]))
+        config["cluster_name"] = config["cyclecloud"]["cluster"]["name"]
+        return config
+    else:
+        with open(bootstrap_config) as fr:
+            return json.load(fr)
+
+
 def main() -> None:
     # needed to set slurmctld only
-    hostname = subprocess.check_output(["hostname"]).decode().strip()
     parser = argparse.ArgumentParser()
     parser.add_argument("--platform", default="rhel", choices=["rhel", "ubuntu"])
-    parser.add_argument("--mode", default="scheduler", choices=["scheduler", "execute", "login"])
+    parser.add_argument(
+        "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
+    )
+    parser.add_argument("--bootstrap-config", default="jetpack")
 
     args = parser.parse_args()
-    
+
+    config = _load_config(args.bootstrap_config)
+
     # create the users
     setup_users()
-    
+
     # create the munge key and/or copy it to /etc/munge/
     munge_key()
-    
+
     # runs either rhel.sh or ubuntu.sh to install the packages
     run_installer(os.path.abspath(f"{args.platform}.sh"))
-    
+
     # various permissions fixes
     fix_permissions()
 
-    
-    complete_install({"hostname": hostname, "cluster_name": "s300f"})
+    complete_install(config)
 
     # scheduler specific - add return_to_idle script
     if args.mode == "scheduler":

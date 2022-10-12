@@ -3,12 +3,11 @@
 #
 import argparse
 import logging
-import os
 import sys
 import traceback
 import time
 from argparse import ArgumentParser
-from math import ceil, floor
+from math import ceil
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, TextIO, Union
 
 from hpc.autoscale.cli import GenericDriver
@@ -35,15 +34,32 @@ from hpc.autoscale.results import AllocationResult
 from hpc.autoscale.ccbindings import cluster_service_client as csc
 
 
+VERSION = "3.0.0"
+
+
 def csv_list(x: str) -> List[str]:
     # used in argument parsing
     return [x.strip() for x in x.split(",")]
 
 
+def init_power_saving_log(function: Callable) -> Callable:
+    def wrapped(*args: Any, **kwargs: Any) -> Any:
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if hasattr(handler, "baseFilename"):
+                fname = getattr(handler, "baseFilename")
+                if fname and fname.endswith(f"{function.__name__}.log"):
+                    handler.setLevel(logging.DEBUG)
+                    logging.info(f"initialized {function.__name__}.log")
+        return function(*args, **kwargs)
+
+    return wrapped
+
+
 class SlurmDriver(GenericDriver):
     def __init__(self) -> None:
         super().__init__("slurm")
-    
+
     def preprocess_node_mgr(self, config: Dict, node_mgr: NodeManager) -> None:
         def default_dampened_memory(node: Node) -> Memory:
             return min(node.memory - Memory.value_of("1g"), node.memory * 0.95)
@@ -107,133 +123,6 @@ class SlurmCLI(CommonCLI):
             output_prefix = prefix
         return [output_prefix + x + "," for x in self.slurm_node_names]
 
-    def _pool_parser(self, parser: ArgumentParser) -> None:
-        parser.add_argument("-n", "--name", type=str, required=True)
-        parser.add_argument("-P", "--partition", type=str, required=False)
-        parser.add_argument(  # type: ignore
-            "-v", "--vm-size", required=False
-        ).completer = self._all_vm_size_completer  # type: ignore
-        parser.add_argument("-N", "--max-nodes", type=int, required=False, default=-1)
-        parser.add_argument("-C", "--max-cores", type=int, required=False, default=-1)
-        parser.add_argument(
-            "-A", "--autoscale", type=bool, required=False, default=True
-        )
-        parser.add_argument(
-            "-S", "--spot", action="store_true", required=False, default=False
-        )
-        parser.add_argument(
-            "-K", "--keep-alive", type=bool, required=False, default=False,
-        )
-        parser.add_argument(
-            "--vmss-definition", type=str, required=False, default="default"
-        )
-        parser.add_argument("-R", "--region", required=True)
-        parser.add_argument("--base-name", required=True)
-
-    def add_pool_parser(self, parser: ArgumentParser) -> None:
-        self._pool_parser(parser)
-
-    def add_pool(
-        self,
-        config: Dict,
-        name: str,
-        region: str,
-        partition: str,
-        vm_size: str,
-        base_name: str = "",
-        max_nodes: int = -1,
-        max_cores: int = -1,
-        autoscale: bool = True,
-        spot: bool = False,
-        keep_alive: bool = False,
-        vmss_definition: str = "default",
-    ):
-        """
-        azslurm add_pool --name name --vm-sizes
-        """
-        from hpc.autoscale.node import vm_sizes as vmlib
-        partition = partition or name
-        aux_info = vmlib.get_aux_vm_size_info(region, vm_size)
-    
-        vm = csc.VirtualMachine(
-            vm_size=vm_size,
-            vcpu_count=aux_info.vcpu_count,
-            pcpu_count=aux_info.pcpu_count,
-            gpu_count=aux_info.gpu_count,
-            infiniband=aux_info.infiniband,
-            memory_gb=aux_info.memory.value,
-        )
-        configuration = csc.PoolConfiguration(
-            base_name=base_name,
-            max_count=max_nodes,
-            virtual_machine=vm,
-            max_core_count=max_cores,
-            placement_group="pg0",
-            placement_group_attribute="placement_group",
-            max_placement_group_size=100,
-            spot=spot,
-            autoscale=autoscale,
-            keep_alive=keep_alive,
-            vmss_definition="",
-            user_data={},
-        )
-
-        self._get_node_manager(config).add_pool(name, configuration)
-
-    def delete_pool_parser(self, parser: ArgumentParser) -> None:
-        parser.add_argument("-n", "--name", type=str, required=True)
-
-    def delete_pool(self, config: Dict, name: str) -> None:
-        properties = csc.RemovePoolRequestMessage(
-            cluster_id=config["cluster_name"],
-            pool_name=name,
-        )
-
-        self._get_node_manager(config).delete_pool(properties)
-    
-    def update_pool_parser(self, parser: ArgumentParser) -> None:
-        self._pool_parser(parser)
-        # parser.add_argument(  # type: ignore
-        #     "-V", "--add-vm-sizes", type=csv_list, required=False
-        # ).completer = self._all_vm_size_completer  # type: ignore
-        # parser.add_argument(  # type: ignore
-        #     "-R", "--remove-vm-sizes", type=csv_list, required=False
-        # ).completer = self._all_vm_size_completer  # type: ignore
-
-    def update_pool(
-        self,
-        config: Dict,
-        name: str,
-        vm_sizes: List[str],
-        add_vm_sizes: List[str],
-        remove_vm_sizes: List[str],
-        max_nodes: int = -1,
-        max_cores: int = -1,
-        autoscale: bool = True,
-    ):
-        print(
-            f"Updating {name} in {config['cluster_name']}"
-        )
-        
-        if vm_sizes and (add_vm_sizes or remove_vm_sizes):
-            raise RuntimeError("You may only pick --vm-sizes OR --add-vm-sizes/--remove-vm-sizes!")
-
-        if add_vm_sizes:
-            print(f"Adding VM Size(s) {','.join(add_vm_sizes)}")
-
-        if remove_vm_sizes:
-            print(f"Removing VM Size(s) {','.join(add_vm_sizes)}")
-        if vm_sizes:
-            print(f"Setting VM Size(s) to {','.join(add_vm_sizes)}")
-
-        if max_cores > 0:
-            print(f"Maximum cores set to {max_cores}")
-        elif max_nodes > 0:
-            print(f"Maximum nodes set to {max_cores}")
-        
-        if autoscale:
-            print(f"Setting autoscale to {autoscale}")
-
     def generate_slurm_conf_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
 
@@ -257,6 +146,7 @@ class SlurmCLI(CommonCLI):
         ).completer = self._slurm_node_name_completer  # type: ignore
         parser.add_argument("--no-wait", action="store_true", default=False)
 
+    @init_power_saving_log
     def resume(self, config: Dict, node_list: List[str], no_wait: bool = False) -> None:
         node_mgr = self._get_node_manager(config)
         partitions = partitionlib.fetch_partitions(node_mgr)
@@ -314,13 +204,8 @@ class SlurmCLI(CommonCLI):
     def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
         nodes = _as_nodes(node_list, node_mgr)
         _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
-
-    def shutdown_parser(self, parser: ArgumentParser) -> None:
-        parser.set_defaults(read_only=False)
-        parser.add_argument(
-            "--node-list", type=hostlist, required=True
-        ).completer = self._slurm_node_name_completer  # type: ignore
-
+        
+    @init_power_saving_log
     def shutdown(self, config: Dict, node_list: List[str], drain_timeout: int = 300):
         for node in node_list:
             cmd = [
@@ -365,7 +250,26 @@ class SlurmCLI(CommonCLI):
                 cmd += ["State=FUTURE"]
             logging.info("Running %s", " ".join(cmd))
             _retry_subprocess(lambda: slutil.check_output(cmd))
+
+    def suspend_parser(self, parser: ArgumentParser) -> None:
+        parser.set_defaults(read_only=False)
+        parser.add_argument(
+            "--node-list", type=hostlist, required=True
+        ).completer = self._slurm_node_name_completer  # type: ignore
+
+    @init_power_saving_log
+    def suspend(self, config: Dict, node_list: List[str]) -> None:
         return self._shutdown(node_list, self._node_mgr(config))
+
+    def resume_fail_parser(self, parser: ArgumentParser) -> None:
+        self.suspend_parser(parser)
+
+    @init_power_saving_log
+    def resume_fail(
+        self, config: Dict, node_list: List[str], drain_timeout: int = 300
+    ) -> None:
+        node_mgr = self._node_mgr(config, self._driver(config))
+        self._shutdown(node_list=node_list, node_mgr=node_mgr)
 
     def _get_node_manager(self, config: Dict, force: bool = False) -> NodeManager:
         return self._node_mgr(config, self._driver(config), force=force)
@@ -377,7 +281,7 @@ class SlurmCLI(CommonCLI):
         shell["partitions"] = ShellDict(partitions)
         shell["node_mgr"] = node_mgr = self._get_node_manager(config)
         nodes = {}
-        
+
         for node in node_mgr.get_nodes():
             node.shellify()
             nodes[node.name] = node
@@ -391,7 +295,10 @@ class SlurmCLI(CommonCLI):
 
             _print("partitions", "partition information")
             _print("node_mgr", "NodeManager")
-            _print("nodes", "Current nodes according to the provider. May include nodes that have not joined yet.")
+            _print(
+                "nodes",
+                "Current nodes according to the provider. May include nodes that have not joined yet.",
+            )
 
         shell["slurmhelp"] = slurmhelp
         return shell
@@ -646,7 +553,7 @@ def _generate_slurm_conf(
 ) -> None:
     for partition in partitions.values():
         node_list = partition.node_list or []
-        
+
         max_count = min(partition.max_vm_count, partition.max_scaleset_size)
         default_yn = "YES" if partition.is_default else "NO"
 
@@ -686,7 +593,7 @@ def _generate_slurm_conf(
         #     key=slutil.get_sort_key_func(partition.is_hpc),
         # )
 
-        #node_list = f"{partition.nodename_prefix}{partition.name}-[1-{max_count}]"
+        # node_list = f"{partition.nodename_prefix}{partition.name}-[1-{max_count}]"
         # node_list = slutil.to_hostlist(",".join((subset_of_nodes)))  # type: ignore
         # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
 
@@ -729,7 +636,7 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
         if not nodes:
             continue
         nodes = sorted(nodes, key=slutil.get_sort_key_func(bool(pg)))
-        slurm_node_expr = ",".join(nodes)  #slutil.to_hostlist(",".join(nodes))
+        slurm_node_expr = ",".join(nodes)  # slutil.to_hostlist(",".join(nodes))
         writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
 
 

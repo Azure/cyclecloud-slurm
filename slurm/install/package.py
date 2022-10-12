@@ -76,10 +76,12 @@ def execute() -> None:
 
     if not version:
         raise RuntimeError("Missing [project] -> version in {}".format(ini_path))
-    
+
     slurm_version = parser.get("config slurm.version", "DefaultValue")
     if not slurm_version:
-        raise RuntimeError("Missing [config slurm.version] -> DefaultValue in {}".format(ini_path))
+        raise RuntimeError(
+            "Missing [config slurm.version] -> DefaultValue in {}".format(ini_path)
+        )
 
     if not os.path.exists("dist"):
         os.makedirs("dist")
@@ -121,7 +123,7 @@ def execute() -> None:
         by_package[package].append(fil)
 
     for package, fils in by_package.items():
-        
+
         if len(fils) > 1:
             print("WARNING: Ignoring duplicate package found:", package, fils)
             assert False
@@ -150,6 +152,7 @@ def execute() -> None:
             "slurm-devel",
             "slurm-example-configs",
             "slurm-slurmctld",
+            "slurm-slurmdbd",
             "slurm-slurmd",
         ]:
             blobs.append(f"{slurmpkg}_{slurm_version}_amd64.deb")
@@ -161,11 +164,14 @@ def execute() -> None:
             "slurm-example-configs",
             "slurm-slurmctld",
             "slurm-slurmd",
+            "slurm-slurmdbd",
             "slurm-perlapi",
             "slurm-torque",
             "slurm-openlava",
         ]:
-            blobs.append(f"{slurmpkg}-{slurm_version}.{args.platform_version}.{args.arch}.rpm")
+            blobs.append(
+                f"{slurmpkg}-{slurm_version}.{args.platform_version}.{args.arch}.rpm"
+            )
     for blob in blobs:
         _add(f"blobs/{blob}", os.path.abspath(f"../../blobs/{blob}"))
 

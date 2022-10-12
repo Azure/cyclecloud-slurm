@@ -63,7 +63,8 @@ class Formatter(Command):
 
     def run(self) -> None:
         check_call(
-            ["black", "src", "test"], cwd=CWD,
+            ["black", "src", "test"],
+            cwd=CWD,
         )
         check_call(
             ["isort", "-y"],
@@ -98,7 +99,9 @@ def run_type_checking() -> None:
         ]
     )
 
-    check_call(["flake8", "--ignore=E203,E231,F405,E501,W503", "src", "test", "setup.py"])
+    check_call(
+        ["flake8", "--ignore=E203,E231,F405,E501,W503", "src", "test", "setup.py"]
+    )
 
 
 class TypeChecking(Command):
@@ -127,7 +130,12 @@ setup(
             "../notices",
         ]
     },
-    install_requires=["typing_extensions==3.7.4.3", "certifi==2020.12.5", "zipp==3.6", "requests == 2.24.0"],
+    install_requires=[
+        "typing_extensions==3.7.4.3",
+        "certifi==2020.12.5",
+        "zipp==3.6",
+        "requests == 2.24.0",
+    ],
     tests_require=["pytest==3.2.3"],
     cmdclass={"test": PyTest, "format": Formatter, "types": TypeChecking},
     url="http://www.cyclecomputing.com",

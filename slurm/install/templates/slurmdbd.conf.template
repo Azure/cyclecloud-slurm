@@ -29,9 +29,7 @@ PidFile=/var/run/slurmdbd.pid
 #
 # Database info
 StorageType=accounting_storage/mysql
-StorageHost=<%= @accountdb %>
-StoragePass=<%= @dbpass %>
-StorageUser=<%= @dbuser %>
-<% if @slurmver > "19" %>
+StorageHost={accountdb}
+StoragePass={dbpass}
+StorageUser={dbuser}
 StorageParameters=SSL_CA=/etc/slurm/BaltimoreCyberTrustRoot.crt.pem
-<% end %>

@@ -53,6 +53,7 @@ set -e
 
 
 python3 -m venv $VENV
+mkdir -p $VENV/../logs
 source $VENV/bin/activate
 # not sure why but pip gets confused installing frozendict locally
 # if you don't install it first. It has no dependencies so this is safe.
@@ -96,3 +97,5 @@ azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --cluster-name $(jetpack config cyclecloud.cluster.name) > $INSTALL_DIR/autoscale.json
 
 azslurm generate_slurm_conf > /sched/azure.conf
+
+chown slurm:slurm $VENV/../logs/*.log

@@ -18,7 +18,6 @@ class ConvergeRetry(RuntimeError):
     pass
 
 
-
 def blob_download(filename: str, project: str, node: Dict) -> str:
 
     downloads_dir = node["blobs"].get("downloads", "/opt/azurehpc/blobs")
@@ -149,6 +148,7 @@ def template(
             contents = fr.read()
 
         with open(dest, "w") as fw:
+
             fw.write(contents.format(**variables))
 
     chmod(dest, mode)
@@ -249,7 +249,7 @@ Restart=always
 
 [Install]
 WantedBy=multi-user.target"""
-    with open("/etc/systemd/system/{name}.service", "w") as fw:
+    with open(f"/etc/systemd/system/{name}.service", "w") as fw:
         fw.write(service_desc)
 
 
@@ -319,7 +319,7 @@ def execute(
     stdout: Optional[str] = None,
     retries: int = 0,
     retry_delay: int = 0,
-    guard_file: Optional[str] = None,  # 
+    guard_file: Optional[str] = None,  #
 ) -> None:
     if guard_file and os.path.exists(guard_file):
         logging.info(f"Skipping '{desc}' because {guard_file} exists.")
