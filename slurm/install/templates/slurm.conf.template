@@ -31,7 +31,7 @@ ResumeProgram=/opt/azurehpc/slurm/resume_program.sh
 ResumeFailProgram=/opt/azurehpc/slurm/resume_fail_program.sh
 SuspendProgram=/opt/azurehpc/slurm/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
-AccountingStorageType=accounting_storage/none
 Include azure.conf
+Include accounting.conf
 
 SlurmCtldHost={slurmctldhost}
