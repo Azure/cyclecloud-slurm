@@ -3,6 +3,7 @@
 #
 import argparse
 import logging
+import shutil
 import sys
 import traceback
 import time
@@ -49,7 +50,7 @@ def init_power_saving_log(function: Callable) -> Callable:
             if hasattr(handler, "baseFilename"):
                 fname = getattr(handler, "baseFilename")
                 if fname and fname.endswith(f"{function.__name__}.log"):
-                    handler.setLevel(logging.DEBUG)
+                    handler.setLevel(logging.INFO)
                     logging.info(f"initialized {function.__name__}.log")
         return function(*args, **kwargs)
 
@@ -164,9 +165,14 @@ class SlurmCLI(CommonCLI):
         for partition in partitions.values():
             for name in partition.all_nodes():
                 name_to_partition[name] = partition
+        existing_nodes_by_name = hpcutil.partition(node_mgr.get_nodes(), lambda n: n.name) 
 
         nodes = []
         for name in node_list:
+            if name in existing_nodes_by_name:
+                logging.info(f"{name} already exists.")
+                continue
+
             if name not in name_to_partition:
                 raise CyclecloudSlurmError(
                     f"Unknown node name: {name}: {list(name_to_partition.keys())}"
@@ -202,9 +208,17 @@ class SlurmCLI(CommonCLI):
         self._wait_for_resume(config, "noop", node_list)
 
     def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
-        nodes = _as_nodes(node_list, node_mgr)
-        _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
-        
+        by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
+        node_list_filtered = []
+        for node_name in node_list:
+            if node_name in by_name:
+                node_list_filtered.append(node_name)
+            else:
+                logging.info(f"{node_name} does not exist. Skipping.")
+        nodes = _as_nodes(node_list_filtered, node_mgr)
+        result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
+        logging.info(str(result))
+
     @init_power_saving_log
     def shutdown(self, config: Dict, node_list: List[str], drain_timeout: int = 300):
         for node in node_list:
@@ -309,12 +323,15 @@ class SlurmCLI(CommonCLI):
     def _default_output_columns(
         self, config: Dict, cmd: Optional[str] = None
     ) -> List[str]:
-        # TODO
-        return ["name", "status"]
+        if hpcutil.LEGACY:
+            return ["nodearray", "name", "hostname", "private_ip", "status"]
+        return ["pool", "name", "hostname", "private_ip", "status"]
 
     def _initconfig_parser(self, parser: ArgumentParser) -> None:
         # TODO
-        ...
+        parser.add_argument("--accounting-tag-name", dest="accounting__tag_name")
+        parser.add_argument("--accounting-tag-value", dest="accounting__tag_value")
+        parser.add_argument("--accounting-subscription-id", dest="accounting__subscription_id")
 
     def _initconfig(self, config: Dict) -> None:
         # TODO
@@ -368,6 +385,62 @@ class SlurmCLI(CommonCLI):
         return super().autoscale(
             config, output_columns, output_format, dry_run=dry_run, long=long
         )
+
+    def keep_alive_parser(self, parser: ArgumentParser) -> None:
+        parser.set_defaults(read_only=False)
+        parser.add_argument(
+            "--node-list", type=hostlist, required=True
+        ).completer = self._slurm_node_name_completer  # type: ignore
+
+        parser.add_argument("--remove", "-r", action="store_true", default=False)
+        parser.add_argument("--set", "-s", action="store_true", default=False, dest="set_nodes")
+
+    def keep_alive(
+        self, config: Dict, node_list: List[str], remove: bool = False, set_nodes: bool = False
+    ) -> None:
+        if remove and set_nodes:
+            raise CyclecloudSlurmError("Please define only --set or --remove, not both.")
+
+        lines = slutil.check_output(["scontrol", "show", "config"]).splitlines()
+        filtered = [
+            line for line in lines if line.lower().startswith("suspendexcnodes")
+        ]
+        current_susp_nodes = []
+        if filtered:
+            current_susp_nodes_expr = filtered[0].split("=")[-1].strip()
+            if current_susp_nodes_expr != "(null)":
+                current_susp_nodes = slutil.from_hostlist(current_susp_nodes_expr)
+
+        if set_nodes:
+            hostnames = list(set(node_list))
+        elif remove:
+            hostnames = list(set(current_susp_nodes) - set(node_list))
+        else:
+            hostnames = current_susp_nodes + node_list
+
+        all_susp_hostnames = (
+            slutil.check_output(
+                [
+                    "scontrol",
+                    "show",
+                    "hostnames",
+                    ",".join(hostnames),
+                ]
+            )
+            .strip()
+            .split()
+        )
+        all_susp_hostnames = sorted(
+            list(set(all_susp_hostnames)), key=slutil.get_sort_key_func(False)
+        )
+        all_susp_hostlist = slutil.check_output(
+            ["scontrol", "show", "hostlist", ",".join(all_susp_hostnames)]
+        ).strip()
+
+        with open("/sched/keep_alive.conf.tmp", "w") as fw:
+            fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
+        shutil.move("/sched/keep_alive.conf.tmp", "/sched/keep_alive.conf")
+        slutil.check_output(["scontrol", "reconfig"])
 
     def _wait_for_resume(
         self,
@@ -519,24 +592,17 @@ class SlurmCLI(CommonCLI):
             ",".join([x.name for x in ready_nodes]),
         )
         for node in ready_nodes:
-            use_nodename_as_hostname = node.software_configuration.get("slurm", {}).get(
-                "use_nodename_as_hostname", False
-            )
-            # backwards compatibility - set NodeAddr=private ip address
-            if not use_nodename_as_hostname:
-
-                if not node.private_ip:
-                    logging.error("Could not find PrivateIp for node %s.", node.name)
-                else:
-                    cmd = [
-                        "scontrol",
-                        "update",
-                        "NodeName=%s" % node.name,
-                        "NodeAddr=%s" % node.private_ip,
-                        "NodeHostName=%s" % node.private_ip,
-                    ]
-                    logging.info("Running %s", " ".join(cmd))
-                    slutil.check_output(cmd)
+            if not hpcutil.is_valid_hostname(config, node):
+                continue
+            cmd = [
+                "scontrol",
+                "update",
+                "NodeName=%s" % node.name,
+                "NodeAddr=%s" % node.private_ip,
+                "NodeHostName=%s" % node.hostname,
+            ]
+            logging.info("Running %s", " ".join(cmd))
+            slutil.check_output(cmd)
 
         logging.info(
             "OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting",

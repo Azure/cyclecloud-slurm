@@ -70,33 +70,7 @@ function build_slurm() {
     rm -rf ~/job_submit
     mkdir -p ~/job_submit
     cd ~/
-    # wget "${DOWNLOAD_URL}/${SLURM_PKG}"
-    # cd ~/job_submit
-    # tar xjf ~/${SLURM_PKG}
-    # mkdir -p ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-    # cd ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-    # rsync -a /source/JobSubmitPlugin/ .
-    # if [ "$SLURM_VERSION" \> "19" ]; then
-    #     mv Makefile.in.v19 Makefile.in
-    # fi
-    # cd ~/job_submit
-    # sed -i 's/src\/plugins\/job_submit\/Makefile/src\/plugins\/job_submit\/Makefile\n                 src\/plugins\/job_submit\/cyclecloud\/Makefile/g'  ${SLURM_FOLDER}/configure.ac
-    # cd ~/job_submit/${SLURM_FOLDER}
-
-    # if [ "$SLURM_VERSION" \> "19" ]; then
-    #     autoconf
-    # else
-    #     ./autogen.sh
-    # fi
-    # ./configure
-    # make
-    # cd ~/job_submit/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-    # make
-
-
-    # LD_LIBRARY_PATH=/root/job_submit/${SLURM_FOLDER}/src/api/.libs/ JOB_SUBMIT_CYCLECLOUD=1 python3 job_submit_cyclecloud_test.py
-    # rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_centos${CENTOS_MAJOR}_${SLURM_VERSION}-1.so
-    # rsync .libs/job_submit_cyclecloud.so  /root/rpmbuild/RPMS/x86_64/job_submit_cyclecloud_ubuntu_${SLURM_VERSION}-1.so
+    
 }
 
 function install_pmix() {

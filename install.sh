@@ -91,10 +91,16 @@ EOF
 fi
 
 which jetpack || exit 0
+tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print(dict([tuple(x.split(':', 1)) for x in sys.stdin.read().split(';')])['ClusterId'])")
 azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --password $(jetpack config cyclecloud.config.password) \
                    --url      $(jetpack config cyclecloud.config.web_server) \
-                   --cluster-name $(jetpack config cyclecloud.cluster.name) > $INSTALL_DIR/autoscale.json
+                   --cluster-name $(jetpack config cyclecloud.cluster.name) \
+                   --accounting-tag-name ClusterId \
+                   --accounting-tag-value $tag \
+                   --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+                   > $INSTALL_DIR/autoscale.json
+
 
 azslurm generate_slurm_conf > /sched/azure.conf
 

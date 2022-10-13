@@ -4,5 +4,4 @@ name "slurm_login_role"
 description "Slurm Login Role"
 run_list("recipe[cyclecloud]",
   "recipe[cshared::client]",
-  "recipe[cuser]",
-  "recipe[slurm::login]")
+  "recipe[cuser]")

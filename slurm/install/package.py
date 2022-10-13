@@ -165,6 +165,7 @@ def execute() -> None:
             "slurm-slurmctld",
             "slurm-slurmd",
             "slurm-slurmdbd",
+            "slurm-libpmi",
             "slurm-perlapi",
             "slurm-torque",
             "slurm-openlava",
