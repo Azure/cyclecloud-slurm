@@ -21,17 +21,27 @@ SlurmctldParameters=idle_on_node_suspend
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurmd/slurmd.log
 # TopologyPlugin=topology/tree
-JobSubmitPlugins=lua
+# If you use the TopologyPlugin you likely also want to use our
+# job submit plugin so that your jobs run on a single switch 
+# or just add --switches 1 to your submission scripts
+# JobSubmitPlugins=lua
 PrivateData=cloud
 TreeWidth=65533
 ResumeTimeout=1800
 SuspendTimeout=600
-SuspendTime=<300
+SuspendTime=300
 ResumeProgram=/opt/azurehpc/slurm/resume_program.sh
 ResumeFailProgram=/opt/azurehpc/slurm/resume_fail_program.sh
 SuspendProgram=/opt/azurehpc/slurm/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
+# This as the partition definitions managed by azslurm generate_slurm_conf > /sched/azure.conf
 Include azure.conf
+# If slurm.accounting.enabled=true this will setup slurmdbd
+# otherwise it will just define accounting_storage/none as the plugin
 Include accounting.conf
+# SuspendExcNodes is managed in /etc/slurm/keep_alive.conf
+# see azslurm keep_alive for more information.
+# you can also remove this import to remove support for azslurm keep_alive
+Include keep_alive.conf
 
 SlurmCtldHost={slurmctldhost}

@@ -5,6 +5,7 @@ import os
 import pwd
 import shutil
 import subprocess
+import tempfile
 import time
 from types import TracebackType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
@@ -237,6 +238,7 @@ def create_service(
     working_dir: str = "",
     user: str = "root",
 ) -> None:
+    
     service_desc = f"""
 [Unit]
 Description={name}
@@ -253,6 +255,10 @@ WantedBy=multi-user.target"""
         fw.write(service_desc)
 
 
+def enable_service(name: str) -> None:
+    execute(f"enable service {name}", command=["systemctl", "enable", name])
+
+
 def start_service(name: str) -> None:
     execute(f"start service {name}", command=["systemctl", "start", name])
 
@@ -262,24 +268,14 @@ def restart_service(name: str) -> None:
 
 
 def cron(desc: str, minute: str, command: str) -> None:
-    pass
-
-
-_DEFERRED_BLOCKS: List[Tuple[str, Callable[[], Any]]] = []
-
-
-def defer_block(desc: str, block: Callable[[], Any], first: bool = False) -> None:
-    if first:
-        _DEFERRED_BLOCKS.insert(0, (desc, block))
-    else:
-        _DEFERRED_BLOCKS.append((desc, block))
-
-
-def finish() -> None:
-    for desc, block in _DEFERRED_BLOCKS:
-        logging.info(f"Begin deferred block: {desc}")
-        block()
-        logging.info(f"End deferred block: {desc}")
+    temp_name = tempfile.mktemp(".crontab")
+    try:
+        with open(temp_name, "w") as fw:
+            fw.write(f"{minute} * * * * {command}")
+        subprocess.check_call(["crontab", temp_name])
+    finally:
+        if os.path.exists(temp_name):
+            os.remove(temp_name)
 
 
 def _merge_dict(a: Dict, b: Dict) -> Dict:
@@ -325,13 +321,13 @@ def execute(
         logging.info(f"Skipping '{desc}' because {guard_file} exists.")
         return
 
+    logging.getLogger("audit").info(f"execute: {desc}")
     logging.info(f"execute: {desc}")
     if stdout and os.path.exists(stdout):
         return
 
     for attempt in range(min(0, retries) + 1):
         try:
-            print(f"RDH command {command}")
             stdout_content = subprocess.check_output(command)
             if stdout:
                 with open(stdout, "w") as fw:

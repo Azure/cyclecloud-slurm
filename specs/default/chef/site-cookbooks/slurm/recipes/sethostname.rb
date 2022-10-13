@@ -45,6 +45,12 @@ if node[:slurm][:use_nodename_as_hostname] then
     action :run
   end
 
+  bash "update hostname via jetpack" do
+    code <<-EOF
+    #{node[:cyclecloud][:home]}/system/embedded/bin/python -c "import jetpack.converge as jc; jc._send_installation_status('warning')"
+  EOF
+  end
+
   execute 'wait for hostname detection' do
     command "nslookup #{node[:ipaddress]} | grep #{nodename}"
     only_if "hostname | grep -q #{nodename}"

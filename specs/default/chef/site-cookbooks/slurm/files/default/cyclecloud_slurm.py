@@ -1255,17 +1255,25 @@ def _subprocess_module():
     return SubprocessModuleWithChaosMode()
 
 
-def initialize_config(path, cluster_name, username, password, url, force=False):
+def initialize_config(path, cluster_name, username, password, url, acct_sub, acct_tag_key, acct_tag_val, force=False):
     if os.path.exists(path) and not force:
         raise CyclecloudSlurmError("{} already exists. To force reinitialization, please pass in --force".format(path))
     
     with open(path + ".tmp", "w") as fw:
-        json.dump({
+        config = {
             "cluster_name": cluster_name,
             "username": username,
             "password": password,
             "url": url.rstrip("/")
-        }, fw, indent=2)
+        }
+        if acct_sub and acct_tag_key and acct_tag_val:
+            config["accounting"] = {
+                "subscription_id": acct_sub,
+                "tag_key": acct_tag_key,
+                "tag_val": acct_tag_avl
+            }
+
+        json.dump(config, fw, indent=2)
     shutil.move(path + ".tmp", path)
     logging.info("Initialized config ({})".format(path))
 
@@ -1349,6 +1357,9 @@ def main(argv=None):
     init_parser.add_argument("--password", required=True)
     init_parser.add_argument("--url", required=True)
     init_parser.add_argument("--force", action="store_true", default=False, required=False)
+    init_parser.add_argument("--accounting-tag-name", dest="acct_tag_name")
+    init_parser.add_argument("--accounting-tag-value", dest="acct_tag_avl")
+    init_parser.add_argument("--accounting-subscription-id", dest="acct_sub")
     
     args = parser.parse_args(argv)
     if hasattr(args, "logfile"):
