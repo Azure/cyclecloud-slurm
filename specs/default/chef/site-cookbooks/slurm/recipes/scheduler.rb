@@ -49,7 +49,7 @@ directory "#{autoscale_dir}" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh", "get_acct_info.sh"]
 scripts.each do |filename| 
     cookbook_file "#{autoscale_dir}/#{filename}" do
         source "#{filename}"
@@ -207,9 +207,7 @@ template '/sched/cgroup.conf' do
   owner "#{slurmuser}"
   source "cgroup.conf.erb"
   action :create_if_missing
-  variables {
-    :slurmver => slurmver
-  }
+  variables(:slurmver => slurmver)
 end
 
 
@@ -225,7 +223,16 @@ password = node[:cyclecloud][:config][:password]
 url = node[:cyclecloud][:config][:web_server]
 bash 'Initialize autoscale.json' do
     code <<-EOH
-     #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' --username='#{username}' --password='#{password}' --url='#{url}' || exit 1
+    tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print(dict([tuple(x.split(':', 1)) for x in sys.stdin.read().split(';')])['ClusterId'])")
+    
+    #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' \
+                                                     --username='#{username}' \
+                                                     --password='#{password}' \
+                                                     --url='#{url}' \
+                                                     --accounting-tag-name ClusterId \
+                                                     --accounting-tag-value $tag \
+                                                     --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+                                                     || exit 1
     EOH
     not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
 end

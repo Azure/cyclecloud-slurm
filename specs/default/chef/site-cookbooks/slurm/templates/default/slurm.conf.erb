@@ -27,7 +27,8 @@ SlurmctldParameters=idle_on_node_suspend
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurmd/slurmd.log
 TopologyPlugin=topology/tree
-JobSubmitPlugins=job_submit/cyclecloud
+JobSubmitPlugins=lua
+# JobSubmitPlugins=job_submit/cyclecloud
 PrivateData=cloud
 TreeWidth=65533
 ResumeTimeout=<%= @resume_timeout %>

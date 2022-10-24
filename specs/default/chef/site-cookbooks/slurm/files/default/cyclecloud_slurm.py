@@ -1218,6 +1218,29 @@ def _check_apply_changes(cc_nodes):
         raise CyclecloudSlurmError(f"Error: The following nodes must be fully terminated before applying changes - {node_names}")            
 
 
+def get_accounting_info(node_name: str) -> None:
+    cluster_wrapper = _get_cluster_wrapper()
+    _, status_response = _retry_rest(lambda: cluster_wrapper.get_cluster_status(nodes=True))
+    region_by_template = {}
+    spot_by_template = {}
+    for nodearray in status_response.nodearrays:
+        region_by_template[nodearray.name] = nodearray.nodearray["Region"]
+        spot_by_template[nodearray.name] = nodearray.nodearray.get("Interruptible", False)
+
+    records = []
+    for node in status_response.nodes:
+        if node.get("Name") == node_name:
+            region = region_by_template[node["Template"]]    
+            spot = spot_by_template[node["Template"]]    
+            records.append({
+                "name": node['Name'],
+                "location": region,
+                "vm_size": node.get('MachineType'),
+                "spot": spot
+            })
+    json.dump(records, sys.stdout, indent=2)
+
+
 def _init_logging(logfile):
     import logging.handlers
     
@@ -1326,17 +1349,25 @@ def _subprocess_module():
     return SubprocessModuleWithChaosMode()
 
 
-def initialize_config(path, cluster_name, username, password, url, force=False):
+def initialize_config(path, cluster_name, username, password, url, acct_sub, acct_tag_key, acct_tag_val, force=False):
     if os.path.exists(path) and not force:
         raise CyclecloudSlurmError("{} already exists. To force reinitialization, please pass in --force".format(path))
     
     with open(path + ".tmp", "w") as fw:
-        json.dump({
+        config = {
             "cluster_name": cluster_name,
             "username": username,
             "password": password,
             "url": url.rstrip("/")
-        }, fw, indent=2)
+        }
+        if acct_sub and acct_tag_key and acct_tag_val:
+            config["accounting"] = {
+                "subscription_id": acct_sub,
+                "tag_key": acct_tag_key,
+                "tag_val": acct_tag_val
+            }
+
+        json.dump(config, fw, indent=2)
     shutil.move(path + ".tmp", path)
     logging.info("Initialized config ({})".format(path))
 
@@ -1416,12 +1447,18 @@ def main(argv=None):
     nodeinfo_parser.add_argument("-a","--all", dest="show_all", action='store_true', required=False)
     nodeinfo_parser.add_argument("-N", dest="list_nodes", action='store_true', required=False)
 
+    acct_parser = add_parser("get_accounting_info", get_accounting_info)
+    acct_parser.add_argument("--node-name", type=str, required=True)
+
     init_parser = add_parser("initialize", initialize_config)
     init_parser.add_argument("--cluster-name", required=True)
     init_parser.add_argument("--username", required=True)
     init_parser.add_argument("--password", required=True)
     init_parser.add_argument("--url", required=True)
     init_parser.add_argument("--force", action="store_true", default=False, required=False)
+    init_parser.add_argument("--accounting-tag-name", dest="acct_tag_name")
+    init_parser.add_argument("--accounting-tag-value", dest="acct_tag_avl")
+    init_parser.add_argument("--accounting-subscription-id", dest="acct_sub")
     
     args = parser.parse_args(argv)
     if hasattr(args, "logfile"):
