@@ -72,30 +72,14 @@ bash 'Install cyclecloud python api' do
     EOH
   not_if { ::File.exist?('/etc/cyclecloud-api.installed') }
 end
-
-
-
-case node[:platform_family]
-when 'ubuntu', 'debian'
-  plugin_name = "job_submit_cyclecloud_ubuntu_#{slurmver}.so"
-when 'centos', 'rhel', 'redhat'
-  if node[:platform_version] >= '8' then
-    plugin_name = "job_submit_cyclecloud_centos8_#{slurmver}.so"
-  else
-    plugin_name = "job_submit_cyclecloud_centos_#{slurmver}.so"
-  end
-when 'suse'
-  plugin_name = "job_submit_cyclecloud_suse_#{slurmver}.so"
+ 
+cookbook_file "/etc/slurm/job_submit.lua" do
+    source "job_submit.lua"
+    mode "0755"
+    owner "root"
+    group "root"
+    not_if { ::File.exist?("/etc/slurm/job_submit.lua")}
 end
-
-bash 'Install job_submit/cyclecloud' do
-  code <<-EOH
-    jetpack download --project slurm #{plugin_name} /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
-    touch /etc/cyclecloud-job-submit.installed
-    EOH
-  not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
-end
-
 
 
 if node[:slurm][:ha_enabled]
