@@ -79,7 +79,7 @@ end
 
 
 defer_block "Defer starting slurmd until end of converge" do
-  slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename}"
+  slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename} -b"
   if node[:slurm][:use_nodename_as_hostname] then
     cmd_str = "getent hosts #{node[:cyclecloud][:instance][:ipv4]} | grep -q #{nodename}"
     cmd = Mixlib::ShellOut.new(cmd_str)
