@@ -3,5 +3,7 @@ CgroupAutomount=no
 ConstrainCores=yes
 ConstrainRamSpace=yes
 ConstrainSwapSpace=yes
+<% if @slurmver > "21" %>
 TaskAffinity=no
+<% end %>
 ConstrainDevices=yes

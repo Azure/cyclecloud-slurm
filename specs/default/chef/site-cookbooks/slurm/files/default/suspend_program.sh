@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
-$(dirname $0)/./cyclecloud_slurm.sh suspend --node-list $1
+node_list=$(echo $@ | sed "s/ /,/g")
+echo node list is $node_list
+$(dirname $0)/./cyclecloud_slurm.sh suspend --node-list $node_list
 exit $?

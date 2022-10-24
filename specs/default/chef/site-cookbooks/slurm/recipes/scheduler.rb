@@ -223,6 +223,9 @@ template '/sched/cgroup.conf' do
   owner "#{slurmuser}"
   source "cgroup.conf.erb"
   action :create_if_missing
+  variables {
+    :slurmver => slurmver
+  }
 end
 
 
