@@ -436,3 +436,56 @@ SwitchName=htc Nodes=htc-[1-8]'''.strip()
         finally:
             if os.path.exists(tmp):
                 os.remove(tmp)
+
+    def test_apply_changes(self):
+        def n(name, status, autoscale=True):
+            return {"Name": name, "Status": status, "Configuration": {"slurm": {"autoscale": autoscale}}}
+
+        def _succeeds(nodes):
+            nodes.append(n("scheduler", "scheduler-ha", False))
+            cyclecloud_slurm._check_apply_changes(nodes)
+        
+        def _throws(nodes, expected):
+            nodes.append(n("scheduler", "scheduler-ha", False))
+            try:
+                cyclecloud_slurm._check_apply_changes(nodes)
+                assert False
+            except cyclecloud_slurm.CyclecloudSlurmError as e:
+                assert str(e).split(" - ")[-1] == expected
+
+        _succeeds([])
+        _succeeds([n("n-1", "Off")])
+        _succeeds([n("n-1", "")])
+        _succeeds([n("n-1", None)])
+
+        _throws([n("n-1", "Started")], "n-1")
+        _throws([n("n-1", "Deallocated")], "n-1")
+        _throws([n("n-1", "Terminating")], "n-1")
+        _throws([n("n-1", "Terminated"), n("n-2", "Started")], "n-2")
+
+    def test_filter_by_nodearrays(self):
+        def n(name, nodearray, autoscale=True):
+            return {"Name": name, "Template": nodearray, "Configuration": {"slurm": {"autoscale": autoscale}}}
+
+        def p(nodearray):
+            class MockPartition:
+                def __init__(self, name):
+                    self.name = self.nodearray = name
+            return MockPartition(nodearray)
+
+        def _check(nodes, partition_names, nodearrays, expected_nodes, expected_partitions):
+            expected_nodes = nodes if expected_nodes is None else expected_nodes
+            nodes = nodes + [n("scheduler", "scheduler-ha", False)]
+            partitions = {}
+            for pname in partition_names:
+                partitions[pname] = p(pname)
+            actual_nodes, actual_partitions = cyclecloud_slurm._filter_by_nodearrays(nodes, partitions, nodearrays)
+            assert actual_nodes == expected_nodes
+            assert set(actual_partitions.keys()) == set(expected_partitions)
+
+        _check([n("n1", "n")], ["n"], ["n"], None, ["n"])
+        _check([n("n1", "n")], ["n"], ["n", "other"], None, ["n"])
+        _check([n("n1", "n")], ["n"], ["other"], [], [])
+        _check([n("n1", "n")], ["n", "other"], ["other"], [], ["other"])
+        _check([n("n1", "n"), n("other1", "other")], ["n", "other"], ["other"], [n("other1", "other")], ["other"])
+        _check([n("n1", "n"), n("other1", "other")], ["n", "other"], ["n"], [n("n1", "n")], ["n"])

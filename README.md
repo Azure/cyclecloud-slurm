@@ -14,7 +14,15 @@ The Slurm cluster deployed in CycleCloud contains a script that facilitates this
 ```
       $ sudo -i
       # cd /opt/cycle/slurm
-      # ./cyclecloud_slurm.sh scale
+      # ./cyclecloud_slurm.sh apply_changes
+```
+
+If you only want to make changes to certain nodearrays, you can add the `--nodearrays` argument.
+
+```
+      $ sudo -i
+      # cd /opt/cycle/slurm
+      # ./cyclecloud_slurm.sh apply_changes --nodearrays array1[,array2,array3...]
 ```
 
 ### Removing all execute nodes

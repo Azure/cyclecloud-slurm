@@ -95,7 +95,10 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                              nodearray_name, unescaped_nodename_prefix, nodename_prefix)
         
         if is_autoscale is None:
-            logging.warning("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
+            log_func = logging.warning
+            if nodearray_name in ["login", "scheduler-ha"]:
+                log_func = logging.debug
+            log_func("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
             continue
         
         if is_autoscale is False:
@@ -964,7 +967,7 @@ def reconfigure():
     rescale(config_only=True)
     
     
-def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None, config_only=False):
+def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None, config_only=False, node_list=None):
     slurm_conf = os.path.join(sched_dir, "slurm.conf")
     
     subprocess_module = subprocess_module or _subprocess_module()
@@ -1154,6 +1157,67 @@ def _drain(node_list, subprocess_module):
         previous_drained_nodes = current_drained_nodes
 
 
+def apply_changes(nodearrays):
+    """
+    prevents user from removing nodes and scaling until all nodes are fully terminated.
+    """
+    cluster_wrapper = _get_cluster_wrapper()
+    subprocess_module = _subprocess_module()
+    
+    # get the list of nodes, filtered by nodearray and slurm.autoscale=true
+    _, cluster_node_list = _retry_rest(cluster_wrapper.get_nodes)
+    partitions = fetch_partitions(cluster_wrapper, subprocess_module)
+    filtered_nodes, _ = _filter_by_nodearrays(cluster_node_list.nodes, partitions, nodearrays)
+
+    # this will raise an exception if there are any existing nodes.
+    _check_apply_changes(filtered_nodes)
+
+    remove_node_list = [n.get("Name") for n in filtered_nodes]    
+    remove_nodes(remove_node_list)
+    
+    # fetch the partitions again (after removing the nodes) and filter by
+    # nodearrays and slurm.autoscale=true
+    updated_partitions = fetch_partitions(cluster_wrapper, subprocess_module)
+    _, filtered_partitions = _filter_by_nodearrays([], updated_partitions, nodearrays)
+    _create_nodes(filtered_partitions, None, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error, dry_run=False)
+    
+    # now run scale, config_only so that no nodes are created or removed
+    rescale(config_only=True)
+
+    if nodearrays:
+        logging.info(f"Changes applied to {','.join(nodearrays)}")
+    else:
+        logging.info(f"Changes applied to all nodearrays.")
+
+
+def _filter_by_nodearrays(nodes, partitions, nodearrays):
+    autoscale_nodes = [x for x in nodes if x.get("Configuration", {}).get("slurm", {}).get("autoscale", False)]
+    del nodes
+    if not nodearrays:
+        return autoscale_nodes, partitions
+    filtered_nodes = [x for x in autoscale_nodes if x.get("Template") in nodearrays]
+    filtered_partitions = {}
+    for pname, partition in partitions.items():
+        if partition.nodearray in nodearrays:
+            filtered_partitions[pname] = partition
+    return filtered_nodes, filtered_partitions
+
+
+def _check_apply_changes(cc_nodes):
+    autoscale_nodes = [x for x in cc_nodes if x.get("Configuration", {}).get("slurm", {}).get("autoscale", False)]
+    still_alive = []
+
+    for node in autoscale_nodes:
+       
+        status = (node.get("Status") or "").lower()
+        if status not in ["terminated", "off", ""]:
+            still_alive.append(node)
+    
+    if still_alive:
+        node_names = ",".join(sorted([x.get("Name") or "" for x in still_alive]))
+        raise CyclecloudSlurmError(f"Error: The following nodes must be fully terminated before applying changes - {node_names}")            
+
+
 def _init_logging(logfile):
     import logging.handlers
     
@@ -1336,6 +1400,8 @@ def main(argv=None):
     sync_nodes_parser = add_parser("sync_nodes", sync_nodes)
     
     add_parser("scale", rescale)
+    apply_changes_parser = add_parser("apply_changes", apply_changes)
+    apply_changes_parser.add_argument("--nodearrays", type=hostlist)
     add_parser("reconfigure", reconfigure)
     
     add_parser("nodeaddrs", nodeaddrs)
