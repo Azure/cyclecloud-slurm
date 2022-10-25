@@ -178,33 +178,33 @@ class CycleCloudSlurmTest(unittest.TestCase):
             # based on the cluster status above, fetch partitions 
             cluster_wrapper = clusterwrapper.ClusterWrapper(mock_cluster.name, DoNotUse(), DoNotUse(), mock_cluster)
             partitions = cyclecloud_slurm.fetch_partitions(cluster_wrapper, mock_subprocess)
-            self.assertEquals(2, len(partitions))
+            self.assertEqual(2, len(partitions))
             hpc_part = partitions["hpc"]
             
-            self.assertEquals("hpc", hpc_part.name)
-            self.assertEquals("hpc", hpc_part.nodearray)
-            self.assertEquals(None, hpc_part.node_list)
+            self.assertEqual("hpc", hpc_part.name)
+            self.assertEqual("hpc", hpc_part.nodearray)
+            self.assertEqual(None, hpc_part.node_list)
             self.assertTrue(hpc_part.is_default)
             self.assertTrue(hpc_part.is_hpc)
             
             htc_part = partitions["htc"]
-            self.assertEquals("htc", htc_part.name)
-            self.assertEquals("htc", htc_part.nodearray)
-            self.assertEquals(None, htc_part.node_list)
+            self.assertEqual("htc", htc_part.name)
+            self.assertEqual("htc", htc_part.nodearray)
+            self.assertEqual(None, htc_part.node_list)
             self.assertFalse(htc_part.is_default)
             self.assertFalse(htc_part.is_hpc)
             
-            self.assertEquals(bucket.definition.machine_type, hpc_part.machine_type)
-            self.assertEquals(30, hpc_part.max_scaleset_size)
-            self.assertEquals(2, hpc_part.max_vm_count)
-            self.assertEquals(4, hpc_part.memory)
-            self.assertEquals(2, hpc_part.vcpu_count)
+            self.assertEqual(bucket.definition.machine_type, hpc_part.machine_type)
+            self.assertEqual(30, hpc_part.max_scaleset_size)
+            self.assertEqual(2, hpc_part.max_vm_count)
+            self.assertEqual(4, hpc_part.memory)
+            self.assertEqual(2, hpc_part.vcpu_count)
             
-            self.assertEquals(bucket.definition.machine_type, htc_part.machine_type)
-            self.assertEquals(2**31, htc_part.max_scaleset_size)
-            self.assertEquals(2, htc_part.max_vm_count)
-            self.assertEquals(4, htc_part.memory)
-            self.assertEquals(2, htc_part.vcpu_count)
+            self.assertEqual(bucket.definition.machine_type, htc_part.machine_type)
+            self.assertEqual(2**31, htc_part.max_scaleset_size)
+            self.assertEqual(2, htc_part.max_vm_count)
+            self.assertEqual(4, htc_part.memory)
+            self.assertEqual(2, htc_part.vcpu_count)
             
             mock_cluster._started_nodes = [{"Name": "hpc-100", "Template": "hpc"},
                                             {"Name": "hpc-101", "Template": "hpc"},
@@ -213,26 +213,26 @@ class CycleCloudSlurmTest(unittest.TestCase):
             # now there are pre-existing nodes, so just use those to determine the node_list
             mock_subprocess.expect("scontrol show hostlist hpc-100,hpc-101,hpc-102", "hpc-10[0-2]")
             partitions = cyclecloud_slurm.fetch_partitions(cluster_wrapper, mock_subprocess)
-            self.assertEquals("hpc-10[0-2]", partitions["hpc"].node_list)
+            self.assertEqual("hpc-10[0-2]", partitions["hpc"].node_list)
             
             # change max scale set size
             mock_subprocess.expect("scontrol show hostlist hpc-100,hpc-101,hpc-102", "hpc-10[0-2]")
             hpc_nodearray_status.nodearray["Azure"] = {"MaxScalesetSize": 2}
             partitions = cyclecloud_slurm.fetch_partitions(cluster_wrapper, mock_subprocess)
-            self.assertEquals("hpc-10[0-2]", partitions["hpc"].node_list)
-            self.assertEquals(2, partitions["hpc"].max_scaleset_size)
+            self.assertEqual("hpc-10[0-2]", partitions["hpc"].node_list)
+            self.assertEqual(2, partitions["hpc"].max_scaleset_size)
             
             # ensure we can disable autoscale
             hpc_nodearray_status.nodearray["Configuration"]["slurm"]["autoscale"] = False
             htc_nodearray_status.nodearray["Configuration"]["slurm"]["autoscale"] = False
             partitions = cyclecloud_slurm.fetch_partitions(cluster_wrapper, mock_subprocess)
-            self.assertEquals(0, len(partitions))
+            self.assertEqual(0, len(partitions))
             
             # default for autoscale is false
             hpc_nodearray_status.nodearray["Configuration"]["slurm"].pop("autoscale")
             htc_nodearray_status.nodearray["Configuration"]["slurm"].pop("autoscale")
             partitions = cyclecloud_slurm.fetch_partitions(cluster_wrapper, mock_subprocess)
-            self.assertEquals(0, len(partitions))
+            self.assertEqual(0, len(partitions))
             
     def test_create_nodes(self):
         partitions = {}
@@ -394,7 +394,7 @@ SwitchName=htc Nodes=htc-[1-8]'''.strip()
             for e, a in zip(result.splitlines(), expected.splitlines()):
                 assert e.strip() == a.strip(), "\n%s\n%s" % (e.strip(), a.strip())        
             
-            self.assertEquals(result.strip(), expected.strip())
+            self.assertEqual(result.strip(), expected.strip())
 
     def test_resume(self):
         assert False, "Skipping until we implement the mock response. Low value for now."
@@ -419,7 +419,7 @@ SwitchName=htc Nodes=htc-[1-8]'''.strip()
         try:
             #  create the config
             cyclecloud_slurm.initialize_config(tmp, cluster_name="c1", username="u1", password="p1", url="https://url1", force=False)
-            self.assertEquals(json.load(open(tmp)), {"cluster_name": "c1", "username": "u1", "password": "p1", "url": "https://url1"})
+            self.assertEqual(json.load(open(tmp)), {"cluster_name": "c1", "username": "u1", "password": "p1", "url": "https://url1"})
             try:
                 # try to recreate the config without --force
                 cyclecloud_slurm.initialize_config(tmp, cluster_name="c2", username="u2", password="p2", url="https://url2", force=False)
@@ -428,11 +428,11 @@ SwitchName=htc Nodes=htc-[1-8]'''.strip()
                 # ensure --force is in there
                 self.assertIn("--force", str(e))
             # make sure nothing changed
-            self.assertEquals(json.load(open(tmp)), {"cluster_name": "c1", "username": "u1", "password": "p1", "url": "https://url1"})
+            self.assertEqual(json.load(open(tmp)), {"cluster_name": "c1", "username": "u1", "password": "p1", "url": "https://url1"})
             
             # now force the change and make sure things are updated
             cyclecloud_slurm.initialize_config(tmp, cluster_name="c2", username="u2", password="p2", url="https://url2", force=True)
-            self.assertEquals(json.load(open(tmp)), {"cluster_name": "c2", "username": "u2", "password": "p2", "url": "https://url2"})
+            self.assertEqual(json.load(open(tmp)), {"cluster_name": "c2", "username": "u2", "password": "p2", "url": "https://url2"})
         finally:
             if os.path.exists(tmp):
                 os.remove(tmp)
