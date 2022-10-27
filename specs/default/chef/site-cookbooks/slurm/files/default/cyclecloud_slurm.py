@@ -1223,20 +1223,36 @@ def get_accounting_info(node_name: str) -> None:
     _, status_response = _retry_rest(lambda: cluster_wrapper.get_cluster_status(nodes=True))
     region_by_template = {}
     spot_by_template = {}
+    vm_by_template_vm_size = {}
     for nodearray in status_response.nodearrays:
         region_by_template[nodearray.name] = nodearray.nodearray["Region"]
         spot_by_template[nodearray.name] = nodearray.nodearray.get("Interruptible", False)
+    
+        for bucket in nodearray.buckets:
+            key = (nodearray.name, bucket.definition.machine_type)
+            vm_by_template_vm_size[key] = bucket.virtual_machine
+
 
     records = []
     for node in status_response.nodes:
         if node.get("Name") == node_name:
-            region = region_by_template[node["Template"]]    
-            spot = spot_by_template[node["Template"]]    
+            template = node["Template"]
+            region = region_by_template[template]
+            spot = spot_by_template[template]
+            vm_size = node["MachineType"]
+            key = (template, vm_size)
+            vm = vm_by_template_vm_size[key]
+            
             records.append({
                 "name": node['Name'],
                 "location": region,
-                "vm_size": node.get('MachineType'),
-                "spot": spot
+                "vm_size": vm_size,
+                "spot": spot,
+                "nodearray": node["Template"],
+                "pcpu_count": vm.pcpu_count,
+                "vcpu_count": vm.vcpu_count,
+                "gpu_count": vm.gpu_count,
+                "memgb": vm.memory,
             })
     json.dump(records, sys.stdout, indent=2)
 
