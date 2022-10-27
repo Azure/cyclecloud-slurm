@@ -1,15 +1,24 @@
 #!/bin/bash
 
-if command -v docker; then
+TMP_BLOBS=blobs-tmp
+rm -rf $TMP_BLOBS
+mkdir $TMP_BLOBS
 
+
+if command -v docker; then
   docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/blobs:/root/rpmbuild/RPMS/x86_64 -ti almalinux:8.5 /bin/bash /source/00-build-slurm.sh centos
-  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/blobs:/root/rpmbuild/RPMS/x86_64 -ti $$REQUIRED$$ /bin/bash /source/00-build-slurm.sh suse
-  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/blobs:/root/rpmbuild/RPMS/x86_64 -ti ubuntu:18.04 /bin/bash /source/01-build-debs.sh
+  
+  # we need to create centos7 rpms to create the valid debs for Ubuntu18
+  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BLOBS:/root/rpmbuild/RPMS/x86_64 -ti centos:7 /bin/bash /source/00-build-slurm.sh centos
+  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BLOBS:/root/rpmbuild/RPMS/x86_64 -ti ubuntu:18.04 /bin/bash /source/01-build-debs.sh
+  
+  mv $TMP_BLOBS/* blobs/
+  rm -rf $TMP_BLOBS
   cat > /tmp/check_mising_files.py <<EOF
 from configparser import ConfigParser
 import os
 parser = ConfigParser()
-parser.read("project.ini")
+parser.read("project.ini") 
 expected_files = set([x.strip() for x in parser.get("blobs", "Files").split(",")])
 actual = set(os.listdir("blobs"))
 missing = expected_files - actual

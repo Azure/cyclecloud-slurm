@@ -26,8 +26,8 @@ function build_slurm() {
             zypper install --no-confirm bzip2 rpmbuild munge-devel pam-devel mysql-devel autoconf readline-devel
             ;;
         centos)
-            CENTOS_VERSION=8.5
-            CENTOS_MAJOR=8
+            CENTOS_VERSION=$(cat /etc/centos-release | sed 's/ /\n/g' | grep -E '[0-9.]+')
+            CENTOS_MAJOR=$(echo $CENTOS_VERSION | cut -d. -f1)
 
             if [ $CENTOS_VERSION \< "8." ]; then
                 LIBTOOL=libtool-2.4.2
@@ -64,39 +64,6 @@ function build_slurm() {
 
     rpmbuild --with mysql -ta ${SLURM_PKG}
 
-    # make the plugin
-    rm -rf ~/job_submit
-    mkdir -p ~/job_submit
-    cd ~/
-    cd ~/job_submit
-    tar xjf ~/${SLURM_PKG}
-    mkdir -p ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-    cd ${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-    rsync -a ${SCRIPT_DIR}/JobSubmitPlugin/ .
-
-    if [ "$SLURM_VERSION" \> "19" ]; then
-        mv Makefile.in.v19 Makefile.in
-    fi
-
-    cd ~/job_submit
-    sed -i 's/src\/plugins\/job_submit\/Makefile/src\/plugins\/job_submit\/Makefile\n                 src\/plugins\/job_submit\/cyclecloud\/Makefile/g'  ${SLURM_FOLDER}/configure.ac
-    cd ~/job_submit/${SLURM_FOLDER}
-
-    if [ "$SLURM_VERSION" \> "19" ]; then
-        autoconf
-    else
-        ./autogen.sh
-    fi
-
-    ./configure
-    make
-    cd ~/job_submit/${SLURM_FOLDER}/src/plugins/job_submit/cyclecloud/
-    make
-
-    LD_LIBRARY_PATH=/root/job_submit/${SLURM_FOLDER}/src/api/.libs/ JOB_SUBMIT_CYCLECLOUD=1 python3 job_submit_cyclecloud_test.py
-    cp .libs/job_submit_cyclecloud.so job_submit_cyclecloud_${DISTRO_FAMILY}${CENTOS_MAJOR}_${SLURM_VERSION}-1.so
-    cp job_submit_cyclecloud_${DISTRO_FAMILY}${CENTOS_MAJOR}_${SLURM_VERSION}-1.so  /usr/src/packages/RPMS/x86_64/
-}
 
 function install_pmix() {
     case ${1} in
@@ -127,4 +94,5 @@ function install_pmix() {
     cd ../../install/v3/
 }
 
+build_slurm ${1} 22.05.3
 build_slurm ${1} 20.11.9
