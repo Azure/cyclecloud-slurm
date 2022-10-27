@@ -72,13 +72,24 @@ bash 'Install cyclecloud python api' do
     EOH
   not_if { ::File.exist?('/etc/cyclecloud-api.installed') }
 end
- 
+
+
 cookbook_file "/etc/slurm/job_submit.lua" do
     source "job_submit.lua"
     mode "0755"
     owner "root"
     group "root"
     not_if { ::File.exist?("/etc/slurm/job_submit.lua")}
+end
+
+if myplatform == 'suse'
+  bash 'Install job_submit/cyclecloud' do
+    code <<-EOH
+      jetpack download --project slurm job_submit_cyclecloud_suse_#{slurmver}.so  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
+      touch /etc/cyclecloud-job-submit.installed
+      EOH
+    not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
+  end
 end
 
 
@@ -335,6 +346,15 @@ end
 defer_block "Defer starting munge until end of converge" do
   service 'munge' do
     action [:enable, :restart]
+  end
+end
+
+defer_block "Check slurmctld health" do
+  bash 'scontrol ping' do
+    code <<-EOH
+    result=$(scontrol ping)
+    echo $result | grep UP || (printf "$result"; exit 200)
+    EOH
   end
 end
 
