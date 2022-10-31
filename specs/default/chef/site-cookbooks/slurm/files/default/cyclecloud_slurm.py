@@ -1223,6 +1223,7 @@ def _check_apply_changes(cc_nodes):
 
 def get_accounting_info(node_name: str) -> None:
     cluster_wrapper = _get_cluster_wrapper()
+    subprocess_module = _subprocess_module()
     _, status_response = _retry_rest(lambda: cluster_wrapper.get_cluster_status(nodes=True))
     region_by_template = {}
     spot_by_template = {}
@@ -1235,6 +1236,12 @@ def get_accounting_info(node_name: str) -> None:
             key = (nodearray.name, bucket.definition.machine_type)
             vm_by_template_vm_size[key] = bucket.virtual_machine
 
+    toks = _check_output(subprocess_module, ["scontrol", "show", "node", node_name]).split()
+    cpus = -1
+    for tok in toks:
+        tok = tok.lower()
+        if tok.startswith("cputot"):
+            cpus = int(tok.split("=")[1])
 
     records = []
     for node in status_response.nodes:
@@ -1252,6 +1259,7 @@ def get_accounting_info(node_name: str) -> None:
                 "vm_size": vm_size,
                 "spot": spot,
                 "nodearray": node["Template"],
+                "cpus": cpus,
                 "pcpu_count": vm.pcpu_count,
                 "vcpu_count": vm.vcpu_count,
                 "gpu_count": vm.gpu_count,
