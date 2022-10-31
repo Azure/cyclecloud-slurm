@@ -30,6 +30,21 @@ file '/sched/munge/munge.key' do
   mode 0700
 end
 
+file '/sched/cyclecloud.conf' do
+  owner 'slurm'
+  group 'slurm'
+  mode 0644
+  content "# this file is managed by cyclecloud-slurm"
+end
+
+file '/sched/keep_alive.conf' do
+  owner 'slurm'
+  group 'slurm'
+  mode 0644
+  content "# this file is managed by cyclecloud-slurm"
+end
+
+
 remote_file '/etc/munge/munge.key' do
   source 'file:///sched/munge/munge.key'
   owner 'munge'
@@ -221,59 +236,10 @@ template '/sched/cgroup.conf' do
   variables(:slurmver => slurmver)
 end
 
-
 link '/etc/slurm/cgroup.conf' do
   to '/sched/cgroup.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
-end
-
-cluster_name = node[:cyclecloud][:cluster][:name]
-username = node[:cyclecloud][:config][:username]
-password = node[:cyclecloud][:config][:password]
-url = node[:cyclecloud][:config][:web_server]
-bash 'Initialize autoscale.json' do
-    code <<-EOH
-    tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print(dict([tuple(x.split(':', 1)) for x in sys.stdin.read().split(';')])['ClusterId'])")
-    
-    #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' \
-                                                     --username='#{username}' \
-                                                     --password='#{password}' \
-                                                     --url='#{url}' \
-                                                     --accounting-tag-name ClusterId \
-                                                     --accounting-tag-value $tag \
-                                                     --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
-                                                     || exit 1
-    EOH
-    not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
-end
-
-# No nodes should exist the first time we start, but after that will because fixed=true on the nodes
-bash 'Create cyclecloud.conf' do
-  code <<-EOH
-    # we want the file to exist, as we are going to do an include and it will complain that it is empty.
-    touch /etc/slurm/cyclecloud.conf
-
-    echo '# this file is controlled by cyclecloud-slurm' > /sched/keep_alive.conf
-    
-    # upgrade the old slurm.conf
-    #{autoscale_dir}/cyclecloud_slurm.sh upgrade_conf || exit 1
-    
-    num_starts=$(jetpack config cyclecloud.cluster.start_count)
-    if [ "$num_starts" == "1" ]; then
-      policy=Error
-      #{autoscale_dir}/cyclecloud_slurm.sh remove_nodes || exit 1;
-    else
-      policy=AllowExisting
-    fi
-    
-    #{autoscale_dir}/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
-    #{autoscale_dir}/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
-    #{autoscale_dir}/cyclecloud_slurm.sh gres_conf > /sched/gres.conf || exit 1;
-    #{autoscale_dir}/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
-    touch /etc/slurm.installed
-    EOH
-  not_if { ::File.exist?('/etc/slurm.installed') }
 end
 
 link '/etc/slurm/gres.conf' do
@@ -321,6 +287,50 @@ cookbook_file "/etc/systemd/system/slurmctld.service.d/override.conf" do
   group "root"
   mode "0644"
   action :create
+end
+
+
+cluster_name = node[:cyclecloud][:cluster][:name]
+username = node[:cyclecloud][:config][:username]
+password = node[:cyclecloud][:config][:password]
+url = node[:cyclecloud][:config][:web_server]
+bash 'Initialize autoscale.json' do
+    code <<-EOH
+    tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print(dict([tuple(x.split(':', 1)) for x in sys.stdin.read().split(';')])['ClusterId'])")
+    
+    #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' \
+                                                     --username='#{username}' \
+                                                     --password='#{password}' \
+                                                     --url='#{url}' \
+                                                     --accounting-tag-name ClusterId \
+                                                     --accounting-tag-value $tag \
+                                                     --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+                                                     || exit 1
+    EOH
+    not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
+end
+
+# No nodes should exist the first time we start, but after that will because fixed=true on the nodes
+bash 'Create cyclecloud.conf' do
+  code <<-EOH
+    # upgrade the old slurm.conf
+    #{autoscale_dir}/cyclecloud_slurm.sh upgrade_conf || exit 1
+    
+    num_starts=$(jetpack config cyclecloud.cluster.start_count)
+    if [ "$num_starts" == "1" ]; then
+      policy=Error
+      #{autoscale_dir}/cyclecloud_slurm.sh remove_nodes || exit 1;
+    else
+      policy=AllowExisting
+    fi
+    
+    #{autoscale_dir}/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh gres_conf > /sched/gres.conf || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
+    touch /etc/slurm.installed
+    EOH
+  not_if { ::File.exist?('/etc/slurm.installed') }
 end
 
 
