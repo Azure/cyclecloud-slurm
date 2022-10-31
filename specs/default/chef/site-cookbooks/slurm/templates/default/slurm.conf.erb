@@ -48,6 +48,7 @@ AccountingStorageHost="localhost"
 AccountingStorageType=accounting_storage/none
 <% end %>
 Include cyclecloud.conf
+Include keep_alive.conf
 
 <% if @haenabled == true %>
 SlurmctldHost=<%= @scheduler_nodes %>

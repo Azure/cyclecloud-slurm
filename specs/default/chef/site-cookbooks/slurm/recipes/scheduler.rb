@@ -49,7 +49,7 @@ directory "#{autoscale_dir}" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh", "get_acct_info.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh", "get_acct_info.sh", "start_nodes.sh"]
 scripts.each do |filename| 
     cookbook_file "#{autoscale_dir}/#{filename}" do
         source "#{filename}"
@@ -242,6 +242,8 @@ bash 'Create cyclecloud.conf' do
   code <<-EOH
     # we want the file to exist, as we are going to do an include and it will complain that it is empty.
     touch /etc/slurm/cyclecloud.conf
+
+    echo '# this file is controlled by cyclecloud-slurm' > /sched/keep_alive.conf
     
     # upgrade the old slurm.conf
     #{autoscale_dir}/cyclecloud_slurm.sh upgrade_conf || exit 1
@@ -278,6 +280,12 @@ end
 
 link '/etc/slurm/cyclecloud.conf' do
   to '/sched/cyclecloud.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
+link '/etc/slurm/keep_alive.conf' do
+  to '/sched/keep_alive.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end

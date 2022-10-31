@@ -443,7 +443,7 @@ def terminate_nodes(node_list):
     return _terminate_nodes(node_list, _get_cluster_wrapper())
 
 
-def _resume(config, node_list, cluster_wrapper, subprocess_module):
+def _resume(config, node_list, cluster_wrapper, subprocess_module, keep_alive=False):
     # Optionally block on termination for up to attempts * delay.
     # For example, set block_for_termination_attempts=360
     # and block_for_termination_delay=5 for a full 1800s delay before failing.
@@ -481,6 +481,9 @@ def _resume(config, node_list, cluster_wrapper, subprocess_module):
     if len(start_response.nodes) != len(node_list):
         missing_nodes = set(node_list) - set(start_response.nodes)
         logging.error("Could only resume %s/%s nodes. The folllowing are unknown: %s" % ",".join(missing_nodes))
+
+    if keep_alive:
+        _keep_alive(subprocess_module, node_list)
 
     _wait_for_resume(cluster_wrapper, start_response.operation_id, node_list, subprocess_module)
 
@@ -611,10 +614,10 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     logging.info("OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting", operation_id, nodes_str)
 
         
-def resume(config, node_list):
+def resume(config, node_list, keep_alive=False):
     cluster_wrapper = _get_cluster_wrapper()
     subprocess_module = _subprocess_module()
-    return _resume(config, node_list, cluster_wrapper, subprocess_module)
+    return _resume(config, node_list, cluster_wrapper, subprocess_module, keep_alive=keep_alive)
 
 
 class ExistingNodePolicy:
@@ -1257,6 +1260,58 @@ def get_accounting_info(node_name: str) -> None:
     json.dump(records, sys.stdout, indent=2)
 
 
+def keep_alive(node_list, remove=False, set_nodes=False):
+    smod = _subprocess_module()
+    _keep_alive(smod, node_list, remove, set_nodes)
+
+def _keep_alive(subprocess_module, node_list, remove=False, set_nodes=False):
+    if remove and set_nodes:
+        raise CyclecloudSlurmError("Please define only --set or --remove, not both.")
+
+    lines = _check_output(subprocess_module, ["scontrol", "show", "config"]).splitlines()
+    filtered = [
+        line for line in lines if line.lower().startswith("suspendexcnodes")
+    ]
+    current_susp_nodes = []
+    if filtered:
+        current_susp_nodes_expr = filtered[0].split("=")[-1].strip()
+        if current_susp_nodes_expr != "(null)":
+            current_susp_nodes = _from_hostlist(subprocess_module, current_susp_nodes_expr)
+
+    if set_nodes:
+        hostnames = list(set(node_list))
+    elif remove:
+        hostnames = list(set(current_susp_nodes) - set(node_list))
+    else:
+        hostnames = current_susp_nodes + node_list
+
+    all_susp_hostnames = (
+        _check_output(
+            subprocess_module,
+            [
+                "scontrol",
+                "show",
+                "hostnames",
+                ",".join(hostnames),
+            ]
+        )
+        .strip()
+        .split()
+    )
+    all_susp_hostnames = sorted(
+        list(set(all_susp_hostnames)), key=_get_sort_key_func(False)
+    )
+    all_susp_hostlist = _check_output(
+        subprocess_module,
+        ["scontrol", "show", "hostlist", ",".join(all_susp_hostnames)]
+    ).strip()
+
+    with open("/sched/keep_alive.conf.tmp", "w") as fw:
+        fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
+    shutil.move("/sched/keep_alive.conf.tmp", "/sched/keep_alive.conf")
+    _check_output(subprocess_module, ["scontrol", "reconfig"])
+
+
 def _init_logging(logfile):
     import logging.handlers
     
@@ -1429,12 +1484,18 @@ def main(argv=None):
 
     drain_parser = add_parser("drain", drain)
     drain_parser.add_argument("--node-list", type=hostlist, required=True)
-    
+
+    keep_parser = add_parser("keep_alive", keep_alive)
+    keep_parser.add_argument("--node-list", type=hostlist, required=True)
+    keep_parser.add_argument("--remove", action="store_true", default=False)
+    keep_parser.add_argument("--set-nodes", action="store_true", default=False)
+
     terminate_parser = add_parser("terminate_nodes", terminate_nodes)
     terminate_parser.add_argument("--node-list", type=hostlist, required=True)
     
     resume_parser = add_parser("resume", resume)
     resume_parser.add_argument("--node-list", type=hostlist, required=True)
+    resume_parser.add_argument("--keep-alive", action="store_true", default=False)
     
     add_parser("upgrade_conf", upgrade_conf)
     
