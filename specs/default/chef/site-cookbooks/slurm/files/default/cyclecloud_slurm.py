@@ -1255,7 +1255,7 @@ def _subprocess_module():
     return SubprocessModuleWithChaosMode()
 
 
-def initialize_config(path, cluster_name, username, password, url, acct_sub, acct_tag_key, acct_tag_val, force=False):
+def initialize_config(path, cluster_name, username, password, url, acct_sub, acct_tag_name, acct_tag_val, force=False):
     if os.path.exists(path) and not force:
         raise CyclecloudSlurmError("{} already exists. To force reinitialization, please pass in --force".format(path))
     
@@ -1266,11 +1266,11 @@ def initialize_config(path, cluster_name, username, password, url, acct_sub, acc
             "password": password,
             "url": url.rstrip("/")
         }
-        if acct_sub and acct_tag_key and acct_tag_val:
+        if acct_sub and acct_tag_name and acct_tag_val:
             config["accounting"] = {
                 "subscription_id": acct_sub,
-                "tag_key": acct_tag_key,
-                "tag_val": acct_tag_avl
+                "tag_name": acct_tag_name,
+                "tag_val": acct_tag_val
             }
 
         json.dump(config, fw, indent=2)
@@ -1358,7 +1358,7 @@ def main(argv=None):
     init_parser.add_argument("--url", required=True)
     init_parser.add_argument("--force", action="store_true", default=False, required=False)
     init_parser.add_argument("--accounting-tag-name", dest="acct_tag_name")
-    init_parser.add_argument("--accounting-tag-value", dest="acct_tag_avl")
+    init_parser.add_argument("--accounting-tag-value", dest="acct_tag_val")
     init_parser.add_argument("--accounting-subscription-id", dest="acct_sub")
     
     args = parser.parse_args(argv)
@@ -1384,7 +1384,15 @@ def main(argv=None):
         
         args.func(**kwargs)
     else:
-        initialize_config(args.config, args.cluster_name, args.username, args.password, args.url, args.force)
+        initialize_config(path=args.config,
+                          cluster_name=args.cluster_name,
+                          username=args.username,
+                          password=args.password,
+                          url=args.url,
+                          acct_tag_name=args.acct_tag_name,
+                          acct_tag_val=args.acct_tag_val,
+                          acct_sub=args.acct_sub,
+                          force=args.force)
 
 
 def _check_output(subprocess_module, *args, **kwargs):

@@ -240,6 +240,50 @@ AccountingStorageHost="localhost"
         raise last_exception
 
 
+def _accounting_debian(s: InstallSettings) -> None:
+    slurmdbdpackage = f"slurm-slurmdbd_{s.slurmver}_amd64.deb"
+
+    #Install for compatibility on Ubuntu
+    package 'Install libmariadbclient-dev-compat' do
+        package_name 'libmariadbclient-dev-compat'
+    end
+
+    package 'Install libssl-dev' do
+        package_name 'libssl-dev'
+    end
+
+    link '/usr/lib/x86_64-linux-gnu/libssl.so.10' do 
+        to '/usr/lib/x86_64-linux-gnu/libssl.so'
+    end
+
+    link '/usr/lib/x86_64-linux-gnu/libcrypto.so.10' do 
+        to '/usr/lib/x86_64-linux-gnu/libcrypto.so'
+    end
+
+    if slurmver < "21" do
+        link '/usr/lib/x86_64-linux-gnu/libmysqlclient.so.18' do
+            to '/usr/lib/x86_64-linux-gnu/libmysqlclient.so'
+        end
+    else
+        link '/usr/lib/x86_64-linux-gnu/libmysqlclient.so.21' do
+            to '/usr/lib/x86_64-linux-gnu/libmysqlclient.so'
+        end
+    end
+
+    jetpack_download "#{slurmdbdpackage}" do
+        project "slurm"
+        not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmdbdpackage}") }
+    end
+
+    execute "Install #{slurmdbdpackage}" do
+        command "apt install -y #{node[:jetpack][:downloads]}/#{slurmdbdpackage}"
+        action :run
+        not_if { ::File.exist?("/var/spool/slurmdbd") }
+        retries 3
+        retry_delay 30
+    end
+
+
 def complete_install(s: InstallSettings) -> None:
     ilib.template(
         "/sched/slurm.conf",
@@ -356,7 +400,7 @@ def complete_install(s: InstallSettings) -> None:
     # v19 does this for us automatically BUT only for nodes that were susped
     # nodes that hit ResumeTimeout, however, remain in down~
 
-    ilib.start_service("munge")
+    ilib.restart_service("munge")
 
 
 def setup_slurmd(s: InstallSettings) -> None:
