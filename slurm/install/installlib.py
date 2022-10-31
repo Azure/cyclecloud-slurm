@@ -271,7 +271,11 @@ def cron(desc: str, minute: str, command: str) -> None:
     temp_name = tempfile.mktemp(".crontab")
     try:
         with open(temp_name, "w") as fw:
-            fw.write(f"{minute} * * * * {command}")
+            fw.write(f"# {desc}\n")
+            fw.write(f"{minute} * * * * {command}\n")
+        with open(temp_name) as fr:
+            print("Adding crontab:")
+            print(fr.read())
         subprocess.check_call(["crontab", temp_name])
     finally:
         if os.path.exists(temp_name):

@@ -4,7 +4,7 @@
 #
 set -e
 apt -y install munge
-apt -y instal blobs/*
+apt -y install blobs/*
 
 # Need to manually create links for libraries the RPMs are linked to (we use alien to create the debs)
 ln -s /lib/x86_64-linux-gnu/libreadline.so.7 /usr/lib/x86_64-linux-gnu/libreadline.so.6 

@@ -151,16 +151,9 @@ def execute() -> None:
     _add("sbin/resume_program.sh", "sbin/resume_program.sh")
     _add("sbin/return_to_idle.sh", "sbin/return_to_idle.sh")
     _add("sbin/suspend_program.sh", "sbin/suspend_program.sh")
-    # _add("ubuntu.sh", "ubuntu.sh")
-    # _add("rhel.sh", "rhel.sh")
-
-    
-    # _add("initialize_pbs.sh", mode=os.stat("initialize_pbs.sh")[0])
-    # _add("initialize_default_queues.sh", mode=os.stat("initialize_default_queues.sh")[0])
-    # _add("generate_autoscale_json.sh", mode=os.stat("generate_autoscale_json.sh")[0])
-    # _add("autoscale_hook.py", "slurm/conf/autoscale_hook.py")
+    _add("sbin/get_acct_info.sh", "sbin/get_acct_info.sh")
     _add("logging.conf", "slurm/conf/logging.conf")
-    # _add("templates/slurm-limits.conf", "templates/slurm-limits.conf")
+    
 
 
 if __name__ == "__main__":

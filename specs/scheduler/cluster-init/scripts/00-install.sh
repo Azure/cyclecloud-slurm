@@ -13,7 +13,7 @@ if [ $do_install == "True" ]; then
     jetpack download --project $slurm_project_name $install_pkg
     tar xzf $install_pkg
     cd azure-slurm-install
-    python3 install.py --platform $platform --mode scheduler --bootstrap-config CYCLECLOUD_HOME/config/node.json
+    python3 install.py --platform $platform --mode scheduler --bootstrap-config $CYCLECLOUD_HOME/config/node.json
     cd ..
 fi
 
@@ -24,3 +24,11 @@ cd azure-slurm
 ./install.sh
 
 slurmctld start
+
+attempts=3
+delay=5
+for i in $( seq 1 $attempts ); do
+    echo $i/$attempts sleeping $delay seconds before running scontrol ping
+    sleep $delay
+    scontrol ping && exit 0
+done
