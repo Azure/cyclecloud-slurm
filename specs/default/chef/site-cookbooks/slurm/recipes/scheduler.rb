@@ -107,6 +107,19 @@ if myplatform == 'suse'
   end
 end
 
+if myplatform == 'debian'
+  package 'Install liblua5.1' do
+    package_name 'liblua5.1'
+  end
+
+  link '/usr/lib64/slurm/liblua-5.1.so' do
+    to '/usr/lib/x86_64-linux-gnu/liblua5.1.so'
+    owner "#{slurmuser}"
+    group "#{slurmuser}"
+  end
+
+end
+
 
 if node[:slurm][:ha_enabled]
   # for SaveStateLocation
