@@ -1,6 +1,7 @@
 #!/bin/bash -e
+
 apt-get update
-apt-get install -y alien
+apt install -y alien lua5.3 liblua5.3
 
 for rpm in $(ls ~/rpmbuild/RPMS/x86_64/*.rpm ); do
     alien --bump 0 --scripts $rpm
