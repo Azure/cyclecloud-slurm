@@ -27,7 +27,13 @@ SlurmctldParameters=idle_on_node_suspend
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurmd/slurmd.log
 TopologyPlugin=topology/tree
+<% if node[:platform_family] == "suse" %>
 JobSubmitPlugins=job_submit/cyclecloud
+# currently the suse slurm packages do not include lua support.
+# JobSubmitPlugins=lua
+<% else %>
+JobSubmitPlugins=lua
+<% end %>
 PrivateData=cloud
 TreeWidth=65533
 ResumeTimeout=<%= @resume_timeout %>
@@ -47,6 +53,7 @@ AccountingStorageHost="localhost"
 AccountingStorageType=accounting_storage/none
 <% end %>
 Include cyclecloud.conf
+Include keep_alive.conf
 
 <% if @haenabled == true %>
 SlurmctldHost=<%= @scheduler_nodes %>

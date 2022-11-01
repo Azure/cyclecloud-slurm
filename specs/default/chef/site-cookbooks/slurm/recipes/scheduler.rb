@@ -30,6 +30,21 @@ file '/sched/munge/munge.key' do
   mode 0700
 end
 
+file '/sched/cyclecloud.conf' do
+  owner 'slurm'
+  group 'slurm'
+  mode 0644
+  content "# this file is managed by cyclecloud-slurm"
+end
+
+file '/sched/keep_alive.conf' do
+  owner 'slurm'
+  group 'slurm'
+  mode 0644
+  content "# this file is managed by cyclecloud-slurm"
+end
+
+
 remote_file '/etc/munge/munge.key' do
   source 'file:///sched/munge/munge.key'
   owner 'munge'
@@ -49,7 +64,7 @@ directory "#{autoscale_dir}" do
 end
 
 
-scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh"]
+scripts = ["cyclecloud_slurm.py", "slurmcc.py", "clusterwrapper.py", "cyclecloud_slurm.sh", "resume_program.sh", "resume_fail_program.sh", "suspend_program.sh", "return_to_idle.sh", "terminate_nodes.sh", "get_acct_info.sh", "start_nodes.sh"]
 scripts.each do |filename| 
     cookbook_file "#{autoscale_dir}/#{filename}" do
         source "#{filename}"
@@ -74,28 +89,23 @@ bash 'Install cyclecloud python api' do
 end
 
 
+cookbook_file "/etc/slurm/job_submit.lua" do
+    source "job_submit.lua"
+    mode "0755"
+    owner "root"
+    group "root"
+    not_if { ::File.exist?("/etc/slurm/job_submit.lua")}
+end
 
-case node[:platform_family]
-when 'ubuntu', 'debian'
-  plugin_name = "job_submit_cyclecloud_ubuntu_#{slurmver}.so"
-when 'centos', 'rhel', 'redhat'
-  if node[:platform_version] >= '8' then
-    plugin_name = "job_submit_cyclecloud_centos8_#{slurmver}.so"
-  else
-    plugin_name = "job_submit_cyclecloud_centos_#{slurmver}.so"
+if myplatform == 'suse'
+  bash 'Install job_submit/cyclecloud' do
+    code <<-EOH
+      jetpack download --project slurm job_submit_cyclecloud_suse_#{slurmver}.so  /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
+      touch /etc/cyclecloud-job-submit.installed
+      EOH
+    not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
   end
-when 'suse'
-  plugin_name = "job_submit_cyclecloud_suse_#{slurmver}.so"
 end
-
-bash 'Install job_submit/cyclecloud' do
-  code <<-EOH
-    jetpack download --project slurm #{plugin_name} /usr/lib64/slurm/job_submit_cyclecloud.so || exit 1;
-    touch /etc/cyclecloud-job-submit.installed
-    EOH
-  not_if { ::File.exist?('/etc/cyclecloud-job-submit.installed') }
-end
-
 
 
 if node[:slurm][:ha_enabled]
@@ -223,50 +233,13 @@ template '/sched/cgroup.conf' do
   owner "#{slurmuser}"
   source "cgroup.conf.erb"
   action :create_if_missing
+  variables(:slurmver => slurmver)
 end
-
 
 link '/etc/slurm/cgroup.conf' do
   to '/sched/cgroup.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
-end
-
-cluster_name = node[:cyclecloud][:cluster][:name]
-username = node[:cyclecloud][:config][:username]
-password = node[:cyclecloud][:config][:password]
-url = node[:cyclecloud][:config][:web_server]
-bash 'Initialize autoscale.json' do
-    code <<-EOH
-     #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' --username='#{username}' --password='#{password}' --url='#{url}' || exit 1
-    EOH
-    not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
-end
-
-# No nodes should exist the first time we start, but after that will because fixed=true on the nodes
-bash 'Create cyclecloud.conf' do
-  code <<-EOH
-    # we want the file to exist, as we are going to do an include and it will complain that it is empty.
-    touch /etc/slurm/cyclecloud.conf
-    
-    # upgrade the old slurm.conf
-    #{autoscale_dir}/cyclecloud_slurm.sh upgrade_conf || exit 1
-    
-    num_starts=$(jetpack config cyclecloud.cluster.start_count)
-    if [ "$num_starts" == "1" ]; then
-      policy=Error
-      #{autoscale_dir}/cyclecloud_slurm.sh remove_nodes || exit 1;
-    else
-      policy=AllowExisting
-    fi
-    
-    #{autoscale_dir}/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
-    #{autoscale_dir}/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
-    #{autoscale_dir}/cyclecloud_slurm.sh gres_conf > /sched/gres.conf || exit 1;
-    #{autoscale_dir}/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
-    touch /etc/slurm.installed
-    EOH
-  not_if { ::File.exist?('/etc/slurm.installed') }
 end
 
 link '/etc/slurm/gres.conf' do
@@ -284,6 +257,12 @@ end
 
 link '/etc/slurm/cyclecloud.conf' do
   to '/sched/cyclecloud.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
+link '/etc/slurm/keep_alive.conf' do
+  to '/sched/keep_alive.conf'
   owner "#{slurmuser}"
   group "#{slurmuser}"
 end
@@ -311,6 +290,50 @@ cookbook_file "/etc/systemd/system/slurmctld.service.d/override.conf" do
 end
 
 
+cluster_name = node[:cyclecloud][:cluster][:name]
+username = node[:cyclecloud][:config][:username]
+password = node[:cyclecloud][:config][:password]
+url = node[:cyclecloud][:config][:web_server]
+bash 'Initialize autoscale.json' do
+    code <<-EOH
+    tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print(dict([tuple(x.split(':', 1)) for x in sys.stdin.read().split(';')])['ClusterId'])")
+    
+    #{autoscale_dir}/cyclecloud_slurm.sh initialize --cluster-name='#{cluster_name}' \
+                                                     --username='#{username}' \
+                                                     --password='#{password}' \
+                                                     --url='#{url}' \
+                                                     --accounting-tag-name ClusterId \
+                                                     --accounting-tag-value $tag \
+                                                     --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+                                                     || exit 1
+    EOH
+    not_if { ::File.exist?("#{node[:cyclecloud][:home]}/config/autoscale.json") }
+end
+
+# No nodes should exist the first time we start, but after that will because fixed=true on the nodes
+bash 'Create cyclecloud.conf' do
+  code <<-EOH
+    # upgrade the old slurm.conf
+    #{autoscale_dir}/cyclecloud_slurm.sh upgrade_conf || exit 1
+    
+    num_starts=$(jetpack config cyclecloud.cluster.start_count)
+    if [ "$num_starts" == "1" ]; then
+      policy=Error
+      #{autoscale_dir}/cyclecloud_slurm.sh remove_nodes || exit 1;
+    else
+      policy=AllowExisting
+    fi
+    
+    #{autoscale_dir}/cyclecloud_slurm.sh create_nodes --policy $policy || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh slurm_conf > /sched/cyclecloud.conf || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh gres_conf > /sched/gres.conf || exit 1;
+    #{autoscale_dir}/cyclecloud_slurm.sh topology > /sched/topology.conf || exit 1;
+    touch /etc/slurm.installed
+    EOH
+  not_if { ::File.exist?('/etc/slurm.installed') }
+end
+
+
 include_recipe 'slurm::accounting'
 
 service 'slurmctld' do
@@ -333,6 +356,15 @@ end
 defer_block "Defer starting munge until end of converge" do
   service 'munge' do
     action [:enable, :restart]
+  end
+end
+
+defer_block "Check slurmctld health" do
+  bash 'scontrol ping' do
+    code <<-EOH
+    result=$(scontrol ping)
+    echo $result | grep UP || (printf "$result"; exit 200)
+    EOH
   end
 end
 

@@ -95,7 +95,10 @@ def fetch_partitions(cluster_wrapper, subprocess_module):
                              nodearray_name, unescaped_nodename_prefix, nodename_prefix)
         
         if is_autoscale is None:
-            logging.warning("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
+            log_func = logging.warning
+            if nodearray_name in ["login", "scheduler-ha"]:
+                log_func = logging.debug
+            log_func("Nodearray %s does not define slurm.autoscale, skipping.", nodearray_name)
             continue
         
         if is_autoscale is False:
@@ -440,7 +443,7 @@ def terminate_nodes(node_list):
     return _terminate_nodes(node_list, _get_cluster_wrapper())
 
 
-def _resume(config, node_list, cluster_wrapper, subprocess_module):
+def _resume(config, node_list, cluster_wrapper, subprocess_module, keep_alive=False):
     # Optionally block on termination for up to attempts * delay.
     # For example, set block_for_termination_attempts=360
     # and block_for_termination_delay=5 for a full 1800s delay before failing.
@@ -478,6 +481,9 @@ def _resume(config, node_list, cluster_wrapper, subprocess_module):
     if len(start_response.nodes) != len(node_list):
         missing_nodes = set(node_list) - set(start_response.nodes)
         logging.error("Could only resume %s/%s nodes. The folllowing are unknown: %s" % ",".join(missing_nodes))
+
+    if keep_alive:
+        _keep_alive(subprocess_module, node_list)
 
     _wait_for_resume(cluster_wrapper, start_response.operation_id, node_list, subprocess_module)
 
@@ -608,10 +614,10 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
     logging.info("OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting", operation_id, nodes_str)
 
         
-def resume(config, node_list):
+def resume(config, node_list, keep_alive=False):
     cluster_wrapper = _get_cluster_wrapper()
     subprocess_module = _subprocess_module()
-    return _resume(config, node_list, cluster_wrapper, subprocess_module)
+    return _resume(config, node_list, cluster_wrapper, subprocess_module, keep_alive=keep_alive)
 
 
 class ExistingNodePolicy:
@@ -964,7 +970,7 @@ def reconfigure():
     rescale(config_only=True)
     
     
-def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None, config_only=False):
+def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf_dir="/etc/slurm", sched_dir="/sched", cluster_wrapper=None, config_only=False, node_list=None):
     slurm_conf = os.path.join(sched_dir, "slurm.conf")
     
     subprocess_module = subprocess_module or _subprocess_module()
@@ -1154,6 +1160,166 @@ def _drain(node_list, subprocess_module):
         previous_drained_nodes = current_drained_nodes
 
 
+def apply_changes(nodearrays):
+    """
+    prevents user from removing nodes and scaling until all nodes are fully terminated.
+    """
+    cluster_wrapper = _get_cluster_wrapper()
+    subprocess_module = _subprocess_module()
+    
+    # get the list of nodes, filtered by nodearray and slurm.autoscale=true
+    _, cluster_node_list = _retry_rest(cluster_wrapper.get_nodes)
+    partitions = fetch_partitions(cluster_wrapper, subprocess_module)
+    filtered_nodes, _ = _filter_by_nodearrays(cluster_node_list.nodes, partitions, nodearrays)
+
+    # this will raise an exception if there are any existing nodes.
+    _check_apply_changes(filtered_nodes)
+
+    remove_node_list = [n.get("Name") for n in filtered_nodes]    
+    remove_nodes(remove_node_list)
+    
+    # fetch the partitions again (after removing the nodes) and filter by
+    # nodearrays and slurm.autoscale=true
+    updated_partitions = fetch_partitions(cluster_wrapper, subprocess_module)
+    _, filtered_partitions = _filter_by_nodearrays([], updated_partitions, nodearrays)
+    _create_nodes(filtered_partitions, None, cluster_wrapper, subprocess_module, existing_policy=ExistingNodePolicy.Error, dry_run=False)
+    
+    # now run scale, config_only so that no nodes are created or removed
+    rescale(config_only=True)
+
+    if nodearrays:
+        logging.info(f"Changes applied to {','.join(nodearrays)}")
+    else:
+        logging.info(f"Changes applied to all nodearrays.")
+
+
+def _filter_by_nodearrays(nodes, partitions, nodearrays):
+    autoscale_nodes = [x for x in nodes if x.get("Configuration", {}).get("slurm", {}).get("autoscale", False)]
+    del nodes
+    if not nodearrays:
+        return autoscale_nodes, partitions
+    filtered_nodes = [x for x in autoscale_nodes if x.get("Template") in nodearrays]
+    filtered_partitions = {}
+    for pname, partition in partitions.items():
+        if partition.nodearray in nodearrays:
+            filtered_partitions[pname] = partition
+    return filtered_nodes, filtered_partitions
+
+
+def _check_apply_changes(cc_nodes):
+    autoscale_nodes = [x for x in cc_nodes if x.get("Configuration", {}).get("slurm", {}).get("autoscale", False)]
+    still_alive = []
+
+    for node in autoscale_nodes:
+       
+        status = (node.get("Status") or "").lower()
+        if status not in ["terminated", "off", ""]:
+            still_alive.append(node)
+    
+    if still_alive:
+        node_names = ",".join(sorted([x.get("Name") or "" for x in still_alive]))
+        raise CyclecloudSlurmError(f"Error: The following nodes must be fully terminated before applying changes - {node_names}")            
+
+
+def get_accounting_info(node_name: str) -> None:
+    cluster_wrapper = _get_cluster_wrapper()
+    subprocess_module = _subprocess_module()
+    _, status_response = _retry_rest(lambda: cluster_wrapper.get_cluster_status(nodes=True))
+    region_by_template = {}
+    spot_by_template = {}
+    vm_by_template_vm_size = {}
+    for nodearray in status_response.nodearrays:
+        region_by_template[nodearray.name] = nodearray.nodearray["Region"]
+        spot_by_template[nodearray.name] = nodearray.nodearray.get("Interruptible", False)
+    
+        for bucket in nodearray.buckets:
+            key = (nodearray.name, bucket.definition.machine_type)
+            vm_by_template_vm_size[key] = bucket.virtual_machine
+
+    toks = _check_output(subprocess_module, ["scontrol", "show", "node", node_name]).split()
+    cpus = -1
+    for tok in toks:
+        tok = tok.lower()
+        if tok.startswith("cputot"):
+            cpus = int(tok.split("=")[1])
+
+    records = []
+    for node in status_response.nodes:
+        if node.get("Name") == node_name:
+            template = node["Template"]
+            region = region_by_template[template]
+            spot = spot_by_template[template]
+            vm_size = node["MachineType"]
+            key = (template, vm_size)
+            vm = vm_by_template_vm_size[key]
+            
+            records.append({
+                "name": node['Name'],
+                "location": region,
+                "vm_size": vm_size,
+                "spot": spot,
+                "nodearray": node["Template"],
+                "cpus": cpus,
+                "pcpu_count": vm.pcpu_count,
+                "vcpu_count": vm.vcpu_count,
+                "gpu_count": vm.gpu_count,
+                "memgb": vm.memory,
+            })
+    json.dump(records, sys.stdout, indent=2)
+
+
+def keep_alive(node_list, remove=False, set_nodes=False):
+    smod = _subprocess_module()
+    _keep_alive(smod, node_list, remove, set_nodes)
+
+def _keep_alive(subprocess_module, node_list, remove=False, set_nodes=False):
+    if remove and set_nodes:
+        raise CyclecloudSlurmError("Please define only --set or --remove, not both.")
+
+    lines = _check_output(subprocess_module, ["scontrol", "show", "config"]).splitlines()
+    filtered = [
+        line for line in lines if line.lower().startswith("suspendexcnodes")
+    ]
+    current_susp_nodes = []
+    if filtered:
+        current_susp_nodes_expr = filtered[0].split("=")[-1].strip()
+        if current_susp_nodes_expr != "(null)":
+            current_susp_nodes = _from_hostlist(subprocess_module, current_susp_nodes_expr)
+
+    if set_nodes:
+        hostnames = list(set(node_list))
+    elif remove:
+        hostnames = list(set(current_susp_nodes) - set(node_list))
+    else:
+        hostnames = current_susp_nodes + node_list
+
+    all_susp_hostnames = (
+        _check_output(
+            subprocess_module,
+            [
+                "scontrol",
+                "show",
+                "hostnames",
+                ",".join(hostnames),
+            ]
+        )
+        .strip()
+        .split()
+    )
+    all_susp_hostnames = sorted(
+        list(set(all_susp_hostnames)), key=_get_sort_key_func(False)
+    )
+    all_susp_hostlist = _check_output(
+        subprocess_module,
+        ["scontrol", "show", "hostlist", ",".join(all_susp_hostnames)]
+    ).strip()
+
+    with open("/sched/keep_alive.conf.tmp", "w") as fw:
+        fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
+    shutil.move("/sched/keep_alive.conf.tmp", "/sched/keep_alive.conf")
+    _check_output(subprocess_module, ["scontrol", "reconfig"])
+
+
 def _init_logging(logfile):
     import logging.handlers
     
@@ -1262,17 +1428,25 @@ def _subprocess_module():
     return SubprocessModuleWithChaosMode()
 
 
-def initialize_config(path, cluster_name, username, password, url, force=False):
+def initialize_config(path, cluster_name, username, password, url, acct_sub, acct_tag_name, acct_tag_val, force=False):
     if os.path.exists(path) and not force:
         raise CyclecloudSlurmError("{} already exists. To force reinitialization, please pass in --force".format(path))
     
     with open(path + ".tmp", "w") as fw:
-        json.dump({
+        config = {
             "cluster_name": cluster_name,
             "username": username,
             "password": password,
             "url": url.rstrip("/")
-        }, fw, indent=2)
+        }
+        if acct_sub and acct_tag_name and acct_tag_val:
+            config["accounting"] = {
+                "subscription_id": acct_sub,
+                "tag_name": acct_tag_name,
+                "tag_val": acct_tag_val
+            }
+
+        json.dump(config, fw, indent=2)
     shutil.move(path + ".tmp", path)
     logging.info("Initialized config ({})".format(path))
 
@@ -1318,12 +1492,18 @@ def main(argv=None):
 
     drain_parser = add_parser("drain", drain)
     drain_parser.add_argument("--node-list", type=hostlist, required=True)
-    
+
+    keep_parser = add_parser("keep_alive", keep_alive)
+    keep_parser.add_argument("--node-list", type=hostlist, required=True)
+    keep_parser.add_argument("--remove", action="store_true", default=False)
+    keep_parser.add_argument("--set-nodes", action="store_true", default=False)
+
     terminate_parser = add_parser("terminate_nodes", terminate_nodes)
     terminate_parser.add_argument("--node-list", type=hostlist, required=True)
     
     resume_parser = add_parser("resume", resume)
     resume_parser.add_argument("--node-list", type=hostlist, required=True)
+    resume_parser.add_argument("--keep-alive", action="store_true", default=False)
     
     add_parser("upgrade_conf", upgrade_conf)
     
@@ -1336,6 +1516,8 @@ def main(argv=None):
     sync_nodes_parser = add_parser("sync_nodes", sync_nodes)
     
     add_parser("scale", rescale)
+    apply_changes_parser = add_parser("apply_changes", apply_changes)
+    apply_changes_parser.add_argument("--nodearrays", type=hostlist)
     add_parser("reconfigure", reconfigure)
     
     add_parser("nodeaddrs", nodeaddrs)
@@ -1350,12 +1532,18 @@ def main(argv=None):
     nodeinfo_parser.add_argument("-a","--all", dest="show_all", action='store_true', required=False)
     nodeinfo_parser.add_argument("-N", dest="list_nodes", action='store_true', required=False)
 
+    acct_parser = add_parser("get_accounting_info", get_accounting_info)
+    acct_parser.add_argument("--node-name", type=str, required=True)
+
     init_parser = add_parser("initialize", initialize_config)
     init_parser.add_argument("--cluster-name", required=True)
     init_parser.add_argument("--username", required=True)
     init_parser.add_argument("--password", required=True)
     init_parser.add_argument("--url", required=True)
     init_parser.add_argument("--force", action="store_true", default=False, required=False)
+    init_parser.add_argument("--accounting-tag-name", dest="acct_tag_name")
+    init_parser.add_argument("--accounting-tag-value", dest="acct_tag_val")
+    init_parser.add_argument("--accounting-subscription-id", dest="acct_sub")
     
     args = parser.parse_args(argv)
     if hasattr(args, "logfile"):
@@ -1380,7 +1568,15 @@ def main(argv=None):
         
         args.func(**kwargs)
     else:
-        initialize_config(args.config, args.cluster_name, args.username, args.password, args.url, args.force)
+        initialize_config(path=args.config,
+                          cluster_name=args.cluster_name,
+                          username=args.username,
+                          password=args.password,
+                          url=args.url,
+                          acct_sub=args.acct_sub,
+                          acct_tag_name=args.acct_tag_name,
+                          acct_tag_val=args.acct_tag_val,
+                          force=args.force)
 
 
 def _check_output(subprocess_module, *args, **kwargs):

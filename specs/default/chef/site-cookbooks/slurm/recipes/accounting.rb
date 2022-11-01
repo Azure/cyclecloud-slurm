@@ -5,6 +5,10 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 slurmver = node[:slurm][:version]
+slurmsemver = node[:slurm][:version].split('-')[0]
+slurmsemver_major = slurmsemver.split('.')[0]
+slurmsemver_minor = slurmsemver.split('.')[1]
+
 slurmarch = node[:slurm][:arch]
 slurmuser = node[:slurm][:user][:name]
 clustername = node[:cyclecloud][:cluster][:name]
@@ -62,11 +66,12 @@ when 'centos', 'rhel', 'redhat'
     end
 
 when 'suse'
-    packages = ['mariadb', 'slurm-slurmdbd']
+
+    packages = ['mariadb', "slurm_#{slurmsemver_major}_#{slurmsemver_minor}-slurmdbd"]
 
     package packages do
         action :install
-      end
+    end
 end
 
 # start mariadb
@@ -86,7 +91,7 @@ case myplatformfamily
 when 'suse'
     bash 'create slurmdbd user/database for mariadb' do
         code <<-EOH
-             mariadb -u root -e"#{createdbcommand} #{createusercommand} #{grantcommand}"
+             mysql -u root -e"#{createdbcommand} #{createusercommand} #{grantcommand}"
              EOH
     end
 end
