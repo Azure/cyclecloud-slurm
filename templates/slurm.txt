@@ -117,6 +117,7 @@ Autoscale = $Autoscale
         fs_type = xfs
 
         [[[configuration cyclecloud.exports.builtinsched]]]
+	disabled = ${NFSSchedDisable}
         export_path = /sched
         options = no_root_squash
         samba.enabled = false
