@@ -35,6 +35,7 @@ file '/sched/cyclecloud.conf' do
   group 'slurm'
   mode 0644
   content "# this file is managed by cyclecloud-slurm"
+  action :create_if_missing
 end
 
 file '/sched/keep_alive.conf' do
@@ -42,6 +43,7 @@ file '/sched/keep_alive.conf' do
   group 'slurm'
   mode 0644
   content "# this file is managed by cyclecloud-slurm"
+  action :create_if_missing
 end
 
 
@@ -108,14 +110,12 @@ if myplatform == 'suse'
 end
 
 if myplatform == 'debian'
-  package 'Install liblua5.1' do
-    package_name 'liblua5.1'
-  end
-
-  link '/usr/lib64/slurm/liblua-5.1.so' do
-    to '/usr/lib/x86_64-linux-gnu/liblua5.1.so'
-    owner "#{slurmuser}"
-    group "#{slurmuser}"
+  bash 'Install job_submit/cyclecloud' do
+    code <<-EOH
+      jetpack download --project slurm liblua5.1.so /usr/lib64/slurm/liblua-5.1.so || exit 1;
+      touch /etc/cyclecloud-lua.installed
+      EOH
+    not_if { ::File.exist?('/etc/cyclecloud-lua.installed') }
   end
 
 end
