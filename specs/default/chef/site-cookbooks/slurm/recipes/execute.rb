@@ -77,6 +77,13 @@ link '/etc/slurm/gres.conf' do
   only_if { ::File.exist?('/sched/gres.conf') }
 end
 
+link '/etc/slurm/keep_alive.conf' do
+  to '/sched/keep_alive.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+  only_if { ::File.exist?('/sched/keep_alive.conf') }
+end
+
 
 defer_block "Defer starting slurmd until end of converge" do
   slurmd_sysconfig="SLURMD_OPTIONS=-N #{nodename} -b"
