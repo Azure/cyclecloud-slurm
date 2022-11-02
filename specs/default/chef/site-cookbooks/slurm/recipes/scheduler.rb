@@ -110,14 +110,15 @@ if myplatform == 'suse'
 end
 
 if myplatform == 'debian'
-  bash 'Install job_submit/cyclecloud' do
+  bash 'Install missing libs' do
     code <<-EOH
-      jetpack download --project slurm liblua5.1.so /usr/lib64/slurm/liblua-5.1.so || exit 1;
-      touch /etc/cyclecloud-lua.installed
+      jetpack download --project slurm ubuntu18-libs.tgz #{node[:cyclecloud][:bootstrap]}/ || exit 1;
+      cd /usr/lib64/slurm || exit 1
+      tar xzf #{node[:cyclecloud][:bootstrap]}/ubuntu18-libs.tgz || exit 1
+      touch /etc/cyclecloud-lua.installed || exit 1
       EOH
     not_if { ::File.exist?('/etc/cyclecloud-lua.installed') }
   end
-
 end
 
 
