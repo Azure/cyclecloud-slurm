@@ -2,7 +2,8 @@ CgroupAutomount=no
 #CgroupMountpoint=/sys/fs/cgroup
 ConstrainCores=yes
 ConstrainRamSpace=yes
-ConstrainSwapSpace=yes
+# This setting can be problematic with GPU skus
+# ConstrainSwapSpace=yes
 <% if @slurmver < "22" %>
 TaskAffinity=no
 <% end %>
