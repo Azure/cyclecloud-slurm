@@ -34,7 +34,7 @@ ResumeProgram=/opt/azurehpc/slurm/resume_program.sh
 ResumeFailProgram=/opt/azurehpc/slurm/resume_fail_program.sh
 SuspendProgram=/opt/azurehpc/slurm/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
-# This as the partition definitions managed by azslurm generate_slurm_conf > /sched/azure.conf
+# This as the partition definitions managed by azslurm partitions > /sched/azure.conf
 Include azure.conf
 # If slurm.accounting.enabled=true this will setup slurmdbd
 # otherwise it will just define accounting_storage/none as the plugin

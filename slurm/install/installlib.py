@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import pwd
+import re
 import shutil
 import subprocess
 import tempfile
@@ -238,7 +239,7 @@ def create_service(
     working_dir: str = "",
     user: str = "root",
 ) -> None:
-    
+
     service_desc = f"""
 [Unit]
 Description={name}
@@ -347,3 +348,79 @@ def execute(
     if guard_file:
         with open(guard_file, "w") as fw:
             fw.write("")
+
+
+def _waagent_service_name(platform_family: str) -> str:
+    if platform_family in ["ubuntu", "debian"]:
+        waagent_service_name = "walinuxagent"
+    else:
+        waagent_service_name = "waagent"
+    return waagent_service_name
+
+
+def _ensure_monitoring(platform_family: str) -> None:
+    with open("/etc/waagent.conf") as fr:
+        lines = fr.readlines()
+
+    modified = False
+    for i in range(len(lines)):
+        line = lines[i].strip().lower()
+        if re.match("^provisioning.monitorhostname=n$", line):
+            lines[i] = "Provisioning.MonitorHostName=y\n"
+            modified = True
+
+    if modified:
+        with open("/etc/waagent.conf.tmp", "w") as fw:
+            for line in lines:
+                fw.write(line)
+        restart_service(_waagent_service_name(platform_family))
+
+
+def _wait_for_hostname(hostname: str) -> None:
+    attempts = 12
+    retry_delay = 10
+
+    for a in range(attempts):
+        nslookup_stdout = _unchecked_output(["nslookup", hostname])
+        if hostname in nslookup_stdout:
+            return
+        logging.info(f"{a}/{attempts} waiting for hostname to register in dns.")
+        time.sleep(retry_delay)
+    raise RuntimeError("Could not register hostname in DNS")
+
+
+def _unchecked_output(cmd: List[str]) -> str:
+    try:
+        return subprocess.check_output(cmd).decode()
+    except Exception as e:
+        logging.debug(f"attempt to run {' '.join(cmd)} failed: {e}")
+        return ""
+
+
+def set_hostname(
+    hostname: str, platform_family: str, monitor_hostname: bool = True
+) -> None:
+    if monitor_hostname:
+        _ensure_monitoring(platform_family)
+    pub_hostname_path = "/var/lib/waagent/published_hostname"
+
+    nslookup_stdout = _unchecked_output(["nslookup", hostname])
+    hostname_stdout = _unchecked_output(["hostname"])
+    pub_hostname_exists = os.path.exists(pub_hostname_path)
+    if (
+        hostname not in nslookup_stdout
+        and hostname not in hostname_stdout
+        and pub_hostname_exists
+    ):
+        os.remove(pub_hostname_path)
+        restart_service(_waagent_service_name(platform_family))
+
+    execute("set hostname", command=["hostnamectl", "set-hostname", hostname])
+    execute(
+        "update hostname via jetpack",
+        command=[
+            "/opt/cycle/jetpack/system/embedded/bin/python",
+            "-c",
+            "import jetpack.converge as jc; jc._send_installation_status('warning')",
+        ],
+    )

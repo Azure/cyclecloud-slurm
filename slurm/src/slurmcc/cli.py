@@ -53,7 +53,7 @@ def init_power_saving_log(function: Callable) -> Callable:
                     handler.setLevel(logging.INFO)
                     logging.info(f"initialized {function.__name__}.log")
         return function(*args, **kwargs)
-
+    wrapped.__doc__ = function.__doc__
     return wrapped
 
 
@@ -124,13 +124,16 @@ class SlurmCLI(CommonCLI):
             output_prefix = prefix
         return [output_prefix + x + "," for x in self.slurm_node_names]
 
-    def generate_slurm_conf_parser(self, parser: ArgumentParser) -> None:
+    def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
 
-    def generate_slurm_conf(self, config: Dict, allow_empty: bool = False) -> None:
+    def partitions(self, config: Dict, allow_empty: bool = False) -> None:
+        """
+        Generates partition configuration
+        """
         node_mgr = self._get_node_manager(config)
         partitions = partitionlib.fetch_partitions(node_mgr)  # type: ignore
-        _generate_slurm_conf(
+        _partitions(
             partitions,
             sys.stdout,
             allow_empty=allow_empty,
@@ -138,6 +141,9 @@ class SlurmCLI(CommonCLI):
         )
 
     def generate_topology(self, config: Dict) -> None:
+        """ 
+        Generates topology plugin configuration
+        """
         return _generate_topology(self._get_node_manager(config), sys.stdout)
 
     def resume_parser(self, parser: ArgumentParser) -> None:
@@ -149,6 +155,9 @@ class SlurmCLI(CommonCLI):
 
     @init_power_saving_log
     def resume(self, config: Dict, node_list: List[str], no_wait: bool = False) -> None:
+        """
+        Equivalent to ResumeProgram, starts and waits for a set of nodes.
+        """
         node_mgr = self._get_node_manager(config)
         partitions = partitionlib.fetch_partitions(node_mgr)
         return self._resume(config, node_mgr, node_list, partitions, no_wait)
@@ -205,6 +214,9 @@ class SlurmCLI(CommonCLI):
         ).completer = self._slurm_node_name_completer  # type: ignore
 
     def wait_for_resume(self, config: Dict, node_list: List[str]) -> None:
+        """
+        Wait for a set of nodes to converge.
+        """
         self._wait_for_resume(config, "noop", node_list)
 
     def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
@@ -219,52 +231,6 @@ class SlurmCLI(CommonCLI):
         result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
         logging.info(str(result))
 
-    @init_power_saving_log
-    def shutdown(self, config: Dict, node_list: List[str], drain_timeout: int = 300):
-        for node in node_list:
-            cmd = [
-                "scontrol",
-                "update",
-                "NodeName=%s" % node,
-                "State=Drain",
-                "Reason=cyclecloud: shutting down",
-            ]
-            logging.info("Running %s", " ".join(cmd))
-            _retry_subprocess(lambda: slutil.check_output(cmd))
-
-        def get_drained_nodes() -> List[str]:
-            args = ["sinfo", "-h", "-t", "DRAINED", "-O", "nodelist"]
-            return _retry_subprocess(lambda: slutil.check_output(args)).split()
-
-        start_time = time.time()
-
-        def is_timedout() -> bool:
-            if drain_timeout < 0:
-                return False
-            omega = start_time + drain_timeout
-            return time.time() > omega
-
-        expected = set(node_list)
-        while not is_timedout():
-            actual = set(get_drained_nodes())
-            still_draining = expected - actual
-            if not still_draining:
-                break
-            time.sleep(1)
-
-        for node in node_list:
-            cmd = [
-                "scontrol",
-                "update",
-                "NodeName=%s" % node,
-                "NodeAddr=%s" % node,
-                "NodeHostName=%s" % node,
-            ]
-            if not config.get("autoscale", True):
-                cmd += ["State=FUTURE"]
-            logging.info("Running %s", " ".join(cmd))
-            _retry_subprocess(lambda: slutil.check_output(cmd))
-
     def suspend_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
         parser.add_argument(
@@ -273,6 +239,9 @@ class SlurmCLI(CommonCLI):
 
     @init_power_saving_log
     def suspend(self, config: Dict, node_list: List[str]) -> None:
+        """
+        Equivalent to SuspendProgram, shutsdown nodes
+        """
         return self._shutdown(node_list, self._node_mgr(config))
 
     def resume_fail_parser(self, parser: ArgumentParser) -> None:
@@ -282,6 +251,9 @@ class SlurmCLI(CommonCLI):
     def resume_fail(
         self, config: Dict, node_list: List[str], drain_timeout: int = 300
     ) -> None:
+        """
+        Equivalent to SuspendFailProgram, shutsdown nodes
+        """
         node_mgr = self._node_mgr(config, self._driver(config))
         self._shutdown(node_list=node_list, node_mgr=node_mgr)
 
@@ -398,6 +370,10 @@ class SlurmCLI(CommonCLI):
     def keep_alive(
         self, config: Dict, node_list: List[str], remove: bool = False, set_nodes: bool = False
     ) -> None:
+        """
+        Add, remeove or set which nodes should be prevented from being shutdown. 
+
+        """
         if remove and set_nodes:
             raise CyclecloudSlurmError("Please define only --set or --remove, not both.")
 
@@ -611,7 +587,7 @@ class SlurmCLI(CommonCLI):
         )
 
 
-def _generate_slurm_conf(
+def _partitions(
     partitions: Dict[str, partitionlib.Partition],
     writer: TextIO,
     allow_empty: bool = False,
@@ -654,15 +630,6 @@ def _generate_slurm_conf(
             )
         )
 
-        # all_nodes = sorted(
-        #     slutil.from_hostlist(partition.node_list),  # type: ignore
-        #     key=slutil.get_sort_key_func(partition.is_hpc),
-        # )
-
-        # node_list = f"{partition.nodename_prefix}{partition.name}-[1-{max_count}]"
-        # node_list = slutil.to_hostlist(",".join((subset_of_nodes)))  # type: ignore
-        # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
-
         if partition.use_pcpu:
             cpus = partition.pcpu_count
             threads = max(1, partition.vcpu_count // partition.pcpu_count)
@@ -672,7 +639,7 @@ def _generate_slurm_conf(
         state = "CLOUD" if autoscale else "FUTURE"
         writer.write(
             "Nodename={} Feature=cloud STATE={} CPUs={} ThreadsPerCore={} RealMemory={}".format(
-                partition.node_list, state, cpus, threads, memory
+                node_list, state, cpus, threads, memory
             )
         )
 

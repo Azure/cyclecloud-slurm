@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 
 class InstallSettings:
-    def __init__(self, config: Dict) -> None:
+    def __init__(self, config: Dict, platform_family: str) -> None:
         if "slurm" not in config:
             config["slurm"] = {}
 
@@ -52,7 +52,14 @@ class InstallSettings:
             "https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem",
         )
 
-        self.use_nodename_as_hostname = config["slurm"].get("use_nodename_as_hostname", False)
+        self.use_nodename_as_hostname = config["slurm"].get(
+            "use_nodename_as_hostname", False
+        )
+        self.ensure_waagent_monitor_hostname = config["slurm"].get(
+            "ensure_waagent_monitor_hostname", True
+        )
+
+        self.platform_family = platform_family
 
 
 def setup_users(s: InstallSettings) -> None:
@@ -205,7 +212,7 @@ AccountingStorageHost="localhost"
         group=s.slurm_grp,
     )
 
-    ilib.enable_service("slurmdbd")  #, user=s.slurm_user, exec_start="/sbin/slurmdbd")
+    ilib.enable_service("slurmdbd")  # , user=s.slurm_user, exec_start="/sbin/slurmdbd")
     subprocess.check_call(["systemctl", "start", "slurmdbd"])
 
     max_attempts = 5
@@ -238,50 +245,6 @@ AccountingStorageHost="localhost"
 
     if last_exception:
         raise last_exception
-
-
-def _accounting_debian(s: InstallSettings) -> None:
-    slurmdbdpackage = f"slurm-slurmdbd_{s.slurmver}_amd64.deb"
-
-    #Install for compatibility on Ubuntu
-    package 'Install libmariadbclient-dev-compat' do
-        package_name 'libmariadbclient-dev-compat'
-    end
-
-    package 'Install libssl-dev' do
-        package_name 'libssl-dev'
-    end
-
-    link '/usr/lib/x86_64-linux-gnu/libssl.so.10' do 
-        to '/usr/lib/x86_64-linux-gnu/libssl.so'
-    end
-
-    link '/usr/lib/x86_64-linux-gnu/libcrypto.so.10' do 
-        to '/usr/lib/x86_64-linux-gnu/libcrypto.so'
-    end
-
-    if slurmver < "21" do
-        link '/usr/lib/x86_64-linux-gnu/libmysqlclient.so.18' do
-            to '/usr/lib/x86_64-linux-gnu/libmysqlclient.so'
-        end
-    else
-        link '/usr/lib/x86_64-linux-gnu/libmysqlclient.so.21' do
-            to '/usr/lib/x86_64-linux-gnu/libmysqlclient.so'
-        end
-    end
-
-    jetpack_download "#{slurmdbdpackage}" do
-        project "slurm"
-        not_if { ::File.exist?("#{node[:jetpack][:downloads]}/#{slurmdbdpackage}") }
-    end
-
-    execute "Install #{slurmdbdpackage}" do
-        command "apt install -y #{node[:jetpack][:downloads]}/#{slurmdbdpackage}"
-        action :run
-        not_if { ::File.exist?("/var/spool/slurmdbd") }
-        retries 3
-        retry_delay 30
-    end
 
 
 def complete_install(s: InstallSettings) -> None:
@@ -418,7 +381,7 @@ def setup_slurmd(s: InstallSettings) -> None:
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
-    ilib.set_hostname(s.node_name)
+    ilib.set_hostname(s.node_name, s.platform_family, s.ensure_waagent_monitor_hostname)
 
 
 def _load_config(bootstrap_config: str) -> Dict:
@@ -438,7 +401,9 @@ def _load_config(bootstrap_config: str) -> Dict:
 def main() -> None:
     # needed to set slurmctld only
     parser = argparse.ArgumentParser()
-    parser.add_argument("--platform", default="rhel", choices=["rhel", "ubuntu"])
+    parser.add_argument(
+        "--platform", default="rhel", choices=["rhel", "ubuntu", "suse"]
+    )
     parser.add_argument(
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
     )
@@ -447,7 +412,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = _load_config(args.bootstrap_config)
-    settings = InstallSettings(config)
+    settings = InstallSettings(config, args.platform)
 
     # create the users
     setup_users(settings)
@@ -475,6 +440,7 @@ def main() -> None:
 
     if args.mode == "execute":
         setup_slurmd(settings)
+        set_hostname(settings)
 
 
 if __name__ == "__main__":
