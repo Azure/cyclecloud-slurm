@@ -16,8 +16,8 @@ The Slurm cluster deployed in CycleCloud contains a script that facilitates this
       # azslurm scale
 ```
 
-### Removing all execute nodes
-As all the Slurm compute nodes have to be pre-created, it's required that all nodes in a cluster be completely removed when making big changes (such as VM type or Image). It is possible to remove all nodes via the UI, but the `azslurm` script has a `remove_nodes` option that will remove any nodes that aren't currently running jobs.
+### Precreating execute nodes
+As of 3.0.0, we are no longer pre-creating the nodes in CycleCloud.
 
 ### Creating additional partitions
 The default template that ships with Azure CycleCloud has two partitions (`hpc` and `htc`), and you can define custom nodearrays that map directly to Slurm partitions. For example, to create a GPU partition, add the following section to your cluster template:
@@ -35,7 +35,7 @@ The default template that ships with Azure CycleCloud has two partitions (`hpc` 
       # Set to true if nodes are used for tightly-coupled multi-node jobs
       slurm.hpc = false
 
-      [[[cluster-init cyclecloud/slurm:execute:2.0.1]]]
+      [[[cluster-init cyclecloud/slurm:execute:3.0.0]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
@@ -69,6 +69,42 @@ And for each nodearray, for example the `htc` array:
 
 ![Alt](/images/nodearrayedit.png "Edit configuration")
 
+
+### Transitioning from 2.7 to 3.0
+
+First, the installation folder changed
+`/opt/cycle/slurm`
+->
+`/opt/azurehpc/slurm`
+
+Second, logs are now in `/opt/azurehpc/slurm/logs` instead of `/var/log/slurmctld`. Note, `slurmctld.log` will still be in this folder.
+
+Third, `cyclecloud_slurm.sh` no longer exists. Instead there is the azslurm cli, which can be run as root. azslurm uses autocomplete.
+```
+[root@scheduler ~]# azslurm
+usage: 
+    buckets              - Prints out autoscale bucket information, like limits etc
+    config               - Writes the effective autoscale config, after any preprocessing, to stdout
+    connect              - Tests connection to CycleCloud
+    create_nodes         - Create a set of nodes given various constraints. A CLI version of the nodemanager interface.
+    default_output_columns - Output what are the default output columns for an optional command.
+    delete_nodes         - 
+    generate_topology    - Generates topology plugin configuration
+    initconfig           - Creates an initial autoscale config. Writes to stdout
+    keep_alive           - Add, remeove or set which nodes should be prevented from being shutdown.
+    limits               - Writes a detailed set of limits for each bucket. Defaults to json due to number of fields.
+    nodes                - Query nodes
+    partitions           - Generates partition configuration
+    refresh_autocomplete - Refreshes local autocomplete information for cluster specific resources and nodes.
+    remove_nodes         - Removes the node from the scheduler without terminating the actual instance.
+    resume               - Equivalent to ResumeProgram, starts and waits for a set of nodes.
+    resume_fail          - Equivalent to SuspendFailProgram, shutsdown nodes
+    retry_failed_nodes   - Retries all nodes in a failed state.
+    shell                - Interactive python shell with relevant objects in local scope. Use --script to run python scripts
+    suspend              - Equivalent to SuspendProgram, shutsdown nodes
+    wait_for_resume      - Wait for a set of nodes to converge.
+```
+Fourth, nodes are no longer pre-populated in CycleCloud. They are only created when needed.
 
 # Contributing
 
