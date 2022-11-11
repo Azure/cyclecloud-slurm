@@ -102,6 +102,6 @@ azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    > $INSTALL_DIR/autoscale.json
 
 
-azslurm generate_slurm_conf > /sched/azure.conf
+azslurm partitions > /sched/azure.conf
 
 chown slurm:slurm $VENV/../logs/*.log
