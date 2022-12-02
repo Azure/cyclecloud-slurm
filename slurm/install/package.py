@@ -145,34 +145,34 @@ def execute() -> None:
         _add(f"templates/{fil}", f"templates/{fil}")
 
     blobs = []
-    if args.platform == "ubuntu":
-        _add("ubuntu.sh", "ubuntu.sh", 600)
-        for slurmpkg in [
-            "slurm",
-            "slurm-devel",
-            "slurm-example-configs",
-            "slurm-slurmctld",
-            "slurm-slurmdbd",
-            "slurm-slurmd",
-        ]:
-            blobs.append(f"{slurmpkg}_{slurm_version}_amd64.deb")
-    else:
-        _add("rhel.sh", "rhel.sh", 600)
-        for slurmpkg in [
-            "slurm",
-            "slurm-devel",
-            "slurm-example-configs",
-            "slurm-slurmctld",
-            "slurm-slurmd",
-            "slurm-slurmdbd",
-            "slurm-libpmi",
-            "slurm-perlapi",
-            "slurm-torque",
-            "slurm-openlava",
-        ]:
-            blobs.append(
-                f"{slurmpkg}-{slurm_version}.{args.platform_version}.{args.arch}.rpm"
-            )
+    # if args.platform == "ubuntu":
+    _add("ubuntu.sh", "ubuntu.sh", 600)
+    for slurmpkg in [
+        "slurm",
+        "slurm-devel",
+        "slurm-example-configs",
+        "slurm-slurmctld",
+        "slurm-slurmdbd",
+        "slurm-slurmd",
+    ]:
+        blobs.append(f"{slurmpkg}_{slurm_version}_amd64.deb")
+    # else:
+    _add("rhel.sh", "rhel.sh", 600)
+    for slurmpkg in [
+        "slurm",
+        "slurm-devel",
+        "slurm-example-configs",
+        "slurm-slurmctld",
+        "slurm-slurmd",
+        "slurm-slurmdbd",
+        "slurm-libpmi",
+        "slurm-perlapi",
+        "slurm-torque",
+        "slurm-openlava",
+    ]:
+        blobs.append(
+            f"{slurmpkg}-{slurm_version}.{args.platform_version}.{args.arch}.rpm"
+        )
     for blob in blobs:
         _add(f"blobs/{blob}", os.path.abspath(f"../../blobs/{blob}"))
 

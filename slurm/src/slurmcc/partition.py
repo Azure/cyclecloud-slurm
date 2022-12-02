@@ -118,7 +118,7 @@ def fetch_partitions(node_mgr: NodeManager) -> Dict[str, Partition]:
     for buckets in split_buckets.values():
         nodearray_name = buckets[0].nodearray
         slurm_config = buckets[0].software_configuration.get("slurm", {})
-        is_hpc = False #str(slurm_config.get("hpc", True)).lower() == "true"
+        is_hpc = str(slurm_config.get("hpc", True)).lower() == "true"
         is_autoscale = slurm_config.get("autoscale", True)  # TODO
         if is_autoscale is None:
             logging.warning(
@@ -134,11 +134,7 @@ def fetch_partitions(node_mgr: NodeManager) -> Dict[str, Partition]:
             )
             continue
 
-        if is_hpc:
-            buckets = [b for b in buckets if b.placement_group]
-        else:
-            buckets = [b for b in buckets if not b.placement_group]
-            assert len(buckets) == 1
+        buckets = [b for b in buckets if not b.placement_group]
         
         if not buckets:
             continue
