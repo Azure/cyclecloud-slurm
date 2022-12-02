@@ -367,13 +367,13 @@ def complete_install(s: InstallSettings) -> None:
 
 
 def setup_slurmd(s: InstallSettings) -> None:
-    ilib.file(
-        "/etc/sysconfig/slurmd",
-        content=f"SLURMD_OPTIONS=-b -N {s.node_name}",
-        owner="root",
-        group="root",
-        mode="0600",
-    )
+    # ilib.file(
+    #     "/etc/sysconfig/slurmd",
+    #     content=f"SLURMD_OPTIONS=-b -N {s.node_name}",
+    #     owner="root",
+    #     group="root",
+    #     mode="0600",
+    # )
     ilib.enable_service("slurmd")
     subprocess.check_call(["systemctl", "start", "slurmd"])
 

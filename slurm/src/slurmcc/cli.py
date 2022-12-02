@@ -3,7 +3,9 @@
 #
 import argparse
 import logging
+import os
 import shutil
+from subprocess import SubprocessError, check_output
 import sys
 import traceback
 import time
@@ -18,21 +20,22 @@ from hpc.autoscale.clilib import (
     disablecommand,
     main as clilibmain,
 )
+from hpc.autoscale import hpctypes as ht
 from hpc.autoscale.hpctypes import Memory
 from hpc.autoscale import util as hpcutil
 from hpc.autoscale.job.demandprinter import OutputFormat
 from hpc.autoscale.job.driver import SchedulerDriver
 from hpc.autoscale.node.bucket import NodeBucket
+from hpc.autoscale.node.delayednodeid import DelayedNodeId
 
 from hpc.autoscale.node.nodemanager import NodeManager
 from hpc.autoscale.node.node import Node
+from hpc.autoscale.job.schedulernode import SchedulerNode
 
 from . import partition as partitionlib
 from . import util as slutil
 from . import CyclecloudSlurmError
 from hpc.autoscale.results import AllocationResult
-
-from hpc.autoscale.ccbindings import cluster_service_client as csc
 
 
 VERSION = "3.0.0"
@@ -53,8 +56,65 @@ def init_power_saving_log(function: Callable) -> Callable:
                     handler.setLevel(logging.INFO)
                     logging.info(f"initialized {function.__name__}.log")
         return function(*args, **kwargs)
+
     wrapped.__doc__ = function.__doc__
     return wrapped
+
+
+class EasyNode(Node):
+    def __init__(
+        self,
+        name: ht.NodeName,
+        node_id: Optional[DelayedNodeId] = None,
+        nodearray: ht.NodeArrayName = ht.NodeArrayName("execute"),
+        bucket_id: Optional[ht.BucketId] = None,
+        hostname: Optional[ht.Hostname] = None,
+        private_ip: Optional[ht.IpAddress] = None,
+        instance_id: Optional[ht.InstanceId] = None,
+        vm_size: ht.VMSize = ht.VMSize("Standard_F4"),
+        location: ht.Location = ht.Location("westus"),
+        spot: bool = False,
+        vcpu_count: int = 4,
+        memory: ht.Memory = ht.Memory.value_of("8g"),
+        infiniband: bool = False,
+        state: ht.NodeStatus = ht.NodeStatus("Off"),
+        target_state: ht.NodeStatus = ht.NodeStatus("Off"),
+        power_state: ht.NodeStatus = ht.NodeStatus("off"),
+        exists: bool = False,
+        placement_group: Optional[ht.PlacementGroup] = None,
+        managed: bool = True,
+        resources: ht.ResourceDict = ht.ResourceDict({}),
+        software_configuration: dict = {},
+        keep_alive: bool = False,
+        gpu_count: Optional[int] = None,
+    ) -> None:
+
+        Node.__init__(
+            self,
+            name=name,
+            nodearray=nodearray,
+            hostname=hostname,
+            node_id=node_id or DelayedNodeId(name),
+            bucket_id=bucket_id or "b1",
+            private_ip=private_ip,
+            instance_id=instance_id,
+            vm_size=vm_size,
+            location=location,
+            spot=spot,
+            vcpu_count=vcpu_count,
+            memory=memory,
+            infiniband=infiniband,
+            state=state,
+            target_state=target_state,
+            power_state=power_state,
+            exists=exists,
+            placement_group=placement_group,
+            managed=managed,
+            resources=resources,
+            software_configuration=software_configuration,
+            keep_alive=keep_alive,
+            gpu_count=gpu_count,
+        )
 
 
 class SlurmDriver(GenericDriver):
@@ -77,7 +137,7 @@ class SlurmDriver(GenericDriver):
             if b.nodearray not in config["nodearrays"]:
                 config["nodearrays"][b.nodearray] = {}
             # TODO remove
-            config["nodearrays"][b.nodearray]["generated_placement_group_buffer"] = 1
+            config["nodearrays"][b.nodearray]["generated_placement_group_buffer"] = 0
             if "generated_placement_group_buffer" in config["nodearrays"][b.nodearray]:
                 continue
             is_hpc = (
@@ -93,7 +153,7 @@ class SlurmDriver(GenericDriver):
             config["nodearrays"][b.nodearray][
                 "generated_placement_group_buffer"
             ] = buffer
-        super().preprocess_node_mgr(config, node_mgr)
+        # super().preprocess_node_mgr(config, node_mgr)
 
 
 class SlurmCLI(CommonCLI):
@@ -141,7 +201,7 @@ class SlurmCLI(CommonCLI):
         )
 
     def generate_topology(self, config: Dict) -> None:
-        """ 
+        """
         Generates topology plugin configuration
         """
         return _generate_topology(self._get_node_manager(config), sys.stdout)
@@ -174,7 +234,9 @@ class SlurmCLI(CommonCLI):
         for partition in partitions.values():
             for name in partition.all_nodes():
                 name_to_partition[name] = partition
-        existing_nodes_by_name = hpcutil.partition(node_mgr.get_nodes(), lambda n: n.name) 
+        existing_nodes_by_name = hpcutil.partition(
+            node_mgr.get_nodes(), lambda n: n.name
+        )
 
         nodes = []
         for name in node_list:
@@ -220,15 +282,20 @@ class SlurmCLI(CommonCLI):
         self._wait_for_resume(config, "noop", node_list)
 
     def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
-        by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
-        node_list_filtered = []
-        for node_name in node_list:
-            if node_name in by_name:
-                node_list_filtered.append(node_name)
-            else:
-                logging.info(f"{node_name} does not exist. Skipping.")
-        nodes = _as_nodes(node_list_filtered, node_mgr)
-        result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
+        # by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
+        # node_list_filtered = []
+        # for node_name in node_list:
+        #     if node_name in by_name:
+        #         node_list_filtered.append(node_name)
+        #     else:
+        #         logging.info(f"{node_name} does not exist. Skipping.")
+        #         node_list_filtered.append(node_name)
+        # nodes = _as_nodes(node_list_filtered, node_mgr)
+
+        nodes = []
+        for n in node_list:
+            nodes.append(EasyNode(n))
+        result = node_mgr.shutdown_nodes(nodes)
         logging.info(str(result))
 
     def suspend_parser(self, parser: ArgumentParser) -> None:
@@ -303,11 +370,15 @@ class SlurmCLI(CommonCLI):
         # TODO
         parser.add_argument("--accounting-tag-name", dest="accounting__tag_name")
         parser.add_argument("--accounting-tag-value", dest="accounting__tag_value")
-        parser.add_argument("--accounting-subscription-id", dest="accounting__subscription_id")
+        parser.add_argument(
+            "--accounting-subscription-id", dest="accounting__subscription_id"
+        )
 
     def _initconfig(self, config: Dict) -> None:
-        # TODO
-        ...
+        import json
+        with open("/sched/demo.json") as fr:
+            config.update(json.load(fr))
+        
 
     @disablecommand
     def analyze(self, config: Dict, job_id: str, long: bool = False) -> None:
@@ -358,6 +429,62 @@ class SlurmCLI(CommonCLI):
             config, output_columns, output_format, dry_run=dry_run, long=long
         )
 
+    def scale_parser(self, parser: ArgumentParser) -> None:
+        return
+
+    def scale(
+        self,
+        config: Dict,
+        backup_dir="/etc/slurm/.backups",
+        slurm_conf_dir="/etc/slurm",
+        sched_dir="/sched",
+        config_only=False,
+    ):
+        node_mgr = self._get_node_manager(config)
+        # make sure .backups exists
+        now = time.time()
+        backup_dir = os.path.join(backup_dir, str(now))
+
+        logging.debug(
+            "Using backup directory %s for azure.conf and gres.conf", backup_dir
+        )
+        os.makedirs(backup_dir)
+
+        azure_conf = os.path.join(sched_dir, "azure.conf")
+        gres_conf = os.path.join(slurm_conf_dir, "gres.conf")
+
+        if os.path.exists(azure_conf):
+            shutil.copyfile(azure_conf, os.path.join(backup_dir, "azure.conf"))
+        
+        if os.path.exists(gres_conf):
+            shutil.copyfile(gres_conf, os.path.join(backup_dir, "gres.conf"))
+
+        partition_dict = partitionlib.fetch_partitions(node_mgr)
+        with open(azure_conf + ".tmp", "w") as fw:
+            _partitions(
+                partition_dict,
+                fw,
+                allow_empty=False,
+                autoscale=config.get("autoscale", True),
+            )
+
+        logging.debug(
+            "Moving %s to %s", azure_conf + ".tmp", azure_conf
+        )
+        shutil.move(azure_conf + ".tmp", azure_conf)
+
+        _update_future_states(node_mgr)
+
+        with open(gres_conf + ".tmp", "w") as fw:
+            _generate_gres_conf(partition_dict, fw)
+        shutil.move(gres_conf + ".tmp", gres_conf)
+
+        logging.info("Restarting slurmctld...")
+        check_output(["systemctl", "restart", "slurmctld"])
+
+        logging.info("")
+        logging.info("Re-scaling cluster complete.")
+
     def keep_alive_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
         parser.add_argument(
@@ -365,17 +492,25 @@ class SlurmCLI(CommonCLI):
         ).completer = self._slurm_node_name_completer  # type: ignore
 
         parser.add_argument("--remove", "-r", action="store_true", default=False)
-        parser.add_argument("--set", "-s", action="store_true", default=False, dest="set_nodes")
+        parser.add_argument(
+            "--set", "-s", action="store_true", default=False, dest="set_nodes"
+        )
 
     def keep_alive(
-        self, config: Dict, node_list: List[str], remove: bool = False, set_nodes: bool = False
+        self,
+        config: Dict,
+        node_list: List[str],
+        remove: bool = False,
+        set_nodes: bool = False,
     ) -> None:
         """
-        Add, remeove or set which nodes should be prevented from being shutdown. 
+        Add, remeove or set which nodes should be prevented from being shutdown.
 
         """
         if remove and set_nodes:
-            raise CyclecloudSlurmError("Please define only --set or --remove, not both.")
+            raise CyclecloudSlurmError(
+                "Please define only --set or --remove, not both."
+            )
 
         lines = slutil.check_output(["scontrol", "show", "config"]).splitlines()
         filtered = [
@@ -610,7 +745,7 @@ def _partitions(
             # cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
 
         writer.write(
-            "# TODO RDH Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
+            "# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
             % (
                 int(partition.memory * 1024),
                 -1,
@@ -673,6 +808,68 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
         writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
 
 
+def _generate_gres_conf(partitions: Dict[str, partitionlib.Partition], writer: TextIO):
+    for partition in partitions.values():
+        if partition.node_list is None:
+            raise RuntimeError(
+                "No nodes found for nodearray %s. Please run 'cyclecloud_slurm.sh create_nodes' first!"
+                % partition.nodearray
+            )
+
+        num_placement_groups = int(
+            ceil(float(partition.max_vm_count) / partition.max_scaleset_size)
+        )
+        all_nodes = sorted(
+            slutil.from_hostlist(partition.node_list),
+            key=slutil.get_sort_key_func(partition.is_hpc),
+        )
+
+        for pg_index in range(num_placement_groups):
+            start = pg_index * partition.max_scaleset_size
+            end = min(
+                partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size
+            )
+            subset_of_nodes = all_nodes[start:end]
+            node_list = slutil.to_hostlist(",".join((subset_of_nodes)))
+            # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
+
+            if partition.gpu_count:
+                if partition.gpu_count > 1:
+                    nvidia_devices = "/dev/nvidia[0-{}]".format(partition.gpu_count - 1)
+                else:
+                    nvidia_devices = "/dev/nvidia0"
+                writer.write(
+                    "Nodename={} Name=gpu Count={} File={}".format(
+                        node_list, partition.gpu_count, nvidia_devices
+                    )
+                )
+
+            writer.write("\n")
+
+
+def _update_future_states(node_mgr: NodeManager):
+    autoscale_enabled = is_autoscale_enabled()
+    if autoscale_enabled:
+        return
+    nodes = node_mgr.get_nodes()
+
+    for node in nodes:
+        if node.target_state != "Started":
+            name = node.name
+            try:
+                cmd = [
+                    "scontrol",
+                    "update",
+                    f"NodeName={name}",
+                    f"NodeAddr={name}",
+                    f"NodeHostName={name}",
+                    "state=FUTURE",
+                ]
+                check_output(cmd)
+            except SubprocessError:
+                logging.warning(f"Could not set {node.get('Name')} state=FUTURE")
+
+
 def _retry_rest(func: Callable, attempts: int = 5) -> Any:
     attempts = max(1, attempts)
     last_exception = None
@@ -728,6 +925,46 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
             raise CyclecloudSlurmError(f"Unknown node - {node_name}")
         nodes.append(by_name[node_name])
     return nodes
+
+
+_IS_AUTOSCALE_ENABLED = None
+
+
+def is_autoscale_enabled(subprocess_module=None):
+    global _IS_AUTOSCALE_ENABLED
+    if _IS_AUTOSCALE_ENABLED is not None:
+        return _IS_AUTOSCALE_ENABLED
+    if subprocess_module is None:
+        import subprocess as subprocess_module
+
+    try:
+        lines = (
+            subprocess_module.check_output(["scontrol", "show", "config"])
+            .decode()
+            .strip()
+            .splitlines()
+        )
+    except Exception:
+        try:
+            with open("/sched/slurm.conf") as fr:
+                lines = fr.readlines()
+        except Exception:
+            _IS_AUTOSCALE_ENABLED = True
+            return _IS_AUTOSCALE_ENABLED
+
+    for line in lines:
+        line = line.strip()
+        # this can be defined more than once
+        if line.startswith("SuspendTime ") or line.startswith("SuspendTime="):
+            suspend_time = line.split("=")[1].strip().split()[0]
+            try:
+                if suspend_time == "NONE" or int(suspend_time) < 0:
+                    _IS_AUTOSCALE_ENABLED = False
+                else:
+                    _IS_AUTOSCALE_ENABLED = True
+            except Exception:
+                pass
+    return _IS_AUTOSCALE_ENABLED
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:

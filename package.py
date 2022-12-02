@@ -35,6 +35,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
     cyclecloud_api_file = "cyclecloud_api-{}-py2.py3-none-any.whl".format(
         CYCLECLOUD_API_VERSION
     )
+    swagger_file = "swagger-client-1.0.0.tar.gz"
 
     scalelib_url = "https://github.com/Azure/cyclecloud-scalelib/archive/{}.tar.gz".format(
         SCALELIB_VERSION
@@ -44,6 +45,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
     to_download = {
         scalelib_file: (args.scalelib, scalelib_url),
         cyclecloud_api_file: (args.cyclecloud_api, cyclecloud_api_url),
+        swagger_file: (args.swagger, None)
     }
 
     for lib_file in to_download:
@@ -79,6 +81,7 @@ def execute() -> None:
         + "If you don't specify local copies of scalelib or cyclecloud-api they will be downloaded from github."
     )
     argument_parser.add_argument("--scalelib", default=None)
+    argument_parser.add_argument("--swagger", default=None)
     argument_parser.add_argument("--cyclecloud-api", default=None)
     args = argument_parser.parse_args()
 
