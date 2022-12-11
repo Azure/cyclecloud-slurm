@@ -21,7 +21,7 @@ end
 
 nodename = node[:cyclecloud][:node][:name]
 node_prefix = node[:slurm][:node_prefix]
-if node_prefix && !nodename.start_with?(node_prefix) then
+if node_prefix && !nodename.downcase.start_with?(node_prefix.downcase) then
   nodename = node_prefix + nodename
 end
 
@@ -33,20 +33,26 @@ end
 
 if node[:slurm][:use_nodename_as_hostname] then
 
-  execute 'remove published_hostname' do
-    command "rm -f /var/lib/waagent/published_hostname && systemctl restart #{waagent_service_name}"
-    only_if "nslookup #{node[:ipaddress]} | grep -v #{nodename}"
-    only_if "hostname | grep -qv #{nodename}"
-    only_if { ::File.exist?("/var/lib/waagent/published_hostname")}
+  # Change hostname and remove from /etc/hosts if present.
+  # This to ensure effective DNS registration check. 
+  bash 'Change hostname and remove from hosts' do
+    code <<-EOH
+      #!/bin/bash
+      oldHostname=$(hostname)
+      hostnamectl set-hostname #{nodename}#{dns_suffix}
+      sed -i '/#{node[:cyclecloud][:instance][:ipv4]}/d' /etc/hosts
+      EOH
   end
   
-  execute 'set hostname' do
-    command "hostnamectl set-hostname #{nodename}#{dns_suffix}"
-    action :run
+  # Remove published hostname file and remove waagent
+  execute 'remove published_hostname' do
+    command "rm -f /var/lib/waagent/published_hostname && systemctl restart #{waagent_service_name}"
+    only_if "nslookup #{node[:ipaddress]} | grep -iv #{nodename}"
+    only_if { ::File.exist?("/var/lib/waagent/published_hostname")}
   end
 
   execute 'wait for hostname detection' do
-    command "nslookup #{node[:ipaddress]} | grep #{nodename}"
+    command "nslookup #{node[:ipaddress]} | grep -i #{nodename}"
     only_if "hostname | grep -q #{nodename}"
     action :run
     retries 30
