@@ -1,0 +1,152 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string"
+        },
+        "networkInterfaceName1": {
+            "type": "string"
+        },
+        "enableAcceleratedNetworking": {
+            "type": "bool"
+        },
+        "subnetName": {
+            "type": "string"
+        },
+        "virtualNetworkId": {
+            "type": "string"
+        },
+        "virtualMachineName": {
+            "type": "string"
+        },
+        "virtualMachineComputerName1": {
+            "type": "string"
+        },
+        "virtualMachineRG": {
+            "type": "string"
+        },
+        "osDiskType": {
+            "type": "string"
+        },
+        "osDiskDeleteOption": {
+            "type": "string"
+        },
+        "virtualMachineSize": {
+            "type": "string"
+        },
+        "nicDeleteOption": {
+            "type": "string"
+        },
+        "adminUsername": {
+            "type": "string"
+        },
+        "adminPublicKey": {
+            "type": "secureString"
+        },
+        "zone": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "vnetId": "[parameters('virtualNetworkId')]",
+        "vnetName": "[last(split(variables('vnetId'), '/'))]",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]"
+    },
+    "resources": [
+        {
+            "name": "[parameters('networkInterfaceName1')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2021-08-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": "[parameters('enableAcceleratedNetworking')]"
+            }
+        },
+        {
+            "name": "[parameters('virtualMachineName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2022-03-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('networkInterfaceName1'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('virtualMachineSize')]"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('osDiskType')]"
+                        },
+                        "deleteOption": "[parameters('osDiskDeleteOption')]"
+                    },
+                    "imageReference": {
+                        "publisher": "almalinux",
+                        "offer": "almalinux-hpc",
+                        "sku": "8-hpc-gen1",
+                        "version": "latest"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaceName1'))]",
+                            "properties": {
+                                "deleteOption": "[parameters('nicDeleteOption')]"
+                            }
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachineComputerName1')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": true,
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
+                                    "keyData": "[parameters('adminPublicKey')]"
+                                }
+                            ]
+                        }
+                    }
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            },
+            "plan": {
+                "name": "8-hpc-gen1",
+                "publisher": "almalinux",
+                "product": "almalinux-hpc"
+            },
+            "zones": [
+                "1"
+            ]
+        }
+    ],
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('adminUsername')]"
+        }
+    }
+}

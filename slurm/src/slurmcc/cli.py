@@ -378,7 +378,12 @@ class SlurmCLI(CommonCLI):
         import json
         with open("/sched/demo.json") as fr:
             config.update(json.load(fr))
-        
+
+    def create_cluster_parser(self, parser: ArgumentParser) -> None:
+        ...
+
+    def create_cluster(self, config: Dict) -> None:
+        self._get_node_manager(config).cluster_bindings.create_cluster()
 
     @disablecommand
     def analyze(self, config: Dict, job_id: str, long: bool = False) -> None:
