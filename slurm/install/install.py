@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import logging.config
 import os
 import subprocess
 import time
@@ -400,6 +401,9 @@ def _load_config(bootstrap_config: str) -> Dict:
 
 def main() -> None:
     # needed to set slurmctld only
+    if os.path.exists("install_logging.conf"):
+        logging.config.fileConfig("install_logging.conf")
+    
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--platform", default="rhel", choices=["rhel", "ubuntu", "suse"]
@@ -420,6 +424,11 @@ def main() -> None:
     # create the munge key and/or copy it to /etc/munge/
     munge_key(settings)
 
+    if args.mode == "scheduler":
+        accounting(settings)
+    else:
+        logging.info(f"RDH not a scheduler - {args.mode}")
+
     # runs either rhel.sh or ubuntu.sh to install the packages
     run_installer(os.path.abspath(f"{args.platform}.sh"), args.mode)
 
@@ -430,7 +439,6 @@ def main() -> None:
 
     # scheduler specific - add return_to_idle script
     if args.mode == "scheduler":
-        accounting(settings)
         # TODO create a rotate log
         ilib.cron(
             "return_to_idle",

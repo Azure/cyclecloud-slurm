@@ -11,7 +11,7 @@ if [ $(whoami) != root ]; then
 fi
 
 if [ -e /etc/centos-release ]; then
-    python3 install.py --platform rhel $@ --mode execute
+    python3 install.py --platform rhel $@
 else
-    python3 install.py --platform ubuntu $@ --mode execute
+    python3 install.py --platform ubuntu $@
 fi
