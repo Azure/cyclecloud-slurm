@@ -538,15 +538,16 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 states["UNKNOWN"] = states.get("UNKNOWN", {})
                 states["UNKNOWN"][state] = states["UNKNOWN"].get(state, 0) + 1
                 continue
-            
-            private_ip = node.get("PrivateIp")
+
             use_nodename_as_hostname = node.get("Configuration", {}).get("slurm", {}).get("use_nodename_as_hostname", False)
             if not use_nodename_as_hostname:
-                if private_ip and private_ip not in ip_already_set:
+                ip_already_set_key = (name, private_ip)
+                if private_ip and ip_already_set_key not in ip_already_set:
                     cmd = ["scontrol", "update", "NodeName=%s" % name, "NodeAddr=%s" % private_ip, "NodeHostName=%s" % private_ip]
                     logging.info("Running %s", " ".join(cmd))
                     subprocess_module.check_call(cmd)
-                    ip_already_set.add(private_ip)
+                    ip_already_set.add(ip_already_set_key)
+
             if state == "Ready":
                 if not private_ip:
                     state = "WaitingOnIPAddress"
@@ -556,23 +557,25 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
             states[state] = states.get(state, 0) + 1
 
         if newly_failed_nodes:
+            failed_node_names_str = ",".join(failed_nodes)
             try:
-                failed_node_names_str = ",".join(failed_nodes)
                 logging.error("The following nodes failed to start: %s", failed_node_names_str)
-                cmd = ["scontrol", "update", "NodeName=%s" % name, "State=down", "Reason=cyclecloud_node_failure"]
+                cmd = ["scontrol", "update", "NodeName=%s" % failed_node_names_str, "State=down", "Reason=cyclecloud_node_failure"]
                 logging.info("Running %s", " ".join(cmd))
                 subprocess_module.check_call(cmd)
             except Exception:
                 logging.exception("Failed to mark the following nodes as down: %s. Will re-attempt next iteration.", failed_node_names_str)
 
         if recovered_nodes:
+            recovered_node_names_str = ",".join(recovered_nodes)
             try:
-                recovered_node_names_str = ",".join(recovered_nodes)
                 logging.error("The following nodes have recovered from failure: %s", recovered_node_names_str)
-                cmd = ["scontrol", "update", "NodeName=%s" % name, "State=idle", "Reason=cyclecloud_node_recovery"]
+                cmd = ["scontrol", "update", "NodeName=%s" % recovered_node_names_str, "State=idle", "Reason=cyclecloud_node_recovery"]
                 logging.info("Running %s", " ".join(cmd))
                 subprocess_module.check_call(cmd)
-                failed_nodes.pop(name)
+
+                for node_name in recovered_nodes:
+                    failed_nodes.pop(node_name)
             except Exception:
                 logging.exception("Failed to mark the following nodes as recovered: %s. Will re-attempt next iteration.", recovered_node_names_str)
 

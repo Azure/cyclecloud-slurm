@@ -20,8 +20,9 @@ default[:slurm][:suspend_timeout] = 600
 default[:slurm][:resume_timeout] = 1800
 
 default[:slurm][:accounting][:enabled] = false
-default[:slurm][:accounting][:user] = 'admin'
-default[:slurm][:accounting][:password] = 'admin'
+# set as root/blank _if_ someone decides to run their own mariadb instance
+default[:slurm][:accounting][:user] = 'root'
+default[:slurm][:accounting][:password] = ''
 default[:slurm][:accounting][:url] = 'localhost'
 
 default[:slurm][:ha_enabled] = false
