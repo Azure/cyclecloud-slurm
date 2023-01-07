@@ -51,6 +51,12 @@ link '/etc/slurm/gres.conf' do
   only_if { ::File.exist?('/sched/gres.conf') }
 end
 
+link '/etc/slurm/keep_alive.conf' do
+  to '/sched/keep_alive.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
+
 service 'munge' do
   action [:enable, :restart]
 end
