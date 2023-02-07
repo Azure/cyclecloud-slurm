@@ -26,6 +26,7 @@ SlurmdLogFile=/var/log/slurmd/slurmd.log
 # or just add --switches 1 to your submission scripts
 # JobSubmitPlugins=lua
 PrivateData=cloud
+PrologSlurmctld=/opt/azurehpc/slurm/prolog.sh
 TreeWidth=65533
 ResumeTimeout=1800
 SuspendTimeout=600
