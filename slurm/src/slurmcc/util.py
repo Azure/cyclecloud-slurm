@@ -9,6 +9,21 @@ from . import custom_chaos_mode
 
 from . import CyclecloudSlurmError
 
+def run_command(cmd: str, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE):
+    """
+    run arbitrary command
+    """
+    cmd_list = cmd.split(' ')
+    logging.debug(cmd_list)
+    try:
+        output = subprocesslib.run(cmd_list,stdout=stdout,stderr=stderr, check=True,
+                       encoding='utf-8')
+    except subprocesslib.CalledProcessError as e:
+        logging.error(f"cmd: {e.cmd}, rc: {e.returncode}")
+        logging.error(e.stderr)
+        raise
+    logging.debug(f"output: {output.stdout}")
+    return output
 
 def to_hostlist(nodes: Union[str, List[str]]) -> str:
     """
