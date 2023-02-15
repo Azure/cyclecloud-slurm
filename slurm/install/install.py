@@ -199,9 +199,9 @@ AccountingStorageHost="localhost"
         source="templates/slurmdbd.conf.template",
         mode=600,
         variables={
-            "accountdb": s.acct_url,
-            "dbuser": s.acct_user,
-            "dbpass": s.acct_pass,
+            "accountdb": s.acct_url or "localhost",
+            "dbuser": s.acct_user or "root",
+            "storagepass": "StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
             "slurmver": s.slurmver,
         },
     )
@@ -406,7 +406,7 @@ def main() -> None:
     
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--platform", default="rhel", choices=["rhel", "ubuntu", "suse"]
+        "--platform", default="rhel", choices=["rhel", "ubuntu", "suse", "debian"]
     )
     parser.add_argument(
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
@@ -414,6 +414,9 @@ def main() -> None:
     parser.add_argument("--bootstrap-config", default="jetpack")
 
     args = parser.parse_args()
+
+    if args.platform == "debian":
+        args.platform = "ubuntu"
 
     config = _load_config(args.bootstrap_config)
     settings = InstallSettings(config, args.platform)
@@ -424,14 +427,9 @@ def main() -> None:
     # create the munge key and/or copy it to /etc/munge/
     munge_key(settings)
 
-    if args.mode == "scheduler":
-        accounting(settings)
-    else:
-        logging.info(f"RDH not a scheduler - {args.mode}")
-
     # runs either rhel.sh or ubuntu.sh to install the packages
     run_installer(os.path.abspath(f"{args.platform}.sh"), args.mode)
-
+    
     # various permissions fixes
     fix_permissions(settings)
 
@@ -439,6 +437,7 @@ def main() -> None:
 
     # scheduler specific - add return_to_idle script
     if args.mode == "scheduler":
+        accounting(settings)
         # TODO create a rotate log
         ilib.cron(
             "return_to_idle",
@@ -447,8 +446,8 @@ def main() -> None:
         )
 
     if args.mode == "execute":
-        setup_slurmd(settings)
         set_hostname(settings)
+        setup_slurmd(settings)
 
 
 if __name__ == "__main__":
