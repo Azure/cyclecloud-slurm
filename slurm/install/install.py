@@ -4,7 +4,6 @@ import logging
 import logging.config
 import os
 import subprocess
-import time
 import installlib as ilib
 from typing import Dict, Optional
 
@@ -86,8 +85,8 @@ def setup_users(s: InstallSettings) -> None:
     )
 
 
-def run_installer(path: str, mode: str) -> None:
-    subprocess.check_call([path, mode])
+def run_installer(s: InstallSettings, path: str, mode: str) -> None:
+    subprocess.check_call([path, mode, s.slurmver])
 
 
 def fix_permissions(s: InstallSettings) -> None:
@@ -214,39 +213,7 @@ AccountingStorageTRES=gres/gpu
         group=s.slurm_grp,
     )
 
-    ilib.enable_service("slurmdbd")  # , user=s.slurm_user, exec_start="/sbin/slurmdbd")
-    subprocess.check_call(["systemctl", "start", "slurmdbd"])
-
-    max_attempts = 5
-    attempt = 0
-    cluster_name = s.cluster_name
-    last_exception: Optional[Exception] = None
-    while attempt < max_attempts:
-        attempt = attempt + 1
-        last_exception = None
-        try:
-            output = subprocess.check_output(
-                ["sacctmgr", "show", "cluster", "-p"]
-            ).decode()
-            if cluster_name in output:
-                break
-        except Exception:
-            logging.exception(
-                f"Attempted to run sacctmgr show cluster -p, attempt {attempt}/{max_attempts}"
-            )
-
-        try:
-            subprocess.check_call(["sacctmgr", "-i", "add", "cluster", cluster_name])
-        except Exception as e:
-            last_exception = e
-            logging.exception(
-                f"Attempted to run sacctmgr -i add cluster {cluster_name}, attempt {attempt}/{max_attempts}"
-            )
-
-        time.sleep(5)
-
-    if last_exception:
-        raise last_exception
+    ilib.enable_service("slurmdbd")
 
 
 def complete_install(s: InstallSettings) -> None:
@@ -362,22 +329,19 @@ def complete_install(s: InstallSettings) -> None:
 
     ilib.create_service("munged", user=s.munge_user, exec_start="/sbin/munged")
 
-    # v19 does this for us automatically BUT only for nodes that were susped
-    # nodes that hit ResumeTimeout, however, remain in down~
-
-    ilib.restart_service("munge")
-
 
 def setup_slurmd(s: InstallSettings) -> None:
-    # ilib.file(
-    #     "/etc/sysconfig/slurmd",
-    #     content=f"SLURMD_OPTIONS=-b -N {s.node_name}",
-    #     owner="root",
-    #     group="root",
-    #     mode="0600",
-    # )
+    slurmd_config = f"SLURMD_OPTIONS=-b -N {s.node_name}"
+    if s.dynamic_config:
+        slurmd_config = f"SLURMD_OPTIONS={s.dynamic_config} -N {s.node_name}"
+    ilib.file(
+        "/etc/sysconfig/slurmd" if s.platform_family == "rhel" else "/etc/default/slurmd",
+        content=slurmd_config,
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+        mode="0700",
+    )
     ilib.enable_service("slurmd")
-    subprocess.check_call(["systemctl", "start", "slurmd"])
 
 
 def set_hostname(s: InstallSettings) -> None:
@@ -429,7 +393,7 @@ def main() -> None:
     munge_key(settings)
 
     # runs either rhel.sh or ubuntu.sh to install the packages
-    run_installer(os.path.abspath(f"{args.platform}.sh"), args.mode)
+    run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
     
     # various permissions fixes
     fix_permissions(settings)

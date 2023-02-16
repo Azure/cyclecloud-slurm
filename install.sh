@@ -55,9 +55,11 @@ set -e
 python3 -m venv $VENV
 mkdir -p $VENV/../logs
 source $VENV/bin/activate
-# not sure why but pip gets confused installing frozendict locally
-# if you don't install it first. It has no dependencies so this is safe.
-pip install --upgrade packages/*
+set -e
+
+# ensure wheel is installed
+pip install wheel
+pip install --upgrade --no-deps packages/*
 
 cat > $VENV/bin/azslurm <<EOF
 #!$VENV/bin/python
