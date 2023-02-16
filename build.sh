@@ -1,30 +1,34 @@
 #!/usr/bin/env bash
 set -e
-# 1) run ./docker-rpmbuild.sh so that you have all necessary RPMs / debs
-# 2) if you are developing a local version of cyclecloud-scalelib, invoke this script like 
-#    ./build.sh PATH/TO/SCALELIB
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ] || [ "$1" == "-help" ]; then
+    echo "Usage: $0 [path/to/scalelib repo]"
+    echo "If no path to scalelib is passed in, one will be downloaded from GitHub based on"
+    echo "the version specified in package.py:SCALELIB_VERSION"
+    exit 1
+fi
 
 LOCAL_SCALELIB=$1
 
+if [ "$LOCAL_SCALELIB" != "" ]; then
+    LOCAL_SCALELIB=$(realpath $LOCAL_SCALELIB)
+fi
+
+cd $(dirname $0)
+if [ ! -e blobs ]; then
+    mkdir blobs
+fi
+
+# ls slurm/install/slurm-pkgs/*.rpm > /dev/null || (echo you need to run docker-rpmbuild.sh first; exit 1)
+# ls slurm/install/slurm-pkgs/*.deb > /dev/null || (echo you need to run docker-rpmbuild.sh first; exit 1)
+
+
 cd slurm/install
 rm -f dist/*
-python3 package.py
+./package.sh
 mv dist/* ../../blobs/
 
 cd ../../
 rm -f dist/*
-
-if [ "$LOCAL_SCALELIB" == "" ]; then
-    # we are using released versions of scalelib
-    python3 package.py
-else
-    pushd $LOCAL_SCALELIB
-    rm -f dist/*.gz
-    python3 setup.py swagger
-    python3 setup.py sdist
-    popd
-    swagger=`ls $LOCAL_SCALELIB/dist/swagger*.gz`
-    scalelib=`ls $LOCAL_SCALELIB/dist/cyclecloud-scalelib*.gz`
-    python3 package.py --scalelib $scalelib --swagger $swagger
-fi
+./package.sh $LOCAL_SCALELIB
 mv dist/* blobs/
