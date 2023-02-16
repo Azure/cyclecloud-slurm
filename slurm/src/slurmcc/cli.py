@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 #
 import argparse
+import json
 import logging
 import os
 import shutil
@@ -56,6 +57,7 @@ def init_power_saving_log(function: Callable) -> Callable:
                     handler.setLevel(logging.INFO)
                     logging.info(f"initialized {function.__name__}.log")
         return function(*args, **kwargs)
+
     wrapped.__doc__ = function.__doc__
     return wrapped
 
@@ -391,7 +393,7 @@ class SlurmCLI(CommonCLI):
 
         if os.path.exists(azure_conf):
             shutil.copyfile(azure_conf, os.path.join(backup_dir, "azure.conf"))
-        
+
         if os.path.exists(gres_conf):
             shutil.copyfile(gres_conf, os.path.join(backup_dir, "gres.conf"))
 
@@ -404,9 +406,7 @@ class SlurmCLI(CommonCLI):
                 autoscale=config.get("autoscale", True),
             )
 
-        logging.debug(
-            "Moving %s to %s", azure_conf + ".tmp", azure_conf
-        )
+        logging.debug("Moving %s to %s", azure_conf + ".tmp", azure_conf)
         shutil.move(azure_conf + ".tmp", azure_conf)
 
         _update_future_states(node_mgr)
@@ -488,6 +488,45 @@ class SlurmCLI(CommonCLI):
             fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
         shutil.move("/sched/keep_alive.conf.tmp", "/sched/keep_alive.conf")
         slutil.check_output(["scontrol", "reconfig"])
+
+    def accounting_info_parser(self, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--node-name", required=True)
+
+    def accounting_info(self, config: Dict, node_name: str) -> None:
+        node_mgr = self._get_node_manager(config)
+        nodes = node_mgr.get_nodes()
+        nodes_filtered = [n for n in nodes if n.name == node_name]
+        if not nodes_filtered:
+            json.dump([], sys.stdout)
+            return
+        assert len(nodes_filtered) == 1
+        node = nodes_filtered[0]
+
+        toks = check_output(["scontrol", "show", "node", node_name]).decode().split()
+        cpus = -1
+        for tok in toks:
+            tok = tok.lower()
+            if tok.startswith("cputot"):
+                cpus = int(tok.split("=")[1])
+
+        json.dump(
+            [
+                {
+                    "name": node.name,
+                    "location": node.location,
+                    "vm_size": node.vm_size,
+                    "spot": node.spot,
+                    "nodearray": node.nodearray,
+                    "cpus": cpus,
+                    "pcpu_count": node.pcpu_count,
+                    "vcpu_count": node.vcpu_count,
+                    "gpu_count": node.gpu_count,
+                    "memgb": node.memory.value,
+                }
+            ],
+            sys.stdout,
+            indent=2,
+        )
 
     def _wait_for_resume(
         self,
