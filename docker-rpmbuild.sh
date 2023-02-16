@@ -1,9 +1,12 @@
 #!/bin/bash
 set -e
-cd $(dirname $0)/install
+SRCROOT=$( realpath $(dirname $0) )
+cd $(dirname $0)/slurm/install
 if [ -e pkg ]; then 
   mkdir pkg
 fi
+
+SLURM_VERSIONS=$(python3 slurm_supported_version.py --short)
 
 TMP_BINS=slurm-pkgs-tmp
 rm -rf $TMP_BINS
@@ -15,9 +18,9 @@ if command -v docker; then
     extra_args="--privileged"
   fi
 
-  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti almalinux:8.5 /bin/bash /source/00-build-slurm.sh centos
-  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 -ti centos:7 /bin/bash /source/00-build-slurm.sh centos
-  docker run -v $(pwd)/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti ubuntu:18.04 /bin/bash /source/01-build-debs.sh
+  docker run -v ${SRCROOT}/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti almalinux:8.5 /bin/bash /source/00-build-slurm.sh centos "$SLURM_VERSIONS"
+  docker run -v ${SRCROOT}/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 -ti centos:7 /bin/bash /source/00-build-slurm.sh centos "$SLURM_VERSIONS"
+  docker run -v ${SRCROOT}/specs/default/cluster-init/files:/source -v $(pwd)/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti ubuntu:18.04 /bin/bash /source/01-build-debs.sh "$SLURM_VERSIONS"
   
   mv $TMP_BINS/* slurm-pkgs/
   rm -rf $TMP_BINS

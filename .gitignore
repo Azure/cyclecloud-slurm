@@ -332,6 +332,15 @@ ASALocalRun/
 
 # rpmbuild output
 *.rpm
-
+.venv/
+.env
+install/slurm-pkg*
+blobs
+**/libs
 **/*.mypy_cache/
+**/dist
+**/*egg-info
+**/creds.json
+slurm/install/slurm-pkgs/*
+install/docker/sched
 .DS_Store
