@@ -1,6 +1,7 @@
 import argparse
 import configparser
 import glob
+import pip
 import os
 import shutil
 import sys
@@ -15,10 +16,9 @@ CYCLECLOUD_API_VERSION = "8.1.0"
 
 
 def build_sdist() -> str:
-    cmd = [sys.executable, "setup.py", "sdist"]
-    check_call(cmd, cwd=os.path.abspath("slurm"))
+    check_call([sys.executable, "setup.py", "sdist"], cwd="slurm")
     sdists = glob.glob("slurm/dist/azure-slurm-*.tar.gz")
-    assert len(sdists) == 1, "Found %d sdist packages, expected 1" % len(sdists)
+    assert len(sdists) == 1, f"Found %d sdist packages, expected 1 - see {os.path.abspath('slurm/dist/azure-slurm-*.tar.gz')}" % len(sdists)
     path = sdists[0]
     fname = os.path.basename(path)
     dest = os.path.join("libs", fname)
@@ -35,7 +35,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
     cyclecloud_api_file = "cyclecloud_api-{}-py2.py3-none-any.whl".format(
         CYCLECLOUD_API_VERSION
     )
-    swagger_file = "swagger-client-1.0.0.tar.gz"
+    # swagger_file = "swagger-client-1.0.0.tar.gz"
 
     scalelib_url = "https://github.com/Azure/cyclecloud-scalelib/archive/{}.tar.gz".format(
         SCALELIB_VERSION
@@ -45,7 +45,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
     to_download = {
         scalelib_file: (args.scalelib, scalelib_url),
         cyclecloud_api_file: (args.cyclecloud_api, cyclecloud_api_url),
-        swagger_file: (args.swagger, None)
+        # swagger_file: (args.swagger, None)
     }
 
     for lib_file in to_download:
@@ -73,15 +73,17 @@ def execute() -> None:
     expected_cwd = os.path.abspath(os.path.dirname(__file__))
     os.chdir(expected_cwd)
 
+    print("Running from", expected_cwd)
+
     if not os.path.exists("libs"):
         os.makedirs("libs")
 
     argument_parser = argparse.ArgumentParser(
-        "Builds CycleCloud GridEngine project with all dependencies.\n"
+        "Builds Azure Slurm project with all dependencies.\n"
         + "If you don't specify local copies of scalelib or cyclecloud-api they will be downloaded from github."
     )
     argument_parser.add_argument("--scalelib", default=None)
-    argument_parser.add_argument("--swagger", default=None)
+    # argument_parser.add_argument("--swagger", default=None)
     argument_parser.add_argument("--cyclecloud-api", default=None)
     args = argument_parser.parse_args()
 
@@ -122,8 +124,9 @@ def execute() -> None:
         dep_path = os.path.abspath(os.path.join("libs", dep))
         _add("packages/" + dep, dep_path)
         packages.append(dep_path)
-
-    check_call(["pip", "download"] + packages, cwd=build_dir)
+    mypip = shutil.which("pip3")
+    print("my pip", mypip)
+    check_call([mypip, "download"] + packages, cwd=build_dir)
 
     print("Using build dir", build_dir)
     by_package: Dict[str, List[str]] = {}
@@ -143,13 +146,13 @@ def execute() -> None:
             assert False
 
     for fil in os.listdir(build_dir):
-        if fil.startswith("certifi-20"):
-            print("WARNING: Ignoring duplicate certifi {}".format(fil))
+        if "pyyaml" in fil.lower():
+            print(f"WARNING: Ignoring unnecessary PyYaml {fil}, also it is platform (ubuntu/rhel) specific.")
             continue
         path = os.path.join(build_dir, fil)
         _add("packages/" + fil, path)
 
-    _add("install.sh", mode=os.stat("install.sh")[0])
+    _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
     _add("sbin/resume_fail_program.sh", "sbin/resume_fail_program.sh")
     _add("sbin/prolog.sh", "sbin/prolog.sh")
     _add("sbin/resume_program.sh", "sbin/resume_program.sh")

@@ -96,5 +96,6 @@ function install_pmix() {
     cd ../../install/v3/
 }
 
-build_slurm ${1} 22.05.8
-build_slurm ${1} 23.02.0
+for version in $(echo $2); do 
+    build_slurm ${1} $version
+done

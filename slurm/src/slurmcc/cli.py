@@ -11,7 +11,7 @@ import sys
 import traceback
 import time
 from argparse import ArgumentParser
-from datetime import date,datetime,timedelta,time
+from datetime import date, datetime, time, timedelta
 from math import ceil
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, TextIO, Union
 
@@ -25,6 +25,7 @@ from hpc.autoscale.clilib import (
 from hpc.autoscale import hpctypes as ht
 from hpc.autoscale.cost.azurecost import azurecost
 from hpc.autoscale.hpctypes import Memory
+from hpc.autoscale import clock
 from hpc.autoscale import util as hpcutil
 from hpc.autoscale.job.demandprinter import OutputFormat
 from hpc.autoscale.job.driver import SchedulerDriver
@@ -178,7 +179,7 @@ class SlurmCLI(CommonCLI):
             partitions,
             sys.stdout,
             allow_empty=allow_empty,
-            autoscale=config.get("autoscale", True),
+            autoscale=is_autoscale_enabled(),
         )
 
     def generate_topology(self, config: Dict) -> None:
@@ -417,7 +418,7 @@ class SlurmCLI(CommonCLI):
     ):
         node_mgr = self._get_node_manager(config)
         # make sure .backups exists
-        now = time.time()
+        now = clock.time()
         backup_dir = os.path.join(backup_dir, str(now))
 
         logging.debug(
@@ -440,7 +441,7 @@ class SlurmCLI(CommonCLI):
                 partition_dict,
                 fw,
                 allow_empty=False,
-                autoscale=config.get("autoscale", True),
+                autoscale=is_autoscale_enabled(),
             )
 
         logging.debug(
@@ -860,7 +861,7 @@ def _generate_gres_conf(partitions: Dict[str, partitionlib.Partition], writer: T
             writer.write("\n")
 
 
-def _update_future_states(node_mgr: NodeManager):
+def _update_future_states(node_mgr: NodeManager) -> None:
     autoscale_enabled = is_autoscale_enabled()
     if autoscale_enabled:
         return
@@ -893,7 +894,7 @@ def _retry_rest(func: Callable, attempts: int = 5) -> Any:
             last_exception = e
             logging.debug(traceback.format_exc())
 
-            time.sleep(attempt * attempt)
+            clock.sleep(attempt * attempt)
 
     raise CyclecloudSlurmError(str(last_exception))
 
@@ -923,7 +924,7 @@ def hostlist(hostlist_expr: str) -> List[str]:
     return slutil.from_hostlist(hostlist_expr)
 
 
-def hostlist_null_star(hostlist_expr) -> Optional[List[str]]:
+def hostlist_null_star(hostlist_expr: str) -> Optional[List[str]]:
     if hostlist_expr == "*":
         return None
     return slutil.from_hostlist(hostlist_expr)
@@ -943,12 +944,14 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
 _IS_AUTOSCALE_ENABLED = None
 
 
-def is_autoscale_enabled(subprocess_module=None):
+def is_autoscale_enabled(subprocess_module: Optional[Any] = None) -> bool:
     global _IS_AUTOSCALE_ENABLED
     if _IS_AUTOSCALE_ENABLED is not None:
         return _IS_AUTOSCALE_ENABLED
     if subprocess_module is None:
-        import subprocess as subprocess_module
+        import subprocess as subprocess_module_tmp
+
+        subprocess_module = subprocess_module_tmp
 
     try:
         lines = (
@@ -971,13 +974,17 @@ def is_autoscale_enabled(subprocess_module=None):
         if line.startswith("SuspendTime ") or line.startswith("SuspendTime="):
             suspend_time = line.split("=")[1].strip().split()[0]
             try:
-                if suspend_time == "NONE" or int(suspend_time) < 0:
+                if suspend_time in ["NONE", "INFINITE"] or int(suspend_time) < 0:
                     _IS_AUTOSCALE_ENABLED = False
                 else:
                     _IS_AUTOSCALE_ENABLED = True
             except Exception:
                 pass
-    return _IS_AUTOSCALE_ENABLED
+
+    if _IS_AUTOSCALE_ENABLED is not None:
+        return _IS_AUTOSCALE_ENABLED
+    logging.warning("Could not determine if autoscale is enabled. Assuming yes")
+    return True
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:
