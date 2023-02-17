@@ -1027,7 +1027,7 @@ def rescale(subprocess_module=None, backup_dir="/etc/slurm/.backups", slurm_conf
     new_topology = _retry_subprocess(lambda: _check_output(subprocess_module, ["scontrol", "show", "topology"]))
     logging.info("New topology:\n%s", new_topology)
 
-    gres_conf = os.path.join(slurm_conf_dir, "gres.conf")
+    gres_conf = os.path.join(sched_dir, "gres.conf")
     if os.path.exists(gres_conf):
         shutil.copyfile(gres_conf, os.path.join(backup_dir, "gres.conf"))
     with open(gres_conf + ".tmp", "w") as fw:
