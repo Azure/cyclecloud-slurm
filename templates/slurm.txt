@@ -195,8 +195,23 @@ Autoscale = $Autoscale
         [[[configuration]]]
         slurm.hpc = false
         slurm.partition = htc
-	# set pcpu = false for all hyperthreaded VMs
-	slurm.use_pcpu = false
+        # set pcpu = false for all hyperthreaded VMs
+        slurm.use_pcpu = false
+
+    [[nodearray dynamic]]
+    Extends = nodearraybase
+    MachineType = $DynamicMachineType
+    ImageName = $DynamicImageName
+    MaxCoreCount = $MaxDynamicExecuteCoreCount
+
+    Interruptible = $DynamicUseLowPrio
+    MaxPrice = $DynamicSpotMaxPrice
+    AdditionalClusterInitSpecs = $DynamicClusterInitSpecs
+        [[[configuration]]]
+        slurm.hpc = false
+        slurm.dynamic_config := "-Z --conf \"RealMemory=3072 Feature=dyn\""
+        # set pcpu = false for all hyperthreaded VMs
+        slurm.use_pcpu = false
 
 [parameters About]
 Order = 1
@@ -244,6 +259,12 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
 
+        [[[parameter DynamicMachineType]]]
+        Label = Dyn VM Type
+        Description = The VM type for Dynamic execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_F2s_v2
+
 
     [[parameters Auto-Scaling]]
     Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster."
@@ -271,6 +292,14 @@ Order = 10
         Config.MinValue = 1
         Config.IntegerOnly = true
 
+        [[[parameter MaxDynamicExecuteCoreCount]]]
+        Label = Max Dyn Cores
+        Description = The total number of Dynamic execute cores to start
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
         [[[parameter HPCMaxScalesetSize]]]
         Label = Max VMs per VMSS
         Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
@@ -281,17 +310,31 @@ Order = 10
 
 
         [[[parameter HTCUseLowPrio]]]
-        Label = Spot
+        Label = HTC Spot
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Use Spot VMs for HTC execute hosts
 
         [[[parameter HTCSpotMaxPrice]]]
-        Label = Max Price
+        Label = Max Price HTC
         DefaultValue = -1
         Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
         Config.Plugin = pico.form.NumberTextBox
         Conditions.Excluded := HTCUseLowPrio isnt true
+        Config.MinValue = -1
+
+        [[[parameter DynamicUseLowPrio]]]
+        Label = DynSpot
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Use Spot VMs for Dynamic execute hosts
+
+        [[[parameter DynamicSpotMaxPrice]]]
+        Label = Max Price Dyn
+        DefaultValue = -1
+        Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
+        Config.Plugin = pico.form.NumberTextBox
+        Conditions.Excluded := DynamicUseLowPrio isnt true
         Config.MinValue = -1
 
         [[[parameter NumberLoginNodes]]]
@@ -440,7 +483,7 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="22.05.8-1"]}
+        Config.Entries := {[Value="22.05.8-1"], [Value="23.02.0"]}
         DefaultValue = 22.05.8-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]
@@ -547,6 +590,13 @@ Order = 20
         DefaultValue = almalinux8
         Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8"}
 
+        [[[parameter DynamicImageName]]]
+        Label = Dynamic OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = almalinux8
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8"}
+
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init
         DefaultValue = =undefined
@@ -563,6 +613,12 @@ Order = 20
         Label = HPC Cluster-Init
         DefaultValue = =undefined
         Description = Cluster init specs to apply to HPC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+
+        [[[parameter DynamicClusterInitSpecs]]]
+        Label = Dyn Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to Dynamic execute nodes
         ParameterType = Cloud.ClusterInitSpecs
 	
 
