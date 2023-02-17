@@ -61,6 +61,10 @@ class InstallSettings:
 
         self.platform_family = platform_family
 
+        self.dynamic_config = config["slurm"].get("dynamic_config")
+
+        self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
+
 
 def setup_users(s: InstallSettings) -> None:
     # Set up users for Slurm and Munge
@@ -226,6 +230,7 @@ def complete_install(s: InstallSettings) -> None:
         variables={
             "slurmctldhost": s.hostname,
             "cluster_name": s.cluster_name,
+            "max_node_count": s.max_node_count,
         },
     )
 

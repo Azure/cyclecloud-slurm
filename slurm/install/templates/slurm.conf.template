@@ -35,6 +35,8 @@ ResumeProgram=/opt/azurehpc/slurm/resume_program.sh
 ResumeFailProgram=/opt/azurehpc/slurm/resume_fail_program.sh
 SuspendProgram=/opt/azurehpc/slurm/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
+# Only used with dynamic node partitions. 
+MaxNodeCount={max_node_count}
 # This as the partition definitions managed by azslurm partitions > /sched/azure.conf
 Include azure.conf
 # If slurm.accounting.enabled=true this will setup slurmdbd
