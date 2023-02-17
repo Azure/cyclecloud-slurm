@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional
 import requests
 
 
-class CyclecloudSlurmError(RuntimeError):
+class AzureSlurmError(RuntimeError):
     pass
 
 
@@ -37,4 +37,4 @@ def chaos_mode(func: Callable, action: Optional[Callable] = None) -> Callable:
 
 
 def is_chaos_mode() -> bool:
-    return random.random() < float(os.getenv("CYCLECLOUD_SLURM_CHAOS_MODE", 0))
+    return random.random() < float(os.getenv("AZURE_SLURM_CHAOS_MODE", 0))

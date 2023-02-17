@@ -6,41 +6,33 @@ import json
 import logging
 import os
 import shutil
-from subprocess import SubprocessError, check_output
 import sys
-import traceback
 import time
+import traceback
 from argparse import ArgumentParser
 from datetime import date, datetime, time, timedelta
 from math import ceil
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, TextIO, Union
+from subprocess import SubprocessError, check_output
+from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
 
-from hpc.autoscale.cli import GenericDriver
-from hpc.autoscale.clilib import (
-    CommonCLI,
-    ShellDict,
-    disablecommand,
-    main as clilibmain,
-)
-from hpc.autoscale import hpctypes as ht
 from hpc.autoscale.cost.azurecost import azurecost
 from hpc.autoscale.hpctypes import Memory
 from hpc.autoscale import clock
 from hpc.autoscale import util as hpcutil
+from hpc.autoscale.cli import GenericDriver
+from hpc.autoscale.clilib import CommonCLI, ShellDict, disablecommand
+from hpc.autoscale.clilib import main as clilibmain
 from hpc.autoscale.job.demandprinter import OutputFormat
 from hpc.autoscale.job.driver import SchedulerDriver
-from hpc.autoscale.node.bucket import NodeBucket
-from hpc.autoscale.node.delayednodeid import DelayedNodeId
-
-from hpc.autoscale.node.nodemanager import NodeManager
 from hpc.autoscale.node.node import Node
-from hpc.autoscale.job.schedulernode import SchedulerNode
+from hpc.autoscale.node.nodemanager import NodeManager
 
+from slurmcc import allocation
+
+from . import AzureSlurmError
 from . import partition as partitionlib
 from . import util as slutil
-from . import CyclecloudSlurmError
 from . import cost
-from hpc.autoscale.results import AllocationResult
 
 
 VERSION = "3.0.1"
@@ -85,10 +77,10 @@ class SlurmDriver(GenericDriver):
                 config["nodearrays"] = {}
             if b.nodearray not in config["nodearrays"]:
                 config["nodearrays"][b.nodearray] = {}
-            # TODO remove
-            config["nodearrays"][b.nodearray]["generated_placement_group_buffer"] = 0
+
             if "generated_placement_group_buffer" in config["nodearrays"][b.nodearray]:
                 continue
+
             is_hpc = (
                 str(
                     b.software_configuration.get("slurm", {}).get("hpc") or "false"
@@ -96,19 +88,28 @@ class SlurmDriver(GenericDriver):
                 == "true"
             )
             if is_hpc:
-                buffer = ceil(b.limits.max_count / b.max_placement_group_size)
+                buffer = 1
+                max_pgs = 1
             else:
                 buffer = 0
+                max_pgs = 0
             config["nodearrays"][b.nodearray][
                 "generated_placement_group_buffer"
             ] = buffer
-        # super().preprocess_node_mgr(config, node_mgr)
+            config["nodearrays"][b.nodearray][
+                "max_placement_groups"
+            ] = max_pgs
+        super().preprocess_node_mgr(config, node_mgr)
 
 
 class SlurmCLI(CommonCLI):
     def __init__(self) -> None:
         super().__init__(project_name="slurm")
         self.slurm_node_names = []
+
+    @disablecommand
+    def create_nodes(self, *args: Any, **kwargs: Dict) -> None:
+        assert False
 
     def _add_completion_data(self, completion_json: Dict) -> None:
         node_names = slutil.check_output(["sinfo", "-N", "-h", "-o", "%N"]).splitlines(
@@ -177,7 +178,7 @@ class SlurmCLI(CommonCLI):
         Generates partition configuration
         """
         node_mgr = self._get_node_manager(config)
-        partitions = partitionlib.fetch_partitions(node_mgr)  # type: ignore
+        partitions = partitionlib.fetch_partitions(node_mgr, include_dynamic=True)  # type: ignore
         _partitions(
             partitions,
             sys.stdout,
@@ -204,55 +205,22 @@ class SlurmCLI(CommonCLI):
         Equivalent to ResumeProgram, starts and waits for a set of nodes.
         """
         node_mgr = self._get_node_manager(config)
-        partitions = partitionlib.fetch_partitions(node_mgr)
-        return self._resume(config, node_mgr, node_list, partitions, no_wait)
-
-    def _resume(
-        self,
-        config: Dict,
-        node_mgr: NodeManager,
-        node_list: List[str],
-        partitions: Dict[str, partitionlib.Partition],
-        no_wait: bool = False,
-    ) -> None:
-        name_to_partition = {}
-        for partition in partitions.values():
-            for name in partition.all_nodes():
-                name_to_partition[name] = partition
-        existing_nodes_by_name = hpcutil.partition(
-            node_mgr.get_nodes(), lambda n: n.name
-        )
-
-        nodes = []
-        for name in node_list:
-            if name in existing_nodes_by_name:
-                logging.info(f"{name} already exists.")
-                continue
-
-            if name not in name_to_partition:
-                raise CyclecloudSlurmError(
-                    f"Unknown node name: {name}: {list(name_to_partition.keys())}"
-                )
-            partition = name_to_partition[name]
-            bucket = partition.bucket_for_node(name)
-
-            def name_hook(bucket: NodeBucket, index: int) -> str:
-                if index != 1:
-                    raise RuntimeError(f"Unexpected index: {index}")
-                return name
-
-            node_mgr.set_node_name_hook(name_hook)
-            result: AllocationResult = node_mgr.allocate(
-                {"node.bucket_id": bucket.bucket_id, "exclusive": True}, node_count=1
+        partitions = partitionlib.fetch_partitions(node_mgr, include_dynamic=True)
+        bootup_result = allocation.resume(config, node_mgr, node_list, partitions)
+        if not bootup_result:
+            raise AzureSlurmError(
+                f"Failed to boot {node_list} - {bootup_result.message}"
             )
-            if len(result.nodes) != 1:
-                raise RuntimeError()
-            result.nodes[0].name_format = name
-            nodes.extend(result.nodes)
-        boot_result = node_mgr.bootup(nodes)
+        if no_wait:
+            return
 
-        if not no_wait:
-            self._wait_for_resume(config, boot_result.operation_id, node_list)
+        def get_latest_nodes() -> List[Node]:
+            node_mgr = self._get_node_manager(config, force=True)
+            return node_mgr.get_nodes()
+
+        allocation.wait_for_resume(
+            config, bootup_result.operation_id, node_list, get_latest_nodes
+        )
 
     def wait_for_resume_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
@@ -264,7 +232,12 @@ class SlurmCLI(CommonCLI):
         """
         Wait for a set of nodes to converge.
         """
-        self._wait_for_resume(config, "noop", node_list)
+
+        def get_latest_nodes() -> List[Node]:
+            node_mgr = self._get_node_manager(config, force=True)
+            return node_mgr.get_nodes()
+
+        allocation.wait_for_resume(config, "noop", node_list, get_latest_nodes)
 
     def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
         by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
@@ -311,7 +284,9 @@ class SlurmCLI(CommonCLI):
         # TODO
         shell = {}
         partitions = partitionlib.fetch_partitions(self._get_node_manager(config))  # type: ignore
-        shell["partitions"] = ShellDict(partitions)
+        shell["partitions"] = ShellDict(
+            hpcutil.partition_single(partitions, lambda p: p.name)
+        )
         shell["node_mgr"] = node_mgr = self._get_node_manager(config)
         nodes = {}
 
@@ -434,7 +409,7 @@ class SlurmCLI(CommonCLI):
 
         if os.path.exists(azure_conf):
             shutil.copyfile(azure_conf, os.path.join(backup_dir, "azure.conf"))
-        
+
         if os.path.exists(gres_conf):
             shutil.copyfile(gres_conf, os.path.join(backup_dir, "gres.conf"))
 
@@ -447,9 +422,7 @@ class SlurmCLI(CommonCLI):
                 autoscale=is_autoscale_enabled(),
             )
 
-        logging.debug(
-            "Moving %s to %s", azure_conf + ".tmp", azure_conf
-        )
+        logging.debug("Moving %s to %s", azure_conf + ".tmp", azure_conf)
         shutil.move(azure_conf + ".tmp", azure_conf)
 
         _update_future_states(node_mgr)
@@ -487,9 +460,7 @@ class SlurmCLI(CommonCLI):
 
         """
         if remove and set_nodes:
-            raise CyclecloudSlurmError(
-                "Please define only --set or --remove, not both."
-            )
+            raise AzureSlurmError("Please define only --set or --remove, not both.")
 
         lines = slutil.check_output(["scontrol", "show", "config"]).splitlines()
         filtered = [
@@ -570,182 +541,48 @@ class SlurmCLI(CommonCLI):
             sys.stdout
         )
 
-    def _wait_for_resume(
-        self,
-        config: Dict,
-        operation_id: str,
-        node_list: List[str],
-    ) -> None:
-        previous_states = {}
 
-        nodes_str = ",".join(node_list[:5])
-        omega = time.time() + 3600
+def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> None:
+    assert partition.dynamic_config
 
-        failed_node_names: Set[str] = set()
+    writer.write(
+        "# Creating dynamic nodeset and partition using slurm.dynamic_config=%s\n"
+        % partition.dynamic_config
+    )
+    toks = partition.dynamic_config.replace('"', "").replace("'", "").split()
+    features = None
+    for tok in toks:
+        if "=" in tok:
+            key, value = tok.split("=", 1)
+            if key.lower() == "feature":
+                features = value.strip()
 
-        ready_nodes: List[Node] = []
-
-        while time.time() < omega:
-            ready_nodes = []
-            states = {}
-
-            node_mgr = self._get_node_manager(config, force=True)
-            nodes = _retry_rest(lambda: node_mgr.get_nodes())
-
-            by_name = hpcutil.partition_single(nodes, lambda node: node.name)
-
-            relevant_nodes: List[Node] = []
-
-            recovered_node_names: Set[str] = set()
-
-            newly_failed_node_names: List[str] = []
-
-            deleted_nodes = []
-
-            for name in node_list:
-                node = by_name.get(name)
-                if not node:
-                    deleted_nodes.append(node)
-                    continue
-
-                relevant_nodes.append(node)
-
-                state = node.state
-
-                if state and state.lower() == "failed":
-                    states["Failed"] = states.get("Failed", 0) + 1
-                    if name not in failed_node_names:
-                        newly_failed_node_names.append(name)
-                        failed_node_names.add(name)
-
-                    continue
-
-                if name in failed_node_names:
-                    recovered_node_names.add(name)
-
-                if node.target_state != "Started":
-                    states["UNKNOWN"] = states.get("UNKNOWN", {})
-                    states["UNKNOWN"][node.state] = states["UNKNOWN"].get(state, 0) + 1
-                    continue
-
-                if node.state == "Ready":
-                    if not node.private_ip:
-                        state = "WaitingOnIPAddress"
-                    else:
-                        ready_nodes.append(node)
-
-                states[state] = states.get(state, 0) + 1
-
-            if newly_failed_node_names:
-                failed_node_names_str = ",".join(failed_node_names)
-                try:
-                    logging.error(
-                        "The following nodes failed to start: %s", failed_node_names_str
-                    )
-                    for failed_name in failed_node_names:
-                        cmd = [
-                            "scontrol",
-                            "update",
-                            "NodeName=%s" % failed_name,
-                            "State=down",
-                            "Reason=cyclecloud_node_failure",
-                        ]
-                        logging.info("Running %s", " ".join(cmd))
-                        slutil.check_output(cmd)
-                except Exception:
-                    logging.exception(
-                        "Failed to mark the following nodes as down: %s. Will re-attempt next iteration.",
-                        failed_node_names_str,
-                    )
-
-            if recovered_node_names:
-                recovered_node_names_str = ",".join(recovered_node_names)
-                try:
-                    for recovered_name in recovered_node_names:
-                        logging.error(
-                            "The following nodes have recovered from failure: %s",
-                            recovered_node_names_str,
-                        )
-                        cmd = [
-                            "scontrol",
-                            "update",
-                            "NodeName=%s" % recovered_name,
-                            "State=idle",
-                            "Reason=cyclecloud_node_recovery",
-                        ]
-                        logging.info("Running %s", " ".join(cmd))
-                        slutil.check_output(cmd)
-                        if recovered_name in failed_node_names:
-                            failed_node_names.pop(recovered_name)
-                except Exception:
-                    logging.exception(
-                        "Failed to mark the following nodes as recovered: %s. Will re-attempt next iteration.",
-                        recovered_node_names_str,
-                    )
-
-            terminal_states = (
-                states.get("Ready", 0)
-                + sum(states.get("UNKNOWN", {}).values())
-                + states.get("Failed", 0)
-            )
-
-            if states != previous_states:
-                states_messages = []
-                for key in sorted(states.keys()):
-                    if key != "UNKNOWN":
-                        states_messages.append("{}={}".format(key, states[key]))
-                    else:
-                        for ukey in sorted(states["UNKNOWN"].keys()):
-                            states_messages.append(
-                                "{}={}".format(ukey, states["UNKNOWN"][ukey])
-                            )
-
-                states_message = " , ".join(states_messages)
-                logging.info(
-                    "OperationId=%s NodeList=%s: Number of nodes in each state: %s",
-                    operation_id,
-                    nodes_str,
-                    states_message,
-                )
-
-            if terminal_states == len(relevant_nodes):
-                break
-
-            previous_states = states
-
-            time.sleep(5)
-
-        logging.info(
-            "The following nodes reached Ready state: %s",
-            ",".join([x.name for x in ready_nodes]),
+    if not features:
+        logging.error(
+            f"slurm.dynamic_config was set for {partition.name}"
+            + "but it did not include a feature declaration. Slurm requires this! Skipping for now.ß"
         )
-        for node in ready_nodes:
-            if not hpcutil.is_valid_hostname(config, node):
-                continue
-            cmd = [
-                "scontrol",
-                "update",
-                "NodeName=%s" % node.name,
-                "NodeAddr=%s" % node.private_ip,
-                "NodeHostName=%s" % node.hostname,
-            ]
-            logging.info("Running %s", " ".join(cmd))
-            slutil.check_output(cmd)
+        return
 
-        logging.info(
-            "OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting",
-            operation_id,
-            nodes_str,
-        )
+    writer.write(f"Nodeset={partition.name}ns Feature={features}\n")
+    writer.write(f"PartitionName={partition.name} Nodes={partition.name}ns")
+    if partition.is_default:
+        writer.write(" Default=YES")
+    writer.write("\n")
 
 
 def _partitions(
-    partitions: Dict[str, partitionlib.Partition],
+    partitions: List[partitionlib.Partition],
     writer: TextIO,
     allow_empty: bool = False,
     autoscale: bool = True,
 ) -> None:
-    for partition in partitions.values():
+
+    for partition in partitions:
+        if partition.dynamic_config:
+            _dynamic_partition(partition, writer)
+            continue
+
         node_list = partition.node_list or []
 
         max_count = min(partition.max_vm_count, partition.max_scaleset_size)
@@ -805,14 +642,14 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
     partitions = partitionlib.fetch_partitions(node_mgr)
 
     nodes_by_pg = {}
-    for partition in partitions.values():
+    for partition in partitions:
         for pg, node_list in partition.node_list_by_pg.items():
             if pg not in nodes_by_pg:
                 nodes_by_pg[pg] = []
             nodes_by_pg[pg].extend(node_list)
 
     if not nodes_by_pg:
-        raise CyclecloudSlurmError(
+        raise AzureSlurmError(
             "No nodes found to create topology! Do you need to run create_nodes first?"
         )
 
@@ -825,11 +662,11 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
         writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
 
 
-def _generate_gres_conf(partitions: Dict[str, partitionlib.Partition], writer: TextIO):
-    for partition in partitions.values():
+def _generate_gres_conf(partitions: List[partitionlib.Partition], writer: TextIO):
+    for partition in partitions:
         if partition.node_list is None:
             raise RuntimeError(
-                "No nodes found for nodearray %s. Please run 'cyclecloud_slurm.sh create_nodes' first!"
+                "No nodes found for nodearray %s. Please run 'azslurm create_nodes' first!"
                 % partition.nodearray
             )
 
@@ -899,22 +736,7 @@ def _retry_rest(func: Callable, attempts: int = 5) -> Any:
 
             clock.sleep(attempt * attempt)
 
-    raise CyclecloudSlurmError(str(last_exception))
-
-
-def _retry_subprocess(func: Callable, attempts: int = 5) -> Any:
-    attempts = max(1, attempts)
-    last_exception: Optional[Exception] = None
-    for attempt in range(1, attempts + 1):
-        try:
-            return func()
-        except Exception as e:
-            last_exception = e
-            logging.debug(traceback.format_exc())
-            logging.warning("Command failed, retrying: %s", str(e))
-            time.sleep(attempt * attempt)
-
-    raise CyclecloudSlurmError(str(last_exception))
+    raise AzureSlurmError(str(last_exception))
 
 
 def hostlist(hostlist_expr: str) -> List[str]:
@@ -939,7 +761,7 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
     for node_name in node_list:
         # TODO error handling on missing node names
         if node_name not in by_name:
-            raise CyclecloudSlurmError(f"Unknown node - {node_name}")
+            raise AzureSlurmError(f"Unknown node - {node_name}")
         nodes.append(by_name[node_name])
     return nodes
 
