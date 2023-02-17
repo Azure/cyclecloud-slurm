@@ -10,6 +10,7 @@ default[:cyclecloud][:hosts][:simple_vpc_dns][:enabled] = false
 default[:cyclecloud][:hosts][:standalone_dns][:enabled] = false
 default[:slurm][:additional][:config] = ""
 default[:slurm][:ensure_waagent_monitor_hostname] = true
+default[:slurm][:use_pcpu] = false
 
 default[:munge][:user][:name] = 'munge'
 default[:munge][:user][:uid] = 11101
