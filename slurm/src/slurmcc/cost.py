@@ -1,12 +1,34 @@
 import os
+import sys
 import json
 import csv
 from tabulate import tabulate
 from datetime import datetime
-import hpc.autoscale.hpclogging as log
+import logging
+import subprocess
 from collections import namedtuple
 from hpc.autoscale.cost.azurecost import azurecost
-from .util import run_command
+
+log = logging.getLogger('cost')
+
+def run_command(cmd: str, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+    """
+    run arbitrary command
+    """
+    cmd_list = cmd.split(' ')
+    log.debug(cmd_list)
+    try:
+        output = subprocess.run(cmd_list,stdout=stdout,stderr=stderr, check=True,
+                       encoding='utf-8')
+    except subprocess.CalledProcessError as e:
+        log.error(f"cmd: {e.cmd}, rc: {e.returncode}")
+        log.error(e.stderr)
+        sys.exit(1)
+    except Exception as e:
+        log.error(e)
+        raise
+    log.debug(f"output: {output.stdout}")
+    return output
 
 def get_sacct_fields():
 
@@ -195,6 +217,8 @@ class CostDriver:
 
     def run(self, start: datetime, end: datetime, out: str):
 
+        log.debug(f"start: {start}")
+        log.debug(f"end: {end}")
         sacct_start = start.isoformat()
         sacct_end = end.isoformat()
         cost_slurm = CostSlurm(start=sacct_start, end=sacct_end, cluster=self.cluster)
