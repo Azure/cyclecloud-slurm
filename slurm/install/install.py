@@ -170,6 +170,7 @@ def accounting(s: InstallSettings) -> None:
         content="""
 AccountingStorageType=accounting_storage/slurmdbd
 AccountingStorageHost="localhost"
+AccountingStorageTRES=gres/gpu
 """,
     )
     subprocess.check_call(
