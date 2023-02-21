@@ -164,8 +164,6 @@ class SlurmCLI(CommonCLI):
             raise ValueError("End date cannot be in the future")
         if start == end:
             end = datetime.combine(end.date(), time(hour=23,minute=59,second=59))
-        logging.debug(f"start: {start}")
-        logging.debug(f"end: {end}")
 
         azcost = azurecost(config)
         driver = cost.CostDriver(azcost, config)
