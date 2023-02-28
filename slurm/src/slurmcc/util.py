@@ -9,6 +9,7 @@ from . import custom_chaos_mode
 
 from . import CyclecloudSlurmError
 
+
 def to_hostlist(nodes: Union[str, List[str]]) -> str:
     """
     convert name-[1-5] into name-1 name-2 name-3 name-4 name-5

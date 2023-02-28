@@ -139,13 +139,12 @@ class SlurmCLI(CommonCLI):
         parser.add_argument("-e", "--end",  type=lambda s: datetime.strptime(s, '%Y-%m-%d'),
                             default=date.today().isoformat(),
                             help="End time period (yyyy-mm-dd), defaults to current day.")
-        parser.add_argument("-o", "--out", required=True, help="Fully qualified output filename")
+        parser.add_argument("-o", "--out", required=True, help="Directory name for output CSV")
+        #parser.add_argument("-p", "--partition", action='store_true', help="Show costs aggregated by partitions")
+        parser.add_argument("-f", "--fmt", type=str,
+                            help="Comma separated list of SLURM formatting options. Otherwise defaults are applied")
 
-        #parser.add_argument("--partition", action='store_true', help="Show costs aggregated by partitions")
-        #parser.add_argument("--user", action='store_true', help="Show costs aggregated by user")
-        #parser.add_argument("-f", "--fmt", type=str, help="Comma separated list of formatting options")
-
-    def cost(self, config: Dict, start, end, out):
+    def cost(self, config: Dict, start, end, out, fmt=None):
         """
         Cost analysis and reporting tool that maps Azure costs
         to SLURM Job Accounting data. This is an experimental
@@ -167,7 +166,7 @@ class SlurmCLI(CommonCLI):
 
         azcost = azurecost(config)
         driver = cost.CostDriver(azcost, config)
-        driver.run(start, end, out)
+        driver.run(start, end, out, fmt)
 
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
