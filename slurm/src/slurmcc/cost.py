@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import json
 import csv
@@ -11,14 +12,13 @@ from hpc.autoscale.cost.azurecost import azurecost
 
 log = logging.getLogger('cost')
 
-def run_command(cmd: str, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+def run_command(cmd: list, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     """
     run arbitrary command
     """
-    cmd_list = cmd.split(' ')
-    log.debug(cmd_list)
+    log.debug(cmd)
     try:
-        output = subprocess.run(cmd_list,stdout=stdout,stderr=stderr, check=True,
+        output = subprocess.run(cmd,stdout=stdout,stderr=stderr, check=True,
                        encoding='utf-8')
     except subprocess.CalledProcessError as e:
         log.error(f"cmd: {e.cmd}, rc: {e.returncode}")
@@ -27,19 +27,7 @@ def run_command(cmd: str, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     except Exception as e:
         log.error(e)
         raise
-    log.debug(f"output: {output.stdout}")
     return output
-
-def get_sacct_fields():
-
-    options = []
-    cmd = "/usr/bin/sacct -e"
-    out = run_command(cmd)
-    for line in out.stdout.split('\n'):
-        for opt in line.split():
-            options.append(opt.lower())
-
-    return options
 
 class Statistics:
 
@@ -63,15 +51,23 @@ class Statistics:
         print(tabulate(table, headers=['SUMMARY',''], tablefmt="simple"))
 
 class CostSlurm:
-    def __init__(self, start:str, end: str, cluster: str, fmt: str=None) -> None:
+    def __init__(self, start:str, end: str, cluster: str, cache_root: str, fmt: str=None) -> None:
 
         self.start = start
         self. end = end
         self.cluster = cluster
-        self.sacct = "/usr/bin/sacct"
-        self.squeue = "/usr/bin/squeue"
-        self.sacctmgr = "/usr/bin/sacctmgr"
-        cache_root = "/tmp"
+        self.sacct = shutil.which("sacct")
+        if not self.sacct:
+            raise RuntimeError("Could not find valid sacct binary")
+
+        self.squeue = shutil.which("squeue")
+        if not self.squeue:
+            raise RuntimeError("Could not find valid squeue binary")
+
+        self.sacctmgr = shutil.which("sacctmgr")
+        if not self.sacctmgr:
+            raise RuntimeError("Could not find valid sacctmgr binary")
+
         self.stats = Statistics()
         self.cache = f"{cache_root}/slurm"
         try:
@@ -82,11 +78,14 @@ class CostSlurm:
             raise
         default_output_fmt = "jobid,user,account,cluster,partition,ncpus,nnodes,submit,start,end,elapsedraw,state"
         default_input_fmt = default_output_fmt + ",admincomment"
-        self.options = "--allusers --duplicates --parsable2 --allocations --noheader"
+        self.options = ["--allusers", "--duplicates", "--parsable2", "--allocations", "--noheader"]
+        avail_format = self.get_sacct_fields()
         if fmt:
             req_fmt = fmt.split(",")
             in_fmt = default_input_fmt.split(",")
             for f in req_fmt:
+                if f not in avail_format:
+                    raise ValueError(f"{f} is not a valid sacct format option")
                 if f not in in_fmt:
                     in_fmt.append(f)
             self.output_format = ",".join(req_fmt)
@@ -99,13 +98,28 @@ class CostSlurm:
         self.slurm_fmt_t = namedtuple('slurm_fmt_t', self.output_format)
         self.c_fmt_t = namedtuple('c_fmt_t', ['cost'])
 
-    def _construct_command(self) -> str:
+    def get_sacct_fields(self):
 
-        args = f"{self.sacct} {self.options} " \
-                f"-M {self.cluster} "\
-                f"--start={self.start} " \
-                f"--end={self.end} -o "\
-                f"{self.input_format}"
+        options = []
+        cmd = [self.sacct, "-e"]
+        out = run_command(cmd)
+        for line in out.stdout.splitlines():
+            for opt in line.split():
+                options.append(opt.lower())
+
+        return options
+
+    def _construct_command(self) -> list:
+
+        args = [self.sacct]
+        for opt in self.options:
+            args.append(opt)
+        args.append("-M")
+        args.append(self.cluster)
+        args.append(f"--start={self.start}")
+        args.append(f"--end={self.end}")
+        args.append("-o")
+        args.append(self.input_format)
         return args
 
     def use_cache(self, filename) -> bool:
@@ -123,7 +137,7 @@ class CostSlurm:
         if self.use_cache(_queue_rec_file):
             return _queue_rec_file
 
-        cmd = f"{self.squeue} --json"
+        cmd = [self.squeue, "--json"]
         with open(_queue_rec_file, 'w') as fp:
             output = run_command(cmd, stdout=fp)
             if output.returncode:
@@ -191,6 +205,11 @@ class CostSlurm:
                 self.stats.admincomment_err += 1
                 self.stats.unprocessed += 1
                 continue
+            except KeyError as e:
+                log.debug(f"Key: {e.args[0]} not found in admincomment, job={row.jobid}, cluster={row.cluster}")
+                self.stats.admincomment_err +=1
+                self.stats.unprocessed += 1
+                continue
             charge_factor = float(row.ncpus) / float(cpupernode)
 
             az_fmt = azcost.get_job(sku_name, region, spot)
@@ -218,8 +237,11 @@ class CostSlurm:
 class CostDriver:
     def __init__(self, azcost: azurecost, config: dict):
 
+        self.config = config
         self.azcost = azcost
-        self.cluster = config['cluster_name']
+        self.cluster = config.get('cluster_name')
+        if not self.cluster:
+            raise ValueError("cluster_name not present in config")
 
     def run(self, start: datetime, end: datetime, out: str, fmt: str):
 
@@ -227,9 +249,21 @@ class CostDriver:
         log.debug(f"end: {end}")
         sacct_start = start.isoformat()
         sacct_end = end.isoformat()
-        cost_slurm = CostSlurm(start=sacct_start, end=sacct_end, cluster=self.cluster, fmt=fmt)
-        os.makedirs(out, exist_ok=True)
 
+        cost_config = self.config.get('cost', {})
+        if not cost_config or not cost_config.get('cache_root'):
+            log.debug("Using /tmp as cost cache dir")
+            cache_root = "/tmp"
+        else:
+            cache_root = cost_config.get('cache_root')
+
+        cost_slurm = CostSlurm(start=sacct_start, end=sacct_end, cluster=self.cluster,
+                               cache_root=cache_root,fmt=fmt)
+        try:
+            os.makedirs(out, exist_ok=True)
+        except OSError as e:
+            log.error(f"Cannot create output directory {out}")
+            raise
         jobs_csv = os.path.join(out, "jobs.csv")
         part_csv = os.path.join(out, "partition.csv")
         part_hourly = os.path.join(out, "partition_hourly.csv")

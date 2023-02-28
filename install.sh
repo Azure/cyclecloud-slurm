@@ -99,6 +99,7 @@ azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --accounting-tag-name ClusterId \
                    --accounting-tag-value $tag \
                    --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+                   --cost-cache-root $INSTALL_DIR/.cache \
                    > $INSTALL_DIR/autoscale.json
 
 
