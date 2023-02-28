@@ -63,7 +63,7 @@ class Statistics:
         print(tabulate(table, headers=['SUMMARY',''], tablefmt="simple"))
 
 class CostSlurm:
-    def __init__(self, start:str, end: str, cluster: str) -> None:
+    def __init__(self, start:str, end: str, cluster: str, fmt: str=None) -> None:
 
         self.start = start
         self. end = end
@@ -80,16 +80,24 @@ class CostSlurm:
             log.error("Unable to create cache directory {self.cache}")
             log.error(e.strerror)
             raise
-        self.DEFAULT_SLURM_FORMAT = "jobid,user,account,cluster,partition,ncpus,nnodes,submit,start,end,elapsedraw,state,admincomment"
+        default_output_fmt = "jobid,user,account,cluster,partition,ncpus,nnodes,submit,start,end,elapsedraw,state"
+        default_input_fmt = default_output_fmt + ",admincomment"
         self.options = "--allusers --duplicates --parsable2 --allocations --noheader"
-        #TODO fix this later
-        self.slurm_avail_fmt = self.DEFAULT_SLURM_FORMAT
-        self.slurm_fmt_t = namedtuple('slurm_fmt_t', self.DEFAULT_SLURM_FORMAT)
+        if fmt:
+            req_fmt = fmt.split(",")
+            in_fmt = default_input_fmt.split(",")
+            for f in req_fmt:
+                if f not in in_fmt:
+                    in_fmt.append(f)
+            self.output_format = ",".join(req_fmt)
+            self.input_format = ",".join(in_fmt)
+        else:
+            self.output_format = default_output_fmt
+            self.input_format = default_input_fmt
+
+        self.in_fmt_t = namedtuple('in_fmt_t', self.input_format)
+        self.slurm_fmt_t = namedtuple('slurm_fmt_t', self.output_format)
         self.c_fmt_t = namedtuple('c_fmt_t', ['cost'])
-
-    def get_slurm_format(self):
-
-        return ','.join(self.DEFAULT_SLURM_FORMAT)
 
     def _construct_command(self) -> str:
 
@@ -97,7 +105,7 @@ class CostSlurm:
                 f"-M {self.cluster} "\
                 f"--start={self.start} " \
                 f"--end={self.end} -o "\
-                f"{self.DEFAULT_SLURM_FORMAT}"
+                f"{self.input_format}"
         return args
 
     def use_cache(self, filename) -> bool:
@@ -154,9 +162,7 @@ class CostSlurm:
 
     def get_output_format(self, azcost: azurecost):
 
-        az_fmt = azcost.get_azcost_job_format()
-        #slurm_fmt =  self.get_slurm_format()
-
+        az_fmt = azcost.get_job_format()
         return namedtuple('out_fmt_t', list(self.slurm_fmt_t._fields + az_fmt._fields + self.c_fmt_t._fields))
 
     def process_jobs(self, azcost: azurecost, jobsfp, out_fmt_t):
@@ -167,7 +173,7 @@ class CostSlurm:
         reader = csv.reader(fp, delimiter='|')
         writer = csv.writer(jobsfp, delimiter=',')
 
-        for row in map(self.slurm_fmt_t._make, reader):
+        for row in map(self.in_fmt_t._make, reader):
             self.stats.jobs += 1
             if row.state == 'RUNNING' and int(row.jobid) in running:
                 admincomment = running[int(row.jobid)]
@@ -187,7 +193,7 @@ class CostSlurm:
                 continue
             charge_factor = float(row.ncpus) / float(cpupernode)
 
-            az_fmt = azcost.get_azcost_job(sku_name, region, spot)
+            az_fmt = azcost.get_job(sku_name, region, spot)
             charged_cost = ((az_fmt.rate/3600) * float(row.elapsedraw)) * charge_factor
             c_fmt = self.c_fmt_t(cost=charged_cost)
             if (region,sku_name) not in self.stats.cost_per_sku:
@@ -196,7 +202,7 @@ class CostSlurm:
 
             out_row = []
             for f in out_fmt_t._fields:
-                if f in self.slurm_fmt_t._fields:
+                if f in self.in_fmt_t._fields:
                     out_row.append(row._asdict()[f])
                 elif f in az_fmt._fields:
                     out_row.append(az_fmt._asdict()[f])
@@ -215,29 +221,36 @@ class CostDriver:
         self.azcost = azcost
         self.cluster = config['cluster_name']
 
-    def run(self, start: datetime, end: datetime, out: str):
+    def run(self, start: datetime, end: datetime, out: str, fmt: str):
 
         log.debug(f"start: {start}")
         log.debug(f"end: {end}")
         sacct_start = start.isoformat()
         sacct_end = end.isoformat()
-        cost_slurm = CostSlurm(start=sacct_start, end=sacct_end, cluster=self.cluster)
+        cost_slurm = CostSlurm(start=sacct_start, end=sacct_end, cluster=self.cluster, fmt=fmt)
         os.makedirs(out, exist_ok=True)
 
         jobs_csv = os.path.join(out, "jobs.csv")
         part_csv = os.path.join(out, "partition.csv")
         part_hourly = os.path.join(out, "partition_hourly.csv")
 
-        fmt = self.azcost.get_azcost_job_format()
+        fmt = self.azcost.get_job_format()
         out_fmt_t = cost_slurm.get_output_format(self.azcost)
         with open(jobs_csv, 'w') as fp:
             writer = csv.writer(fp, delimiter=',')
             writer.writerow(list(out_fmt_t._fields))
             cost_slurm.process_jobs(azcost=self.azcost, jobsfp=fp, out_fmt_t=out_fmt_t)
 
-        fmt = self.azcost.get_azcost_nodearray_format()
+        fmt = self.azcost.get_nodearray_format()
         with open(part_csv, 'w') as fp:
             writer = csv.writer(fp, delimiter=',')
             writer.writerow(list(fmt._fields))
-            count = self.azcost.get_azcost_nodearray(fp, start=sacct_start, end=sacct_end)
+            self.azcost.get_nodearray(fp, start=sacct_start, end=sacct_end)
+
+        fmt = self.azcost.get_nodearray_hourly_format()
+        with open(part_hourly, 'w') as fp:
+            writer = csv.writer(fp, delimiter=',')
+            writer.writerow(list(fmt._fields))
+            self.azcost.get_nodearray_hourly(fp, start=sacct_start, end=sacct_end)
+
         cost_slurm.stats.display()
