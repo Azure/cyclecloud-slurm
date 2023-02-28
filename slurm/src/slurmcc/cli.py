@@ -42,7 +42,7 @@ from . import cost
 from hpc.autoscale.results import AllocationResult
 
 
-VERSION = "3.0.0"
+VERSION = "3.0.1"
 
 
 def csv_list(x: str) -> List[str]:
@@ -433,7 +433,7 @@ class SlurmCLI(CommonCLI):
 
         if os.path.exists(azure_conf):
             shutil.copyfile(azure_conf, os.path.join(backup_dir, "azure.conf"))
-
+        
         if os.path.exists(gres_conf):
             shutil.copyfile(gres_conf, os.path.join(backup_dir, "gres.conf"))
 
@@ -446,7 +446,9 @@ class SlurmCLI(CommonCLI):
                 autoscale=config.get("autoscale", True),
             )
 
-        logging.debug("Moving %s to %s", azure_conf + ".tmp", azure_conf)
+        logging.debug(
+            "Moving %s to %s", azure_conf + ".tmp", azure_conf
+        )
         shutil.move(azure_conf + ".tmp", azure_conf)
 
         _update_future_states(node_mgr)
