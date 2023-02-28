@@ -150,7 +150,7 @@ class SlurmCLI(CommonCLI):
         to SLURM Job Accounting data. This is an experimental
         feature.
         """
-        config['cache_root'] = "/tmp"
+
         curr = datetime.today()
         delta = timedelta(days=365)
 
@@ -352,6 +352,7 @@ class SlurmCLI(CommonCLI):
         parser.add_argument(
             "--accounting-subscription-id", dest="accounting__subscription_id"
         )
+        parser.add_argument("--cost-cache-root", dest="cost__cache_root")
 
     def _initconfig(self, config: Dict) -> None:
         # TODO
