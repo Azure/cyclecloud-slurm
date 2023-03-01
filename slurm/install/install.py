@@ -170,6 +170,7 @@ def accounting(s: InstallSettings) -> None:
         content="""
 AccountingStorageType=accounting_storage/slurmdbd
 AccountingStorageHost="localhost"
+AccountingStorageTRES=gres/gpu
 """,
     )
     subprocess.check_call(
@@ -201,7 +202,7 @@ AccountingStorageHost="localhost"
         variables={
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
-            "storagepass": "StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
+            "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
             "slurmver": s.slurmver,
         },
     )

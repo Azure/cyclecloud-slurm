@@ -151,6 +151,7 @@ def execute() -> None:
 
     _add("install.sh", mode=os.stat("install.sh")[0])
     _add("sbin/resume_fail_program.sh", "sbin/resume_fail_program.sh")
+    _add("sbin/prolog.sh", "sbin/prolog.sh")
     _add("sbin/resume_program.sh", "sbin/resume_program.sh")
     _add("sbin/return_to_idle.sh", "sbin/return_to_idle.sh")
     _add("sbin/suspend_program.sh", "sbin/suspend_program.sh")
