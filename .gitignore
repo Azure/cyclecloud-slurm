@@ -351,3 +351,5 @@ install/docker/sched
 **/.kitchen.local.yml
 **/kitchen.yml
 **/kitchen.local.yml
+integration/clusters/*.txt
+integration/clusters/*.json

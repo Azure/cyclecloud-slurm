@@ -30,7 +30,7 @@ if [ ${SLURM_ROLE} == "scheduler" ]; then
                       slurm_${SLURM_VERSION}-lua \
                       slurm_${SLURM_VERSION}-sql
 else
-    zypper install -y slurm_${SLURM_VERSION} \
+    zypper install -y slurm_${SLURM_VERSION}
 fi
 
 for fil in slurm.conf cgroup.conf slurmdbd.conf; do
