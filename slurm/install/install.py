@@ -1,4 +1,5 @@
 import argparse
+from hashlib import md5
 import json
 import logging
 import logging.config
@@ -64,6 +65,8 @@ class InstallSettings:
         self.dynamic_config = config["slurm"].get("dynamic_config")
 
         self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
+
+        self.additonal_slurm_config = config["slurm"].get("additional", {}).get("config")
 
 
 def setup_users(s: InstallSettings) -> None:
@@ -233,6 +236,16 @@ def complete_install(s: InstallSettings) -> None:
             "max_node_count": s.max_node_count,
         },
     )
+
+    if s.additonal_slurm_config:
+        hash = md5(s.additonal_slurm_config.encode()).hexdigest()
+        with open("/sched/slurm.conf", "r") as fr:
+            already_written = hash in fr.read()
+        if not already_written:        
+            with open("/sched/slurm.conf", "a") as fa:
+                fa.write("\n")
+                fa.write(f"# Additional config from CycleCloud - md5 = {hash}\n")
+                fa.write(s.additonal_slurm_config)
 
     ilib.link(
         "/sched/slurm.conf",
