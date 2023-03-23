@@ -21,8 +21,8 @@ Autoscale = $Autoscale
 
         [[[configuration]]]
 
-        slurm.install_pkg = azure-slurm-install-pkg-3.0.0.tar.gz
-        slurm.autoscale_pkg = azure-slurm-pkg-3.0.0.tar.gz
+        slurm.install_pkg = azure-slurm-install-pkg-3.0.1.tar.gz
+        slurm.autoscale_pkg = azure-slurm-pkg-3.0.1.tar.gz
 
         slurm.version = $configuration_slurm_version
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
@@ -49,7 +49,7 @@ Autoscale = $Autoscale
         cyclecloud.exports.defaults.samba.enabled = false      
         cshared.server.legacy_links_disabled = true
 
-        [[[cluster-init cyclecloud/slurm:default:3.0.0]]]
+        [[[cluster-init cyclecloud/slurm:default:3.0.1]]]
         Optional = true
 
         [[[configuration cyclecloud.mounts.nfs_shared]]]
@@ -92,7 +92,7 @@ Autoscale = $Autoscale
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
 
 
-        [[[cluster-init cyclecloud/slurm:scheduler:3.0.0]]]
+        [[[cluster-init cyclecloud/slurm:scheduler:3.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -146,7 +146,7 @@ Autoscale = $Autoscale
         MachineType = $loginMachineType
         ImageName = $SchedulerImageName
 
-        [[[cluster-init cyclecloud/slurm:login:3.0.0]]]
+        [[[cluster-init cyclecloud/slurm:login:3.0.1]]]
         [[[configuration]]]
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
@@ -160,7 +160,7 @@ Autoscale = $Autoscale
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
-        [[[cluster-init cyclecloud/slurm:execute:3.0.0]]]
+        [[[cluster-init cyclecloud/slurm:execute:3.0.1]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -433,8 +433,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="22.05.3-1"]}
-        DefaultValue = 22.05.3-1
+        Config.Entries := {[Value="22.05.8-1"]}
+        DefaultValue = 22.05.8-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]
         Label = Job Accounting
