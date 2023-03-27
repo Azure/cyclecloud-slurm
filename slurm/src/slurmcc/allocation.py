@@ -51,12 +51,13 @@ def resume(
         if partition.is_hpc:
             constraints["node.colocated"] = True
         result: AllocationResult = node_mgr.allocate(
-            constraints, node_count=1
+            constraints, node_count=1, allow_existing=False
         )
         if len(result.nodes) != 1:
             raise RuntimeError()
         result.nodes[0].name_format = name
         nodes.extend(result.nodes)
+
     boot_result = node_mgr.bootup(nodes)
 
     return boot_result
