@@ -70,8 +70,8 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
             return "\n".join(_show_hostnames(args[-1]))
 
         if args[0:2] == ["show", "nodes"]:
-            assert len(args) >= 3
-            return self.show_nodes(args[2:])
+            assert len(args) == 3
+            return self.show_nodes(args[2].split(","))
 
         if args[0] == "update":
             entity, value = args[1].split("=")
@@ -95,18 +95,19 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
             ret.append(
                 """
 NodeName=%(NodeName)s
-    NodeAddr=%(NodeAddr)s NodeHostName=%(NodeHostName)s"""
+    NodeAddr=%(NodeAddr)s NodeHostName=%(NodeHostName)s AvailableFeatures=%(AvailableFeatures)s"""
                 % snode
             )
 
         return "\n".join(ret)
 
-    def create_nodes(self, node_names: List[str]) -> None:
+    def create_nodes(self, node_names: List[str], features: List[str] = []) -> None:
         for node_name in node_names:
             self.slurm_nodes[node_name] = {
                 "NodeName": node_name,
                 "NodeAddr": node_name,
                 "NodeHostName": node_name,
+                "AvailableFeatures": ",".join(features),
             }
 
 
@@ -159,11 +160,12 @@ def make_test_node_manager(cluster_name: str = "c1") -> NodeManager:
     bindings.add_nodearray(
         name="dynamic",
         resources={},
-        software_configuration=dict(slurm=dict(is_default=False, hpc=False)),
+        software_configuration=dict(slurm=dict(is_default=False, hpc=False, dynamic_config="-Z Feature=dyn")),
     )
     bindings.add_bucket(
-        nodearray_name="hpc", vm_size="Standard_F4", max_count=100, available_count=100
+        nodearray_name="hpc", vm_size="Standard_F4", max_count=100, available_count=100, placement_groups=["Standard_F4_pg0"]
     )
+    
     bindings.add_bucket(
         nodearray_name="htc", vm_size="Standard_F2", max_count=100, available_count=100
     )

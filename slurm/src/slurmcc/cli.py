@@ -562,22 +562,14 @@ def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> Non
         "# Creating dynamic nodeset and partition using slurm.dynamic_config=%s\n"
         % partition.dynamic_config
     )
-    toks = partition.dynamic_config.replace('"', "").replace("'", "").split()
-    features = None
-    for tok in toks:
-        if "=" in tok:
-            key, value = tok.split("=", 1)
-            if key.lower() == "feature":
-                features = value.strip()
-
-    if not features:
+    if not partition.features:
         logging.error(
             f"slurm.dynamic_config was set for {partition.name}"
             + "but it did not include a feature declaration. Slurm requires this! Skipping for now.ß"
         )
         return
 
-    writer.write(f"Nodeset={partition.name}ns Feature={features}\n")
+    writer.write(f"Nodeset={partition.name}ns Feature={','.join(partition.features)}\n")
     writer.write(f"PartitionName={partition.name} Nodes={partition.name}ns")
     if partition.is_default:
         writer.write(" Default=YES")
@@ -591,9 +583,16 @@ def _partitions(
     autoscale: bool = True,
 ) -> None:
 
+    written_dynamic_partitions = set()
+
     for partition in partitions:
         if partition.dynamic_config:
+            if partition.name in written_dynamic_partitions:
+                logging.warning("Duplicate partition found mapped to the same name." +
+                                " Using first Feature= declaration and ignoring the rest!")
+                continue
             _dynamic_partition(partition, writer)
+            written_dynamic_partitions.add(partition.name)
             continue
 
         node_list = partition.node_list or []

@@ -57,6 +57,16 @@ class Partition:
         self.dynamic_config = dynamic_config
         self.over_allocation_thresholds = over_allocation_thresholds
 
+        self.features = []
+        if self.dynamic_config:
+            toks = self.dynamic_config.replace('"', "").replace("'", "").split()
+
+            for tok in toks:
+                if "=" in tok:
+                    key, value = tok.split("=", 1)
+                    if key.lower() == "feature":
+                        self.features = value.strip().split(",")
+
     def bucket_for_node(self, node_name: str) -> NodeBucket:
         for pg, node_list in self.node_list_by_pg.items():
             if node_name in node_list:
@@ -64,6 +74,17 @@ class Partition:
                     if bucket.placement_group == pg:
                         return bucket
         raise RuntimeError()
+
+    def add_dynamic_node(
+        self, node_name: str, placement_group: Optional[PlacementGroup] = None
+    ) -> None:
+        assert self.dynamic_config, "Cannot add dynamic node to non-dynamic partition"
+        if placement_group not in self.node_list_by_pg:
+            self.node_list_by_pg[placement_group] = []
+
+        node_list = self.node_list_by_pg[placement_group]
+        if node_name not in node_list:
+            node_list.append(node_name)
 
     @property
     def node_list(self) -> str:
@@ -215,62 +236,62 @@ def fetch_partitions(
                 nodename_prefix,
             )
 
-        machine_type = buckets[0].vm_size
-        if not machine_type:
+        if len(buckets) > 1 and not dynamic_config:
             logging.warning(
-                "MachineType not defined for nodearray %s. Skipping", nodearray_name
-            )
-            continue
-
-        # TODO only allowed for dynamic
-        # if partition_name in partitions:
-        #     logging.warning(
-        #         "Same partition defined for two different nodearrays. Ignoring nodearray %s",
-        #         nodearray_name,
-        #     )
-        #     continue
-
-        limits: BucketLimits = buckets[0].limits
-
-        if limits.max_count <= 0:
-            logging.info(
-                "Bucket has a max_count <= 0, defined for machinetype=='%s'. Skipping",
-                machine_type,
-            )
-            continue
-
-        max_scaleset_size = buckets[0].max_placement_group_size
-
-        # dampen_memory = float(slurm_config.get("dampen_memory") or 5) / 100
-
-        if not is_hpc:
-            max_scaleset_size = 2**31
-
-        use_pcpu = str(slurm_config.get("use_pcpu", True)).lower() == "true"
-
-        overallocation_expr = slurm_config.get("overallocation") or []
-        over_allocation_thresholds = {}
-        if overallocation_expr:
-            over_allocation_thresholds = _parse_default_overallocations(
-                partition_name, overallocation_expr
-            )
-
-        all_partitions.append(
-            Partition(
-                partition_name,
+                "Multiple buckets defined for nodearray %s, but no dynamic_config. Using first bucket (vm_size or placement group) only.",
                 nodearray_name,
-                nodename_prefix,
-                machine_type,
-                slurm_config.get("default_partition", False),
-                is_hpc,
-                max_scaleset_size,
-                buckets,
-                limits.max_count,
-                use_pcpu=use_pcpu,
-                dynamic_config=dynamic_config,
-                over_allocation_thresholds=over_allocation_thresholds,
             )
-        )
+            buckets = [buckets[0]]
+
+        for bucket in buckets:
+            machine_type = bucket.vm_size
+            if not machine_type:
+                logging.warning(
+                    "MachineType not defined for nodearray %s. Skipping", nodearray_name
+                )
+                continue
+
+            limits: BucketLimits = buckets[0].limits
+
+            if limits.max_count <= 0:
+                logging.info(
+                    "Bucket has a max_count <= 0, defined for machinetype=='%s'. Skipping",
+                    machine_type,
+                )
+                continue
+
+            max_scaleset_size = buckets[0].max_placement_group_size
+
+            # dampen_memory = float(slurm_config.get("dampen_memory") or 5) / 100
+
+            if not is_hpc:
+                max_scaleset_size = 2 ** 31
+
+            use_pcpu = str(slurm_config.get("use_pcpu", True)).lower() == "true"
+
+            overallocation_expr = slurm_config.get("overallocation") or []
+            over_allocation_thresholds = {}
+            if overallocation_expr:
+                over_allocation_thresholds = _parse_default_overallocations(
+                    partition_name, overallocation_expr
+                )
+
+            all_partitions.append(
+                Partition(
+                    partition_name,
+                    nodearray_name,
+                    nodename_prefix,
+                    machine_type,
+                    slurm_config.get("default_partition", False),
+                    is_hpc,
+                    max_scaleset_size,
+                    buckets,
+                    limits.max_count,
+                    use_pcpu=use_pcpu,
+                    dynamic_config=dynamic_config,
+                    over_allocation_thresholds=over_allocation_thresholds,
+                )
+            )
 
     filtered_partitions = []
     by_name = hpcutil.partition(all_partitions, lambda p: p.name)

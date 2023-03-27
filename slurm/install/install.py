@@ -33,6 +33,7 @@ class InstallSettings:
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
         self.slurmver = config["slurm"]["version"]
+        self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
 
         self.slurm_user: str = config["slurm"]["user"].get("name") or "slurm"
         self.slurm_grp: str = config["slurm"]["user"].get("group") or "slurm"
@@ -63,10 +64,28 @@ class InstallSettings:
         self.platform_family = platform_family
 
         self.dynamic_config = config["slurm"].get("dynamic_config")
+        if self.dynamic_config:
+            self.dynamic_config = _inject_vm_size(self.dynamic_config, self.vm_size)
+        self.dynamic_config
 
         self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
 
         self.additonal_slurm_config = config["slurm"].get("additional", {}).get("config")
+
+
+def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
+    lc = dynamic_config.lower()
+    if "feature=" not in lc:
+        logging.warning("Dynamic config is specified but no 'Feature={some_flag}' is set under slurm.dynamic_config.")
+        return dynamic_config
+    else:
+        ret = []
+        for tok in dynamic_config.split():
+            if tok.lower().startswith("feature="):
+                ret.append(f"Feature={vm_size},{tok[len('Feature='):]}")
+            else:
+                ret.append(tok)
+        return " ".join(ret)
 
 
 def setup_users(s: InstallSettings) -> None:

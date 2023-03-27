@@ -5,7 +5,7 @@ import subprocess as subprocesslib
 import time
 import traceback
 from abc import ABC, abstractmethod
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from . import AzureSlurmError, custom_chaos_mode
 
@@ -36,6 +36,35 @@ def set_slurm_cli(cli: NativeSlurmCLI) -> None:
 def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
+
+
+def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    args = ["show", "nodes"]
+    if node_list:
+        args.append(",".join(node_list))
+    stdout = scontrol(args)
+    return parse_show_nodes(stdout)
+
+
+def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
+    ret = []
+    current_node = None
+    for line in stdout.splitlines():
+        line = line.strip()
+
+        for sub_expr in line.split():
+            if "=" not in sub_expr:
+                continue
+            key, value = sub_expr.split("=", 1)
+            if key == "NodeName":
+                if current_node:
+                    ret.append(current_node)
+                current_node = {}
+            assert current_node is not None
+            current_node[key] = value
+
+    ret.append(current_node)
+    return ret
 
 
 def to_hostlist(nodes: Union[str, List[str]]) -> str:

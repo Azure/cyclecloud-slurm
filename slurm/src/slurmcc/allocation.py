@@ -23,18 +23,64 @@ def resume(
     partitions: List[partitionlib.Partition],
 ) -> BootupResult:
     name_to_partition = {}
+    feature_to_partition = {}
     for partition in partitions:
         for name in partition.all_nodes():
             name_to_partition[name] = partition
+
+        if partition.dynamic_config:
+            feature_key = tuple(sorted([x.lower() for x in partition.features]))
+            if feature_key in feature_to_partition:
+                logging.warning(
+                    f"Duplicate feature key: {feature_key}: {partition}, using the first definition."
+                )
+            else:
+                feature_to_partition[feature_key] = partition
+            feature_key_w_vm_size = feature_key + (partition.machine_type.lower(),)
+            if feature_key_w_vm_size in feature_to_partition:
+                logging.warning(
+                    f"Duplicate feature key: {feature_key_w_vm_size}: {partition}, using the first definition."
+                )
+            else:
+                feature_to_partition[feature_key_w_vm_size] = partition
+
     existing_nodes_by_name = hpcutil.partition(node_mgr.get_nodes(), lambda n: n.name)
 
     nodes = []
+    find_by_feature = []
+    for name in node_list:
+        if name not in name_to_partition:
+            find_by_feature.append(name)
+    
+    if find_by_feature and not feature_to_partition:
+        raise AzureSlurmError(f"Could not find static nodes {find_by_feature} and there were no dynamic patitions either!")
+
+    if find_by_feature:
+        response = slutil.show_nodes(find_by_feature)
+        for slurm_node in response:
+            name = slurm_node["NodeName"]
+            find_by_feature.remove(name)
+            features = [x.strip() for x in slurm_node.get("AvailableFeatures", "").lower().split(",") if x.strip()]
+            if not features:
+                raise AzureSlurmError(f"The node {name} is not a static node and does not define any Features. This is required for dynamic nodes. {slurm_node}")
+            feature_key = tuple(sorted(features))
+            if feature_key not in feature_to_partition:
+                # assert False, f"{feature_key} not in {list(feature_to_partition.keys())}"
+                raise AzureSlurmError(
+                    f"Could not map feature set to a nodearray/VM_Size combination: {feature_key}: {list(feature_to_partition.keys())}"
+                )
+                continue
+            partition = feature_to_partition[feature_key]
+            partition.add_dynamic_node(name)
+            logging.info(f"Resuming {name} in {partition.name}")
+            name_to_partition[name] = partition
+    
     for name in node_list:
         if name in existing_nodes_by_name:
             logging.info(f"{name} already exists.")
             continue
 
-        if name not in name_to_partition:
+        if name not in name_to_partition:    
             raise AzureSlurmError(
                 f"Unknown node name: {name}: {list(name_to_partition.keys())}"
             )
@@ -43,7 +89,7 @@ def resume(
 
         def name_hook(bucket: NodeBucket, index: int) -> str:
             if index != 1:
-                raise RuntimeError(f"Unexpected index: {index}")
+                raise RuntimeError(f"Could not create node with name {name}. Perhaps the node already exists in a terminating state?")
             return name
 
         node_mgr.set_node_name_hook(name_hook)
