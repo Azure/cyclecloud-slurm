@@ -111,6 +111,18 @@ class SlurmCLI(CommonCLI):
     def create_nodes(self, *args: Any, **kwargs: Dict) -> None:
         assert False
 
+    @disablecommand
+    def delete_nodes(
+        self,
+        config: Dict,
+        hostnames: List[str],
+        node_names: List[str],
+        do_delete: bool = True,
+        force: bool = False,
+        permanent: bool = False,
+    ) -> None:
+        assert False
+
     def _add_completion_data(self, completion_json: Dict) -> None:
         node_names = slutil.check_output(["sinfo", "-N", "-h", "-o", "%N"]).splitlines(
             keepends=False
