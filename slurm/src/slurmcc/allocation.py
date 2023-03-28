@@ -6,6 +6,7 @@ from typing import Callable, Dict, List, Set, Tuple
 
 from hpc.autoscale import util as hpcutil
 from hpc.autoscale import clock
+from hpc.autoscale.ccbindings import ClusterBindingInterface
 from hpc.autoscale.node.bucket import NodeBucket
 from hpc.autoscale.node.node import Node
 from hpc.autoscale.node.nodemanager import NodeManager
@@ -107,6 +108,35 @@ def resume(
     boot_result = node_mgr.bootup(nodes)
 
     return boot_result
+
+
+def wait_for_nodes_to_terminate(
+    bindings: ClusterBindingInterface, node_list: List[str]
+) -> None:
+    attempts = 1800 / 5
+    waiting_for_nodes = []
+    while attempts > 0:
+        attempts -= 1
+        waiting_for_nodes = []
+        cc_by_name = hpcutil.partition_single(bindings.get_nodes().nodes, lambda n: n["Name"])
+
+        for name in node_list:
+            if name in cc_by_name:
+                cc_node = cc_by_name[name]
+                target_state = cc_node.get("TargetState") or "undefined"
+                status = cc_node.get("Status") or "undefined"
+                is_booting = target_state == "Started"
+                reached_final_state = target_state == status
+                if is_booting or reached_final_state:
+                    continue
+                waiting_for_nodes.append(name)
+        if not waiting_for_nodes:
+            logging.info("All nodes are available to be started.")
+            return
+        logging.info(f"Waiting for nodes to terminate: {waiting_for_nodes}")
+        clock.sleep(5)
+    raise AzureSlurmError(f"Timed out waiting for nodes to terminate: {waiting_for_nodes}")
+
 
 
 class WaitForResume:

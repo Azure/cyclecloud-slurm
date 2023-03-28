@@ -16,6 +16,7 @@ from subprocess import SubprocessError, check_output
 from typing import Any, Callable, Dict, Iterable, List, Optional, TextIO, Union
 
 from hpc.autoscale.cost.azurecost import azurecost
+from hpc.autoscale.ccbindings import new_cluster_bindings
 from hpc.autoscale.hpctypes import Memory
 from hpc.autoscale import clock
 from hpc.autoscale import util as hpcutil
@@ -213,6 +214,9 @@ class SlurmCLI(CommonCLI):
         """
         Equivalent to ResumeProgram, starts and waits for a set of nodes.
         """
+        bindings = new_cluster_bindings(config)
+        allocation.wait_for_nodes_to_terminate(bindings, node_list)
+
         node_mgr = self._get_node_manager(config)
         partitions = partitionlib.fetch_partitions(node_mgr, include_dynamic=True)
         bootup_result = allocation.resume(config, node_mgr, node_list, partitions)
