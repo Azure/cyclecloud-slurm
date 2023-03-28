@@ -3,5 +3,8 @@
 set -e
 
 yum install -y python36 wget
-
-/source/azure-slurm/build.sh /source/cyclecloud-scalelib
+if [ -e /source/cyclecloud-scalelib ]; then
+    /source/azure-slurm/build.sh /source/cyclecloud-scalelib
+else
+    /source/azure-slurm/build.sh
+fi
