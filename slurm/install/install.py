@@ -1,10 +1,10 @@
 import argparse
+from hashlib import md5
 import json
 import logging
 import logging.config
 import os
 import subprocess
-import time
 import installlib as ilib
 from typing import Dict, Optional
 
@@ -33,6 +33,7 @@ class InstallSettings:
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
         self.slurmver = config["slurm"]["version"]
+        self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
 
         self.slurm_user: str = config["slurm"]["user"].get("name") or "slurm"
         self.slurm_grp: str = config["slurm"]["user"].get("group") or "slurm"
@@ -62,6 +63,30 @@ class InstallSettings:
 
         self.platform_family = platform_family
 
+        self.dynamic_config = config["slurm"].get("dynamic_config")
+        if self.dynamic_config:
+            self.dynamic_config = _inject_vm_size(self.dynamic_config, self.vm_size)
+        self.dynamic_config
+
+        self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
+
+        self.additonal_slurm_config = config["slurm"].get("additional", {}).get("config")
+
+
+def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
+    lc = dynamic_config.lower()
+    if "feature=" not in lc:
+        logging.warning("Dynamic config is specified but no 'Feature={some_flag}' is set under slurm.dynamic_config.")
+        return dynamic_config
+    else:
+        ret = []
+        for tok in dynamic_config.split():
+            if tok.lower().startswith("feature="):
+                ret.append(f"Feature={vm_size},{tok[len('Feature='):]}")
+            else:
+                ret.append(tok)
+        return " ".join(ret)
+
 
 def setup_users(s: InstallSettings) -> None:
     # Set up users for Slurm and Munge
@@ -86,8 +111,8 @@ def setup_users(s: InstallSettings) -> None:
     )
 
 
-def run_installer(path: str, mode: str) -> None:
-    subprocess.check_call([path, mode])
+def run_installer(s: InstallSettings, path: str, mode: str) -> None:
+    subprocess.check_call([path, mode, s.slurmver])
 
 
 def fix_permissions(s: InstallSettings) -> None:
@@ -214,39 +239,7 @@ AccountingStorageTRES=gres/gpu
         group=s.slurm_grp,
     )
 
-    ilib.enable_service("slurmdbd")  # , user=s.slurm_user, exec_start="/sbin/slurmdbd")
-    subprocess.check_call(["systemctl", "start", "slurmdbd"])
-
-    max_attempts = 5
-    attempt = 0
-    cluster_name = s.cluster_name
-    last_exception: Optional[Exception] = None
-    while attempt < max_attempts:
-        attempt = attempt + 1
-        last_exception = None
-        try:
-            output = subprocess.check_output(
-                ["sacctmgr", "show", "cluster", "-p"]
-            ).decode()
-            if cluster_name in output:
-                break
-        except Exception:
-            logging.exception(
-                f"Attempted to run sacctmgr show cluster -p, attempt {attempt}/{max_attempts}"
-            )
-
-        try:
-            subprocess.check_call(["sacctmgr", "-i", "add", "cluster", cluster_name])
-        except Exception as e:
-            last_exception = e
-            logging.exception(
-                f"Attempted to run sacctmgr -i add cluster {cluster_name}, attempt {attempt}/{max_attempts}"
-            )
-
-        time.sleep(5)
-
-    if last_exception:
-        raise last_exception
+    ilib.enable_service("slurmdbd")
 
 
 def complete_install(s: InstallSettings) -> None:
@@ -259,8 +252,19 @@ def complete_install(s: InstallSettings) -> None:
         variables={
             "slurmctldhost": s.hostname,
             "cluster_name": s.cluster_name,
+            "max_node_count": s.max_node_count,
         },
     )
+
+    if s.additonal_slurm_config:
+        hash = md5(s.additonal_slurm_config.encode()).hexdigest()
+        with open("/sched/slurm.conf", "r") as fr:
+            already_written = hash in fr.read()
+        if not already_written:        
+            with open("/sched/slurm.conf", "a") as fa:
+                fa.write("\n")
+                fa.write(f"# Additional config from CycleCloud - md5 = {hash}\n")
+                fa.write(s.additonal_slurm_config)
 
     ilib.link(
         "/sched/slurm.conf",
@@ -362,22 +366,19 @@ def complete_install(s: InstallSettings) -> None:
 
     ilib.create_service("munged", user=s.munge_user, exec_start="/sbin/munged")
 
-    # v19 does this for us automatically BUT only for nodes that were susped
-    # nodes that hit ResumeTimeout, however, remain in down~
-
-    ilib.restart_service("munge")
-
 
 def setup_slurmd(s: InstallSettings) -> None:
-    # ilib.file(
-    #     "/etc/sysconfig/slurmd",
-    #     content=f"SLURMD_OPTIONS=-b -N {s.node_name}",
-    #     owner="root",
-    #     group="root",
-    #     mode="0600",
-    # )
+    slurmd_config = f"SLURMD_OPTIONS=-b -N {s.node_name}"
+    if s.dynamic_config:
+        slurmd_config = f"SLURMD_OPTIONS={s.dynamic_config} -N {s.node_name}"
+    ilib.file(
+        "/etc/sysconfig/slurmd" if s.platform_family == "rhel" else "/etc/default/slurmd",
+        content=slurmd_config,
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+        mode="0700",
+    )
     ilib.enable_service("slurmd")
-    subprocess.check_call(["systemctl", "start", "slurmd"])
 
 
 def set_hostname(s: InstallSettings) -> None:
@@ -429,7 +430,7 @@ def main() -> None:
     munge_key(settings)
 
     # runs either rhel.sh or ubuntu.sh to install the packages
-    run_installer(os.path.abspath(f"{args.platform}.sh"), args.mode)
+    run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
     
     # various permissions fixes
     fix_permissions(settings)

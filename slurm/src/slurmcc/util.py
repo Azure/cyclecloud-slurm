@@ -1,13 +1,70 @@
 import logging
+from abc import ABC, abstractmethod
 import random
 import subprocess as subprocesslib
 import time
 import traceback
-from typing import Any, Callable, List, Optional, Union
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Dict, List, Optional, Union
 
-from . import custom_chaos_mode
+from . import AzureSlurmError, custom_chaos_mode
 
-from . import CyclecloudSlurmError
+
+class NativeSlurmCLI(ABC):
+    @abstractmethod
+    def scontrol(self, args: List[str], retry: bool = True) -> str:
+        ...
+
+
+class NativeSlurmCLIImpl(NativeSlurmCLI):
+    def scontrol(self, args: List[str], retry: bool = True) -> str:
+        assert args[0] != "scontrol"
+        full_args = ["scontrol"] + args
+        if retry:
+            return retry_subprocess(lambda: check_output(full_args)).strip()
+        return check_output(full_args).strip()
+
+
+SLURM_CLI: NativeSlurmCLI = NativeSlurmCLIImpl()
+
+
+def set_slurm_cli(cli: NativeSlurmCLI) -> None:
+    global SLURM_CLI
+    SLURM_CLI = cli
+
+
+def scontrol(args: List[str], retry: bool = True) -> str:
+    assert args[0] != "scontrol"
+    return SLURM_CLI.scontrol(args, retry)
+
+
+def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    args = ["show", "nodes"]
+    if node_list:
+        args.append(",".join(node_list))
+    stdout = scontrol(args)
+    return parse_show_nodes(stdout)
+
+
+def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
+    ret = []
+    current_node = None
+    for line in stdout.splitlines():
+        line = line.strip()
+
+        for sub_expr in line.split():
+            if "=" not in sub_expr:
+                continue
+            key, value = sub_expr.split("=", 1)
+            if key == "NodeName":
+                if current_node:
+                    ret.append(current_node)
+                current_node = {}
+            assert current_node is not None
+            current_node[key] = value
+
+    ret.append(current_node)
+    return ret
 
 
 def to_hostlist(nodes: Union[str, List[str]]) -> str:
@@ -19,18 +76,14 @@ def to_hostlist(nodes: Union[str, List[str]]) -> str:
     else:
         nodes_str = nodes
 
-    return retry_subprocess(
-        lambda: check_output(["scontrol", "show", "hostlist", nodes_str])
-    ).strip()
+    return scontrol(["show", "hostlist", nodes_str])
 
 
 def from_hostlist(hostlist_expr: str) -> List[str]:
     """
     convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
     """
-    stdout = retry_subprocess(
-        lambda: check_output(["scontrol", "show", "hostnames", hostlist_expr])
-    )
+    stdout = scontrol(["show", "hostnames", hostlist_expr])
     return [x.strip() for x in stdout.split()]
 
 
@@ -46,7 +99,7 @@ def retry_rest(func: Callable, attempts: int = 5) -> Any:
 
             time.sleep(attempt * attempt)
 
-    raise CyclecloudSlurmError(str(last_exception))
+    raise AzureSlurmError(str(last_exception))
 
 
 def retry_subprocess(func: Callable, attempts: int = 5) -> Any:
@@ -61,7 +114,7 @@ def retry_subprocess(func: Callable, attempts: int = 5) -> Any:
             logging.warning("Command failed, retrying: %s", str(e))
             time.sleep(attempt * attempt)
 
-    raise CyclecloudSlurmError(str(last_exception))
+    raise AzureSlurmError(str(last_exception))
 
 
 def check_output(args: List[str], **kwargs: Any) -> str:
