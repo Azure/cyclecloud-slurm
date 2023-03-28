@@ -37,11 +37,11 @@ def get_cycle_libs(args: Namespace) -> List[str]:
     )
     # swagger_file = "swagger-client-1.0.0.tar.gz"
 
-    scalelib_url = "https://github.com/Azure/cyclecloud-scalelib/archive/{}.tar.gz".format(
+    scalelib_url = "https://github.com/Azure/cyclecloud-scalelib/archive/refs/tags/{}.tar.gz".format(
         SCALELIB_VERSION
     )
-    # TODO RDH!!!
-    cyclecloud_api_url = "https://github.com/Azure/cyclecloud-gridengine/releases/download/2.0.0/cyclecloud_api-8.0.1-py2.py3-none-any.whl"
+    
+    cyclecloud_api_url = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-03-13-bins/cyclecloud_api-8.3.1-py2.py3-none-any.whl"
     to_download = {
         scalelib_file: (args.scalelib, scalelib_url),
         cyclecloud_api_file: (args.cyclecloud_api, cyclecloud_api_url),
