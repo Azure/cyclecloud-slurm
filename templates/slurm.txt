@@ -207,7 +207,7 @@ Autoscale = $Autoscale
     AdditionalClusterInitSpecs = $DynamicClusterInitSpecs
         [[[configuration]]]
         slurm.hpc = false
-        slurm.dynamic_config := "-Z --conf \"RealMemory=3072 Feature=dyn\""
+        slurm.dynamic_config := "-Z --conf \"Feature=dyn\""
         # set pcpu = false for all hyperthreaded VMs
         slurm.use_pcpu = false
 
