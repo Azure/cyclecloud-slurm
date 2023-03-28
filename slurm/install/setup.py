@@ -132,7 +132,6 @@ setup(
     },
     install_requires=[
         "typing_extensions==3.7.4.3",
-        "certifi==2020.12.5",
         "zipp==3.6",
         "requests == 2.24.0",
     ],
