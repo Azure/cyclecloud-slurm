@@ -237,7 +237,7 @@ Order = 10
         Label = Scheduler VM Type
         Description = The VM type for scheduler node
         ParameterType = Cloud.MachineType
-        DefaultValue = Standard_D12_v2
+        DefaultValue = Standard_D4ads_v5
 
         [[[parameter loginMachineType]]]
         Label = Login node VM Type
