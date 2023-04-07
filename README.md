@@ -37,13 +37,13 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
       # Set to true if nodes are used for tightly-coupled multi-node jobs
       slurm.hpc = false
 
-      [[[cluster-init cyclecloud/slurm:execute:3.0.1]]]
+      [[[cluster-init cyclecloud/slurm:execute:3.0.2]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
 
 ### Dynamic Partitions
-As of `3.0.1`, we support dynamic partitions. You can make a `nodearray` map to a dynamic partition by adding the following.
+As of `3.0.2`, we support dynamic partitions. You can make a `nodearray` map to a dynamic partition by adding the following.
 Note that `mydyn` could be any valid Feature. It could also be more than one, separated by a comma.
 ```ini
       [[[configuration]]]
