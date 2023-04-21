@@ -540,6 +540,7 @@ def _wait_for_resume(cluster_wrapper, operation_id, node_list, subprocess_module
                 continue
 
             use_nodename_as_hostname = node.get("Configuration", {}).get("slurm", {}).get("use_nodename_as_hostname", False)
+            private_ip = node.get("PrivateIp")
             if not use_nodename_as_hostname:
                 ip_already_set_key = (name, private_ip)
                 if private_ip and ip_already_set_key not in ip_already_set:
