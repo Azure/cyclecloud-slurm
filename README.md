@@ -108,6 +108,74 @@ To start a cluster in this mode, simply add `SuspendTime=-1` to the additional s
 
 To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `azslurm remove_nodes && azslurm scale`. 
 
+### Accounting
+
+To enable accounting in slurm, maria-db can now be started via cloud-init on the scheduler node and slurmdbd configured to enable db connection without a
+password string. In the absense of database URL and password, slurmdbd configuration defaults to localhost.
+One way of doing this is to add following lines in cluster-init:
+
+```
+#!/bin/bash
+yum install -y mariadb-server
+systemctl enable mariadb.service
+systemctl start mariadb.service
+```
+### Cost Reporting
+
+`azslurm` in slurm 3.0 project now comes with a new experimental feature `azslurm cost` to display costs of slurm jobs. This requires Cyclecloud 8.4 or newer, as well
+as slurm accounting enabled.
+
+```
+usage: azslurm cost [-h] [--config CONFIG] [-s START] [-e END] -o OUT [-f FMT]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --config CONFIG, -c CONFIG
+  -s START, --start START
+                        Start time period (yyyy-mm-dd), defaults to current
+                        day.
+  -e END, --end END     End time period (yyyy-mm-dd), defaults to current day.
+  -o OUT, --out OUT     Directory name for output CSV
+  -f FMT, --fmt FMT     Comma separated list of SLURM formatting options.
+                        Otherwise defaults are applied
+```
+
+Cost reporting at the moment only works with retail azure pricing, and hence may not reflect actual customer invoices.
+
+To generate cost reports for a given time period:
+
+```
+ azslurm cost -s 2023-03-01 -e 2023-03-31 -o march-2023
+```
+
+This will create a directory march-2023 and generate csv files containing costs for jobs and partitions.
+
+```
+[root@slurm301-2-scheduler ~]# ls march-2023/
+jobs.csv  partition.csv  partition_hourly.csv
+```
+
+1. jobs.csv :  contains costs per job based on jobs runtime. Currently running jobs are included.
+2. partition.csv: contains costs per partition, based total usage in each partition. For partitions, such
+                  as dynamic partitions where multiple VM sizes can be included, it includes a row for each VM size.
+3. partition_hourly.csv: contains csv report for each partition on an hourly basis.
+
+Some basic formatting support includes customizing fields in the jobs report that are appended from `sacct` data. Cost
+reporting fields such as `sku_name,region,spot,meter,meterid,metercat,rate,currency,cost` are always appended but slurm
+fields from sacct can be customizable. Any field available in `sacct -e` is valid. To customize formatting:
+
+```
+azslurm cost -s 2023-03-01 -e 2023-03-31 -o march-2023 -f account,cluster,jobid,jobname,reqtres,start,end,state,qos,priority,container,constraints,user
+```
+This will append the supplied formatting options to cost reporting fields, and produce the jobs csv file with following
+columns:
+```
+account,cluster,jobid,jobname,reqtres,start,end,state,qos,priority,container,constraints,user,sku_name,region,spot,meter,meterid,metercat,rate,currency,cost
+```
+Formatting is only available for jobs and not for partition and partition_hourly data.
+
+Do note: `azslurm cost` relies on slurm's admincomment feature to associate specific vm_size and meter info for jobs.
+
 ## Troubleshooting
 
 ### UID conflicts for Slurm and Munge users
