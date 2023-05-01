@@ -1,0 +1,101 @@
+# Bursting CycleCloud Slurm clusters from a dedicated on-prem scheduler (Slurm Cluster-Init `2.7.0` and newer with `Lua plugin`)
+
+It is possible to configure a Slurm scheduler not provisioned by CycleCloud to autoscale an execute nodearray/partition defined in CycleCloud. There are some manual steps to install.
+
+## Prerequisites and assumptions
+Due to the complexity of a hybrid Slurm setup, some familiarity with Slurm administration is expected. See the [Slurm Documentation](https://slurm.schedmd.com/) for more information.
+
+---
+**NOTE**
+
+Burst support for Slurm with Lua plugin is only supported and tested with Slurm 20.11.9. 22.05.3 and newer. Older versions of Slurm are no longer supported by SchedMD and are not tested by Microsoft.
+
+---
+
+The scheduler and execute nodes need to have the same NFS mounts available. This can either be done with shared NFS export from something like Azure NetApp Files that's mounted on both the scheduler and the execute nodes, or by exporting NFS from the on-prem scheduler to the execute nodes. The default shares that the Slurm project expects are `/shared` for home directories and `/sched` for Slurm configuration.
+
+It's also expected that any firewalls between the on-prem and cloud environment allow the slurmd's to connect back to the scheduler via ports 6817 and 6818, as well as any additional Slurm ports that may be configured in your cluster.
+
+## In CycleCloud/Initializing a headless cluster
+
+1) Import the headless cluster template (available here)[https://raw.githubusercontent.com/Azure/cyclecloud-slurm/feature/burst8/templates/slurm-headless-lua.txt]:
+
+```bash
+cyclecloud import_template slurm-headless -f templates/slurm-headless-lua.txt -c slurm
+```
+
+2) Create a cluster in CycleCloud using the slurm-headless template and start it. No execute nodes will be created yet; that will happen after the cluster is joined to the on-prem scheduler.
+
+## On the scheduler
+
+1) Ensure that the Slurm scheduler is installed and configured properly for a basic on-prem setup
+
+2) Copy the slurm_bootstrap tarball (https://ahowardinternal.blob.core.windows.net/releases/slurm-lua_bootstrap.tgz) tarball contents to /opt/cycle/slurm:
+
+```bash
+mkdir -p /opt/cycle/slurm
+cd !$
+tar xvzf /tmp/slurm-lua_bootstrap.tgz
+```
+
+3) Install `python3` and `python3-pip` packages if they aren't already installed
+
+4) Install the cyclecloud-api Python package using pip:
+
+```bash
+sudo pip install cyclecloud_api-8.1.0-py2.py3-none-any.whl
+```
+
+5) Copy `job_submit.lua` to `/etc/slurm/`
+
+```bash
+sudo cp /opt/cycle/slurm/job_submit.lua /usr/lib64/slurm/
+```
+
+6) Make the jetpack config directory
+
+```bash
+mkdir /opt/cycle/jetpack/config
+```
+
+7) Initialize the connection to CycleCloud with the cyclecloud_slurm.sh script. Note: You may want to use a special API user since this password will be stored on the cluster:
+
+```bash
+cd /opt/cycle/slurm
+./cyclecloud_slurm.sh initialize --cluster-name slurmmpi --username myuser --password mypass --url https://<cyclecloud_url> 
+```
+
+8) Create/move `/sched/{topology,cyclecloud,cgroups}.conf` if they don't already exist and link them to `/etc/slurm/{topology,cyclecloud,cgroups}.conf`
+
+9) Move `/etc/slurm/slurm.conf` to `/sched/slurm.conf` and create a symlink back to `/etc/slurm/slurm.conf`
+
+10) Update `/etc/slurm/slurm.conf` to have the following settings:
+
+```ini
+TopologyPlugin=topology/tree
+JobSubmitPlugins=lua
+ResumeTimeout=1800
+SuspendTimeout=600
+SuspendTime=300
+ResumeProgram=/opt/cycle/slurm/resume_program.sh
+ResumeFailProgram=/opt/cycle/slurm/resume_fail_program.sh
+SuspendProgram=/opt/cycle/slurm/suspend_program.sh
+PrivateData=cloud
+TreeWidth=65533
+SchedulerParameters=max_switch_wait=24:00:00
+
+Include cyclecloud.conf
+SlurmctldHost=<SchedulerIP>
+```
+
+11) Run the scale command to create the cyclecloud.conf, topology.conf, and gres.conf files and create the nodes in CycleCloud:
+
+```bash
+cd /opt/cycle/slurm
+./cyclecloud_slurm.sh scale
+```
+
+
+## Additional notes:
+
+* The scheduler and execute nodes need to have the same NFS mounts available. This can either be done with shared NFS export from something like Azure NetApp Files that's mounted on both the scheduler and the execute nodes, or by exporting NFS from the on-prem scheduler to the execute nodes. The default shares that the Slurm project expects are /shared for home directories and /sched for Slurm configuration
