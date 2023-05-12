@@ -24,6 +24,7 @@ default[:slurm][:accounting][:enabled] = false
 default[:slurm][:accounting][:user] = 'root'
 default[:slurm][:accounting][:password] = ''
 default[:slurm][:accounting][:url] = 'localhost'
+default[:slurm][:accounting][:certificate_url] = 'https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem'
 
 default[:slurm][:ha_enabled] = false
 default[:slurm][:launch_parameters] = ''

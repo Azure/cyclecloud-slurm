@@ -118,7 +118,7 @@ link '/etc/slurm/slurmdbd.conf' do
 end
 
 remote_file '/etc/slurm/BaltimoreCyberTrustRoot.crt.pem' do
-    source 'https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem'
+    source node[:slurm][:accounting][:certificate_url]
     owner 'slurm'
     group 'slurm'
     mode 0644
