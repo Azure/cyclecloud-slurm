@@ -441,12 +441,27 @@ class SlurmCLI(CommonCLI):
 
         _update_future_states(node_mgr)
 
-        with open(gres_conf + ".tmp", "w") as fw:
-            _generate_gres_conf(partition_dict, fw)
-        shutil.move(gres_conf + ".tmp", gres_conf)
+        etc_gres = os.path.join(slurm_conf_dir, "gres.conf")
+        if _has_gres(partition_dict):
+            logging.debug("Updating gres.conf")
 
-        logging.info("Restarting slurmctld...")
-        check_output(["systemctl", "restart", "slurmctld"])
+            with open(gres_conf + ".tmp", "w") as fw:
+                _generate_gres_conf(partition_dict, fw)
+            shutil.move(gres_conf + ".tmp", gres_conf)
+            
+            if not os.path.exists(etc_gres):
+                os.symlink(gres_conf, etc_gres)
+        else:
+            if os.path.exists(etc_gres):
+                logging.debug("Removing %s", etc_gres)
+                os.remove(etc_gres)
+            if os.path.exists(gres_conf):
+                logging.debug("Removing %s", gres_conf)
+                os.remove(gres_conf)
+
+        if not skip_restart:
+            logging.info("Restarting slurmctld...")
+            check_output(["systemctl", "restart", "slurmctld"])
 
         logging.info("")
         logging.info("Re-scaling cluster complete.")
@@ -554,6 +569,14 @@ class SlurmCLI(CommonCLI):
             ],
             sys.stdout
         )
+
+    def gres_conf_parser(self, parser: ArgumentParser) -> None:
+        pass
+
+    def gres_conf(self, config: Dict) -> None:
+        node_mgr = self._get_node_manager(config)
+        partitions = partitionlib.fetch_partitions(node_mgr, include_dynamic=True)
+        _generate_gres_conf(partitions, sys.stdout)
 
 
 def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> None:
@@ -673,6 +696,13 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
         nodes = sorted(nodes, key=slutil.get_sort_key_func(bool(pg)))
         slurm_node_expr = ",".join(nodes)  # slutil.to_hostlist(",".join(nodes))
         writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
+
+
+def _has_gres(partitions: List[partitionlib.Partition]) -> bool:
+    for partition in partitions:
+        if partition.gpu_count:
+            return True
+    return False
 
 
 def _generate_gres_conf(partitions: List[partitionlib.Partition], writer: TextIO):
