@@ -256,15 +256,20 @@ class SlurmCLI(CommonCLI):
     def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
         by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
         node_list_filtered = []
+        attempt_by_name = []
         for node_name in node_list:
-            if node_name in by_name:
-                node_list_filtered.append(node_name)
+            if node_name not in by_name:
+                logging.warning(f"{node_name} does not exist in an existing partition. It may be an old VM size?")
+                attempt_by_name.append(node_name)
             else:
-                logging.info(f"{node_name} does not exist. Skipping.")
+                node_list_filtered.append(node_name)
         nodes = _as_nodes(node_list_filtered, node_mgr)
-        result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
-        logging.info(str(result))
-
+        if nodes:
+            result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
+            logging.info(str(result))
+        if attempt_by_name:
+            node_mgr.cluster_bindings.shutdown_nodes(names=attempt_by_name)
+        
     def suspend_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
         parser.add_argument(
@@ -398,7 +403,7 @@ class SlurmCLI(CommonCLI):
         )
 
     def scale_parser(self, parser: ArgumentParser) -> None:
-        return
+        parser.add_argument("--skip-restart", action="store_true", help="Skips slurmctld restart.")
 
     def scale(
         self,
@@ -406,7 +411,7 @@ class SlurmCLI(CommonCLI):
         backup_dir="/etc/slurm/.backups",
         slurm_conf_dir="/etc/slurm",
         sched_dir="/sched",
-        config_only=False,
+        skip_restart=False,
     ):
         node_mgr = self._get_node_manager(config)
         # make sure .backups exists
@@ -419,7 +424,7 @@ class SlurmCLI(CommonCLI):
         os.makedirs(backup_dir)
 
         azure_conf = os.path.join(sched_dir, "azure.conf")
-        gres_conf = os.path.join(slurm_conf_dir, "gres.conf")
+        gres_conf = os.path.join(sched_dir, "gres.conf")
 
         if os.path.exists(azure_conf):
             shutil.copyfile(azure_conf, os.path.join(backup_dir, "azure.conf"))
@@ -802,9 +807,9 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
     nodes: List[Node] = []
     by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
     for node_name in node_list:
-        # TODO error handling on missing node names
         if node_name not in by_name:
-            raise AzureSlurmError(f"Unknown node - {node_name}")
+            logging.warning(f"Unknown node - {node_name}")
+            continue
         nodes.append(by_name[node_name])
     return nodes
 

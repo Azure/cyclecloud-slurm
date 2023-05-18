@@ -279,6 +279,9 @@ def wait_for_resume(
 
     while clock.time() < omega:
         states, ready_nodes = waiter.check_nodes(node_list, get_latest_nodes())
+        if not states:
+            logging.warning("Nodes have disappeared. Did the VM size change? Node_List=%s", nodes_str)
+            return
         terminal_states = (
             states.get("Ready", 0)
             + sum(states.get("UNKNOWN", {}).values())
