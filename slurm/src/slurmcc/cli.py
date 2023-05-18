@@ -36,7 +36,7 @@ from . import util as slutil
 from . import cost
 
 
-VERSION = "3.0.1"
+VERSION = "3.0.2"
 
 
 def csv_list(x: str) -> List[str]:
