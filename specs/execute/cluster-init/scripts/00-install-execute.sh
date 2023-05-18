@@ -4,6 +4,8 @@ do_install=$(jetpack config slurm.do_install True)
 install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-3.0.1.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
 platform=$(jetpack config platform_family rhel)
+dynamic_config=$(jetpack config slurm.dynamic_config _none_)
+
 
 cd $CYCLECLOUD_HOME/system/bootstrap
 if [ $do_install == "True" ]; then
@@ -25,5 +27,16 @@ while [ $iters -ge 0 ]; do
     sleep 1
     iters=$(( $iters - 1 ))
 done
+
+
+if [ "$dynamic_config" != "_none_" ]; then
+    delete_dynamic_node=$(jetpack config slurm.delete_dynamic_node True)
+    if [ "$delete_dynamic_node" == "True" ]; then
+        node_name=$(jetpack config cyclecloud.node.name)
+        echo "Deleting dynamic node $node_name"
+        
+        scontrol delete nodename=$node_name
+    fi
+fi
 
 systemctl start slurmd
