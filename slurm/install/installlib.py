@@ -370,9 +370,12 @@ def _ensure_monitoring(platform_family: str) -> None:
             modified = True
 
     if modified:
-        with open("/etc/waagent.conf.tmp", "w") as fw:
+        dest_waagent = "/etc/waagent.conf"
+        temp_waagent = dest_waagent + ".tmp"
+        with open(temp_waagent, "w") as fw:
             for line in lines:
                 fw.write(line)
+        shutil.move(temp_waagent, dest_waagent)
         restart_service(_waagent_service_name(platform_family))
 
 
