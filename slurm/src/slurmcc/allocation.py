@@ -25,6 +25,11 @@ def resume(
 ) -> BootupResult:
     name_to_partition = {}
     feature_to_partition = {}
+
+    # A CX can add other custom feature flags. This allows a user to add a short hand
+    # flag for the VM size when creating nodes - i.e. Feature=dyn,Standard_F4,F4. 
+    relevant_keys = set()
+
     for partition in partitions:
         for name in partition.all_nodes():
             name_to_partition[name] = partition
@@ -38,6 +43,8 @@ def resume(
             else:
                 feature_to_partition[feature_key] = partition
             feature_key_w_vm_size = feature_key + (partition.machine_type.lower(),)
+            for key in feature_key_w_vm_size:
+                relevant_keys.add(key.lower())
             if feature_key_w_vm_size in feature_to_partition:
                 logging.warning(
                     f"Duplicate feature key: {feature_key_w_vm_size}: {partition}, using the first definition."
@@ -60,10 +67,14 @@ def resume(
         response = slutil.show_nodes(find_by_feature)
         for slurm_node in response:
             name = slurm_node["NodeName"]
+
             find_by_feature.remove(name)
-            features = [x.strip() for x in slurm_node.get("AvailableFeatures", "").lower().split(",") if x.strip()]
+            unfiltered_features = [x.strip() for x in slurm_node.get("AvailableFeatures", "").lower().split(",") if x.strip()]
+            features = [x for x in unfiltered_features if x in relevant_keys]
+
             if not features:
                 raise AzureSlurmError(f"The node {name} is not a static node and does not define any Features. This is required for dynamic nodes. {slurm_node}")
+            
             feature_key = tuple(sorted(features))
             if feature_key not in feature_to_partition:
                 # assert False, f"{feature_key} not in {list(feature_to_partition.keys())}"
