@@ -1,16 +1,24 @@
 import argparse
-from hashlib import md5
 import json
 import logging
 import logging.config
 import os
+import re
 import subprocess
+import sys
 import installlib as ilib
 from typing import Dict, Optional
 
 
+logging.basicConfig(
+    level=logging.INFO, stream=sys.stderr, format="%(asctime)s - %(message)s"
+)
+
+
 class InstallSettings:
-    def __init__(self, config: Dict, platform_family: str) -> None:
+    def __init__(self, config: Dict, platform_family: str, mode: str) -> None:
+        self.provider_config = config
+
         if "slurm" not in config:
             config["slurm"] = {}
 
@@ -57,11 +65,18 @@ class InstallSettings:
         self.use_nodename_as_hostname = config["slurm"].get(
             "use_nodename_as_hostname", False
         )
+        self.node_name_prefix = config["slurm"].get("node_prefix")
+        if self.node_name_prefix:
+            self.node_name_prefix = re.sub(
+                "[^a-zA-Z0-9-]", "-", self.node_name_prefix
+            ).lower()
+
         self.ensure_waagent_monitor_hostname = config["slurm"].get(
             "ensure_waagent_monitor_hostname", True
         )
 
         self.platform_family = platform_family
+        self.mode = mode
 
         self.dynamic_config = config["slurm"].get("dynamic_config")
         if self.dynamic_config:
@@ -70,7 +85,12 @@ class InstallSettings:
 
         self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
 
-        self.additonal_slurm_config = config["slurm"].get("additional", {}).get("config")
+        self.additonal_slurm_config = (
+            config["slurm"].get("additional", {}).get("config")
+        )
+
+        self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
+        self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -177,6 +197,14 @@ def munge_key(s: InstallSettings) -> None:
 
 
 def accounting(s: InstallSettings) -> None:
+    if s.mode != "scheduler":
+        return
+    if s.is_primary_scheduler:
+        _accounting_primary(s)
+    _accounting_all(s)
+
+
+def _accounting_primary(s: InstallSettings) -> None:
 
     if not s.acct_enabled:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
@@ -210,12 +238,6 @@ AccountingStorageTRES=gres/gpu
         "/sched/BaltimoreCyberTrustRoot.crt.pem", owner=s.slurm_user, group=s.slurm_grp
     )
     ilib.chmod("/sched/BaltimoreCyberTrustRoot.crt.pem", mode="0600")
-    ilib.link(
-        "/sched/BaltimoreCyberTrustRoot.crt.pem",
-        "/etc/slurm/BaltimoreCyberTrustRoot.crt.pem",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
 
     # Configure slurmdbd.conf
     ilib.template(
@@ -227,10 +249,22 @@ AccountingStorageTRES=gres/gpu
         variables={
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
-            "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
+            "storagepass": f"StoragePass={s.acct_pass}"
+            if s.acct_pass
+            else "#StoragePass=",
             "slurmver": s.slurmver,
         },
     )
+
+
+def _accounting_all(s: InstallSettings) -> None:
+    ilib.link(
+        "/sched/BaltimoreCyberTrustRoot.crt.pem",
+        "/etc/slurm/BaltimoreCyberTrustRoot.crt.pem",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
         "/sched/slurmdbd.conf",
@@ -243,6 +277,27 @@ AccountingStorageTRES=gres/gpu
 
 
 def complete_install(s: InstallSettings) -> None:
+    if s.mode == "scheduler":
+        if s.is_primary_scheduler:
+            _complete_install_primary(s)
+        _complete_install_all(s)
+    else:
+        _complete_install_all(s)
+
+
+def _complete_install_primary(s: InstallSettings) -> None:
+    assert s.is_primary_scheduler
+    secondary_scheduler = None
+    if s.secondary_scheduler_name:
+        secondary_scheduler = ilib.await_node_hostname(
+            s.provider_config, s.secondary_scheduler_name
+        )
+    state_save_location = "/var/spool/slurmd"
+    if secondary_scheduler:
+        state_save_location = "/sched/spool/slurmd"
+        if not os.path.exists("/sched/spool/slurmd"):
+            ilib.directory("/sched/spool/slurmd", owner=s.slurm_user, group=s.slurm_grp)
+
     ilib.template(
         "/sched/slurm.conf",
         owner=s.slurm_user,
@@ -253,25 +308,23 @@ def complete_install(s: InstallSettings) -> None:
             "slurmctldhost": s.hostname,
             "cluster_name": s.cluster_name,
             "max_node_count": s.max_node_count,
+            "state_save_location": state_save_location,
         },
     )
 
-    if s.additonal_slurm_config:
-        hash = md5(s.additonal_slurm_config.encode()).hexdigest()
-        with open("/sched/slurm.conf", "r") as fr:
-            already_written = hash in fr.read()
-        if not already_written:        
-            with open("/sched/slurm.conf", "a") as fa:
-                fa.write("\n")
-                fa.write(f"# Additional config from CycleCloud - md5 = {hash}\n")
-                fa.write(s.additonal_slurm_config)
+    if secondary_scheduler:
+        ilib.append_file(
+            "/sched/slurm.conf",
+            content=f"SlurmCtldHost={secondary_scheduler.hostname}\n",
+            comment_prefix="\n# Additional HA scheduler host -",
+        )
 
-    ilib.link(
-        "/sched/slurm.conf",
-        "/etc/slurm/slurm.conf",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
+    if s.additonal_slurm_config:
+        ilib.append_file(
+            "/sched/slurm.conf",
+            content=s.additonal_slurm_config,
+            comment_prefix="\n# Additional config from CycleCloud -",
+        )
 
     ilib.template(
         "/sched/cgroup.conf",
@@ -279,28 +332,6 @@ def complete_install(s: InstallSettings) -> None:
         group=s.slurm_grp,
         source="templates/cgroup.conf.template",
         mode="0644",
-    )
-
-    ilib.link(
-        "/sched/cgroup.conf",
-        "/etc/slurm/cgroup.conf",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
-
-    if os.path.exists("/sched/gres.conf"):
-        ilib.link(
-            "/sched/gres.conf",
-            "/etc/slurm/gres.conf",
-            owner=s.slurm_user,
-            group=s.slurm_grp,
-        )
-
-    ilib.link(
-        "/sched/azure.conf",
-        "/etc/slurm/azure.conf",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
     )
 
     if not os.path.exists("/sched/azure.conf"):
@@ -312,13 +343,6 @@ def complete_install(s: InstallSettings) -> None:
             content="",
         )
 
-    ilib.link(
-        "/sched/keep_alive.conf",
-        "/etc/slurm/keep_alive.conf",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
-
     if not os.path.exists("/sched/keep_alive.conf"):
         ilib.file(
             "/sched/keep_alive.conf",
@@ -327,6 +351,44 @@ def complete_install(s: InstallSettings) -> None:
             mode="0644",
             content="# Do not edit this file. It is managed by azslurm",
         )
+
+
+def _complete_install_all(s: InstallSettings) -> None:
+
+    ilib.link(
+        "/sched/gres.conf",
+        "/etc/slurm/gres.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        "/sched/slurm.conf",
+        "/etc/slurm/slurm.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        "/sched/cgroup.conf",
+        "/etc/slurm/cgroup.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        "/sched/azure.conf",
+        "/etc/slurm/azure.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        "/sched/keep_alive.conf",
+        "/etc/slurm/keep_alive.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
 
     # Link the accounting.conf regardless
     ilib.link(
@@ -367,12 +429,56 @@ def complete_install(s: InstallSettings) -> None:
     ilib.create_service("munged", user=s.munge_user, exec_start="/sbin/munged")
 
 
+def add_return_to_idle(s: InstallSettings) -> None:
+    ilib.cron(
+        "return_to_idle",
+        minute="*/5",
+        command=f"{s.autoscale_dir}/return_to_idle.sh 1>&2 >> {s.autoscale_dir}/logs/return_to_idle.log",
+    )
+
+
+def add_log_rotate_d(s: InstallSettings) -> None:
+    # Credit: Xavier Pillions from az-hop
+    ilib.file(
+        mode=644,
+        owner="root",
+        group="root",
+        dest="/etc/logrotate.d/slurm",
+        content="""##
+# Slurm Logrotate Configuration
+# rotate daily up to 7 days and compress
+##
+/var/log/slurmctld/*.log {
+        compress
+        missingok
+        nocopytruncate
+        nodelaycompress
+        nomail
+        notifempty
+        noolddir
+        daily
+        rotate 7
+        sharedscripts
+        size=100M
+        create 640 slurm root
+        postrotate
+                pkill -x --signal SIGUSR2 slurmctld
+                pkill -x --signal SIGUSR2 slurmd
+                pkill -x --signal SIGUSR2 slurmdbd
+                exit 0
+        endscript
+}""",
+    )
+
+
 def setup_slurmd(s: InstallSettings) -> None:
     slurmd_config = f"SLURMD_OPTIONS=-b -N {s.node_name}"
     if s.dynamic_config:
         slurmd_config = f"SLURMD_OPTIONS={s.dynamic_config} -N {s.node_name}"
     ilib.file(
-        "/etc/sysconfig/slurmd" if s.platform_family == "rhel" else "/etc/default/slurmd",
+        "/etc/sysconfig/slurmd"
+        if s.platform_family == "rhel"
+        else "/etc/default/slurmd",
         content=slurmd_config,
         owner=s.slurm_user,
         group=s.slurm_grp,
@@ -384,7 +490,17 @@ def setup_slurmd(s: InstallSettings) -> None:
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
-    ilib.set_hostname(s.node_name, s.platform_family, s.ensure_waagent_monitor_hostname)
+    
+    if s.is_primary_scheduler:
+        return
+    
+    new_hostname = s.node_name.lower()
+    if s.mode != "execute" and not new_hostname.startswith(s.node_name_prefix):
+        new_hostname = f"{s.node_name_prefix}{new_hostname}"
+
+    ilib.set_hostname(
+        new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
+    )
 
 
 def _load_config(bootstrap_config: str) -> Dict:
@@ -405,7 +521,7 @@ def main() -> None:
     # needed to set slurmctld only
     if os.path.exists("install_logging.conf"):
         logging.config.fileConfig("install_logging.conf")
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--platform", default="rhel", choices=["rhel", "ubuntu", "suse", "debian"]
@@ -421,7 +537,7 @@ def main() -> None:
         args.platform = "ubuntu"
 
     config = _load_config(args.bootstrap_config)
-    settings = InstallSettings(config, args.platform)
+    settings = InstallSettings(config, args.platform, args.mode)
 
     # create the users
     setup_users(settings)
@@ -431,26 +547,34 @@ def main() -> None:
 
     # runs either rhel.sh or ubuntu.sh to install the packages
     run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
-    
+
     # various permissions fixes
     fix_permissions(settings)
 
     complete_install(settings)
 
-    # scheduler specific - add return_to_idle script
-    if args.mode == "scheduler":
+    if settings.mode == "scheduler":
         accounting(settings)
-        # TODO create a rotate log
-        ilib.cron(
-            "return_to_idle",
-            minute="*/5",
-            command=f"{settings.autoscale_dir}/return_to_idle.sh 1>&2 >> {settings.autoscale_dir}/logs/return_to_idle.log",
-        )
 
-    if args.mode == "execute":
-        set_hostname(settings)
+    if settings.mode == "scheduler":
+        add_return_to_idle(settings)
+
+    set_hostname(settings)
+
+    if settings.mode == "execute":
         setup_slurmd(settings)
+
+    if settings.mode == "scheduler":
+        add_log_rotate_d(settings)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except:
+        print(
+            "An error occured during installation. See log file /var/log/azure-slurm-install.log for details.",
+            file=sys.stderr,
+        )
+        logging.exception("An error occured during installation.")
+        sys.exit(1)

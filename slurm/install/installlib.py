@@ -1,15 +1,23 @@
+import base64
 import grp
+from hashlib import md5
 import json
 import logging
 import os
 import pwd
 import re
 import shutil
+from ssl import SSLContext
+import ssl
 import subprocess
 import tempfile
 import time
 from types import TracebackType
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+
+import urllib
+import urllib.parse
+import urllib.request
 
 
 class ConvergeError(RuntimeError):
@@ -88,7 +96,7 @@ def chmod(dest: str, mode: Optional[Union[str, int]], recursive: bool = False) -
             cmd = ["chmod", "-R", str(mode), dest]
         else:
             cmd = ["chmod", str(mode), dest]
-        print(" ".join(cmd))
+        logging.info(" ".join(cmd))
         subprocess.check_call(cmd)
         # os.chmod(dest, mode)
 
@@ -118,7 +126,28 @@ def file(
         fw.write(content)
     chown(tmp_dest, owner, group)
     chmod(tmp_dest, mode)
-    shutil.move(tmp_dest, dest)
+    move(tmp_dest, dest)
+
+
+def append_file(dest: str, content: str, comment_prefix: str) -> None:
+    """
+        provides monotonic appending of content to a file.
+        This relies on the fact that we can append "md5 = <hash>" to the end 
+        of the comment to prevent duplicate appends.
+    """
+    hash = md5(content.encode()).hexdigest()
+    with open(dest, "r") as fr:
+        already_written = hash in fr.read()
+    if not already_written:
+        logging.info(f"Appending to {dest}: content='{content}'")
+        with open(dest, "a") as fa:
+            fa.write(f"{comment_prefix} md5 = {hash}\n")
+            fa.write(content)
+
+
+def move(src: str, dest: str) -> None:
+    logging.info(f"mv {src} {dest}")
+    shutil.move(src, dest)
 
 
 # TODO!!!
@@ -275,8 +304,8 @@ def cron(desc: str, minute: str, command: str) -> None:
             fw.write(f"# {desc}\n")
             fw.write(f"{minute} * * * * {command}\n")
         with open(temp_name) as fr:
-            print("Adding crontab:")
-            print(fr.read())
+            logging.info("Adding crontab:")
+            logging.info(fr.read())
         subprocess.check_call(["crontab", temp_name])
     finally:
         if os.path.exists(temp_name):
@@ -375,7 +404,7 @@ def _ensure_monitoring(platform_family: str) -> None:
         with open(temp_waagent, "w") as fw:
             for line in lines:
                 fw.write(line)
-        shutil.move(temp_waagent, dest_waagent)
+        move(temp_waagent, dest_waagent)
         restart_service(_waagent_service_name(platform_family))
 
 
@@ -427,3 +456,113 @@ def set_hostname(
             "import jetpack.converge as jc; jc._send_installation_status('warning')",
         ],
     )
+
+
+class ProviderNode:
+    def __init__(
+        self,
+        name: str,
+        profile_name: str,
+        hostname: str,
+        private_ipv4: str,
+        provider_status: str,
+        provider_type: str,
+    ) -> None:
+        self.name = name
+        self.profile_name = profile_name
+        self.hostname = hostname
+        self.private_ipv4 = private_ipv4
+        self.provider_status = provider_status
+        assert provider_type in ["CycleCloud", "ClusterService"]
+        self.provider_type = provider_type
+
+    def to_dict(self) -> Dict:
+        ret = {}
+        for attr in dir(self):
+            if attr.startswith("_"):
+                continue
+            if attr == "to_dict":
+                continue
+            val = getattr(self, attr)
+            if hasattr(val, "__call__"):
+                continue
+            ret[attr] = val
+        return ret
+
+
+    def is_failed(self) -> bool:
+        return self.provider_status == "Failed"
+
+    def is_ready(self) -> bool:
+        return self.provider_status == "Ready"
+
+    def is_booting(self) -> bool:
+        return self.provider_status != "Ready"
+
+
+def await_node_hostname(
+    provider_config: Dict, node_name: str, timeout=300
+) -> ProviderNode:
+    omega = timeout + time.time()
+    referenced_hostname = None
+    while referenced_hostname is None and time.time() < omega:
+        referenced_node = provider_node_status(provider_config, node_name)
+        if referenced_node.hostname:
+            return referenced_node
+        time.sleep(5)
+    raise RuntimeError(
+        f"Node {node_name} did not register hostname in {timeout} seconds"
+    )
+
+
+def provider_node_status(config: Dict, node_name: str) -> ProviderNode:
+    status = provider_nodes(config)
+    for node in status["nodes"]:
+        if node["Name"] == node_name:
+            return ProviderNode(
+                name=node["Name"],
+                profile_name=node["Template"],
+                hostname=node["Hostname"],
+                private_ipv4=node["PrivateIp"],
+                provider_status=node["Status"],
+                provider_type="CycleCloud",
+            )
+    raise RuntimeError(f"Node {node_name} not found in cluster status!")
+
+
+def provider_nodes(config: Dict) -> Dict:
+    if config.get("mock_provider"):
+        return config["mock_provider"]["nodes"]
+
+    cc_config = config["cyclecloud"]["config"]
+    urlbase = cc_config["web_server"].rstrip("/")
+    username = cc_config["username"]
+    password = cc_config["password"]
+    context = SSLContext(ssl.PROTOCOL_TLSv1_2)
+    cluster_name = urllib.parse.quote(config["cyclecloud"]["cluster"]["name"])
+    url = f"{urlbase}/clusters/{cluster_name}/nodes"
+    
+    auth_token = base64.b64encode(f"{username}:{password}".encode('utf-8')).decode("ascii")
+
+    request = urllib.request.Request(
+        url=url, headers={"Authorization": f"Basic {auth_token}"}, method="GET"
+    )
+    response = urllib.request.urlopen(
+        request,
+        context=context,
+        timeout=30,
+    )
+    
+    if response.getcode() != 200:
+        raise RuntimeError(f"Error getting cluster status: {response.status}")
+    return json.loads(response.read().decode("utf-8"))
+
+
+if __name__ == "__main__":
+    with open("/opt/cycle/jetpack/config/node.json") as fr:
+        config = json.load(fr)
+    import sys
+
+    # json.dump(cluster_status(config), sys.stdout, indent=2)
+
+    json.dump(provider_node_status(config, "scheduler-ha").to_dict(), sys.stdout, indent=2)

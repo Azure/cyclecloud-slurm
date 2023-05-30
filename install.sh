@@ -97,9 +97,9 @@ tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print
 azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --password $(jetpack config cyclecloud.config.password) \
                    --url      $(jetpack config cyclecloud.config.web_server) \
-                   --cluster-name $(jetpack config cyclecloud.cluster.name) \
+                   --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
                    --accounting-tag-name ClusterId \
-                   --accounting-tag-value $tag \
+                   --accounting-tag-value "$tag" \
                    --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
                    --cost-cache-root $INSTALL_DIR/.cache \
                    > $INSTALL_DIR/autoscale.json
