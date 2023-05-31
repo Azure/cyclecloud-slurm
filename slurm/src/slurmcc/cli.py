@@ -84,7 +84,7 @@ class SlurmDriver(GenericDriver):
 
             is_hpc = (
                 str(
-                    b.software_configuration.get("slurm", {}).get("hpc") or "false"
+                    b.software_configuration.get("slurm", {}).get("hpc") or "true"
                 ).lower()
                 == "true"
             )
