@@ -67,9 +67,7 @@ class InstallSettings:
         )
         self.node_name_prefix = config["slurm"].get("node_prefix")
         if self.node_name_prefix:
-            self.node_name_prefix = re.sub(
-                "[^a-zA-Z0-9-]", "-", self.node_name_prefix
-            ).lower()
+            self.node_name_prefix = _escape(self.node_name_prefix)
 
         self.ensure_waagent_monitor_hostname = config["slurm"].get(
             "ensure_waagent_monitor_hostname", True
@@ -91,6 +89,10 @@ class InstallSettings:
 
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
+
+
+def _escape(s: str) -> str:
+    return re.sub("[^a-zA-Z0-9-]", "-", s).lower()
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -306,7 +308,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         source="templates/slurm.conf.template",
         variables={
             "slurmctldhost": s.hostname,
-            "cluster_name": s.cluster_name,
+            "cluster_name": _escape(s.cluster_name),
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
         },

@@ -228,6 +228,8 @@ def fetch_partitions(
 
         nodename_prefix = re.sub("[^a-zA-Z0-9-]", "-", unescaped_nodename_prefix)
 
+        nodename_prefix = nodename_prefix.lower()
+
         if unescaped_nodename_prefix != nodename_prefix:
             logging.warning(
                 "slurm.node_prefix for partition %s was converted from '%s' to '%s' due to invalid hostname characters.",
