@@ -1,0 +1,392 @@
+
+################################
+## Cluster Configuration File ##
+################################
+
+[cluster Slurm]
+FormLayout = selectionpanel
+Category = Schedulers
+IconURL = https://github.com/Azure/cyclecloud-slurm/blob/master/icon.png?raw=true
+Autoscale = $Autoscale
+
+    [[node defaults]]
+    Credentials = $Credentials    
+    SubnetId = $SubnetId
+    Region = $Region
+    KeyPairLocation = ~/.ssh/cyclecloud.pem
+
+    # Slurm autoscaling supports both Terminate and Deallocate shutdown policies
+    ShutdownPolicy = $configuration_slurm_shutdown_policy
+
+        [[[configuration]]]
+        slurm.version = $configuration_slurm_version
+
+        # For fast spin-up after Deallocate, force an immediate re-converge on boot
+        cyclecloud.converge_on_boot = true
+
+        # Disable normal NFS exports and mounts
+        cyclecloud.mounts.sched.disabled = true
+        cyclecloud.mounts.shared.disabled = true
+        cyclecloud.exports.sched.disabled = true
+        cyclecloud.exports.shared.disabled = true
+        cyclecloud.exports.sched.samba.enabled = false
+        cyclecloud.exports.shared.samba.enabled = false
+        cyclecloud.exports.defaults.samba.enabled = false      
+        cshared.server.legacy_links_disabled = true
+        cuser.base_home_dir = /home
+        cyclecloud.selinux.policy = permissive
+        ganglia.install = false
+
+	    # Testing setting slurm/munge ID
+	    slurm.user.name = slurm
+	    slurm.user.uid = 11000
+	    slurm.user.gid = 11000
+	    munge.user.name = munge
+	    munge.user.uid = 11001
+	    munge.user.gid = 11001
+
+        [[[cluster-init cyclecloud/slurm:default:2.7.0]]]
+        Optional = true
+
+        [[[configuration cyclecloud.mounts.nfs_home]]]
+        type = nfs
+        mountpoint = /home
+        export_path = $NFSSharedExportPath
+        address = $NFSAddress
+        options = $NFSSharedMountOptions
+
+        [[[configuration cyclecloud.mounts.nfs_sched]]]
+        type = nfs
+        mountpoint = /sched
+        export_path = $NFSSchedExportPath
+        address = $NFSSchedAddress
+        options = $NFSSchedMountOptions
+
+        [[[configuration cyclecloud.mounts.additional_nfs]]]
+        disabled = ${AdditionalNAS isnt true}
+        type = nfs
+        address = ${ifThenElse(AdditionalNAS, AdditonalNFSAddress, undefined)}
+        mountpoint = ${ifThenElse(AdditionalNAS, AdditionalNFSMountPoint, undefined)}
+        export_path = ${ifThenElse(AdditionalNAS, AdditionalNFSExportPath, undefined)}
+        options = ${ifThenElse(AdditionalNAS, AdditionalNFSMountOptions, undefined)}
+
+    [[node nodearraybase]]
+    Abstract = true
+        [[[configuration]]]
+        slurm.autoscale = true
+
+        [[[network-interface eth0]]]
+
+    [[nodearray mpi]]
+    Extends = nodearraybase
+    MachineType = $HPCMachineType
+    ImageName = $HPCImageName
+    MaxCoreCount = $MaxHPCExecuteCoreCount
+    Azure.MaxScalesetSize = $HPCMaxScalesetSize
+    AdditionalClusterInitSpecs = $HPCClusterInitSpecs
+
+        [[[configuration]]]
+        slurm.autoscale = true
+        slurm.default_partition = true
+        slurm.hpc = true
+
+        [[[cluster-init cyclecloud/slurm:execute:2.7.0]]]
+
+    [[nodearray gpu]]
+    MachineType = $GpuMachineType
+    ImageName = $GpuImageName
+    MaxCoreCount = $MaxGpuExecuteCoreCount
+    AdditionalClusterInitSpecs = $GpuClusterInitSpecs
+
+        [[[configuration]]]
+        slurm.autoscale = true
+        slurm.hpc = false
+        slurm.use_pcpu = false
+
+        [[[cluster-init cyclecloud/slurm:execute:2.7.0]]]
+
+    [[nodearray htc]]
+    MachineType = $HTCMachineType
+    ImageName = $HTCImageName
+    MaxCoreCount = $MaxHTCExecuteCoreCount
+    AdditionalClusterInitSpecs = $HTCClusterInitSpecs
+    Interruptible = $HTCUseLowPrio
+
+        [[[configuration]]]
+        slurm.autoscale = true
+        slurm.hpc = false
+        slurm.use_pcpu = false
+
+        [[[cluster-init cyclecloud/slurm:execute:2.7.0]]]
+
+[parameters About]
+Order = 1
+
+    [[parameters About Slurm]]
+
+        [[[parameter slurm]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<table role=\"presentation\"><tr><td><img alt=\"Slurm icon\" src='static/cloud/cluster/ui/ClusterIcon/slurm.png' width='192' height='192'></td></tr><tr><td><p>Slurm is a highly configurable open source workload manager. See the <a href=\"https://www.schedmd.com/\" target=\"_blank\">Slurm project site</a> for an overview.</p><p>Follow the instructions in the <a href=\"https://github.com/azure/cyclecloud-slurm/\" target=\"_blank\">README</a> for details on instructions on extending and configuring the Project for your environment.</p></td></tr></table>"
+
+[parameters Required Settings]
+Order = 10
+
+    [[parameters Virtual Machines ]]
+    Description = "The cluster, in this case, has two roles: the scheduler master-node with shared filer and the execute hosts. Configure which VM types to use based on the requirements of your application."
+    Order = 20
+
+        [[[parameter Region]]]
+        Label = Region
+        Description = Deployment Location
+        ParameterType = Cloud.Region
+        DefaultValue = eastus
+
+        [[[parameter HPCMachineType]]]
+        Label = HPC VM Type
+        Description = The VM type for HPC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_HB120rs_v2
+
+        [[[parameter GpuMachineType]]]
+        Label = GPU VM Type
+        Description = The VM type for GPU execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_NC6s_v3
+
+        [[[parameter HTCMachineType]]]
+        Label = HTC VM Type
+        Description = The VM type for HTC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_E2ds_v5
+
+    [[parameters Auto-Scaling]]
+    Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster"
+    Order = 30
+
+        [[[parameter Autoscale]]]
+        Label = Autoscale
+        DefaultValue = true
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Start and stop execute instances automatically
+
+        [[[parameter MaxHPCExecuteCoreCount]]]
+        Label = Max HPC Cores
+        Description = The total number of HPC execute cores to start
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter HPCMaxScalesetSize]]]
+        Label = Max VMs per Scaleset
+        Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter MaxGpuExecuteCoreCount]]]
+        Label = Max GPU Cores
+        Description = The total number of GPU execute cores to start
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter MaxHTCExecuteCoreCount]]]
+        Label = Max HTC Cores
+        Description = The total number of HTC execute cores to start
+        DefaultValue = 100
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+
+        [[[parameter HTCUseLowPrio]]]
+        Label = Spot
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Use Spot VMs for HTC execute hosts
+
+        [[[parameter HTCSpotMaxPrice]]]
+        Label = Max Price
+        DefaultValue = -1
+        Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
+        Config.Plugin = pico.form.NumberTextBox
+        Conditions.Excluded := HTCUseLowPrio isnt true
+        Config.MinValue = -1
+
+        Config.IntegerOnly = true
+
+    [[parameters Networking]]
+    Order = 40
+
+        [[[parameter SubnetId]]]
+        Label = Subnet ID
+        Description = Subnet Resource Path (ResourceGroup/VirtualNetwork/Subnet)
+        ParameterType = Azure.Subnet
+        Required = True
+
+[parameters Filesystems]
+Order = 15
+
+    [[parameters Default NFS Sched]]
+    Order = 20
+        [[[parameter About sched]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>The directory <code>/sched</code> is a network attached mount and exists in all nodes of the cluster. Slurm config files reside within this mountpoint and Cyclecloud will link these files to <code>/etc/slurm</code>.</p>"
+        Order = 20
+
+        [[[parameter NFSSchedAddress]]]
+        Label = NFS IP Address
+        Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
+        Config.ParameterType = String
+
+        [[[parameter NFSSchedExportPath]]]
+        Label = Sched Export Path
+        Description = The path exported by the file system
+        DefaultValue = /sched
+
+        [[[parameter NFSSchedMountOptions]]]
+        Label = NFS Mount Options
+        Description = NFS Client Mount Options
+
+    [[parameters Default NFS Home]]
+    Order = 10
+        [[[parameter About home]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>The directory <code>/home</code> is a network attached mount and exists in all nodes of the cluster. Users' home directories reside within this mountpoint with the base homedir <code>/home</code>.<br><br>There are two options for providing this mount:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External NFS]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.</p>"
+        Order = 20
+
+        [[[parameter NFSAddress]]]
+        Label = NFS IP Address
+        Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
+        Config.ParameterType = String
+
+        [[[parameter NFSSharedExportPath]]]
+        Label = Shared Export Path
+        Description = The path exported by the file system
+        DefaultValue = /home
+
+        [[[parameter NFSSharedMountOptions]]]
+        Label = NFS Mount Options
+        Description = NFS Client Mount Options
+
+
+    [[parameters Additional NFS Mount]]
+    Order = 30
+        [[[parameter Additional NFS Mount Readme]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p>Mount another NFS endpoint on the cluster nodes</p>"
+        Order = 20
+
+        [[[parameter AdditionalNAS]]]
+        HideLabel = true
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Add NFS mount
+
+        [[[parameter AdditonalNFSAddress]]]
+        Label = NFS IP Address 
+        Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
+        Config.ParameterType = String
+        Conditions.Excluded := AdditionalNAS isnt true
+
+        [[[parameter AdditionalNFSMountPoint]]]
+        Label = NFS Mount Point
+        Description = The path at which to mount the Filesystem
+        DefaultValue = /data
+        Conditions.Excluded := AdditionalNAS isnt true
+
+        [[[parameter AdditionalNFSExportPath]]]
+        Label = NFS Export Path
+        Description = The path exported by the file system
+        DefaultValue = /data
+        Conditions.Excluded := AdditionalNAS isnt true
+
+        [[[parameter AdditionalNFSMountOptions]]]
+        Label = NFS Mount Options
+        Description = NFS Client Mount Options
+        Conditions.Excluded := AdditionalNAS isnt true
+
+
+[parameters Advanced Settings]
+Order = 20
+
+    [[parameters Azure Settings]]
+    Order = 10 
+
+        [[[parameter Credentials]]]
+        Description = The credentials for the cloud provider
+        ParameterType = Cloud.Credentials
+
+    [[parameters Slurm Settings ]]
+    Description = "Section for configuring Slurm"
+    Order = 5
+
+        [[[parameter configuration_slurm_version]]]
+        Required = True
+        Label = Slurm Version
+        Description = Version of Slurm to install on the cluster
+        ParameterType = StringList
+        Config.Plugin = pico.form.Dropdown
+        Config.FreeForm = true
+        Config.Entries := {[Value="22.05.3-1"], [Value="20.11.9-1"]}
+        DefaultValue = 22.05.3-1
+
+        [[[parameter configuration_slurm_shutdown_policy]]]
+        Label = ShutdownPolicy
+        description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.
+        DefaultValue = Terminate
+        config.plugin = pico.control.AutoCompleteDropdown
+            [[[[list Config.Entries]]]]
+            Name = Terminate
+            Label = Terminate
+            [[[[list Config.Entries]]]]
+            Name = Deallocate
+            Label = Deallocate
+
+    [[parameters Software]]
+    Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
+    Order = 10
+
+        [[[parameter HPCImageName]]]
+        Label = HPC OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+
+        [[[parameter GpuImageName]]]
+        Label = GPU OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+
+        [[[parameter HTCImageName]]]
+        Label = HTC OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = cycle.image.centos7
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+
+        [[[parameter HPCClusterInitSpecs]]]
+        Label = HPC Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to HPC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+
+        [[[parameter HTCClusterInitSpecs]]]
+        Label = HTC Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to HTC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs	
+
+        [[[parameter GpuClusterInitSpecs]]]
+        Label = GPU Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to GPU execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
