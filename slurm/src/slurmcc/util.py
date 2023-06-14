@@ -38,11 +38,11 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     return SLURM_CLI.scontrol(args, retry)
 
 
-def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def show_nodes(node_list: Optional[List[str]] = None, retry: bool = True) -> List[Dict[str, Any]]:
     args = ["show", "nodes"]
     if node_list:
         args.append(",".join(node_list))
-    stdout = scontrol(args)
+    stdout = scontrol(args, retry)
     return parse_show_nodes(stdout)
 
 

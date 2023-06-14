@@ -64,7 +64,7 @@ def resume(
         raise AzureSlurmError(f"Could not find static nodes {find_by_feature} and there were no dynamic patitions either!")
 
     if find_by_feature:
-        response = slutil.show_nodes(find_by_feature)
+        response = slutil.show_nodes(find_by_feature, retry=False)
         for slurm_node in response:
             name = slurm_node["NodeName"]
 

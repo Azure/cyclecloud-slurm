@@ -583,6 +583,34 @@ class SlurmCLI(CommonCLI):
         partitions = partitionlib.fetch_partitions(node_mgr, include_dynamic=True)
         _generate_gres_conf(partitions, sys.stdout)
 
+    def return_to_idle_parser(self, parser: ArgumentParser) -> None:
+        pass
+
+    @init_power_saving_log
+    def return_to_idle(self, config: Dict) -> None:
+        logging.debug("Begin return_to_idle check.")
+        response = slutil.show_nodes(retry=False)
+        to_return = []
+        for node in response:
+            name = node["NodeName"]
+            states = node["State"]
+            if "POWERED_DOWN" in states:
+                if "DOWN" in states or "DRAINED" in states:
+                    to_return.append(name)
+        
+        if not to_return:
+            logging.debug("No nodes found in a down~ or drained~ state. Exiting.")
+            return
+        
+        logging.warning(f"Found {len(to_return)} nodes in either a down~ or drained~ state. Returning to idle.")
+        to_return = sorted(to_return, key=slutil.get_sort_key_func(False))
+        for i in range(0, len(to_return), 25):
+            subset = to_return[i: i + 25]
+            subset_short = slutil.from_hostlist(",".join(subset))
+            subset_short_str = ",".join(subset_short)
+            slutil.scontrol(["update", f"NodeName={subset_short_str}", "State=IDLE"])
+        logging.warning("Completed returning nodes to idle.")
+            
 
 def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> None:
     assert partition.dynamic_config
