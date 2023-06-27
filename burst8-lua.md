@@ -49,7 +49,7 @@ sudo pip install cyclecloud_api-8.1.0-py2.py3-none-any.whl
 5) Copy `job_submit.lua` to `/etc/slurm/`
 
 ```bash
-sudo cp /opt/cycle/slurm/job_submit.lua /usr/lib64/slurm/
+sudo cp /opt/cycle/slurm/job_submit.lua /etc/slurm/
 ```
 
 6) Make the jetpack config directory
