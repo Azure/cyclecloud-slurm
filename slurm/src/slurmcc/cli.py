@@ -129,7 +129,16 @@ class SlurmCLI(CommonCLI):
             keepends=False
         )
         node_lists = slutil.check_output(["sinfo", "-h", "-o", "%N"]).strip().split(",")
-        completion_json["slurm_node_names"] = node_names + node_lists
+        
+        response = slutil.show_partitions(retry=False)
+        
+        dynamic_nodes = []
+
+        for part in response:
+            if part.get("NodeSets"):
+                dynamic_nodes.append(f"{part['PartitionName']}-")
+
+        completion_json["slurm_node_names"] = node_names + node_lists + dynamic_nodes
 
     def _read_completion_data(self, completion_json: Dict) -> None:
         self.slurm_node_names = completion_json.get("slurm_node_names", [])
@@ -145,6 +154,7 @@ class SlurmCLI(CommonCLI):
         output_prefix = ""
         if prefix.endswith(","):
             output_prefix = prefix
+        
         return [output_prefix + x + "," for x in self.slurm_node_names]
 
     def cost_parser(self, parser: ArgumentParser) -> None:

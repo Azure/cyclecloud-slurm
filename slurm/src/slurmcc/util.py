@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License.
+#
 import logging
 from abc import ABC, abstractmethod
 import random
@@ -46,9 +49,25 @@ def show_nodes(node_list: Optional[List[str]] = None, retry: bool = True) -> Lis
     return parse_show_nodes(stdout)
 
 
+def show_partitions(node_list: Optional[List[str]] = None, retry: bool = True) -> List[Dict[str, Any]]:
+    args = ["show", "partitions"]
+    if node_list:
+        args.append(",".join(node_list))
+    stdout = scontrol(args, retry)
+    return parse_show_partitions(stdout)
+
+
 def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
+    return _parse_show("NodeName", stdout)
+
+
+def parse_show_partitions(stdout: str) -> List[Dict[str, Any]]:
+    return _parse_show("PartitionName", stdout)
+
+
+def _parse_show(primary_key: str, stdout: str) -> List[Dict[str, Any]]:
     ret = []
-    current_node = None
+    current_rec = None
     for line in stdout.splitlines():
         line = line.strip()
 
@@ -56,14 +75,14 @@ def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
             if "=" not in sub_expr:
                 continue
             key, value = sub_expr.split("=", 1)
-            if key == "NodeName":
-                if current_node:
-                    ret.append(current_node)
-                current_node = {}
-            assert current_node is not None
-            current_node[key] = value
+            if key == primary_key:
+                if current_rec:
+                    ret.append(current_rec)
+                current_rec = {}
+            assert current_rec is not None
+            current_rec[key] = value
 
-    ret.append(current_node)
+    ret.append(current_rec)
     return ret
 
 
