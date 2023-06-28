@@ -479,8 +479,15 @@ Order = 20
         ParameterType = Cloud.Credentials
 
     [[parameters Slurm Settings ]]
+    Description = "Section for configuring Slurm"
+    
     Order = 5
 
+        [[[parameter slurm_version_warning]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<table role=\"presentation\"><tr><td> <b>Note that for SuSe, only 22.05 is supported.</b></td></tr></table>"
+        
         [[[parameter configuration_slurm_version]]]
         Required = True
         Label = Slurm Version
@@ -580,28 +587,28 @@ Order = 20
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8", "cycle.image.sles15-hpc"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8", "cycle.image.sles15-hpc"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8", "cycle.image.sles15-hpc"}
 
         [[[parameter DynamicImageName]]]
         Label = Dynamic OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu20", "almalinux8", "cycle.image.sles15-hpc"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init

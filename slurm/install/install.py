@@ -568,6 +568,8 @@ def main() -> None:
 
     if settings.mode == "scheduler":
         add_log_rotate_d(settings)
+    
+    logging.info("Installation complete.")
 
 
 if __name__ == "__main__":
