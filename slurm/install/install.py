@@ -49,10 +49,7 @@ class InstallSettings:
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
         self.acct_pass: Optional[str] = config["slurm"]["accounting"].get("password")
         self.acct_url: Optional[str] = config["slurm"]["accounting"].get("url")
-        self.acct_cert_url = config["slurm"]["accounting"].get(
-            "certificate_url",
-            "https://www.digicert.com/CACerts/BaltimoreCyberTrustRoot.crt.pem",
-        )
+        self.acct_cert_url: Optional[str] = config["slurm"]["accounting"].get("certificate_url")
 
         self.use_nodename_as_hostname = config["slurm"].get(
             "use_nodename_as_hostname", False
@@ -198,24 +195,29 @@ AccountingStorageHost="localhost"
 AccountingStorageTRES=gres/gpu
 """,
     )
-    subprocess.check_call(
-        [
-            "wget",
-            "-O",
-            "/sched/BaltimoreCyberTrustRoot.crt.pem",
-            s.acct_cert_url,
-        ]
-    )
-    ilib.chown(
-        "/sched/BaltimoreCyberTrustRoot.crt.pem", owner=s.slurm_user, group=s.slurm_grp
-    )
-    ilib.chmod("/sched/BaltimoreCyberTrustRoot.crt.pem", mode="0600")
-    ilib.link(
-        "/sched/BaltimoreCyberTrustRoot.crt.pem",
-        "/etc/slurm/BaltimoreCyberTrustRoot.crt.pem",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
+
+    if s.acct_cert_url:
+        logging.info(f"Downloading {s.acct_cert_url} to /sched/AzureCA.pem")
+        subprocess.check_call(
+            [
+                "wget",
+                "-O",
+                "/sched/AzureCA.pem",
+                s.acct_cert_url,
+            ]
+        )
+        ilib.chown(
+            "/sched/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
+        )
+        ilib.chmod("/sched/AzureCA.pem", mode="0600")
+    else:
+        ilib.copy_file(
+            "AzureCA.pem",
+            "/sched/AzureCA.pem",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0600",
+        )
 
     # Configure slurmdbd.conf
     ilib.template(
@@ -231,6 +233,14 @@ AccountingStorageTRES=gres/gpu
             "slurmver": s.slurmver,
         },
     )
+
+    ilib.link(
+        "/sched/AzureCA.pem",
+        "/etc/slurm/AzureCA.pem",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
         "/sched/slurmdbd.conf",
