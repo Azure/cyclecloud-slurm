@@ -7,7 +7,6 @@ import logging
 import os
 import shutil
 import sys
-import time
 import traceback
 from argparse import ArgumentParser
 from datetime import date, datetime, time, timedelta
@@ -128,8 +127,14 @@ class SlurmCLI(CommonCLI):
         node_names = slutil.check_output(["sinfo", "-N", "-h", "-o", "%N"]).splitlines(
             keepends=False
         )
-        node_lists = slutil.check_output(["sinfo", "-h", "-o", "%N"]).strip().split(",")
-        
+        args = ["sinfo", "-h", "-F", "-o", "%N"]
+        try:
+            # try with --future/-F if it fails, remove it and try again
+            # not all versions support -F
+            node_lists = slutil.check_output(args).strip().split(",")
+        except:
+            args = [x for x in args if x != "-F"]
+            node_lists = slutil.check_output(args).strip().split(",")
         response = slutil.show_partitions(retry=False)
         
         dynamic_nodes = []
@@ -164,7 +169,10 @@ class SlurmCLI(CommonCLI):
         parser.add_argument("-e", "--end",  type=lambda s: datetime.strptime(s, '%Y-%m-%d'),
                             default=date.today().isoformat(),
                             help="End time period (yyyy-mm-dd), defaults to current day.")
-        parser.add_argument("-o", "--out", required=True, help="Fully qualified output filename")
+        parser.add_argument("-o", "--out", required=True, help="Directory name for output CSV")
+        # parser.add_argument("-p", "--partition", action='store_true', help="Show costs aggregated by partitions")
+        parser.add_argument("-f", "--fmt", type=str,
+                            help="Comma separated list of SLURM formatting options. Otherwise defaults are applied")
 
     def cost(self, config: Dict, start, end, out, fmt=None):
         """
