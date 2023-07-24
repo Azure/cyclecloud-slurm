@@ -468,6 +468,9 @@ def setup_slurmd(s: InstallSettings) -> None:
     slurmd_config = f"SLURMD_OPTIONS=-b -N {s.node_name}"
     if s.dynamic_config:
         slurmd_config = f"SLURMD_OPTIONS={s.dynamic_config} -N {s.node_name}"
+        if "-b" not in slurmd_config.split():
+            slurmd_config = slurmd_config + " -b"
+
     ilib.file(
         "/etc/sysconfig/slurmd"
         if s.platform_family == "rhel"
