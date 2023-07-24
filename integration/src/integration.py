@@ -32,6 +32,13 @@ CLUSTER_DEFS = {
         "SchedulerImageName": "cycle.image.ubuntu20",
         "additional_slurm_config": "SuspendTimeout=60",
     },
+    "basic-ubuntu22": {
+        "HPCImageName": "cycle.image.ubuntu22",
+        "HTCImageName": "cycle.image.ubuntu22",
+        "DynamicImageName": "cycle.image.ubuntu22",
+        "SchedulerImageName": "cycle.image.ubuntu22",
+        "additional_slurm_config": "SuspendTimeout=60",
+    },
     "basic-sles15": {
         "HPCImageName": "cycle.image.sles15-hpc",
         "HTCImageName": "cycle.image.sles15-hpc",
