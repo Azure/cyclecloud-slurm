@@ -34,12 +34,16 @@ done
 
 if [ "$mode" == "execute" ]; then
     if [ "$dynamic_config" != "_none_" ]; then
-        delete_dynamic_node=$(jetpack config slurm.delete_dynamic_node True)
+        delete_dynamic_node=$(jetpack config slurm.delete_dynamic_node False)
         if [ "$delete_dynamic_node" == "True" ]; then
             node_name=$(jetpack config cyclecloud.node.name)
             echo "Deleting dynamic node $node_name"
-            
-            scontrol delete nodename=$node_name
+            set +e
+            scontrol show node=$node_name 2> /dev/null
+            if [ $? == 0 ]; then
+              scontrol delete nodename=$node_name || exit 1
+            fi
+            set -e
         fi
     fi
 
