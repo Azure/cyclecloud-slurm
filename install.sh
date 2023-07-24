@@ -53,7 +53,7 @@ set -e
 
 
 python3 -m venv $VENV
-mkdir -p $VENV/../logs
+mkdir -p --mode u=rwx,g=rwxs,o=rx $VENV/../logs && chown slurm:slurm $VENV/../logs
 source $VENV/bin/activate
 set -e
 
