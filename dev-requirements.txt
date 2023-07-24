@@ -7,4 +7,4 @@ tabulate
 flake8
 hypothesis
 isort==4.3.21
-typing_extensions==3.7.4
+typing_extensions==3.6.6

@@ -636,6 +636,7 @@ Order = 20
 	
 
     [[parameters Advanced Networking]]
+    Description = Advanced networking settings
 
         [[[parameter ReturnProxy]]]
         Label = Return Proxy

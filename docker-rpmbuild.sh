@@ -30,5 +30,3 @@ $runtime run -v $SOURCE_ROOT/specs/default/cluster-init/files:/source -v $SOURCE
 
 mv $TMP_BINS/* $SOURCE_ROOT/slurm/install/slurm-pkgs/
 rm -rf $TMP_BINS
-
-S
