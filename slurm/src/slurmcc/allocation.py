@@ -149,7 +149,6 @@ def wait_for_nodes_to_terminate(
     raise AzureSlurmError(f"Timed out waiting for nodes to terminate: {waiting_for_nodes}")
 
 
-
 class WaitForResume:
     def __init__(self) -> None:
         self.failed_node_names: Set[str] = set()
@@ -196,18 +195,28 @@ class WaitForResume:
             use_nodename_as_hostname = node.software_configuration.get("slurm", {}).get(
                 "use_nodename_as_hostname", False
             )
-            if not use_nodename_as_hostname and not is_dynamic:
+            
+            if not use_nodename_as_hostname:
                 ip_already_set_key = (name, node.private_ip)
                 if node.private_ip and ip_already_set_key not in self.ip_already_set:
-                    slutil.scontrol(
-                        [
-                            "update",
-                            "NodeName=%s" % name,
-                            "NodeAddr=%s" % node.private_ip,
-                            "NodeHostName=%s" % node.private_ip,
-                        ]
-                    )
-                    self.ip_already_set.add(ip_already_set_key)
+                    node_record_exists = False
+                    try:
+                        slutil.scontrol(["scontrol", "show", "node", name])
+                        node_record_exists = True
+                    except Exception:
+                        logging.info(f"No node record was pre-created for node {name}. Will not set NodeAddr or NodeHostname")
+                        pass
+                    
+                    if node_record_exists:
+                        slutil.scontrol(
+                            [
+                                "update",
+                                "NodeName=%s" % name,
+                                "NodeAddr=%s" % node.private_ip,
+                                "NodeHostName=%s" % node.private_ip,
+                            ]
+                        )
+                        self.ip_already_set.add(ip_already_set_key)
 
             if name in self.failed_node_names:
                 recovered_node_names.add(name)
