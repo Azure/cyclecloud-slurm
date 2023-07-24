@@ -57,6 +57,7 @@ class InstallSettings:
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
         self.acct_pass: Optional[str] = config["slurm"]["accounting"].get("password")
         self.acct_url: Optional[str] = config["slurm"]["accounting"].get("url")
+        self.acct_cert_url: Optional[str] = config["slurm"]["accounting"].get("certificate_url")
 
         self.use_nodename_as_hostname = config["slurm"].get(
             "use_nodename_as_hostname", False
@@ -224,13 +225,29 @@ AccountingStorageHost="localhost"
 AccountingStorageTRES=gres/gpu
 """,
     )
-    ilib.copy_file(
-        "AzureCA.pem",
-        "/sched/AzureCA.pem",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-        mode="0600",
-    )
+
+    if s.acct_cert_url:
+        logging.info(f"Downloading {s.acct_cert_url} to /sched/AzureCA.pem")
+        subprocess.check_call(
+            [
+                "wget",
+                "-O",
+                "/sched/AzureCA.pem",
+                s.acct_cert_url,
+            ]
+        )
+        ilib.chown(
+            "/sched/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
+        )
+        ilib.chmod("/sched/AzureCA.pem", mode="0600")
+    else:
+        ilib.copy_file(
+            "AzureCA.pem",
+            "/sched/AzureCA.pem",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0600",
+        )
 
     # Configure slurmdbd.conf
     ilib.template(
