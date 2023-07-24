@@ -11,14 +11,14 @@ SUPPORTED_VERSIONS = {
         "debian": [{"arch": "amd64"}],
         "sles": [],  # no packages required for sles
     },
-    "23.02.2-1": {
+    "23.02.3-1": {
         "rhel": [{"platform_version": "el8", "arch": "x86_64"},
                  {"platform_version": "el7", "arch": "x86_64"}],
         "debian": [{"arch": "amd64"}],
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-06-28-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-07-15-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:

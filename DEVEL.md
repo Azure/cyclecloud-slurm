@@ -23,7 +23,7 @@ docker-package.sh ../cyclecloud-scalelib
             "rhel": [{"platform_version": "el8", "arch": "x86_64"}],
             "debian": [{"arch": "amd64"}],
         },
-        "23.02.0-1": {
+        "23.02.3-1": {
             "rhel": [{"platform_version": "el8", "arch": "x86_64"}],
             "debian": [{"arch": "amd64"}],
         }
