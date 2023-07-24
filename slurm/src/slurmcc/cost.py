@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import sys
 import json
@@ -234,6 +235,11 @@ class CostSlurm:
             self.stats.processed += 1
         fp.close()
 
+
+def _escape(s: str) -> str:
+    return re.sub("[^a-zA-Z0-9-]", "-", s).lower()
+
+
 class CostDriver:
     def __init__(self, azcost: azurecost, config: dict):
 
@@ -242,6 +248,7 @@ class CostDriver:
         self.cluster = config.get('cluster_name')
         if not self.cluster:
             raise ValueError("cluster_name not present in config")
+        self.cluster = _escape(self.cluster)
 
     def run(self, start: datetime, end: datetime, out: str, fmt: str):
 
