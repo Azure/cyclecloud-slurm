@@ -15,19 +15,20 @@ default[:slurm][:additional][:config] = ""
 default[:slurm][:ensure_waagent_monitor_hostname] = true
 
 myplatform=node[:platform_family]
+default[:slurm][:user][:uid] = 11100
+default[:slurm][:user][:gid] = 11100
+
 case myplatform
-when 'ubuntu', 'debian'
-  default[:slurm][:arch] = "amd64"
-  default[:slurm][:user][:uid] = 64030
-  default[:slurm][:user][:gid] = 64030
-when 'centos', 'rhel', 'redhat', 'almalinux'
-  if node[:platform_version] < "8";
-    default[:slurm][:arch] = "el7.x86_64"
-  else
-    default[:slurm][:arch] = "el8.x86_64"
-  end
-  default[:slurm][:user][:uid] = 11100
-  default[:slurm][:user][:gid] = 11100
+  when 'ubuntu', 'debian'
+    default[:slurm][:arch] = "amd64"
+  when 'centos', 'rhel', 'redhat', 'almalinux'
+    if node[:platform_version] < "8";
+      default[:slurm][:arch] = "el7.x86_64"
+    else
+      default[:slurm][:arch] = "el8.x86_64"
+    end
+  when 'suse'
+    default[:slurm][:accounting][:user] = 'slurm'
 end
 default[:munge][:user][:name] = 'munge'
 default[:munge][:user][:uid] = 11101
