@@ -15,7 +15,7 @@ def test_simple_autoscale():
     if not is_autoscale():
         return
 
-    script_path = os.path.expanduser("~/hello_world.sh")
+    script_path = "/tmp/hello_world.sh"
     job_name = str(uuid.uuid4())
     with open(script_path, "w") as fw:
         fw.write(
@@ -30,7 +30,7 @@ srun hostname""".format(
             )
         )
 
-    check_output("sbatch", script_path)
+    check_output("sudo", "-u", "cyclecloud", "sbatch", script_path)
     wait_for_job(job_name)
     wait_for_scale_down()
 
@@ -38,7 +38,7 @@ srun hostname""".format(
 def test_manual_scale():
     if is_autoscale():
         return
-    nodes = _get_powered_down_nodes()
+    nodes = _get_future_nodes()
     check_output("azslurm", "resume", "--nodes", nodes[-1])
     wait_for_scale_up()
     check_output("azslurm", "suspend", "--nodes", nodes[-1])
@@ -139,7 +139,7 @@ def test_resume_suspend_repeat() -> None:
 def test_create_dyn_node() -> None:
     cluster_name = check_output("jetpack", "config", "cyclecloud.cluster.name")
     cluster_name = cluster_name.replace("_", "-").replace(".", "-")
-    node = f"{cluster_name}-test_create_dyn_node"
+    node = f"{cluster_name}-dyn-node-test"
     if is_autoscale():
         check_output(
             "scontrol", "create", f"nodename={node}", "state=CLOUD", "Feature=dyn"
@@ -165,8 +165,20 @@ def test_azslurm_cost() -> None:
 
 
 def _get_powered_down_nodes() -> List[str]:
+    ret = []
+    lines = check_output(
+        "scontrol", "show", "nodes", "--future"
+    ).splitlines()
+    for line in lines:
+        line = line.strip()
+        if line.startswith("NodeName"):
+            name = line.split()[0].split("=")[1].strip()
+            ret.append(name)
+    return ret
+
+def _get_future_nodes() -> List[str]:
     return check_output(
-        "sinfo", "-N", "-h", "-t", "powered_down", "--format=%N"
+        "scontrol", "-N", "-h", "-t", "powered_down", "--format=%N"
     ).splitlines()
 
 

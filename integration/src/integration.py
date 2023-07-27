@@ -38,6 +38,7 @@ CLUSTER_DEFS = {
         "DynamicImageName": "cycle.image.ubuntu22",
         "SchedulerImageName": "cycle.image.ubuntu22",
         "additional_slurm_config": "SuspendTimeout=60",
+        "configuration_slurm_accounting_enabled": False,
     },
     "basic-sles15": {
         "HPCImageName": "cycle.image.sles15-hpc",
@@ -45,6 +46,7 @@ CLUSTER_DEFS = {
         "DynamicImageName": "cycle.image.sles15-hpc",
         "SchedulerImageName": "cycle.image.sles15-hpc",
         "additional_slurm_config": "SuspendTimeout=60",
+        "configuration_slurm_accounting_enabled": False,
     },
     "manual-scale": {
         "HPCImageName": "almalinux8",
@@ -89,13 +91,20 @@ def _add_cluster_init(
 zypper install -y mariadb
 systemctl start mariadb
 """
-    elif "ubuntu" in scheduler_image_name:
+    elif "ubuntu20" in scheduler_image_name:
         cloud_init = """#!/bin/bash
 apt update
 apt install -y mariadb-server
 systemctl enable mariadb.service
 systemctl start mariadb.service
 mysql --connect-timeout=120 -u root -e "UPDATE mysql.user SET plugin='mysql_native_password' WHERE user='root'; FLUSH privileges;"
+"""
+    elif "ubuntu22" in scheduler_image_name:
+        cloud_init = """#!/bin/bash
+apt update
+apt install -y mariadb-server
+systemctl enable mariadb.service
+systemctl start mariadb.service
 """
     else:
         cloud_init = """#!/bin/bash
@@ -141,6 +150,9 @@ def start_clusters(skip_tests: bool = False) -> None:
 
     for cluster_name in cluster_names:
         print(f"Starting {cluster_name}")
+        env = dict(os.environ)
+        env["CycleCloudDevel"] = "1"
+        check_output(["cyclecloud", "await_target_state", cluster_name], env=env)
         args = ["cyclecloud", "start_cluster", cluster_name]
         if not skip_tests:
             args.append("--test")

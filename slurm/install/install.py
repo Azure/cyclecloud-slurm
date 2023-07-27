@@ -92,6 +92,22 @@ def _escape(s: str) -> str:
     return re.sub("[^a-zA-Z0-9-]", "-", s).lower()
 
 
+def _is_ubuntu22(s: InstallSettings) -> bool:
+    with open("/etc/os-release") as fr:
+        lines = fr.readlines()
+
+    os_release = {}
+    for line in lines:
+        if "=" in line:
+            try:
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip()
+                os_release[key] = value.strip('"')
+            except:
+                pass
+    return os_release.get("ID") == "ubuntu" and os_release.get("VERSION_ID", "20") > "22"
+
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
     lc = dynamic_config.lower()
     if "feature=" not in lc:
@@ -336,11 +352,14 @@ def _complete_install_primary(s: InstallSettings) -> None:
             comment_prefix="\n# Additional config from CycleCloud -",
         )
 
+    cgroup_template = "cgroup.conf.template"
+    if _is_ubuntu22(s):
+        cgroup_template = "cgroup.conf.ubuntu22.template"
     ilib.template(
         "/sched/cgroup.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
-        source="templates/cgroup.conf.template",
+        source=f"templates/{cgroup_template}",
         mode="0644",
     )
 
