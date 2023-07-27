@@ -32,21 +32,18 @@ default[:slurm][:ha_enabled] = false
 default[:slurm][:launch_parameters] = ''
 
 myplatform=node[:platform_family]
+default[:slurm][:user][:uid] = 11100
+default[:slurm][:user][:gid] = 11100
+
 case myplatform
   when 'ubuntu', 'debian'
     default[:slurm][:arch] = "amd64"
-    default[:slurm][:user][:uid] = 64030
-    default[:slurm][:user][:gid] = 64030
   when 'centos', 'rhel', 'redhat', 'almalinux'
     if node[:platform_version] < "8";
       default[:slurm][:arch] = "el7.x86_64"
     else
       default[:slurm][:arch] = "el8.x86_64"
     end
-    default[:slurm][:user][:uid] = 11100
-    default[:slurm][:user][:gid] = 11100
   when 'suse'
-    default[:slurm][:user][:uid] = 11100
-    default[:slurm][:user][:gid] = 11100
     default[:slurm][:accounting][:user] = 'slurm'
 end
