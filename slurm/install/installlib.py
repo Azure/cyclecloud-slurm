@@ -489,7 +489,6 @@ class ProviderNode:
             ret[attr] = val
         return ret
 
-
     def is_failed(self) -> bool:
         return self.provider_status == "Failed"
 
@@ -507,28 +506,63 @@ def await_node_hostname(
     referenced_hostname = None
     while referenced_hostname is None and time.time() < omega:
         referenced_node = provider_node_status(provider_config, node_name)
-        if referenced_node.hostname:
-            return referenced_node
+        if is_valid_hostname(referenced_node):
+            return ProviderNode(
+                name=referenced_node["Name"],
+                profile_name=referenced_node["Template"],
+                hostname=referenced_node["Hostname"],
+                private_ipv4=referenced_node["PrivateIp"],
+                provider_status=referenced_node["Status"],
+                provider_type="CycleCloud",
+            )
         time.sleep(5)
     raise RuntimeError(
         f"Node {node_name} did not register hostname in {timeout} seconds"
     )
 
 
-def provider_node_status(config: Dict, node_name: str) -> ProviderNode:
+def provider_node_status(config: Dict, node_name: str) -> Dict:
     status = provider_nodes(config)
     for node in status["nodes"]:
         if node["Name"] == node_name:
-            return ProviderNode(
-                name=node["Name"],
-                profile_name=node["Template"],
-                hostname=node["Hostname"],
-                private_ipv4=node["PrivateIp"],
-                provider_status=node["Status"],
-                provider_type="CycleCloud",
-            )
+            return node
     raise RuntimeError(f"Node {node_name} not found in cluster status!")
 
+
+def is_valid_hostname(node: Dict) -> bool:
+    hostname = node.get("Hostname")
+    if not hostname:
+        return False
+
+    # TODO slurm specific
+    nodename_as_hostname = node.get("Configuration", {}).get("slurm", {}).get("nodename_as_hostname", True)
+    valid_hostnames: List[str] = []
+
+    if nodename_as_hostname:
+        valid_hostnames = [f"^.*({node['Name'].lower()}).*$"]
+    elif is_standalone_dns(node):
+        valid_hostnames = ["^ip-[0-9A-Za-z]{8}$"]
+
+    for valid_hostname in valid_hostnames:
+        if re.match(valid_hostname, hostname):
+            return True
+
+    logging.warning(
+        "Rejecting invalid hostname '%s': Did not match any of the following patterns: %s",
+        hostname,
+        valid_hostnames,
+    )
+    return False
+
+
+def is_standalone_dns(node: Dict) -> bool:
+    return (
+        node.get("Configuration", {})
+        .get("cyclecloud", {})
+        .get("hosts", {})
+        .get("standalone_dns", {})
+        .get("enabled", True)
+    )
 
 def provider_nodes(config: Dict) -> Dict:
     if config.get("mock_provider"):
