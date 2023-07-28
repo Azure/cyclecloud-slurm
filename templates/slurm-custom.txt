@@ -183,7 +183,7 @@ Order = 10
         Label = Scheduler VM Type
         Description = The VM type for scheduler node
         ParameterType = Cloud.MachineType
-        DefaultValue = Standard_E4_v4
+        DefaultValue = Standard_D12_v2
 
         [[[parameter HPCMachineType]]]
         Label = HPC VM Type

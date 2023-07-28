@@ -11,7 +11,7 @@
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
-
+*.eggs*
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -332,8 +332,17 @@ ASALocalRun/
 
 # rpmbuild output
 *.rpm
-
+.venv/
+.env
+install/slurm-pkg*
+blobs
+**/libs
 **/*.mypy_cache/
+**/dist
+**/*egg-info
+**/creds.json
+slurm/install/slurm-pkgs/*
+install/docker/sched
 .DS_Store
 
 # test-kitchen
@@ -342,3 +351,5 @@ ASALocalRun/
 **/.kitchen.local.yml
 **/kitchen.yml
 **/kitchen.local.yml
+integration/clusters/*.txt
+integration/clusters/*.json

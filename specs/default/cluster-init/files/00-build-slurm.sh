@@ -36,6 +36,9 @@ function build_slurm() {
                 yum install -y dnf-plugins-core
                 dnf config-manager --set-enabled powertools
                 yum install -y make
+
+                dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+                dnf install -y cuda-nvml-devel-12-1.x86_64
             fi
 
              # munge is in EPEL
@@ -64,7 +67,21 @@ function build_slurm() {
         wget "${DOWNLOAD_URL}/${SLURM_PKG}"
     fi
 
-    rpmbuild --with mysql --define '_with_pmix --with-pmix=/opt/pmix/v3' --with=hwlocs --with=lua -ta ${SLURM_PKG}
+
+    if [ $CENTOS_VERSION \< "8." ]; then
+        rpmbuild --with mysql\
+                 --define '_with_pmix --with-pmix=/opt/pmix/v3'\
+                 --with=hwlocs\
+                 --with=lua\
+                 -ta ${SLURM_PKG}
+    else
+        rpmbuild --with mysql\
+                 --define '_with_pmix --with-pmix=/opt/pmix/v3'\
+                 --with=hwlocs\
+                 --with=lua\
+                 --define '_with_nvml --with-nvml=/usr/local/cuda-12.1' \
+                 -ta ${SLURM_PKG}
+    fi
 }
 
 function install_pmix() {
@@ -96,5 +113,6 @@ function install_pmix() {
     cd ../../install/v3/
 }
 
-build_slurm ${1} 22.05.3
-build_slurm ${1} 20.11.9
+for version in $(echo $2); do 
+    build_slurm ${1} $version
+done

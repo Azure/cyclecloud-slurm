@@ -1,9 +1,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-default[:slurm][:version] = "19.05.8-1"
+default[:slurm][:version] = "22.05.9-1"
+default[:slurm][:autoscale_version] = "3.0.2"
 default[:slurm][:user][:name] = 'slurm'
 default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.1.0-py2.py3-none-any.whl"
-default[:slurm][:autoscale_dir] = "/opt/cycle/slurm"
+default[:slurm][:autoscale_dir] = "/opt/azurehpc/slurm"
+default[:slurm][:autoscale_pkg] = "azure-slurm-#{default[:slurm][:autoscale_version]}-pkg.tar.gz"
+default[:slurm][:install_pkg] = "azure-slurm-install-#{default[:slurm][:autoscale_version]}-pkg.tar.gz"
 default[:slurm][:install] = true
 default[:slurm][:use_nodename_as_hostname] = false
 default[:cyclecloud][:hosts][:simple_vpc_dns][:enabled] = false
@@ -29,21 +32,18 @@ default[:slurm][:ha_enabled] = false
 default[:slurm][:launch_parameters] = ''
 
 myplatform=node[:platform_family]
+default[:slurm][:user][:uid] = 11100
+default[:slurm][:user][:gid] = 11100
+
 case myplatform
   when 'ubuntu', 'debian'
     default[:slurm][:arch] = "amd64"
-    default[:slurm][:user][:uid] = 64030
-    default[:slurm][:user][:gid] = 64030
   when 'centos', 'rhel', 'redhat', 'almalinux'
     if node[:platform_version] < "8";
       default[:slurm][:arch] = "el7.x86_64"
     else
       default[:slurm][:arch] = "el8.x86_64"
     end
-    default[:slurm][:user][:uid] = 11100
-    default[:slurm][:user][:gid] = 11100
   when 'suse'
-    default[:slurm][:user][:uid] = 11100
-    default[:slurm][:user][:gid] = 11100
     default[:slurm][:accounting][:user] = 'slurm'
 end
