@@ -1,8 +1,0 @@
-{
-  "Region" : "southcentralus",
-  "Credentials" : "cloud",
-  "SubnetId" : "RG/VNET/default",
-  "ReturnProxy" : false,
-  "UsePublicNetwork" : false,
-  "ExecuteNodesPublic": false
-}
