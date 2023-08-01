@@ -31,6 +31,7 @@ Autoscale = $Autoscale
         slurm.accounting.password = $configuration_slurm_accounting_password
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
+        slurm.launch_parameters = $configuration_slurm_launch_parameters
         
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
@@ -120,6 +121,7 @@ Autoscale = $Autoscale
         fs_type = xfs
 
         [[[configuration cyclecloud.exports.builtinsched]]]
+	disabled = ${NFSSchedDisable}
         export_path = /sched
         options = no_root_squash
         samba.enabled = false
@@ -265,7 +267,7 @@ Order = 10
 
 
     [[parameters Auto-Scaling]]
-    Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster"
+    Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster."
     Order = 30
 
         [[[parameter Autoscale]]]
@@ -299,7 +301,7 @@ Order = 10
         Config.IntegerOnly = true
 
         [[[parameter HPCMaxScalesetSize]]]
-        Label = Max VMs per Scaleset
+        Label = Max VMs per VMSS
         Description = The maximum number of VMs created per VM Scaleset e.g. switch in Slurm.
         DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
@@ -364,7 +366,7 @@ Order = 15
         Config.Plugin = pico.widget.HtmlTemplateWidget
         Config.Template = ''' <p>The directory <code>/sched</code> is a network attached mount and exists in all nodes of the cluster. 
             Slurm's configuration is linked in from this directory. It's managed by the scheduler node. 
-            To disable the mount of the /sched directory, and to supply your own for a <strong>hybrid scenario</strong>, select the checkbox below '''
+            To disable the mount of the /sched directory, and to supply your own for a <strong>hybrid scenario</strong>, select the checkbox below.'''
         Order = 6
 
         [[[parameter NFSSchedDisable]]]
@@ -378,7 +380,7 @@ Order = 15
         [[[parameter About shared]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template := "<p>The directory <code>/shared</code> is a network attached mount and exists in all nodes of the cluster. Users' home directories reside within this mountpoint with the base homedir <code>/shared/home</code>.<br><br>There are two options for providing this mount:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External NFS]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.</p>"
+        Config.Template := "<p>The directory <code>/shared</code> is a network attached mount and exists in all nodes of the cluster. Users' home directories reside within this mountpoint with the base homedir <code>/shared/home</code>.<br><br>There are two options for providing this mount:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External NFS]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.</p><p>Note: the cluster must be terminated for this to take effect.</p>"
         Order = 20
 
         [[[parameter NFSType]]]
@@ -388,6 +390,12 @@ Order = 15
         Config.Plugin = pico.form.Dropdown
         Config.Entries := {[Label="External NFS"; Value="External"], [Label="Builtin"; Value="Builtin"]}
         DefaultValue = Builtin
+
+	[[[parameter NFSDiskWarning]]]
+	HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p><b>Warning</b>: switching an active cluster over to NFS will delete the shared disk.</p>"
+        Conditions.Hidden := NFSType != "External"
 
         [[[parameter NFSAddress]]]
         Label = NFS IP Address
@@ -408,7 +416,7 @@ Order = 15
 
         [[[parameter FilesystemSize]]]
         Label = Size (GB)
-        Description = The filesystem size
+        Description = The filesystem size (cannot be changed after initial start)
         DefaultValue = 100
 
         Config.Plugin = pico.form.NumberTextBox
@@ -422,7 +430,7 @@ Order = 15
         [[[parameter Additional NFS Mount Readme]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template := "<p>Mount another NFS endpoint on the cluster nodes</p>"
+        Config.Template := "<p>Mount another NFS endpoint on the cluster nodes.</p>"
         Order = 20
 
         [[[parameter AdditionalNAS]]]
@@ -466,7 +474,6 @@ Order = 20
         ParameterType = Cloud.Credentials
 
     [[parameters Slurm Settings ]]
-    Description = "Section for configuring Slurm"
     Order = 5
 
         [[[parameter configuration_slurm_version]]]
@@ -502,7 +509,7 @@ Order = 20
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
         
         [[[parameter configuration_slurm_shutdown_policy]]]
-	Label = ShutdownPolicy
+	Label = Shutdown Policy
         description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.
         DefaultValue = Terminate
         config.plugin = pico.control.AutoCompleteDropdown
@@ -514,20 +521,26 @@ Order = 20
             Label = Deallocate
 
         [[[parameter additional_slurm_config]]]
-        Label = Additional Slurm configuration
+        Label = Slurm Configuration
         Description = Any additional lines to add to slurm.conf
         ParameterType = Text
 
         [[[parameter configuration_slurm_ha_enabled]]]
-        Label = Deploy Slurm with HA
-        Description = Deploy Slurm with an additional HA node
+        Label = Slurm HA Node
+        Description = Deploy with an additional HA node
         DefaultValue = false
         ParameterType = Boolean
 	
+        [[[parameter configuration_slurm_launch_parameters]]]
+        Label = Launch Parameters
+        Description = Deploy Slurm with Launch Parameters (comma delimited)
+        DefaultValue = ''
+        ParameterType = String
+
 
 
     [[parameters Software]]
-    Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
+    Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your locker."
     Order = 10
 
         [[[parameter NodeNameIsHostname]]]
@@ -610,7 +623,6 @@ Order = 20
 	
 
     [[parameters Advanced Networking]]
-    Description = Advanced networking settings
 
         [[[parameter ReturnProxy]]]
         Label = Return Proxy
