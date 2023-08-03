@@ -51,10 +51,13 @@ class Partition:
         self.max_vm_count = sum([b.max_count for b in buckets])
         self.buckets = buckets
         self.use_pcpu = use_pcpu
+        self.dynamic_config = dynamic_config
+        # cache node_list property for dynamic partitions
+        self.__dynamic_node_list_cache = None
         self.node_list_by_pg: Dict[
             Optional[PlacementGroup], List[str]
         ] = _construct_node_list(self)
-        self.dynamic_config = dynamic_config
+        
         self.over_allocation_thresholds = over_allocation_thresholds
 
         self.features = []
@@ -67,6 +70,7 @@ class Partition:
                     if key.lower() == "feature":
                         self.features = value.strip().split(",")
 
+        
     def bucket_for_node(self, node_name: str) -> NodeBucket:
         for pg, node_list in self.node_list_by_pg.items():
             if node_name in node_list:
@@ -74,28 +78,51 @@ class Partition:
                     if bucket.placement_group == pg:
                         return bucket
         raise RuntimeError()
+    
+    _SLURM_NODES_CACHE = None
 
-    def add_dynamic_node(
-        self, node_name: str, placement_group: Optional[PlacementGroup] = None
-    ) -> None:
-        assert self.dynamic_config, "Cannot add dynamic node to non-dynamic partition"
-        if placement_group not in self.node_list_by_pg:
-            self.node_list_by_pg[placement_group] = []
-
-        node_list = self.node_list_by_pg[placement_group]
-        if node_name not in node_list:
-            node_list.append(node_name)
+    @classmethod
+    def _slurm_nodes(cls) -> List[Dict[str, str]]:
+        if not cls._SLURM_NODES_CACHE:
+            cls._SLURM_NODES_CACHE = slutil.show_nodes()
+        return cls._SLURM_NODES_CACHE
 
     @property
     def node_list(self) -> str:
-        return slutil.to_hostlist(self.all_nodes())
+        if not self.dynamic_config:
+            return slutil.to_hostlist(self._static_all_nodes())
+        # with dynamic nodes, we only look at those defined in the partition
+        if not self.__dynamic_node_list_cache:
+            ret: List[str] = []
+            all_slurm_nodes = Partition._slurm_nodes()
+            for node in all_slurm_nodes:
+                partitions = node["Partitions"].split(",")
+                if self.name in partitions:
+                    # only include nodes that have the same vm_size declared as a feature
+                    features = (node.get("AvailableFeatures") or "").lower().split(",")
+                    has_vm_size = any([f.startswith("standard_") for f in features])
+                    if self.machine_type.lower() in features:
+                        ret.append(node["NodeName"])
+                    elif not has_vm_size:
+                        logging.debug("No vm_size feature for node %s is defined, assuming partition %s",
+                                      node["NodeName"],
+                                      self.name)
+                        ret.append(node["NodeName"])
 
-    def all_nodes(self) -> List[str]:
+            self.__dynamic_node_list_cache = slutil.to_hostlist(ret)
+        return self.__dynamic_node_list_cache
+    
+    def _static_all_nodes(self) -> List[str]:
         ret = []
         for bucket in self.buckets:
             ret.extend(self.node_list_by_pg[bucket.placement_group])
         ret = sorted(ret, key=slutil.get_sort_key_func(self.is_hpc))
         return ret
+    
+    def all_nodes(self) -> List[str]:
+        if not self.dynamic_config:
+            return self._static_all_nodes()        
+        return slutil.from_hostlist(self.node_list)
 
     @property
     def pcpu_count(self) -> int:
@@ -107,6 +134,22 @@ class Partition:
 
 
 def _construct_node_list(
+    partition: Partition,
+) -> Dict[Optional[PlacementGroup], List[str]]:
+    if partition.dynamic_config:
+        return _construct_dynamic_node_list(partition)
+    else:
+        return _construct_static_node_list(partition)
+
+
+def _construct_dynamic_node_list(
+    partition: Partition,
+) -> Dict[Optional[PlacementGroup], List[str]]:
+    part_node_names = slutil.from_hostlist(partition.node_list)
+    return {None: part_node_names}
+
+
+def _construct_static_node_list(
     partition: Partition,
 ) -> Dict[Optional[PlacementGroup], List[str]]:
     name_format = partition.nodename_prefix + "{}-%d"
