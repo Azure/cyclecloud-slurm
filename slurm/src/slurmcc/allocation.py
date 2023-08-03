@@ -148,7 +148,7 @@ class WaitForResume:
             use_nodename_as_hostname = node.software_configuration.get("slurm", {}).get(
                 "use_nodename_as_hostname", False
             )
-            if not use_nodename_as_hostname and not is_dynamic:
+            if not use_nodename_as_hostname:
                 ip_already_set_key = (name, node.private_ip)
                 if node.private_ip and ip_already_set_key not in self.ip_already_set:
                     slutil.scontrol(
