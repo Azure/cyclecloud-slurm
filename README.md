@@ -9,14 +9,15 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
 See [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30) for more information.
 
 ### Making Cluster Changes
-The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
+The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster such as updating VM sizes or changing node counts, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and `gres.conf`.
 
 ```
       $ sudo -i
       # azslurm scale
 ```
 
-This should create the partitions with the correct number of nodes, the proper `gres.conf` and restart the `slurmctld`.
+This should re-create the partition and node information with the correct number of nodes, the proper `gres.conf`.
+Note: changes to static partitions may require user to restart slurmctld `systemctl restart slurmctld`. 
 
 ### No longer pre-creating execute nodes
 As of 3.0.0, we are no longer pre-creating the nodes in CycleCloud. Nodes are created when `azslurm resume` is invoked, or by manually creating them in CycleCloud via CLI etc.

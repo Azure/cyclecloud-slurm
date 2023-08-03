@@ -428,7 +428,7 @@ class SlurmCLI(CommonCLI):
             msg = f"{linked_gres_conf} should be a symlink to {gres_conf}! Changes will not take effect locally."
             print("WARNING: " + msg, file=sys.stderr)
             logging.warning(msg)
-        
+
         if not os.path.exists(linked_gres_conf):
             msg = f"please run 'ln -s {gres_conf} {linked_gres_conf}' && chown slurm:slurm {linked_gres_conf}"
             print("WARNING: " + msg, file=sys.stderr)
@@ -458,9 +458,8 @@ class SlurmCLI(CommonCLI):
             _generate_gres_conf(partition_dict, fw)
         shutil.move(gres_conf + ".tmp", gres_conf)
 
-        logging.info("Restarting slurmctld...")
-        check_output(["systemctl", "restart", "slurmctld"])
-
+        msg = f"Warning: For changes impacting non-dynamic partitions, please run `systemctl restart slurmctld` for changes to take effect."
+        print(msg)
         logging.info("")
         logging.info("Re-scaling cluster complete.")
 
