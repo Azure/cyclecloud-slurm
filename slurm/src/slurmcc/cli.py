@@ -615,14 +615,15 @@ def _partitions(
         default_yn = "YES" if partition.is_default else "NO"
 
         memory = max(1024, partition.memory)
-        def_mem_per_cpu = memory // partition.pcpu_count
 
         if partition.use_pcpu:
             cpus = partition.pcpu_count
-            # cores_per_socket = 1
+            threads = max(1, partition.vcpu_count // partition.pcpu_count)
         else:
             cpus = partition.vcpu_count
-            # cores_per_socket = max(1, partition.vcpu_count // partition.pcpu_count)
+            threads = 1
+        
+        def_mem_per_cpu = memory // cpus
 
         writer.write(
             "# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
@@ -645,12 +646,6 @@ def _partitions(
             )
         )
 
-        if partition.use_pcpu:
-            cpus = partition.pcpu_count
-            threads = max(1, partition.vcpu_count // partition.pcpu_count)
-        else:
-            cpus = partition.vcpu_count
-            threads = 1
         state = "CLOUD" if autoscale else "FUTURE"
         writer.write(
             "Nodename={} Feature=cloud STATE={} CPUs={} ThreadsPerCore={} RealMemory={}".format(
