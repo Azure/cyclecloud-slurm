@@ -85,6 +85,7 @@ def execute() -> None:
     _add("install.py", "install.py")
     _add("ubuntu.sh", "ubuntu.sh", 600)
     _add("rhel.sh", "rhel.sh", 600)
+    _add("AzureCA.pem", "AzureCA.pem")
 
     for fil in os.listdir("templates"):
         if os.path.isfile(f"templates/{fil}"):

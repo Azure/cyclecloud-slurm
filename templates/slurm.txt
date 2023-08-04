@@ -29,6 +29,7 @@ Autoscale = $Autoscale
         slurm.accounting.url = $configuration_slurm_accounting_url
         slurm.accounting.user = $configuration_slurm_accounting_user
         slurm.accounting.password = $configuration_slurm_accounting_password
+        slurm.accounting.certificate_url = $configuration_slurm_accounting_certificate_url
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
         slurm.launch_parameters = $configuration_slurm_launch_parameters

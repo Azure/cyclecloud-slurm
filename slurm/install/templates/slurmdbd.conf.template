@@ -32,4 +32,4 @@ StorageType=accounting_storage/mysql
 StorageHost={accountdb}
 {storagepass}
 StorageUser={dbuser}
-StorageParameters=SSL_CA=/etc/slurm/BaltimoreCyberTrustRoot.crt.pem
+StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem
