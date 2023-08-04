@@ -422,7 +422,17 @@ class SlurmCLI(CommonCLI):
         os.makedirs(backup_dir)
 
         azure_conf = os.path.join(sched_dir, "azure.conf")
-        gres_conf = os.path.join(slurm_conf_dir, "gres.conf")
+        gres_conf = os.path.join(sched_dir, "gres.conf")
+        linked_gres_conf = os.path.join(slurm_conf_dir, "gres.conf")
+        if os.path.isfile(linked_gres_conf) and not os.path.islink(linked_gres_conf):
+            msg = f"{linked_gres_conf} should be a symlink to {gres_conf}! Changes will not take effect locally."
+            print("WARNING: " + msg, file=sys.stderr)
+            logging.warning(msg)
+        
+        if not os.path.exists(linked_gres_conf):
+            msg = f"please run 'ln -s {gres_conf} {linked_gres_conf}' && chown slurm:slurm {linked_gres_conf}"
+            print("WARNING: " + msg, file=sys.stderr)
+            logging.warning(msg)
 
         if os.path.exists(azure_conf):
             shutil.copyfile(azure_conf, os.path.join(backup_dir, "azure.conf"))
