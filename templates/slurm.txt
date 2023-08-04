@@ -508,7 +508,13 @@ Order = 20
         Description = Password for Slurm DBD admin
         ParameterType = Password
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-        
+
+        [[[parameter configuration_slurm_accounting_certificate_url]]]
+        Label = SSL Certificate URL
+        Description = URL to fetch SSL certificate for authentication to DB
+        Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
+        ParameterType = String
+
         [[[parameter configuration_slurm_shutdown_policy]]]
 	Label = Shutdown Policy
         description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.
