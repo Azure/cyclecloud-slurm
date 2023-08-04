@@ -38,6 +38,14 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     return SLURM_CLI.scontrol(args, retry)
 
 
+def is_slurmctld_up() -> bool:
+    try:
+        SLURM_CLI.scontrol(["ping"], retry=False)
+        return True
+    except Exception:
+        return False
+
+
 def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     args = ["show", "nodes"]
     if node_list:

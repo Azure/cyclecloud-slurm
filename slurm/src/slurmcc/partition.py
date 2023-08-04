@@ -93,6 +93,9 @@ class Partition:
             return slutil.to_hostlist(self._static_all_nodes())
         # with dynamic nodes, we only look at those defined in the partition
         if not self.__dynamic_node_list_cache:
+            if not slutil.is_slurmctld_up():
+                logging.warning("While slurmctld is down, dynamic nodes can not be queried at this time.")
+                return ""
             ret: List[str] = []
             all_slurm_nodes = Partition._slurm_nodes()
             for node in all_slurm_nodes:
