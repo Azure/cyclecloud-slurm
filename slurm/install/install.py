@@ -4,6 +4,7 @@ import json
 import logging
 import logging.config
 import os
+import re
 import subprocess
 import installlib as ilib
 from typing import Dict, Optional
@@ -60,6 +61,9 @@ class InstallSettings:
 
         self.platform_family = platform_family
 
+        if self.node_name_prefix:
+            self.node_name_prefix = _escape(self.node_name_prefix)
+
         self.dynamic_config = config["slurm"].get("dynamic_config")
         if self.dynamic_config:
             self.dynamic_config = _inject_vm_size(self.dynamic_config, self.vm_size)
@@ -68,6 +72,10 @@ class InstallSettings:
         self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
 
         self.additonal_slurm_config = config["slurm"].get("additional", {}).get("config")
+
+
+def _escape(s: str) -> str:
+    return re.sub("[^a-zA-Z0-9-]", "-", s).lower()
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -397,8 +405,14 @@ def setup_slurmd(s: InstallSettings) -> None:
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
-    ilib.set_hostname(s.node_name, s.platform_family, s.ensure_waagent_monitor_hostname)
+    
+    new_hostname = s.node_name.lower()
+    if s.mode != "execute" and not new_hostname.startswith(s.node_name_prefix):
+        new_hostname = f"{s.node_name_prefix}{new_hostname}"
 
+    ilib.set_hostname(
+        new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
+    )
 
 def _load_config(bootstrap_config: str) -> Dict:
     if bootstrap_config == "jetpack":
@@ -459,9 +473,12 @@ def main() -> None:
             minute="*/5",
             command=f"{settings.autoscale_dir}/return_to_idle.sh 1>&2 >> {settings.autoscale_dir}/logs/return_to_idle.log",
         )
+    
+    if args.mode != "scheduler":
+        # TODO - HA scheduler node will need to do this.
+        set_hostname(settings)
 
     if args.mode == "execute":
-        set_hostname(settings)
         setup_slurmd(settings)
 
 
