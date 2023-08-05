@@ -38,13 +38,12 @@ if node[:slurm][:use_nodename_as_hostname] then
   bash 'Change hostname and remove from hosts' do
     code <<-EOH
       #!/bin/bash
-      oldHostname=$(hostname)
       hostnamectl set-hostname #{nodename}#{dns_suffix}
       sed -i '/#{node[:cyclecloud][:instance][:ipv4]}/d' /etc/hosts
       EOH
   end
   
-  # Remove published hostname file and remove waagent
+  # Remove published hostname file and restart waagent
   execute 'remove published_hostname' do
     command "rm -f /var/lib/waagent/published_hostname && systemctl restart #{waagent_service_name}"
     only_if "nslookup #{node[:ipaddress]} | grep -iv #{nodename}"
