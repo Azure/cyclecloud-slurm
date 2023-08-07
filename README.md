@@ -37,7 +37,7 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
       # Set to true if nodes are used for tightly-coupled multi-node jobs
       slurm.hpc = false
 
-      [[[cluster-init cyclecloud/slurm:execute:3.0.1]]]
+      [[[cluster-init cyclecloud/slurm:execute:3.0.3]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
@@ -231,7 +231,7 @@ And for each nodearray, for example the `htc` array:
       wait_for_resume      - Wait for a set of nodes to converge.
       ```
 4. Nodes are no longer pre-populated in CycleCloud. They are only created when needed.
-5. All slurm binaries are inside the `azure-slurm-install-pkg*.tar.gz` file, under `slurm-pkgs`. They are pulled from a specific binary release. The current binary releaes is [2023-03-13](https://github.com/Azure/cyclecloud-slurm/releases/tag/2023-03-13-bins)
+5. All slurm binaries are inside the `azure-slurm-install-pkg*.tar.gz` file, under `slurm-pkgs`. They are pulled from a specific binary release. The current binary releases is [2023-08-07](https://github.com/Azure/cyclecloud-slurm/releases/tag/2023-08-07-bins)
 6. For MPI jobs, the only network boundary that exists by default is the partition. There are not multiple "placement groups" per partition like 2.x. So you only have one colocated VMSS per partition. There is also no use of the topology plugin, which necessitated the use of a job submission plugin that is also no longer needed. Instead, submitting to multiple partitions is now the recommended option for use cases that require submitting jobs to multiple placement groups.
 
 # Contributing
