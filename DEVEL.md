@@ -19,11 +19,11 @@ docker-package.sh ../cyclecloud-scalelib
     Currently it looks like
     ```json
     SUPPORTED_VERSIONS = {
-        "22.05.8-1": {
+        "22.05.8": {
             "rhel": [{"platform_version": "el8", "arch": "x86_64"}],
             "debian": [{"arch": "amd64"}],
         },
-        "23.02.0-1": {
+        "23.02.0": {
             "rhel": [{"platform_version": "el8", "arch": "x86_64"}],
             "debian": [{"arch": "amd64"}],
         }
@@ -36,7 +36,7 @@ docker-package.sh ../cyclecloud-scalelib
     # container.
     # ./specs/default/cluster-init/files/01-build-debs.sh
     # ./specs/default/cluster-init/files/00-build-slurm.sh
-    ./docker-rpmbuild.sh
+    ./util/docker-rpmbuild.sh
     ```
 
 3. Create a new -bins release
