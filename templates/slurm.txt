@@ -265,6 +265,7 @@ Order = 10
         Description = The VM type for Dynamic execute nodes
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
+        Config.MultiSelect = true
 
 
     [[parameters Auto-Scaling]]
