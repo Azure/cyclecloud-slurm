@@ -30,11 +30,14 @@ class Partition:
         use_pcpu: bool = False,
         dynamic_config: Optional[str] = None,
         over_allocation_thresholds: Dict = {},
+        nodearray_machine_types: Optional[List[str]] = None,
     ) -> None:
         self.name = name
         self.nodearray = nodearray
         self.nodename_prefix = nodename_prefix
         self.machine_type = machine_type
+        nodearray_machine_types = nodearray_machine_types or [self.machine_type]
+        self.nodearray_machine_types = [x.lower() for x in nodearray_machine_types]
         self.is_default = is_default
         self.is_hpc = is_hpc
         if not is_hpc:
@@ -103,13 +106,38 @@ class Partition:
                 if self.name in partitions:
                     # only include nodes that have the same vm_size declared as a feature
                     features = (node.get("AvailableFeatures") or "").lower().split(",")
-                    has_vm_size = any([f.startswith("standard_") for f in features])
                     if self.machine_type.lower() in features:
                         ret.append(node["NodeName"])
-                    elif not has_vm_size:
-                        logging.debug("No vm_size feature for node %s is defined, assuming partition %s",
-                                      node["NodeName"],
-                                      self.name)
+                    else:
+                        matches_another_vm_size = set(self.nodearray_machine_types).intersection(set(features))
+                        if matches_another_vm_size:
+                            # this node has a declared vm_size, but it's not the one we're looking for.
+                            continue
+
+                        # we only use the highest priority vm_size as the default - let that 
+                        # partition object handle this.
+                        if self.machine_type.lower() != self.nodearray_machine_types[0]:
+                            continue
+
+                        # anything that starts with standard_ "looks" like a vm_size, at least for logging purposes
+                        possible_vm_sizes = [f for f in features if f.startswith("standard_")]
+                        if possible_vm_sizes:
+                            # we do allow users to use features that start with standard_, but we 
+                            # want to warn them at least. For example, someone puts standard_f2_2v instead of _v2
+                            # or say someone unchecks the relevant vm_size from the CycleCloud cluster.
+                            logging.warning("Found potential vm_size %s - however none match approved vm sizes %s. Is this a typo?",
+                                             ",".join(possible_vm_sizes),
+                                             ",".join(self.nodearray_machine_types))
+
+                        # if we get here, we will just use our  machine type as the vm_size.
+                        # HOWEVER we bump the logging up to warning if there are multiple vm_sizes defined
+                        # for this nodearray, as users _should_ be specific about which vm size they want when
+                        # allowing more than one per nodearray.
+                        log_level = logging.DEBUG if len(self.nodearray_machine_types) > 1 else logging.WARNING
+                        logging.log(log_level,
+                                    "No vm_size feature for node %s is defined, assuming vm_size %s",
+                                    node["NodeName"],
+                                    self.machine_type)
                         ret.append(node["NodeName"])
 
             self.__dynamic_node_list_cache = slutil.to_hostlist(ret)
@@ -230,6 +258,13 @@ def fetch_partitions(
         node_mgr.get_buckets(), lambda b: (b.nodearray, b.vm_size)
     )
 
+    # dict[nodearray, List[vm_size]]
+    nodearray_vm_size: Dict[str, List[str]] = {}
+    for nodearray, vm_size in split_buckets.keys():
+        if nodearray not in nodearray_vm_size:
+            nodearray_vm_size[nodearray] = []
+        nodearray_vm_size[nodearray].append(vm_size)
+
     for buckets in split_buckets.values():
         nodearray_name = buckets[0].nodearray
         slurm_config = buckets[0].software_configuration.get("slurm", {})
@@ -336,6 +371,7 @@ def fetch_partitions(
                     use_pcpu=use_pcpu,
                     dynamic_config=dynamic_config,
                     over_allocation_thresholds=over_allocation_thresholds,
+                    nodearray_machine_types=nodearray_vm_size.get(nodearray_name),
                 )
             )
 
