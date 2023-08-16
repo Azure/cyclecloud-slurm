@@ -14,6 +14,10 @@ default[:cyclecloud][:hosts][:standalone_dns][:enabled] = false
 default[:slurm][:additional][:config] = ""
 default[:slurm][:ensure_waagent_monitor_hostname] = true
 
+# WORKAROUND: This should not need to be set here, but unexpectedly the default is sometimes being set
+# back to /home.
+default[:cuser][:base_home_dir] = "/shared/home"
+
 myplatform=node[:platform_family]
 case myplatform
 when 'ubuntu', 'debian'
