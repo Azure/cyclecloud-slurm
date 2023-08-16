@@ -5,12 +5,12 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "22.05.9-1": {
+    "22.05.9": {
         "rhel": [{"platform_version": "el8", "arch": "x86_64"},
                  {"platform_version": "el7", "arch": "x86_64"}],
         "debian": [{"arch": "amd64"}],
     },
-    "23.02.4-1": {
+    "23.02.4": {
         "rhel": [{"platform_version": "el8", "arch": "x86_64"},
                  {"platform_version": "el7", "arch": "x86_64"}],
         "debian": [{"arch": "amd64"}],
@@ -34,6 +34,7 @@ def get_required_packages() -> Dict[str, List[str]]:
     referenced_versions = set()
     for tok in toks:
         _, _referenced_version = tok.strip("]").strip("[").split("=")
+        _referenced_version = _referenced_version.strip("-1")
         referenced_versions.add(_referenced_version)
 
     assert referenced_versions == set(
@@ -55,7 +56,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-slurmd",
             ]:
                 required_bins.append(
-                    f"{slurmpkg}_{slurm_version}_{debian_version['arch']}.deb"
+                    f"{slurmpkg}_{slurm_version}-1_{debian_version['arch']}.deb"
                 )
         for rhel_version in distros["rhel"]:
 
@@ -72,7 +73,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-openlava",
             ]:
                 required_bins.append(
-                    f"{slurmpkg}-{slurm_version}.{rhel_version['platform_version']}.{rhel_version['arch']}.rpm"
+                    f"{slurmpkg}-{slurm_version}-1.{rhel_version['platform_version']}.{rhel_version['arch']}.rpm"
                 )
     return ret
 

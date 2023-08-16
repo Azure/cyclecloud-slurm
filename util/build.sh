@@ -14,22 +14,24 @@ if [ "$LOCAL_SCALELIB" != "" ]; then
     LOCAL_SCALELIB=$(realpath $LOCAL_SCALELIB)
 fi
 
-cd $(dirname $0)
-if [ ! -e blobs ]; then
-    mkdir blobs
+cwd=$(dirname "$(readlink -f "$0")")
+SOURCE=$(dirname $cwd)
+
+if [ ! -e $SOURCE/blobs ]; then
+    mkdir $SOURCE/blobs
 fi
 
-wget -k -O slurm/install/AzureCA.pem  https://github.com/Azure/cyclecloud-slurm/releases/download/2.7.3/AzureCA.pem
+wget -k -O $SOURCE/slurm/install/AzureCA.pem  https://github.com/Azure/cyclecloud-slurm/releases/download/2.7.3/AzureCA.pem
 # ls slurm/install/slurm-pkgs/*.rpm > /dev/null || (echo you need to run docker-rpmbuild.sh first; exit 1)
 # ls slurm/install/slurm-pkgs/*.deb > /dev/null || (echo you need to run docker-rpmbuild.sh first; exit 1)
 
 
-cd slurm/install
+cd $SOURCE/slurm/install
 rm -f dist/*
 ./package.sh
 mv dist/* ../../blobs/
 
-cd ../../
+cd $SOURCE
 rm -f dist/*
 ./package.sh $LOCAL_SCALELIB
 mv dist/* blobs/
