@@ -41,8 +41,10 @@ def resume(
     
     for name in node_list:
         if name in existing_nodes_by_name:
-            logging.info(f"{name} already exists.")
-            continue
+            node = existing_nodes_by_name[name][0]
+            if node.state != "Deallocated":
+                logging.info(f"{name} already exists.")
+                continue
 
         if name not in name_to_partition:    
             raise AzureSlurmError(
