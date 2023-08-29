@@ -3,6 +3,7 @@
 ## Cluster Configuration File ##
 ################################
 
+
 [cluster Slurm]
 FormLayout = selectionpanel
 Category = Schedulers
@@ -92,6 +93,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
         cyclecloud.mounts.nfs_sched.disabled = true
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
+        slurm.secondary_scheduler_name = ${ifThenElse(configuration_slurm_ha_enabled, "scheduler-ha-1", undefined)}
 
 
         [[[cluster-init cyclecloud/slurm:scheduler:3.0.4]]]
@@ -142,6 +144,7 @@ Autoscale = $Autoscale
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
+        slurm.is_primary_scheduler = false
 
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
