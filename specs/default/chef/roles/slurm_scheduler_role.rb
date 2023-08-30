@@ -7,5 +7,6 @@ run_list("role[scheduler]",
   "recipe[cshared::directories]",
   "recipe[cuser]",
   "recipe[cshared::server]",
-  "recipe[cganglia::server]")
-default_attributes "cyclecloud" => { "discoverable" => true }
+  "recipe[cganglia::server]",
+  "recipe[slurm::delayed_services]")
+default_attributes "cyclecloud" => { "discoverable" => true }, "slurm" => { "role" => "scheduler" }

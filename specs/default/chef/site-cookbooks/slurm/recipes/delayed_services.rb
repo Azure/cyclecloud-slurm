@@ -7,9 +7,10 @@
 # cluster init has finished
 
 defer_block 'Delayed start of services' do
-
+    cmd = "#{node[:cyclecloud][:bootstrap]}/azure-slurm-install/start-services.sh #{node[:slurm][:role]} >> #{node[:cyclecloud][:bootstrap]}/azure-slurm-install/start-services.log 2>&1"
+    Chef::Log.info "Executing #{cmd}"
     execute "delayed_start_of_services" do
-        command "#{node[:cyclecloud][:bootstrap]/azure-slurm-install/start-services.sh #{node[:slurm][:role]}"
+        command cmd
     end
 
 end

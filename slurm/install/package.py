@@ -87,6 +87,7 @@ def execute() -> None:
     _add("rhel.sh", "rhel.sh", 600)
     _add("AzureCA.pem", "AzureCA.pem")
     _add("suse.sh", "suse.sh", 600)
+    _add("start-services.sh", "start-services.sh", 555)
 
     for fil in os.listdir("templates"):
         if os.path.isfile(f"templates/{fil}"):
