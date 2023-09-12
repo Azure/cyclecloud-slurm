@@ -19,18 +19,4 @@ if [ $do_install == "True" ]; then
     python3 install.py --platform $platform --mode $mode --bootstrap-config /opt/cycle/jetpack/config/node.json
 fi
 
-systemctl restart munge
-# wait up to 60 seconds for munge to start
-iters=60
-while [ $iters -ge 0 ]; do
-    echo test | munge > /dev/null 2>&1
-    if [ $? == 0 ]; then
-        break
-    fi
-    sleep 1
-    iters=$(( $iters - 1 ))
-done
-
-if [ "$mode" == "execute" ]; then
-    systemctl start slurmd
-fi
+echo "installation complete. Run start-services scheduler|execute|login to start the slurm services."
