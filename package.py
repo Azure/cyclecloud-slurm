@@ -12,7 +12,7 @@ from subprocess import check_call
 from typing import Dict, List, Optional
 
 SCALELIB_VERSION = "1.0.1"
-CYCLECLOUD_API_VERSION = "8.1.0"
+CYCLECLOUD_API_VERSION = "8.4.1"
 
 
 def build_sdist() -> str:
@@ -41,7 +41,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
         SCALELIB_VERSION
     )
     
-    cyclecloud_api_url = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-03-13-bins/cyclecloud_api-8.3.1-py2.py3-none-any.whl"
+    cyclecloud_api_url = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-09-14-bins/cyclecloud_api-8.4.1-py2.py3-none-any.whl"
     to_download = {
         scalelib_file: (args.scalelib, scalelib_url),
         cyclecloud_api_file: (args.cyclecloud_api, cyclecloud_api_url),

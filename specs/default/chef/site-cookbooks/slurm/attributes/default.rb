@@ -3,7 +3,7 @@
 default[:slurm][:version] = "22.05.9-1"
 default[:slurm][:autoscale_version] = "3.0.4"
 default[:slurm][:user][:name] = 'slurm'
-default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.1.0-py2.py3-none-any.whl"
+default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.4.1-py2.py3-none-any.whl"
 default[:slurm][:autoscale_dir] = "/opt/azurehpc/slurm"
 default[:slurm][:autoscale_pkg] = "azure-slurm-#{default[:slurm][:autoscale_version]}-pkg.tar.gz"
 default[:slurm][:install_pkg] = "azure-slurm-install-#{default[:slurm][:autoscale_version]}-pkg.tar.gz"
