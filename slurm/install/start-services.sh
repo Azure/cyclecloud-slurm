@@ -8,9 +8,6 @@ fi
 
 role=$1
 
-# TODO RDH remove
-echo $(date) starting services >> /tmp/start-services.log
-
 # all nodes need to have munge running
 echo restarting munge...
 systemctl restart munge
