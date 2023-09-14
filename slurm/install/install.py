@@ -1,16 +1,19 @@
 import argparse
-from hashlib import md5
 import json
 import logging
 import logging.config
 import os
+import re
 import subprocess
+import sys
 import installlib as ilib
 from typing import Dict, Optional
 
 
 class InstallSettings:
     def __init__(self, config: Dict, platform_family: str, mode: str) -> None:
+        self.config = config
+
         if "slurm" not in config:
             config["slurm"] = {}
 
@@ -54,6 +57,12 @@ class InstallSettings:
         self.use_nodename_as_hostname = config["slurm"].get(
             "use_nodename_as_hostname", False
         )
+        self.node_name_prefix = config["slurm"].get("node_prefix")
+        if self.node_name_prefix:
+            self.node_name_prefix = re.sub(
+                "[^a-zA-Z0-9-]", "-", self.node_name_prefix
+            ).lower()
+
         self.ensure_waagent_monitor_hostname = config["slurm"].get(
             "ensure_waagent_monitor_hostname", True
         )
@@ -68,7 +77,12 @@ class InstallSettings:
 
         self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
 
-        self.additonal_slurm_config = config["slurm"].get("additional", {}).get("config")
+        self.additonal_slurm_config = (
+            config["slurm"].get("additional", {}).get("config")
+        )
+
+        self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
+        self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -177,7 +191,18 @@ def munge_key(s: InstallSettings) -> None:
 
 
 def accounting(s: InstallSettings) -> None:
+    if s.mode != "scheduler":
+        return
+    if s.is_primary_scheduler:
+        _accounting_primary(s)
+    _accounting_all(s)
 
+
+def _accounting_primary(s: InstallSettings) -> None:
+    """
+    Only the primary scheduler should be creating files under
+    /sched for accounting.
+    """
     if not s.acct_enabled:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
         ilib.file(
@@ -237,6 +262,11 @@ AccountingStorageTRES=gres/gpu
         },
     )
 
+
+def _accounting_all(s: InstallSettings) -> None:
+    """
+    Perform linking and enabling of slurmdbd
+    """
     ilib.link(
         "/sched/AzureCA.pem",
         "/etc/slurm/AzureCA.pem",
@@ -257,11 +287,29 @@ AccountingStorageTRES=gres/gpu
 
 def complete_install(s: InstallSettings) -> None:
     if s.mode == "scheduler":
-        _complete_install_primary(s)
-    _complete_install_all(s)
+        if s.is_primary_scheduler:
+            _complete_install_primary(s)
+        _complete_install_all(s)
+    else:
+        _complete_install_all(s)
 
 
 def _complete_install_primary(s: InstallSettings) -> None:
+    """
+    Only the primary scheduler should be creating files under /sched.
+    """
+    assert s.is_primary_scheduler
+    secondary_scheduler = None
+    if s.secondary_scheduler_name:
+        secondary_scheduler = ilib.await_node_hostname(
+            s.config, s.secondary_scheduler_name
+        )
+    state_save_location = "/var/spool/slurmctld"
+    if secondary_scheduler:
+        state_save_location = "/sched/spool/slurmctld"
+
+    if not os.path.exists(state_save_location):
+        ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
 
     ilib.template(
         "/sched/slurm.conf",
@@ -274,18 +322,23 @@ def _complete_install_primary(s: InstallSettings) -> None:
             # TODO needs to be escaped to support accounting with spaces in cluster name
             "cluster_name": s.cluster_name,
             "max_node_count": s.max_node_count,
+            "state_save_location": state_save_location,
         },
     )
 
+    if secondary_scheduler:
+        ilib.append_file(
+            "/sched/slurm.conf",
+            content=f"SlurmCtldHost={secondary_scheduler.hostname}\n",
+            comment_prefix="\n# Additional HA scheduler host -",
+        )
+
     if s.additonal_slurm_config:
-        hash = md5(s.additonal_slurm_config.encode()).hexdigest()
-        with open("/sched/slurm.conf", "r") as fr:
-            already_written = hash in fr.read()
-        if not already_written:        
-            with open("/sched/slurm.conf", "a") as fa:
-                fa.write("\n")
-                fa.write(f"# Additional config from CycleCloud - md5 = {hash}\n")
-                fa.write(s.additonal_slurm_config)
+        ilib.append_file(
+            "/sched/slurm.conf",
+            content=s.additonal_slurm_config,
+            comment_prefix="\n# Additional config from CycleCloud -",
+        )
 
     ilib.template(
         "/sched/cgroup.conf",
@@ -409,7 +462,17 @@ def setup_slurmd(s: InstallSettings) -> None:
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
-    ilib.set_hostname(s.node_name, s.platform_family, s.ensure_waagent_monitor_hostname)
+    
+    if s.is_primary_scheduler:
+        return
+    
+    new_hostname = s.node_name.lower()
+    if s.mode != "execute" and not new_hostname.startswith(s.node_name_prefix):
+        new_hostname = f"{s.node_name_prefix}{new_hostname}"
+
+    ilib.set_hostname(
+        new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
+    )
 
 
 def _load_config(bootstrap_config: str) -> Dict:
@@ -462,8 +525,7 @@ def main() -> None:
 
     complete_install(settings)
 
-    # scheduler specific - add return_to_idle script
-    if args.mode == "scheduler":
+    if settings.mode == "scheduler":
         accounting(settings)
         # TODO create a rotate log
         ilib.cron(
@@ -472,10 +534,19 @@ def main() -> None:
             command=f"{settings.autoscale_dir}/return_to_idle.sh 1>&2 >> {settings.autoscale_dir}/logs/return_to_idle.log",
         )
 
-    if args.mode == "execute":
-        set_hostname(settings)
+    set_hostname(settings)
+
+    if settings.mode == "execute":
         setup_slurmd(settings)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except:
+        print(
+            "An error occured during installation. See log file /var/log/azure-slurm-install.log for details.",
+            file=sys.stderr,
+        )
+        logging.exception("An error occured during installation.")
+        sys.exit(1)

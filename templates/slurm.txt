@@ -3,6 +3,7 @@
 ## Cluster Configuration File ##
 ################################
 
+
 [cluster Slurm]
 FormLayout = selectionpanel
 Category = Schedulers
@@ -92,6 +93,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
         cyclecloud.mounts.nfs_sched.disabled = true
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
+        slurm.secondary_scheduler_name = ${ifThenElse(configuration_slurm_ha_enabled, "scheduler-ha-1", undefined)}
 
 
         [[[cluster-init cyclecloud/slurm:scheduler:3.0.4]]]
@@ -106,30 +108,30 @@ Autoscale = $Autoscale
         Persistent = False
 
         [[[volume shared]]]
-        Size = ${ifThenElse(NFSType == "Builtin", FilesystemSize, 2)}
+        Size = ${ifThenElse(NFSType == "Builtin" && !configuration_slurm_ha_enabled, FilesystemSize, 2)}
         SSD = True
         Mount = builtinshared
-        Persistent = ${NFSType == "Builtin"}
+        Persistent = ${NFSType == "Builtin" && !configuration_slurm_ha_enabled}
 
         [[[configuration cyclecloud.mounts.builtinsched]]]
-        disabled = ${NFSType != "Builtin"}
+        disabled = ${NFSType == "Builtin" && !configuration_slurm_ha_enabled}
         mountpoint = /sched
         fs_type = xfs
 
         [[[configuration cyclecloud.mounts.builtinshared]]]
-        disabled = ${NFSType != "Builtin"}
+        disabled = ${NFSType == "Builtin" && !configuration_slurm_ha_enabled}
         mountpoint = /shared
         fs_type = xfs
 
         [[[configuration cyclecloud.exports.builtinsched]]]
-	disabled = ${NFSSchedDisable}
+	    disabled = ${NFSSchedDisable && !configuration_slurm_ha_enabled}
         export_path = /sched
         options = no_root_squash
         samba.enabled = false
         type = nfs
 
         [[[configuration cyclecloud.exports.builtinshared]]]
-        disabled = ${NFSType != "Builtin"}
+        disabled = ${NFSType != "Builtin" && !configuration_slurm_ha_enabled}
         export_path = /shared
         samba.enabled = false
         type = nfs
@@ -142,6 +144,7 @@ Autoscale = $Autoscale
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
+        slurm.is_primary_scheduler = false
 
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
@@ -226,6 +229,15 @@ Order = 1
 [parameters Required Settings]
 Order = 10
 
+    
+    [[parameters High Availability]]
+    Description = "Slurm can be setup in HA mode - where slurmctld is running on two nodes with failover. Note that checking this box will require an external NFS, so any reference to the 'builtin' NFS will be hidden."
+        [[[parameter configuration_slurm_ha_enabled]]]
+        Label = Slurm HA Node
+        Description = Deploy with an additional HA node
+        DefaultValue = false
+        ParameterType = Boolean
+    
     [[parameters Virtual Machines ]]
     Description = "The cluster, in this case, has two roles: the scheduler node with shared filer and the execute hosts. Configure which VM types to use based on the requirements of your application."
     Order = 20
@@ -362,6 +374,7 @@ Order = 15
 
     [[parameters Scheduler Mount]]
     Order = 5
+    Conditions.Hidden := configuration_slurm_ha_enabled
         [[[parameter About sched]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
@@ -369,20 +382,24 @@ Order = 15
             Slurm's configuration is linked in from this directory. It's managed by the scheduler node. 
             To disable the mount of the /sched directory, and to supply your own for a <strong>hybrid scenario</strong>, select the checkbox below.'''
         Order = 6
+        # Conditions.Hidden := configuration_slurm_ha_enabled
 
         [[[parameter NFSSchedDisable]]]
         HideLabel = true
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = External Scheduler
+        # Conditions.Hidden := configuration_slurm_ha_enabled
 
     [[parameters Default NFS Share]]
     Order = 10
+    Label = NFS mount for /shared
         [[[parameter About shared]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
         Config.Template := "<p>The directory <code>/shared</code> is a network attached mount and exists in all nodes of the cluster. Users' home directories reside within this mountpoint with the base homedir <code>/shared/home</code>.<br><br>There are two options for providing this mount:<br> <strong>[Builtin]</strong>: The scheduler node is an NFS server that provides the mountpoint to the other nodes of the cluster.<br> <strong>[External NFS]</strong>: A network attached storage such as Azure Netapp Files, HPC Cache, or another VM running an NFS server, provides the mountpoint.</p><p>Note: the cluster must be terminated for this to take effect.</p>"
         Order = 20
+        Conditions.Hidden := configuration_slurm_ha_enabled
 
         [[[parameter NFSType]]]
         Label = NFS Type
@@ -391,29 +408,30 @@ Order = 15
         Config.Plugin = pico.form.Dropdown
         Config.Entries := {[Label="External NFS"; Value="External"], [Label="Builtin"; Value="Builtin"]}
         DefaultValue = Builtin
+        Conditions.Hidden := configuration_slurm_ha_enabled
 
 	[[[parameter NFSDiskWarning]]]
 	HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
         Config.Template := "<p><b>Warning</b>: switching an active cluster over to NFS will delete the shared disk.</p>"
-        Conditions.Hidden := NFSType != "External"
+        Conditions.Hidden := configuration_slurm_ha_enabled
 
         [[[parameter NFSAddress]]]
         Label = NFS IP Address
         Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
         Config.ParameterType = String
-        Conditions.Hidden := NFSType != "External"
+        Conditions.Hidden := NFSType != "External" && !configuration_slurm_ha_enabled
 
         [[[parameter NFSSharedExportPath]]]
         Label = Shared Export Path
         Description = The path exported by the file system
         DefaultValue = /shared
-        Conditions.Hidden := NFSType != "External"
+        Conditions.Hidden := NFSType != "External" && !configuration_slurm_ha_enabled
 
         [[[parameter NFSSharedMountOptions]]]
         Label = NFS Mount Options
         Description = NFS Client Mount Options
-        Conditions.Hidden := NFSType != "External"
+        Conditions.Hidden := NFSType != "External" && !configuration_slurm_ha_enabled
 
         [[[parameter FilesystemSize]]]
         Label = Size (GB)
@@ -424,10 +442,11 @@ Order = 15
         Config.MinValue = 10
         Config.MaxValue = 10240
         Config.IntegerOnly = true
-        Conditions.Excluded := NFSType != "Builtin"
+        Conditions.Excluded := NFSType != "Builtin" || configuration_slurm_ha_enabled
 
     [[parameters Additional NFS Mount]]
     Order = 20
+    Label = NFS Mount for /sched
         [[[parameter Additional NFS Mount Readme]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
@@ -439,29 +458,30 @@ Order = 15
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Add NFS mount
+        Conditions.Hidden := configuration_slurm_ha_enabled
 
         [[[parameter AdditonalNFSAddress]]]
         Label = NFS IP Address 
         Description = The IP address or hostname of the NFS server. Also accepts a list comma-separated addresses, for example, to mount a frontend load-balanced Azure HPC Cache.
         Config.ParameterType = String
-        Conditions.Excluded := AdditionalNAS isnt true
+        Conditions.Excluded := AdditionalNAS isnt true && !configuration_slurm_ha_enabled
 
         [[[parameter AdditionalNFSMountPoint]]]
         Label = NFS Mount Point
         Description = The path at which to mount the Filesystem
-        DefaultValue = /data
-        Conditions.Excluded := AdditionalNAS isnt true
+        DefaultValue = /sched
+        Conditions.Excluded := AdditionalNAS isnt true && !configuration_slurm_ha_enabled
 
         [[[parameter AdditionalNFSExportPath]]]
         Label = NFS Export Path
         Description = The path exported by the file system
-        DefaultValue = /data
-        Conditions.Excluded := AdditionalNAS isnt true
+        DefaultValue = /sched
+        Conditions.Excluded := AdditionalNAS isnt true && !configuration_slurm_ha_enabled
 
         [[[parameter AdditionalNFSMountOptions]]]
         Label = NFS Mount Options
         Description = NFS Client Mount Options
-        Conditions.Excluded := AdditionalNAS isnt true
+        Conditions.Excluded := AdditionalNAS isnt true && !configuration_slurm_ha_enabled
     
 
 [parameters Advanced Settings]
@@ -537,12 +557,6 @@ Order = 20
         Label = Slurm Configuration
         Description = Any additional lines to add to slurm.conf
         ParameterType = Text
-
-        [[[parameter configuration_slurm_ha_enabled]]]
-        Label = Slurm HA Node
-        Description = Deploy with an additional HA node
-        DefaultValue = false
-        ParameterType = Boolean
 	
         [[[parameter configuration_slurm_launch_parameters]]]
         Label = Launch Parameters
