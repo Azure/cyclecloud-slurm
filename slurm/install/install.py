@@ -304,11 +304,12 @@ def _complete_install_primary(s: InstallSettings) -> None:
         secondary_scheduler = ilib.await_node_hostname(
             s.config, s.secondary_scheduler_name
         )
-    state_save_location = "/var/spool/slurmd"
+    state_save_location = "/var/spool/slurmctld"
     if secondary_scheduler:
-        state_save_location = "/sched/spool/slurmd"
-        if not os.path.exists("/sched/spool/slurmd"):
-            ilib.directory("/sched/spool/slurmd", owner=s.slurm_user, group=s.slurm_grp)
+        state_save_location = "/sched/spool/slurmctld"
+
+    if not os.path.exists(state_save_location):
+        ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
 
     ilib.template(
         "/sched/slurm.conf",
