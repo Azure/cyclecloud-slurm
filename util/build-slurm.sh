@@ -41,9 +41,9 @@ function build_slurm() {
              # munge is in EPEL
             yum -y install epel-release && yum -q makecache
             yum install -y make $PYTHON which rpm-build munge-devel munge-libs readline-devel openssl openssl-devel pam-devel perl-ExtUtils-MakeMaker gcc mysql mysql-devel wget gtk2-devel.x86_64 glib2-devel.x86_64 $LIBTOOL m4 automake rsync lua-devel
-            yum install -y http-parser-devel json-c-devel
+            yum install -y http-parser-devel json-c-devel hwloc-devel
             ;;
-            
+
     esac
 
     if [ ! -e ~/bin ]; then
@@ -64,7 +64,7 @@ function build_slurm() {
         wget "${DOWNLOAD_URL}/${SLURM_PKG}"
     fi
 
-    rpmbuild --with mysql --define '_with_pmix --with-pmix=/opt/pmix/v3' --with=hwlocs --with=lua -ta ${SLURM_PKG}
+    rpmbuild --with mysql --define '_with_pmix --with-pmix=/opt/pmix/v4' --with=hwloc --with=lua --with=slurmrestd -ta ${SLURM_PKG}
 }
 
 function install_pmix() {
@@ -77,8 +77,8 @@ function install_pmix() {
     esac
    
     cd ~/
-    mkdir -p /opt/pmix/v3
-    mkdir -p pmix/build/v3 pmix/install/v3
+    mkdir -p /opt/pmix/v4
+    mkdir -p pmix/build/v4 pmix/install/v4
     cd pmix
 
     if ! [[ -d source ]]; then
@@ -87,13 +87,13 @@ function install_pmix() {
 
     cd source/
     # git branch -a
-    git checkout v3.1
-    git pull
-    ./autogen.sh
-    cd ../build/v3/
-    ../../source/configure --prefix=/opt/pmix/v3
+    git checkout v4.2.6
+    git submodule update --init --recursive
+    ./autogen.pl
+    cd ../build/v4/
+    ../../source/configure --prefix=/opt/pmix/v4
     make -j install >/dev/null
-    cd ../../install/v3/
+    cd ../../install/v4/
 }
 
 for version in $(echo $2); do 

@@ -28,9 +28,9 @@ else
   exit 1
 fi
 
-$runtime run -v $SOURCE_ROOT:/source -v $WORKDIR/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti almalinux:8.5 /bin/bash /source/util/build-slurm.sh centos "$SLURM_VERSIONS"
-$runtime run -v $SOURCE_ROOT:/source -v $WORKDIR/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti centos:7 /bin/bash /source/util/build-slurm.sh centos "$SLURM_VERSIONS"
-$runtime run -v $SOURCE_ROOT:/source -v $WORKDIR/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti ubuntu:20.04 /bin/bash /source/util/build-debs.sh "$SLURM_VERSIONS"
+$runtime run -v $SOURCE_ROOT:/source -v $WORKDIR/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti mcr.microsoft.com/mirror/docker/library/almalinux:8.7 /bin/bash /source/util/build-slurm.sh centos "$SLURM_VERSIONS"
+$runtime run -v $SOURCE_ROOT:/source -v $WORKDIR/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti mcr.microsoft.com/mirror/docker/library/centos:7 /bin/bash /source/util/build-slurm.sh centos "$SLURM_VERSIONS"
+$runtime run -v $SOURCE_ROOT:/source -v $WORKDIR/$TMP_BINS:/root/rpmbuild/RPMS/x86_64 $extra_args -ti mcr.microsoft.com/mirror/docker/library/ubuntu:20.04 /bin/bash /source/util/build-debs.sh "$SLURM_VERSIONS"
 
 mv $TMP_BINS/* slurm-pkgs/
 rm -rf $TMP_BINS
