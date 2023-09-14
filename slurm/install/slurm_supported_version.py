@@ -17,7 +17,7 @@ SUPPORTED_VERSIONS = {
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-08-07-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-09-14-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
@@ -54,6 +54,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-slurmctld",
                 "slurm-slurmdbd",
                 "slurm-slurmd",
+                "slurm-slurmrestd"
             ]:
                 required_bins.append(
                     f"{slurmpkg}_{slurm_version}-1_{debian_version['arch']}.deb"
@@ -71,6 +72,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-perlapi",
                 "slurm-torque",
                 "slurm-openlava",
+                "slurm-slurmrestd"
             ]:
                 required_bins.append(
                     f"{slurmpkg}-{slurm_version}-1.{rhel_version['platform_version']}.{rhel_version['arch']}.rpm"
