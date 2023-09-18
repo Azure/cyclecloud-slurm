@@ -501,7 +501,6 @@ Order = 20
         [[[parameter slurm_version_warning]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template := "<table role=\"presentation\"><tr><td> <b>Note that for SuSe, only 22.05 is supported.</b></td></tr></table>"
 
         [[[parameter configuration_slurm_version]]]
         Required = True
@@ -510,7 +509,7 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="22.05.9-1"], [Value="23.02.4-1"]}
+        Config.Entries := {[Value="22.05.9-1"], [Value="23.02.5-1"]}
         DefaultValue = 22.05.9-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]
