@@ -65,7 +65,7 @@ Autoscale = $Autoscale
         [[[configuration cyclecloud.mounts.nfs_sched]]]
         type = nfs
         mountpoint = /sched
-        disabled = $NFSSchedDisable
+        disabled = ${NFSSchedDisable || configuration_slurm_ha_enabled} 
 
         [[[configuration cyclecloud.mounts.additional_nfs]]]
         disabled = ${AdditionalNAS isnt true && !configuration_slurm_ha_enabled}
