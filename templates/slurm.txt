@@ -65,15 +65,15 @@ Autoscale = $Autoscale
         [[[configuration cyclecloud.mounts.nfs_sched]]]
         type = nfs
         mountpoint = /sched
-        disabled = $NFSSchedDisable
+        disabled = ${NFSSchedDisable || configuration_slurm_ha_enabled} 
 
         [[[configuration cyclecloud.mounts.additional_nfs]]]
-        disabled = ${AdditionalNAS isnt true}
+        disabled = ${AdditionalNAS isnt true && !configuration_slurm_ha_enabled}
         type = nfs
-        address = ${ifThenElse(AdditionalNAS, AdditonalNFSAddress, undefined)}
-        mountpoint = ${ifThenElse(AdditionalNAS, AdditionalNFSMountPoint, undefined)}
-        export_path = ${ifThenElse(AdditionalNAS, AdditionalNFSExportPath, undefined)}
-        options = ${ifThenElse(AdditionalNAS, AdditionalNFSMountOptions, undefined)}
+        address = ${ifThenElse(AdditionalNAS || configuration_slurm_ha_enabled, AdditonalNFSAddress, undefined)}
+        mountpoint = ${ifThenElse(AdditionalNAS || configuration_slurm_ha_enabled, AdditionalNFSMountPoint, undefined)}
+        export_path = ${ifThenElse(AdditionalNAS || configuration_slurm_ha_enabled, AdditionalNFSExportPath, undefined)}
+        options = ${ifThenElse(AdditionalNAS || configuration_slurm_ha_enabled, AdditionalNFSMountOptions, undefined)}
 
     [[node scheduler]]
     MachineType = $SchedulerMachineType
@@ -92,7 +92,7 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
         cyclecloud.mounts.nfs_sched.disabled = true
-        cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
+        cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External" && !configuration_slurm_ha_enabled}
         slurm.secondary_scheduler_name = ${ifThenElse(configuration_slurm_ha_enabled, "scheduler-ha-1", undefined)}
 
 
@@ -114,24 +114,24 @@ Autoscale = $Autoscale
         Persistent = ${NFSType == "Builtin" && !configuration_slurm_ha_enabled}
 
         [[[configuration cyclecloud.mounts.builtinsched]]]
-        disabled = ${NFSType == "Builtin" && !configuration_slurm_ha_enabled}
+        disabled = ${NFSType != "Builtin" || configuration_slurm_ha_enabled}
         mountpoint = /sched
         fs_type = xfs
 
         [[[configuration cyclecloud.mounts.builtinshared]]]
-        disabled = ${NFSType == "Builtin" && !configuration_slurm_ha_enabled}
+        disabled = ${NFSType != "Builtin" || configuration_slurm_ha_enabled}
         mountpoint = /shared
         fs_type = xfs
 
         [[[configuration cyclecloud.exports.builtinsched]]]
-	    disabled = ${NFSSchedDisable && !configuration_slurm_ha_enabled}
+	    disabled = ${NFSSchedDisable || configuration_slurm_ha_enabled}
         export_path = /sched
         options = no_root_squash
         samba.enabled = false
         type = nfs
 
         [[[configuration cyclecloud.exports.builtinshared]]]
-        disabled = ${NFSType != "Builtin" && !configuration_slurm_ha_enabled}
+        disabled = ${NFSType != "Builtin" || configuration_slurm_ha_enabled}
         export_path = /shared
         samba.enabled = false
         type = nfs
@@ -414,7 +414,7 @@ Order = 15
 	HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
         Config.Template := "<p><b>Warning</b>: switching an active cluster over to NFS will delete the shared disk.</p>"
-        Conditions.Hidden := configuration_slurm_ha_enabled
+        Conditions.Hidden := NFSType != "External" || configuration_slurm_ha_enabled
 
         [[[parameter NFSAddress]]]
         Label = NFS IP Address
