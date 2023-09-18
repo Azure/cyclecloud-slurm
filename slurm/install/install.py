@@ -83,7 +83,7 @@ class InstallSettings:
 
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
-
+        self.config_dir = f"/sched/{self.cluster_name}"
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
     lc = dynamic_config.lower()
@@ -99,6 +99,11 @@ def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
                 ret.append(tok)
         return " ".join(ret)
 
+def setup_config_dir(s: InstallSettings) -> None:
+
+    # set up config dir inside {s.config_dir} mount.
+    if s.is_primary_scheduler:
+        ilib.directory(s.config_dir, owner="root", group="root", mode=755)
 
 def setup_users(s: InstallSettings) -> None:
     # Set up users for Slurm and Munge
@@ -145,7 +150,7 @@ def fix_permissions(s: InstallSettings) -> None:
         "/run/munge", owner=s.munge_user, group=s.munge_grp, mode=755, recursive=True
     )
 
-    ilib.directory("/sched/munge", owner=s.munge_user, group=s.munge_grp, mode=700)
+    ilib.directory(f"{s.config_dir}/munge", owner=s.munge_user, group=s.munge_grp, mode=700)
 
     # Set up slurm
     ilib.user(s.slurm_user, comment="User to run slurmctld", shell="/bin/false")
@@ -166,7 +171,7 @@ def munge_key(s: InstallSettings) -> None:
         "/etc/munge", owner=s.munge_user, group=s.munge_grp, mode=700, recursive=True
     )
 
-    if s.mode == "scheduler" and not os.path.exists("/sched/munge.key"):
+    if s.mode == "scheduler" and not os.path.exists(f"{s.config_dir}/munge.key"):
         # TODO only should do this on the primary
         # we should skip this for secondary HA nodes
         with open("/dev/urandom", "rb") as fr:
@@ -174,7 +179,7 @@ def munge_key(s: InstallSettings) -> None:
             while len(buf) < 1024:
                 buf = buf + fr.read(1024 - len(buf))
         ilib.file(
-            "/sched/munge.key",
+            f"{s.config_dir}/munge.key",
             content=buf,
             owner=s.munge_user,
             group=s.munge_grp,
@@ -182,7 +187,7 @@ def munge_key(s: InstallSettings) -> None:
         )
 
     ilib.copy_file(
-        "/sched/munge.key",
+        f"{s.config_dir}/munge.key",
         "/etc/munge/munge.key",
         owner=s.munge_user,
         group=s.munge_grp,
@@ -201,12 +206,12 @@ def accounting(s: InstallSettings) -> None:
 def _accounting_primary(s: InstallSettings) -> None:
     """
     Only the primary scheduler should be creating files under
-    /sched for accounting.
+    {s.config_dir} for accounting.
     """
     if not s.acct_enabled:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
         ilib.file(
-            "/sched/accounting.conf",
+            f"{s.config_dir}/accounting.conf",
             owner=s.slurm_user,
             group=s.slurm_grp,
             content="AccountingStorageType=accounting_storage/none",
@@ -214,7 +219,7 @@ def _accounting_primary(s: InstallSettings) -> None:
         return
 
     ilib.file(
-        "/sched/accounting.conf",
+        f"{s.config_dir}/accounting.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
         content="""
@@ -225,23 +230,23 @@ AccountingStorageTRES=gres/gpu
     )
 
     if s.acct_cert_url:
-        logging.info(f"Downloading {s.acct_cert_url} to /sched/AzureCA.pem")
+        logging.info(f"Downloading {s.acct_cert_url} to {s.config_dir}/AzureCA.pem")
         subprocess.check_call(
             [
                 "wget",
                 "-O",
-                "/sched/AzureCA.pem",
+                f"{s.config_dir}/AzureCA.pem",
                 s.acct_cert_url,
             ]
         )
         ilib.chown(
-            "/sched/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
+            f"{s.config_dir}/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
         )
-        ilib.chmod("/sched/AzureCA.pem", mode="0600")
+        ilib.chmod(f"{s.config_dir}/AzureCA.pem", mode="0600")
     else:
         ilib.copy_file(
             "AzureCA.pem",
-            "/sched/AzureCA.pem",
+            f"{s.config_dir}/AzureCA.pem",
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0600",
@@ -249,7 +254,7 @@ AccountingStorageTRES=gres/gpu
 
     # Configure slurmdbd.conf
     ilib.template(
-        "/sched/slurmdbd.conf",
+        f"{s.config_dir}/slurmdbd.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
         source="templates/slurmdbd.conf.template",
@@ -268,7 +273,7 @@ def _accounting_all(s: InstallSettings) -> None:
     Perform linking and enabling of slurmdbd
     """
     ilib.link(
-        "/sched/AzureCA.pem",
+        f"{s.config_dir}/AzureCA.pem",
         "/etc/slurm/AzureCA.pem",
         owner=s.slurm_user,
         group=s.slurm_grp,
@@ -276,7 +281,7 @@ def _accounting_all(s: InstallSettings) -> None:
 
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
-        "/sched/slurmdbd.conf",
+        f"{s.config_dir}/slurmdbd.conf",
         "/etc/slurm/slurmdbd.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
@@ -296,7 +301,7 @@ def complete_install(s: InstallSettings) -> None:
 
 def _complete_install_primary(s: InstallSettings) -> None:
     """
-    Only the primary scheduler should be creating files under /sched.
+    Only the primary scheduler should be creating files under {s.config_dir}.
     """
     assert s.is_primary_scheduler
     secondary_scheduler = None
@@ -306,13 +311,13 @@ def _complete_install_primary(s: InstallSettings) -> None:
         )
     state_save_location = "/var/spool/slurmctld"
     if secondary_scheduler:
-        state_save_location = "/sched/spool/slurmctld"
+        state_save_location = f"{s.config_dir}/spool/slurmctld"
 
     if not os.path.exists(state_save_location):
         ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
 
     ilib.template(
-        "/sched/slurm.conf",
+        f"{s.config_dir}/slurm.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
         mode="0644",
@@ -328,38 +333,38 @@ def _complete_install_primary(s: InstallSettings) -> None:
 
     if secondary_scheduler:
         ilib.append_file(
-            "/sched/slurm.conf",
+            f"{s.config_dir}/slurm.conf",
             content=f"SlurmCtldHost={secondary_scheduler.hostname}\n",
             comment_prefix="\n# Additional HA scheduler host -",
         )
 
     if s.additonal_slurm_config:
         ilib.append_file(
-            "/sched/slurm.conf",
+            f"{s.config_dir}/slurm.conf",
             content=s.additonal_slurm_config,
             comment_prefix="\n# Additional config from CycleCloud -",
         )
 
     ilib.template(
-        "/sched/cgroup.conf",
+        f"{s.config_dir}/cgroup.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
         source=f"templates/cgroup.conf.template",
         mode="0644",
     )
 
-    if not os.path.exists("/sched/azure.conf"):
+    if not os.path.exists(f"{s.config_dir}/azure.conf"):
         ilib.file(
-            "/sched/azure.conf",
+            f"{s.config_dir}/azure.conf",
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0644",
             content="",
         )
 
-    if not os.path.exists("/sched/keep_alive.conf"):
+    if not os.path.exists(f"{s.config_dir}/keep_alive.conf"):
         ilib.file(
-            "/sched/keep_alive.conf",
+            f"{s.config_dir}/keep_alive.conf",
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0644",
@@ -369,35 +374,35 @@ def _complete_install_primary(s: InstallSettings) -> None:
 
 def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
-        "/sched/gres.conf",
+        f"{s.config_dir}/gres.conf",
         "/etc/slurm/gres.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
 
     ilib.link(
-        "/sched/slurm.conf",
+        f"{s.config_dir}/slurm.conf",
         "/etc/slurm/slurm.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
 
     ilib.link(
-        "/sched/cgroup.conf",
+        f"{s.config_dir}/cgroup.conf",
         "/etc/slurm/cgroup.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
 
     ilib.link(
-        "/sched/azure.conf",
+        f"{s.config_dir}/azure.conf",
         "/etc/slurm/azure.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
 
     ilib.link(
-        "/sched/keep_alive.conf",
+        f"{s.config_dir}/keep_alive.conf",
         "/etc/slurm/keep_alive.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
@@ -405,7 +410,7 @@ def _complete_install_all(s: InstallSettings) -> None:
 
     # Link the accounting.conf regardless
     ilib.link(
-        "/sched/accounting.conf",
+        f"{s.config_dir}/accounting.conf",
         "/etc/slurm/accounting.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
@@ -462,10 +467,10 @@ def setup_slurmd(s: InstallSettings) -> None:
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
-    
+
     if s.is_primary_scheduler:
         return
-    
+
     new_hostname = s.node_name.lower()
     if s.mode != "execute" and not new_hostname.startswith(s.node_name_prefix):
         new_hostname = f"{s.node_name_prefix}{new_hostname}"
@@ -493,7 +498,7 @@ def main() -> None:
     # needed to set slurmctld only
     if os.path.exists("install_logging.conf"):
         logging.config.fileConfig("install_logging.conf")
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--platform", default="rhel", choices=["rhel", "ubuntu", "suse", "debian"]
@@ -511,6 +516,9 @@ def main() -> None:
     config = _load_config(args.bootstrap_config)
     settings = InstallSettings(config, args.platform, args.mode)
 
+    #create config dir
+    setup_config_dir(settings)
+
     # create the users
     setup_users(settings)
 
@@ -519,7 +527,7 @@ def main() -> None:
 
     # runs either rhel.sh or ubuntu.sh to install the packages
     run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
-    
+
     # various permissions fixes
     fix_permissions(settings)
 

@@ -346,6 +346,7 @@ class SlurmCLI(CommonCLI):
             "--accounting-subscription-id", dest="accounting__subscription_id"
         )
         parser.add_argument("--cost-cache-root", dest="cost__cache_root")
+        parser.add_argument("--config-dir", required=True)
 
     def _initconfig(self, config: Dict) -> None:
         # TODO
@@ -408,9 +409,9 @@ class SlurmCLI(CommonCLI):
         config: Dict,
         backup_dir="/etc/slurm/.backups",
         slurm_conf_dir="/etc/slurm",
-        sched_dir="/sched",
         config_only=False,
     ):
+        sched_dir = config.get("config_dir")
         node_mgr = self._get_node_manager(config)
         # make sure .backups exists
         now = clock.time()
@@ -428,7 +429,7 @@ class SlurmCLI(CommonCLI):
             msg = f"{linked_gres_conf} should be a symlink to {gres_conf}! Changes will not take effect locally."
             print("WARNING: " + msg, file=sys.stderr)
             logging.warning(msg)
-        
+
         if not os.path.exists(linked_gres_conf):
             msg = f"please run 'ln -s {gres_conf} {linked_gres_conf}' && chown slurm:slurm {linked_gres_conf}"
             print("WARNING: " + msg, file=sys.stderr)
@@ -483,9 +484,11 @@ class SlurmCLI(CommonCLI):
         set_nodes: bool = False,
     ) -> None:
         """
-        Add, remeove or set which nodes should be prevented from being shutdown.
+        Add, remove or set which nodes should be prevented from being shutdown.
 
         """
+
+        config_dir = config.get("config_dir")
         if remove and set_nodes:
             raise AzureSlurmError("Please define only --set or --remove, not both.")
 
@@ -525,9 +528,9 @@ class SlurmCLI(CommonCLI):
             ["scontrol", "show", "hostlist", ",".join(all_susp_hostnames)]
         ).strip()
 
-        with open("/sched/keep_alive.conf.tmp", "w") as fw:
+        with open(f"{config_dir}/keep_alive.conf.tmp", "w") as fw:
             fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
-        shutil.move("/sched/keep_alive.conf.tmp", "/sched/keep_alive.conf")
+        shutil.move(f"{config_dir}/keep_alive.conf.tmp", f"{config_dir}/keep_alive.conf")
         slutil.check_output(["scontrol", "reconfig"])
 
     def accounting_info_parser(self, parser: argparse.ArgumentParser) -> None:
@@ -808,7 +811,7 @@ def is_autoscale_enabled(subprocess_module: Optional[Any] = None) -> bool:
         )
     except Exception:
         try:
-            with open("/sched/slurm.conf") as fr:
+            with open("/etc/slurm/slurm.conf") as fr:
                 lines = fr.readlines()
         except Exception:
             _IS_AUTOSCALE_ENABLED = True
