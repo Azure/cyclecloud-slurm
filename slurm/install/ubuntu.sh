@@ -22,6 +22,8 @@ apt -y install munge
 apt -y install libmariadbclient-dev-compat libssl-dev
 
 if [ $UBUNTU_VERSION > "19" ]; then
+    apt install -y libhwloc15
+
     ln -sf /lib/x86_64-linux-gnu/libreadline.so.8 /usr/lib/x86_64-linux-gnu/libreadline.so.7
     ln -sf /lib/x86_64-linux-gnu/libhistory.so.8 /usr/lib/x86_64-linux-gnu/libhistory.so.7
     ln -sf /lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.6
