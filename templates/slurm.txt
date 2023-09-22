@@ -89,6 +89,7 @@ Autoscale = $Autoscale
     #             undefined,
     #             SchedulerHostName)),
     # "-")}
+    Zone = ${ifThenElse(configuration_slurm_ha_enabled, SchedulerZone, undefined)}
     
         [[[configuration]]]
         cyclecloud.mounts.nfs_sched.disabled = true
@@ -140,6 +141,7 @@ Autoscale = $Autoscale
     Extends = scheduler
     IsReturnProxy = false
     InitialCount = $configuration_slurm_ha_enabled
+    Zone = $SchedulerHAZone
         [[[configuration]]]
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
@@ -229,14 +231,6 @@ Order = 1
 [parameters Required Settings]
 Order = 10
 
-    
-    [[parameters High Availability]]
-    Description = "Slurm can be setup in HA mode - where slurmctld is running on two nodes with failover. Note that checking this box will require an external NFS, so any reference to the 'builtin' NFS will be hidden."
-        [[[parameter configuration_slurm_ha_enabled]]]
-        Label = Slurm HA Node
-        Description = Deploy with an additional HA node
-        DefaultValue = false
-        ParameterType = Boolean
     
     [[parameters Virtual Machines ]]
     Description = "The cluster, in this case, has two roles: the scheduler node with shared filer and the execute hosts. Configure which VM types to use based on the requirements of your application."
@@ -367,6 +361,37 @@ Order = 10
         Description = Subnet Resource Path (ResourceGroup/VirtualNetwork/Subnet)
         ParameterType = Azure.Subnet
         Required = True
+
+    [[parameters High Availability]]
+    Order = 50
+    Description = "Slurm can be setup in HA mode - where slurmctld is running on two nodes with failover. Note that checking this box will require an external NFS, so any reference to the 'builtin' NFS will be hidden."
+        [[[parameter configuration_slurm_ha_enabled]]]
+        Label = Slurm HA Node
+        Description = Deploy with an additional HA node
+        DefaultValue = false
+        ParameterType = Boolean
+
+        [[[parameter ZoneWarning]]]
+        HideLabel = true
+        Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<p><b>Note</b>: You should put the two schedulers into different availability zones for maximum fault tolerance.</p>"
+        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
+
+        [[[parameter SchedulerZone]]]
+        Label = Scheduler Zone
+        Description = The availability zone in which to deploy the scheduler node.
+        DefaultValue = 1
+        Config.Plugin = pico.form.Dropdown
+        Config.Entries := {[Value=1], [Value=2], [Value=3]}
+        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
+
+        [[[parameter SchedulerHAZone]]]
+        Label = Scheduler HA Zone
+        Description = The availability zone in which to deploy the scheduler-ha node.
+        DefaultValue = 2
+        Config.Plugin = pico.form.Dropdown
+        Config.Entries := {[Value=1], [Value=2], [Value=3]}
+        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
 
 [parameters Network Attached Storage]
 Order = 15
