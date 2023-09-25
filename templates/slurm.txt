@@ -371,27 +371,6 @@ Order = 10
         DefaultValue = false
         ParameterType = Boolean
 
-        [[[parameter ZoneWarning]]]
-        HideLabel = true
-        Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template := "<p><b>Note</b>: You should put the two schedulers into different availability zones for maximum fault tolerance.</p>"
-        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
-
-        [[[parameter SchedulerZone]]]
-        Label = Scheduler Zone
-        Description = The availability zone in which to deploy the scheduler node.
-        DefaultValue = 1
-        Config.Plugin = pico.form.Dropdown
-        Config.Entries := {[Value=1], [Value=2], [Value=3]}
-        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
-
-        [[[parameter SchedulerHAZone]]]
-        Label = Scheduler HA Zone
-        Description = The availability zone in which to deploy the scheduler-ha node.
-        DefaultValue = 2
-        Config.Plugin = pico.form.Dropdown
-        Config.Entries := {[Value=1], [Value=2], [Value=3]}
-        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
 
 [parameters Network Attached Storage]
 Order = 15
@@ -693,4 +672,18 @@ Order = 20
         ParameterType = Boolean
         Config.Label = Access execute nodes from the Internet
         Conditions.Excluded := UsePublicNetwork isnt true
-    
+
+        [[[parameter SchedulerZone]]]
+        Label = Scheduler Zone
+        Description = The availability zone in which to deploy the scheduler node.
+        DefaultValue = =undefined
+        Config.Plugin = pico.form.Dropdown
+        Config.Entries := {[Value=1], [Value=2], [Value=3], [Value=undefined; Label="Any"]}
+
+        [[[parameter SchedulerHAZone]]]
+        Label = Scheduler HA Zone
+        Description = The availability zone in which to deploy the scheduler-ha node.
+        DefaultValue = =undefined
+        Config.Plugin = pico.form.Dropdown
+        Config.Entries := {[Value=1], [Value=2], [Value=3], [Value=undefined; Label="Any"]}
+        Conditions.Hidden := configuration_slurm_ha_enabled isnt true
