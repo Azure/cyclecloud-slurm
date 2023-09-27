@@ -24,7 +24,7 @@ when 'ubuntu', 'debian'
   default[:slurm][:arch] = "amd64"
   default[:slurm][:user][:uid] = 64030
   default[:slurm][:user][:gid] = 64030
-when 'centos', 'rhel', 'redhat', 'almalinux'
+when 'centos', 'rhel', 'redhat', 'almalinux', 'suse'
   if node[:platform_version] < "8";
     default[:slurm][:arch] = "el7.x86_64"
   else
@@ -42,8 +42,6 @@ default[:slurm][:suspend_timeout] = 600
 default[:slurm][:resume_timeout] = 1800
 
 default[:slurm][:accounting][:enabled] = false
-default[:slurm][:accounting][:user] = 'admin'
-default[:slurm][:accounting][:password] = 'admin'
 default[:slurm][:accounting][:url] = 'localhost'
 
 default[:slurm][:ha_enabled] = false
