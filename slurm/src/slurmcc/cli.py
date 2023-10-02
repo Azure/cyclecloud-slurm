@@ -431,7 +431,7 @@ class SlurmCLI(CommonCLI):
             logging.warning(msg)
 
         if not os.path.exists(linked_gres_conf):
-            msg = f"please run 'ln -s {gres_conf} {linked_gres_conf}' && chown slurm:slurm {linked_gres_conf}"
+            msg = f"please run 'ln -fs {gres_conf} {linked_gres_conf} && chown slurm:slurm {linked_gres_conf}'"
             print("WARNING: " + msg, file=sys.stderr)
             logging.warning(msg)
 
