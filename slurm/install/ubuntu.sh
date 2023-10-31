@@ -44,11 +44,17 @@ else
     ln -sf /lib/x86_64-linux-gnu/libtinfo.so.5 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
 fi
 
-dpkg -i --force-all $(ls slurm-pkgs/*${SLURM_VERSION}*.deb | grep -v slurmdbd)
+if [ $UBUNTU_VERSION == 22.04 ]; then
+    PACKAGE_DIR=slurm-pkgs-ubuntu22
+else
+    PACKAGE_DIR=slurm-pkgs-ubuntu20
+
+
+dpkg -i --force-all $(ls $PACKAGE_DIR/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
+
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    # slurmdbd transpilation from rpm to deb fails due to a clashing build uuid
-    # e.g. /usr/lib/.build-id/XX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    dpkg -i --force-all slurm-pkgs/*slurmdbd*${SLURM_VERSION}*.deb
+    dpkg -i --force-all $PACKAGE_DIR/slurm-slurmctld_${SLURM_VERSION}*.deb
+    dpkg -i --force-all $PACKAGE_DIR/slurm-slurmdbd_${SLURM_VERSION}*.deb
 fi
 
 touch $INSALLED_FILE

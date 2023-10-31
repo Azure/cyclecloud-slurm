@@ -7,20 +7,26 @@ from typing import Optional
 
 import slurm_supported_version
 
-
-def download_bins() -> None:
+## temporarily while our rpms/debs are not in PMC we have to download zip files
+## from  github. We will have to modify this function to download binaries from
+## PMC once they are there.
+def download_bins(slurm_required_bins: None) -> None:
     with open("download-slurm-pkgs.sh", "w") as fw:
         fw.write(f"""#!/usr/bin/env bash
 cd $(dirname $0)
-mkdir -p slurm-pkgs
 """)    
-        slurm_bins_by_version = slurm_supported_version.get_required_packages()
+
         url_root = slurm_supported_version.CURRENT_DOWNLOAD_URL
-        for _, pkgs in slurm_bins_by_version.items():
-            for pkg in pkgs:
+        if not slurm_required_bins:
+            slurm_required_bins = slurm_supported_version.get_required_packages()
+        for pkg in slurm_required_bins:
+                zipfile = pkg.split("/")[0]
                 fw.write(f"""
-if [ ! -e slurm-pkgs/{pkg} ]; then
-    wget -O slurm-pkgs/{pkg} {url_root}/{pkg}
+if [ ! -e {pkg} ]; then
+    rm -rf {zipfile}.zip
+    rm -rf {zipfile}
+    wget -O {zipfile}.zip {url_root}/{zipfile}.zip
+    unzip {zipfile}.zip
 fi
 """)
 
@@ -39,11 +45,13 @@ fi
 
 
 def execute() -> None:
-    
+
     expected_cwd = os.path.abspath(os.path.dirname(__file__))
     os.chdir(expected_cwd)
 
-    download_bins()
+    pkgs = slurm_supported_version.get_required_packages()
+    slurm_required_bins = [f"slurm-pkgs-{pkg}" for pkg in pkgs]
+    download_bins(slurm_required_bins)
 
     if not os.path.exists("libs"):
         os.makedirs("libs")
@@ -58,8 +66,6 @@ def execute() -> None:
 
     if not version:
         raise RuntimeError("Missing [project] -> version in {}".format(ini_path))
-
-    slurm_bins_by_version = slurm_supported_version.get_required_packages()
 
     if not os.path.exists("dist"):
         os.makedirs("dist")
@@ -93,9 +99,9 @@ def execute() -> None:
         if os.path.isfile(f"templates/{fil}"):
             _add(f"templates/{fil}", f"templates/{fil}")
 
-    for _, slurm_bins_by_version in slurm_bins_by_version.items():
-        for rbin in slurm_bins_by_version:
-            _add(f"slurm-pkgs/{rbin}", os.path.abspath(f"slurm-pkgs/{rbin}"))
+
+    for binary in slurm_required_bins:
+            _add(f"{binary}", os.path.abspath(f"{binary}"))
 
 
 if __name__ == "__main__":
