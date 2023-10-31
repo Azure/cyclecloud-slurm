@@ -5,19 +5,29 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "22.05.9": {
-        "rhel": [{"platform_version": "el8", "arch": "x86_64"},
-                 {"platform_version": "el7", "arch": "x86_64"}],
-        "debian": [{"arch": "amd64"}],
+    "22.05.10": {
+        "rhel": {
+            "rhel8": {"platform_version": "el8", "arch": "x86_64"},
+            "centos7": {"platform_version": "el7", "arch": "x86_64"}
+        },
+        "debian": {
+            "ubuntu20": {"arch": "amd64"},
+            "ubuntu22": {"arch": "amd64"}
+        }
     },
-    "23.02.5": {
-        "rhel": [{"platform_version": "el8", "arch": "x86_64"},
-                 {"platform_version": "el7", "arch": "x86_64"}],
-        "debian": [{"arch": "amd64"}],
+    "23.02.6": {
+        "rhel": {
+            "rhel8": {"platform_version": "el8", "arch": "x86_64"},
+            "centos7": {"platform_version": "el7", "arch": "x86_64"}
+        },
+        "debian": {
+            "ubuntu20": {"arch": "amd64"},
+            "ubuntu22": {"arch": "amd64"}
+        }
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-09-14-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-10-27-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
@@ -41,10 +51,10 @@ def get_required_packages() -> Dict[str, List[str]]:
         SUPPORTED_VERSIONS.keys()
     ), f"Expected {referenced_versions} == {set(SUPPORTED_VERSIONS.keys())}"
 
-    ret = {}
-    for slurm_version, distros in SUPPORTED_VERSIONS.items():
-        ret[slurm_version] = required_bins = []
-        for debian_version in distros["debian"]:
+    ret = []
+    for slurm_version,ostype in SUPPORTED_VERSIONS.items():
+
+        for distro,pkg in ostype["debian"].items():
             for slurmpkg in [
                 "slurm",
                 "slurm-devel",
@@ -54,12 +64,16 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-slurmctld",
                 "slurm-slurmdbd",
                 "slurm-slurmd",
-                "slurm-slurmrestd"
+                "slurm-slurmrestd",
+                "slurm-contribs",
+                "slurm-pam-slurm",
+                "slurm-torque",
+                "slurm-openlava",
             ]:
-                required_bins.append(
-                    f"{slurmpkg}_{slurm_version}-1_{debian_version['arch']}.deb"
+                ret.append(
+                    f"{distro}/{slurmpkg}_{slurm_version}-1_{pkg['arch']}.deb"
                 )
-        for rhel_version in distros["rhel"]:
+        for distro,pkg in ostype["rhel"].items():
 
             for slurmpkg in [
                 "slurm",
@@ -72,10 +86,12 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-perlapi",
                 "slurm-torque",
                 "slurm-openlava",
-                "slurm-slurmrestd"
+                "slurm-slurmrestd",
+                "slurm-pam_slurm",
+                "slurm-contribs"
             ]:
-                required_bins.append(
-                    f"{slurmpkg}-{slurm_version}-1.{rhel_version['platform_version']}.{rhel_version['arch']}.rpm"
+                ret.append(
+                    f"{distro}/{slurmpkg}-{slurm_version}-1.{pkg['platform_version']}.{pkg['arch']}.rpm"
                 )
     return ret
 

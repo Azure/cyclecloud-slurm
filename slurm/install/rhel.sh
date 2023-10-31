@@ -16,15 +16,17 @@ yum -y install epel-release
 yum -y install munge
 if [ "$OS_VERSION" -gt "7" ]; then
     dnf -y --enablerepo=powertools install -y perl-Switch
+    PACKAGE_DIR=slurm-pkgs-rhel8
 else
     yum -y install python3
+    PACKAGE_DIR=slurm-pkgs-centos7
 fi
 
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    yum  -y install $(ls slurm-pkgs/*${SLURM_VERSION}.el${OS_VERSION}*.rpm)
+    yum  -y install $(ls $PACKAGE_DIR/*${SLURM_VERSION}.el${OS_VERSION}*.rpm)
 else
-    yum  -y install $(ls slurm-pkgs/*${SLURM_VERSION}.el${OS_VERSION}*.rpm | grep -v slurmdbd)
+    yum  -y install $(ls $PACKAGE_DIR/*${SLURM_VERSION}.el${OS_VERSION}*.rpm | grep -v -e slurmdbd -e slurmctld)
 fi
 
 touch $INSALLED_FILE
