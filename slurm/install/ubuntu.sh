@@ -14,7 +14,7 @@ SLURM_VERSION=$2
 apt update
 UBUNTU_VERSION=$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2)
 if [ $UBUNTU_VERSION > "19" ]; then
-    apt -y install python3.8-venv
+    apt -y install python3-venv
 fi
 
 apt -y install munge
@@ -48,7 +48,7 @@ if [ $UBUNTU_VERSION == 22.04 ]; then
     PACKAGE_DIR=slurm-pkgs-ubuntu22
 else
     PACKAGE_DIR=slurm-pkgs-ubuntu20
-
+fi
 
 dpkg -i --force-all $(ls $PACKAGE_DIR/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
 
