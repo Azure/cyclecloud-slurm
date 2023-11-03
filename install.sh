@@ -98,15 +98,15 @@ config_dir="/sched/$(jetpack config cyclecloud.cluster.name)"
 azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --password $(jetpack config cyclecloud.config.password) \
                    --url      $(jetpack config cyclecloud.config.web_server) \
-                   --cluster-name $(jetpack config cyclecloud.cluster.name) \
-                   --config-dir $config_dir \
+                   --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
+                   --config-dir "$config_dir" \
                    --accounting-tag-name ClusterId \
-                   --accounting-tag-value $tag \
+                   --accounting-tag-value "$tag" \
                    --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
                    --cost-cache-root $INSTALL_DIR/.cache \
                    > $INSTALL_DIR/autoscale.json
 
 
-azslurm partitions > $config_dir/azure.conf
+azslurm partitions > "$config_dir"/azure.conf
 
 chown slurm:slurm $VENV/../logs/*.log

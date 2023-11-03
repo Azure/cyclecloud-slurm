@@ -105,6 +105,10 @@ def setup_config_dir(s: InstallSettings) -> None:
     if s.is_primary_scheduler:
         ilib.directory(s.config_dir, owner="root", group="root", mode=755)
 
+def _escape(s: str) -> str:
+    return re.sub("[^a-zA-Z0-9-]", "-", s).lower()
+
+
 def setup_users(s: InstallSettings) -> None:
     # Set up users for Slurm and Munge
     ilib.group(s.slurm_grp, gid=s.slurm_gid)
@@ -325,7 +329,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         variables={
             "slurmctldhost": s.hostname,
             # TODO needs to be escaped to support accounting with spaces in cluster name
-            "cluster_name": s.cluster_name,
+            "cluster_name": _escape(s.cluster_name),
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
         },
