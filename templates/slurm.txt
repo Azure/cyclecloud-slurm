@@ -172,7 +172,7 @@ Autoscale = $Autoscale
     Abstract = true
         [[[configuration]]]
         slurm.autoscale = true
-        
+
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
@@ -188,6 +188,7 @@ Autoscale = $Autoscale
     MaxCoreCount = $MaxHPCExecuteCoreCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
     AdditionalClusterInitSpecs = $HPCClusterInitSpecs
+    EnableNodeHealthChecks = $EnableNodeHealthChecks
 
 
         [[[configuration]]]
@@ -712,3 +713,13 @@ Order = 20
         Config.Plugin = pico.form.Dropdown
         Config.Entries := {[Value=1], [Value=2], [Value=3], [Value=undefined; Label="Any"]}
         Conditions.Hidden := configuration_slurm_ha_enabled isnt true
+
+        [[parameters Node Healthchecks]]
+        Description = "Section for configuring Node Healthchecks"
+        Order = 12
+
+            [[[parameter EnableNodeHealthChecks]]]
+            Label = Enable NHC tests
+            DefaultValue = false
+            Widget.Plugin = pico.form.BooleanCheckBox
+            Widget.Label = Run Node Healthchecks on startup
