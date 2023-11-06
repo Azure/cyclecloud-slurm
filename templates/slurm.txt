@@ -714,12 +714,12 @@ Order = 20
         Config.Entries := {[Value=1], [Value=2], [Value=3], [Value=undefined; Label="Any"]}
         Conditions.Hidden := configuration_slurm_ha_enabled isnt true
 
-        [[parameters Node Healthchecks]]
-        Description = "Section for configuring Node Healthchecks"
-        Order = 12
+    [[parameters Node Health Checks]]
+    Description = "Section for configuring Node Health Checks"
+    Order = 12
 
-            [[[parameter EnableNodeHealthChecks]]]
-            Label = Enable NHC tests
-            DefaultValue = false
-            Widget.Plugin = pico.form.BooleanCheckBox
-            Widget.Label = Run Node Healthchecks on startup
+        [[[parameter EnableNodeHealthChecks]]]
+        Label = Enable NHC tests
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Run Node Health Checks on startup
