@@ -93,7 +93,14 @@ EOF
 fi
 
 which jetpack || exit 0
-tag=$(jetpack config azure.metadata.compute.tags | python3 -c "import sys; print(dict([tuple(x.split(':', 1)) for x in sys.stdin.read().split(';')])['ClusterId'])")
+
+# note: lower case the tag names, and use a sane default 'unknown'
+tag=$(jetpack config azure.metadata.compute.tags | python3 -c "\
+import sys;\
+items = [x.split(':', 1) for x in sys.stdin.read().split(';')];\
+tags = dict([tuple([i[0].lower(), i[-1]]) for i in items]);\
+print(tags.get('clusterid', 'unknown'))")
+
 config_dir="/sched/$(jetpack config cyclecloud.cluster.name)"
 azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --password $(jetpack config cyclecloud.config.password) \
