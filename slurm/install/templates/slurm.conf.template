@@ -13,6 +13,10 @@ SchedulerType=sched/backfill
 SelectType=select/cons_tres
 GresTypes=gpu
 SelectTypeParameters=CR_Core_Memory
+# We use a "safe" form of the CycleCloud ClusterName throughout slurm.
+# First we lowercase the cluster name, then replace anything
+# that is not letters, digits and '-' with a '-'
+# eg My Cluster == my-cluster
 ClusterName={cluster_name}
 JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=debug

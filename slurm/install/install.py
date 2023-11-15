@@ -32,7 +32,12 @@ class InstallSettings:
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
         )
-        self.cluster_name = config["cluster_name"]
+        self.cyclecloud_cluster_name = config["cluster_name"]
+        # We use a "safe" form of the CycleCloud ClusterName
+        # First we lowercase the cluster name, then replace anything
+        # that is not letters, digits and '-' with a '-'
+        # eg My Cluster == my-cluster
+        self.slurm_cluster_name = _escape(self.cyclecloud_cluster_name)
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
         self.slurmver = config["slurm"]["version"]
@@ -83,7 +88,7 @@ class InstallSettings:
 
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
-        self.config_dir = f"/sched/{_escape(self.cluster_name)}"
+        self.config_dir = f"/sched/{self.slurm_cluster_name}"
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -329,8 +334,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         source="templates/slurm.conf.template",
         variables={
             "slurmctldhost": s.hostname,
-            # TODO needs to be escaped to support accounting with spaces in cluster name
-            "cluster_name": _escape(s.cluster_name),
+            "cluster_name": s.slurm_cluster_name,
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
         },
