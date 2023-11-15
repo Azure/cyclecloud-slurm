@@ -120,6 +120,10 @@ yum install -y mariadb-server
 systemctl enable mariadb.service
 systemctl start mariadb.service
 ```
+
+#### AzureCA.pem and existing MariaDB/MySQL instances
+In previous versions, we shipped with an embedded certificate to connect to Azure MariaDB and Azure MySQL instances. This is no longer required. However, if you wish to restore this behavior, select the 'AzureCA.pem' option from the dropdown for the _'Accounting Certificate URL'_ parameter in your your cluster settings.
+
 ### Cost Reporting
 
 `azslurm` in slurm 3.0 project now comes with a new experimental feature `azslurm cost` to display costs of slurm jobs. This requires Cyclecloud 8.4 or newer, as well

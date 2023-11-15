@@ -9,6 +9,9 @@ import sys
 import installlib as ilib
 from typing import Dict, Optional
 
+# Legacy: used for connecting to Azure MariaDB, which is deprecated.
+LOCAL_AZURE_CA_PEM = "AzureCA.pem"
+
 
 class InstallSettings:
     def __init__(self, config: Dict, platform_family: str, mode: str) -> None:
@@ -239,7 +242,9 @@ AccountingStorageTRES=gres/gpu
 """,
     )
 
-    if s.acct_cert_url:
+    # Previously this was required when connecting to any Azure MariaDB instance.
+    # Which is why we shipped with LOCAL_AZURE_CA_PEM.
+    if s.acct_cert_url and s.acct_cert_url != LOCAL_AZURE_CA_PEM:
         logging.info(f"Downloading {s.acct_cert_url} to {s.config_dir}/AzureCA.pem")
         subprocess.check_call(
             [
@@ -253,9 +258,9 @@ AccountingStorageTRES=gres/gpu
             f"{s.config_dir}/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
         )
         ilib.chmod(f"{s.config_dir}/AzureCA.pem", mode="0600")
-    else:
+    elif s.acct_cert_url and s.acct_cert_url == LOCAL_AZURE_CA_PEM:
         ilib.copy_file(
-            "AzureCA.pem",
+            LOCAL_AZURE_CA_PEM,
             f"{s.config_dir}/AzureCA.pem",
             owner=s.slurm_user,
             group=s.slurm_grp,
@@ -273,6 +278,9 @@ AccountingStorageTRES=gres/gpu
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
             "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
+            "storage_parameters": "StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem"
+                                  if s.acct_cert_url
+                                  else "#StorageParameters=",
             "slurmver": s.slurmver,
         },
     )
@@ -282,12 +290,16 @@ def _accounting_all(s: InstallSettings) -> None:
     """
     Perform linking and enabling of slurmdbd
     """
-    ilib.link(
-        f"{s.config_dir}/AzureCA.pem",
-        "/etc/slurm/AzureCA.pem",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
+    # This used to be required for all installations, but it is
+    # now optional, so only create the link if required.
+    original_azure_ca_pem = f"{s.config_dir}/AzureCA.pem"
+    if os.path.exists(original_azure_ca_pem):
+        ilib.link(
+            f"{s.config_dir}/AzureCA.pem",
+            "/etc/slurm/AzureCA.pem",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+        )
 
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
