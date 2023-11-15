@@ -83,7 +83,8 @@ class InstallSettings:
 
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
-        self.config_dir = f"/sched/{self.cluster_name}"
+        self.config_dir = f"/sched/{_escape(self.cluster_name)}"
+
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
     lc = dynamic_config.lower()
