@@ -9,6 +9,9 @@ import sys
 import installlib as ilib
 from typing import Dict, Optional
 
+# Legacy: used for connecting to Azure MariaDB, which is deprecated.
+LOCAL_AZURE_CA_PEM = "AzureCA.pem"
+
 
 class InstallSettings:
     def __init__(self, config: Dict, platform_family: str, mode: str) -> None:
@@ -32,7 +35,12 @@ class InstallSettings:
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
         )
-        self.cluster_name = config["cluster_name"]
+        self.cyclecloud_cluster_name = config["cluster_name"]
+        # We use a "safe" form of the CycleCloud ClusterName
+        # First we lowercase the cluster name, then replace anything
+        # that is not letters, digits and '-' with a '-'
+        # eg My Cluster == my-cluster
+        self.slurm_cluster_name = _escape(self.cyclecloud_cluster_name)
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
         self.slurmver = config["slurm"]["version"]
@@ -83,7 +91,7 @@ class InstallSettings:
 
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
-        self.config_dir = f"/sched/{_escape(self.cluster_name)}"
+        self.config_dir = f"/sched/{self.slurm_cluster_name}"
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -234,7 +242,9 @@ AccountingStorageTRES=gres/gpu
 """,
     )
 
-    if s.acct_cert_url:
+    # Previously this was required when connecting to any Azure MariaDB instance.
+    # Which is why we shipped with LOCAL_AZURE_CA_PEM.
+    if s.acct_cert_url and s.acct_cert_url != LOCAL_AZURE_CA_PEM:
         logging.info(f"Downloading {s.acct_cert_url} to {s.config_dir}/AzureCA.pem")
         subprocess.check_call(
             [
@@ -248,9 +258,9 @@ AccountingStorageTRES=gres/gpu
             f"{s.config_dir}/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
         )
         ilib.chmod(f"{s.config_dir}/AzureCA.pem", mode="0600")
-    else:
+    elif s.acct_cert_url and s.acct_cert_url == LOCAL_AZURE_CA_PEM:
         ilib.copy_file(
-            "AzureCA.pem",
+            LOCAL_AZURE_CA_PEM,
             f"{s.config_dir}/AzureCA.pem",
             owner=s.slurm_user,
             group=s.slurm_grp,
@@ -268,6 +278,9 @@ AccountingStorageTRES=gres/gpu
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
             "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
+            "storage_parameters": "StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem"
+                                  if s.acct_cert_url
+                                  else "#StorageParameters=",
             "slurmver": s.slurmver,
         },
     )
@@ -277,12 +290,16 @@ def _accounting_all(s: InstallSettings) -> None:
     """
     Perform linking and enabling of slurmdbd
     """
-    ilib.link(
-        f"{s.config_dir}/AzureCA.pem",
-        "/etc/slurm/AzureCA.pem",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
+    # This used to be required for all installations, but it is
+    # now optional, so only create the link if required.
+    original_azure_ca_pem = f"{s.config_dir}/AzureCA.pem"
+    if os.path.exists(original_azure_ca_pem):
+        ilib.link(
+            f"{s.config_dir}/AzureCA.pem",
+            "/etc/slurm/AzureCA.pem",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+        )
 
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
@@ -329,8 +346,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         source="templates/slurm.conf.template",
         variables={
             "slurmctldhost": s.hostname,
-            # TODO needs to be escaped to support accounting with spaces in cluster name
-            "cluster_name": _escape(s.cluster_name),
+            "cluster_name": s.slurm_cluster_name,
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
         },

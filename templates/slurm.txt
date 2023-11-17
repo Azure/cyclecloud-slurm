@@ -566,9 +566,13 @@ Order = 20
 
         [[[parameter configuration_slurm_accounting_certificate_url]]]
         Label = SSL Certificate URL
-        Description = URL to fetch SSL certificate for authentication to DB
+        Description = URL to fetch SSL certificate for authentication to DB. Use AzureCA.pem (embedded) for use with deprecated MariaDB instances.
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-        ParameterType = String
+        ParameterType = StringList
+        Config.Plugin = pico.form.Dropdown
+        Config.FreeForm = true
+        Config.Entries := {[Value=""], [Value="AzureCA.pem"]}
+        DefaultValue = ""
 
         [[[parameter configuration_slurm_shutdown_policy]]]
 	Label = Shutdown Policy
