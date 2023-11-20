@@ -459,9 +459,8 @@ class SlurmCLI(CommonCLI):
             _generate_gres_conf(partition_dict, fw)
         shutil.move(gres_conf + ".tmp", gres_conf)
 
-        logging.info("Restarting slurmctld...")
-        check_output(["systemctl", "restart", "slurmctld"])
-
+        msg = f"Warning: For changes impacting non-dynamic partitions, please run `systemctl restart slurmctld` for changes to take effect."
+        print(msg)
         logging.info("")
         logging.info("Re-scaling cluster complete.")
 
