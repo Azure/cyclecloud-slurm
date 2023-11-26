@@ -402,15 +402,21 @@ class SlurmCLI(CommonCLI):
         )
 
     def scale_parser(self, parser: ArgumentParser) -> None:
+
+        parser.add_argument("--no-restart", action="store_true", default=False, help="Don't restart slurm controller")
         return
 
     def scale(
         self,
         config: Dict,
+        no_restart=False,
         backup_dir="/etc/slurm/.backups",
         slurm_conf_dir="/etc/slurm",
         config_only=False,
     ):
+        """
+        Create or update slurm partition and/or gres information
+        """
         sched_dir = config.get("config_dir")
         node_mgr = self._get_node_manager(config)
         # make sure .backups exists
@@ -459,8 +465,9 @@ class SlurmCLI(CommonCLI):
             _generate_gres_conf(partition_dict, fw)
         shutil.move(gres_conf + ".tmp", gres_conf)
 
-        logging.info("Restarting slurmctld...")
-        check_output(["systemctl", "restart", "slurmctld"])
+        if not no_restart:
+            logging.info("Restarting slurmctld...")
+            check_output(["systemctl", "restart", "slurmctld"])
 
         logging.info("")
         logging.info("Re-scaling cluster complete.")
@@ -625,7 +632,6 @@ def _partitions(
         else:
             cpus = partition.vcpu_count
             threads = 1
-        
         def_mem_per_cpu = memory // cpus
 
         writer.write(
