@@ -13,7 +13,7 @@ SLURM_VERSION=$2
 
 apt update
 UBUNTU_VERSION=$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2)
-if [ $UBUNTU_VERSION > "19" ]; then
+if [[ $UBUNTU_VERSION > "19" ]]; then
     apt -y install python3-venv
 fi
 
@@ -21,7 +21,7 @@ apt -y install munge
  
 apt -y install libmariadbclient-dev-compat libssl-dev
 
-if [ $UBUNTU_VERSION > "19" ]; then
+if [[ $UBUNTU_VERSION > "19" ]]; then
     apt install -y libhwloc15
 
     ln -sf /lib/x86_64-linux-gnu/libreadline.so.8 /usr/lib/x86_64-linux-gnu/libreadline.so.7
