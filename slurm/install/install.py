@@ -539,8 +539,8 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.platform == "debian":
-        args.platform = "ubuntu"
+#    if args.platform == "debian":
+#        args.platform = "ubuntu"
 
     config = _load_config(args.bootstrap_config)
     settings = InstallSettings(config, args.platform, args.mode)

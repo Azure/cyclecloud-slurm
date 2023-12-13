@@ -22,12 +22,13 @@ SUPPORTED_VERSIONS = {
         },
         "debian": {
             "ubuntu20": {"arch": "amd64"},
-            "ubuntu22": {"arch": "amd64"}
+            "ubuntu22": {"arch": "amd64"},
+            "debian10": {"arch": "amd64"}
         }
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-10-27-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-12-13-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
