@@ -455,15 +455,16 @@ class SlurmCLI(CommonCLI):
                 allow_empty=False,
                 autoscale=is_autoscale_enabled(),
             )
-
-        logging.debug("Moving %s to %s", azure_conf + ".tmp", azure_conf)
-        shutil.move(azure_conf + ".tmp", azure_conf)
+        # Issue #193 - failure to maintain ownership/permissions when
+        # rewriting azure.conf and gres.conf
+        _move_with_permissions(azure_conf + ".tmp", azure_conf)
 
         _update_future_states(node_mgr)
 
         with open(gres_conf + ".tmp", "w") as fw:
             _generate_gres_conf(partition_dict, fw)
-        shutil.move(gres_conf + ".tmp", gres_conf)
+        
+        _move_with_permissions(gres_conf + ".tmp", gres_conf)
 
         if not no_restart:
             logging.info("Restarting slurmctld...")
@@ -577,6 +578,15 @@ class SlurmCLI(CommonCLI):
             ],
             sys.stdout
         )
+
+
+def _move_with_permissions(src: str, dst: str) -> None:
+    if os.path.exists(dst):
+        st = os.stat(dst)
+        os.chmod(src, st.st_mode)
+        os.chown(src, st.st_uid, st.st_gid)
+    logging.debug("Moving %s to %s", src, dst)
+    shutil.move(src, dst)
 
 
 def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> None:

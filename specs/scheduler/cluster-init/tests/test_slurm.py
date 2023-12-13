@@ -2,11 +2,13 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 #
+import grp
 import json
 import os
+import pwd
 import random
 import subprocess
-from typing import List
+from typing import List, Tuple
 import time
 import uuid
 
@@ -166,6 +168,40 @@ def test_azslurm_cost() -> None:
     assert os.path.exists("/tmp/partition.csv")
     assert os.path.exists("/tmp/partition_hourly.csv")
 
+
+def test_azslurm_scale() -> None:
+    def stat(path: str) -> Tuple[int, int, int]:
+        st = os.stat(path)
+        return st.st_mode, st.st_uid, st.st_gid
+    
+    azure_conf = os.path.realpath("/etc/slurm/azure.conf")
+    gres_conf = os.path.realpath("/etc/slurm/gres.conf")
+    original = stat(azure_conf), stat(gres_conf)
+    try:
+        subprocess.call(["sudo", "chown", f"cyclecloud:cyclecloud", azure_conf])
+        subprocess.call(["sudo", "chmod", "400", azure_conf])
+        subprocess.call(["sudo", "chown", f"cyclecloud:cyclecloud", gres_conf])
+        subprocess.call(["sudo", "chmod", "400", gres_conf])
+        before_scale = stat(azure_conf), stat(gres_conf)
+        assert before_scale != original
+        subprocess.call(["sudo", "azslurm", "scale"])
+        after_scale = stat(azure_conf), stat(gres_conf)
+        
+        # assert we have actually maintained perms and ownership
+        # See issue #193 for more information
+        assert after_scale == before_scale
+        
+    finally:
+        # restore back to original permissions
+        azconf_owner = pwd.getpwuid(original[0][1]).pw_name
+        azconf_grp = grp.getgrgid(original[0][2]).gr_name
+        gres_owner = pwd.getpwuid(original[1][1]).pw_name
+        gres_grp = grp.getgrgid(original[1][2]).gr_name
+        subprocess.call(["sudo", "chown", f"{azconf_owner}:{azconf_grp}", azure_conf])
+        subprocess.call(["sudo", "chown", f"{gres_owner}:{gres_grp}", gres_conf])
+        subprocess.call(["sudo", "chmod", oct(original[0][0])[-4:], azure_conf])
+        subprocess.call(["sudo", "chmod", oct(original[1][0])[-4:], gres_conf])
+    
 
 def _get_powered_down_nodes() -> List[str]:
     ret = []
