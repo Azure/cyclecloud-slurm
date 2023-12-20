@@ -92,6 +92,8 @@ class InstallSettings:
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
         self.config_dir = f"/sched/{self.slurm_cluster_name}"
+        # Leave the ability to disable this.
+        self.ubuntu22_waagent_fix = config["slurm"].get("ubuntu22_waagent_fix", True)
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -507,6 +509,31 @@ def set_hostname(s: InstallSettings) -> None:
     ilib.set_hostname(
         new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
     )
+    if _is_at_least_ubuntu22() and s.ubuntu22_waagent_fix:
+        logging.warning("Restarting systemd-networkd to fix waagent/hostname issue on Ubuntu 22.04." +
+                        " To disable this, set slurm.ubuntu22_waagent_fix=false under this" +
+                        " node/nodearray's [[[configuration]]] section")
+        subprocess.check_call(["systemctl", "restart", "systemd-networkd"])
+
+
+def _is_at_least_ubuntu22() -> bool:
+    if not os.path.exists("/etc/os-release"):
+        return False
+    lsb_rel = {}
+    with open("/etc/os-release") as fr:
+        for line in fr:
+            line = line.strip()
+            if not line:
+                continue
+            if "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            lsb_rel[key.strip().upper()] = val.strip('"').strip().lower()
+
+    if lsb_rel.get("ID") == "ubuntu" and lsb_rel.get("VERSION_ID", "") >= "22.04":
+        return True
+    
+    return False
 
 
 def _load_config(bootstrap_config: str) -> Dict:
