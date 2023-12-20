@@ -48,6 +48,8 @@ def is_slurmctld_up() -> bool:
 
 def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     args = ["show", "nodes"]
+    if not is_autoscale_enabled():
+        args.append("--future")
     if node_list:
         args.append(",".join(node_list))
     stdout = scontrol(args)
@@ -177,3 +179,49 @@ def _node_index_and_pg_as_sort_key(nodename: str) -> Union[str, int]:
         return pg + node_index
     except Exception:
         return nodename
+
+
+_IS_AUTOSCALE_ENABLED = None
+
+
+def is_autoscale_enabled(subprocess_module: Optional[Any] = None) -> bool:
+    global _IS_AUTOSCALE_ENABLED
+    if _IS_AUTOSCALE_ENABLED is not None:
+        return _IS_AUTOSCALE_ENABLED
+    if subprocess_module is None:
+        import subprocess as subprocess_module_tmp
+
+        subprocess_module = subprocess_module_tmp
+
+    try:
+        lines = (
+            subprocess_module.check_output(["scontrol", "show", "config"])
+            .decode()
+            .strip()
+            .splitlines()
+        )
+    except Exception:
+        try:
+            with open("/etc/slurm/slurm.conf") as fr:
+                lines = fr.readlines()
+        except Exception:
+            _IS_AUTOSCALE_ENABLED = True
+            return _IS_AUTOSCALE_ENABLED
+
+    for line in lines:
+        line = line.strip()
+        # this can be defined more than once
+        if line.startswith("SuspendTime ") or line.startswith("SuspendTime="):
+            suspend_time = line.split("=")[1].strip().split()[0]
+            try:
+                if suspend_time in ["NONE", "INFINITE"] or int(suspend_time) < 0:
+                    _IS_AUTOSCALE_ENABLED = False
+                else:
+                    _IS_AUTOSCALE_ENABLED = True
+            except Exception:
+                pass
+
+    if _IS_AUTOSCALE_ENABLED is not None:
+        return _IS_AUTOSCALE_ENABLED
+    logging.warning("Could not determine if autoscale is enabled. Assuming yes")
+    return True

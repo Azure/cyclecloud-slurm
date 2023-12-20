@@ -33,6 +33,7 @@ from slurmcc import allocation
 from . import AzureSlurmError
 from . import partition as partitionlib
 from . import util as slutil
+from .util import is_autoscale_enabled
 from . import cost
 
 
@@ -807,52 +808,6 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
             raise AzureSlurmError(f"Unknown node - {node_name}")
         nodes.append(by_name[node_name])
     return nodes
-
-
-_IS_AUTOSCALE_ENABLED = None
-
-
-def is_autoscale_enabled(subprocess_module: Optional[Any] = None) -> bool:
-    global _IS_AUTOSCALE_ENABLED
-    if _IS_AUTOSCALE_ENABLED is not None:
-        return _IS_AUTOSCALE_ENABLED
-    if subprocess_module is None:
-        import subprocess as subprocess_module_tmp
-
-        subprocess_module = subprocess_module_tmp
-
-    try:
-        lines = (
-            subprocess_module.check_output(["scontrol", "show", "config"])
-            .decode()
-            .strip()
-            .splitlines()
-        )
-    except Exception:
-        try:
-            with open("/etc/slurm/slurm.conf") as fr:
-                lines = fr.readlines()
-        except Exception:
-            _IS_AUTOSCALE_ENABLED = True
-            return _IS_AUTOSCALE_ENABLED
-
-    for line in lines:
-        line = line.strip()
-        # this can be defined more than once
-        if line.startswith("SuspendTime ") or line.startswith("SuspendTime="):
-            suspend_time = line.split("=")[1].strip().split()[0]
-            try:
-                if suspend_time in ["NONE", "INFINITE"] or int(suspend_time) < 0:
-                    _IS_AUTOSCALE_ENABLED = False
-                else:
-                    _IS_AUTOSCALE_ENABLED = True
-            except Exception:
-                pass
-
-    if _IS_AUTOSCALE_ENABLED is not None:
-        return _IS_AUTOSCALE_ENABLED
-    logging.warning("Could not determine if autoscale is enabled. Assuming yes")
-    return True
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:
