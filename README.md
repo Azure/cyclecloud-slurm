@@ -37,7 +37,7 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
       # Set to true if nodes are used for tightly-coupled multi-node jobs
       slurm.hpc = false
 
-      [[[cluster-init cyclecloud/slurm:execute:3.0.4]]]
+      [[[cluster-init cyclecloud/slurm:execute:3.0.6]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
