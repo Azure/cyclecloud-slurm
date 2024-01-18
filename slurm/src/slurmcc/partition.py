@@ -161,6 +161,8 @@ class Partition:
 
     @property
     def gpu_count(self) -> int:
+        if "slurm_gpus" in self.buckets[0].resources:
+            return self.buckets[0].resources["slurm_gpus"]
         return self.buckets[0].gpu_count
 
 
