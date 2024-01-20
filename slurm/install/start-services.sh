@@ -54,7 +54,7 @@ for i in $( seq 1 $attempts ); do
     sleep $delay
     scontrol ping
     if [ $? == 0 ]; then
-        systemctl start slurmd || exit 1
+        systemctl start slurmctld || exit 1
         exit 0
     fi;
 done
