@@ -537,7 +537,10 @@ class SlurmCLI(CommonCLI):
         ).strip()
 
         with open(f"{config_dir}/keep_alive.conf.tmp", "w") as fw:
-            fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
+            if all_susp_hostlist:
+                fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
+            else:
+                fw.write("# SuspendExcNodes = ")
         shutil.move(f"{config_dir}/keep_alive.conf.tmp", f"{config_dir}/keep_alive.conf")
         slutil.check_output(["scontrol", "reconfig"])
 
