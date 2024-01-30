@@ -238,6 +238,14 @@ And for each nodearray, for example the `htc` array:
 5. All slurm binaries are inside the `azure-slurm-install-pkg*.tar.gz` file, under `slurm-pkgs`. They are pulled from a specific binary release. The current binary releases is [2023-08-07](https://github.com/Azure/cyclecloud-slurm/releases/tag/2023-08-07-bins)
 6. For MPI jobs, the only network boundary that exists by default is the partition. There are not multiple "placement groups" per partition like 2.x. So you only have one colocated VMSS per partition. There is also no use of the topology plugin, which necessitated the use of a job submission plugin that is also no longer needed. Instead, submitting to multiple partitions is now the recommended option for use cases that require submitting jobs to multiple placement groups.
 
+### Ubuntu 22 or greater and DNS hostname resolution
+Due to an issue with the underlying DNS registration scheme that is used across Azure, our Slurm scripts use a mitigation that involves restarting `systemd-networkd` when changing the hostname of VMs deployed in a VMSS. This mitigation can be disabled by adding the following to your `Configuration` section.
+```ini
+      [[[configuration]]]
+      slurm.ubuntu22_waagent_fix = false
+```
+In future releases, this mitigation will be disabled by default when the issue is resolved in `waagent`.
+
 # Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a

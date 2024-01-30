@@ -482,6 +482,7 @@ def set_hostname(
         and pub_hostname_exists
     ):
         os.remove(pub_hostname_path)
+        logging.warning("Restarting waagent service to force re-registration of hostname")
         restart_service(_waagent_service_name(platform_family))
 
     execute("set hostname", command=["hostnamectl", "set-hostname", hostname])
