@@ -61,6 +61,7 @@ class InstallSettings:
         self.acct_pass: Optional[str] = config["slurm"]["accounting"].get("password")
         self.acct_url: Optional[str] = config["slurm"]["accounting"].get("url")
         self.acct_cert_url: Optional[str] = config["slurm"]["accounting"].get("certificate_url")
+        self.disable_pmc = config["slurm"].get("disable_pmc") or False
 
         self.use_nodename_as_hostname = config["slurm"].get(
             "use_nodename_as_hostname", False
@@ -142,7 +143,7 @@ def setup_users(s: InstallSettings) -> None:
 
 
 def run_installer(s: InstallSettings, path: str, mode: str) -> None:
-    subprocess.check_call([path, mode, s.slurmver])
+    subprocess.check_call([path, mode, s.slurmver, str(s.disable_pmc)])
 
 
 def fix_permissions(s: InstallSettings) -> None:

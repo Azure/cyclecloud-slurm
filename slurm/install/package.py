@@ -89,6 +89,8 @@ def execute() -> None:
     _add("install_logging.conf", "conf/install_logging.conf")
     _add("installlib.py", "installlib.py")
     _add("install.py", "install.py")
+    _add("slurmel8.repo", "slurmel8.repo")
+    _add("slurmel7.repo", "slurmel7.repo")
     _add("ubuntu.sh", "ubuntu.sh", 600)
     _add("rhel.sh", "rhel.sh", 600)
     _add("AzureCA.pem", "AzureCA.pem")
