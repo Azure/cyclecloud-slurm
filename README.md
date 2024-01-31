@@ -199,6 +199,42 @@ And for each nodearray, for example the `htc` array:
 ![Alt](/images/nodearrayedit.png "Edit configuration")
 
 
+### Incorrect number of GPUs
+
+For some regions and VM sizes, some subscriptions may report an incorrect number of GPUs. This value is controlled in `/opt/azurehpc/slurm/autoscale.json`
+
+The default definition looks like the following: 
+```json
+  "default_resources": [
+    {
+      "select": {},
+      "name": "slurm_gpus",
+      "value": "node.gpu_count"
+    }
+  ],
+```
+Note that here it is saying "For all VM sizes in all nodearrays, create a resource called `slurm_gpus` with the value of the `gpu_count` CycleCloud is reporting".
+
+A common solution is to add a specific override for that VM size. In this case, `8` GPUs. Note the ordering here is critical - the blank `select` statement will set the default for all possible VM sizes and all other definitions will be ignored. For more information on how scalelib `default_resources` work, the underlying library used in all CycleCloud autoscalers, [see the ScaleLib documentation](https://github.com/Azure/cyclecloud-scalelib?tab=readme-ov-file#resources)
+
+```json
+  "default_resources": [
+    {
+      "select": {"node.vm_size": "Standard_XYZ"},
+      "name": "slurm_gpus",
+      "value": 8
+    },
+    {
+      "select": {},
+      "name": "slurm_gpus",
+      "value": "node.gpu_count"
+    }
+  ],
+```
+
+Simply run `azslurm scale` again for the changes to take effect. Note that if you need to iterate on this, you may also run `azslurm partitions`, which will write the partition definition out to stdout. This output will match what is in `/etc/slurm/azure.conf` after `azslurm scale` is run.
+
+
 ### Transitioning from 2.7 to 3.0
 
 1. The installation folder changed
