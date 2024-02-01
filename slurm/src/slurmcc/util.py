@@ -38,6 +38,23 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     return SLURM_CLI.scontrol(args, retry)
 
 
+def revert_nodeaddr(name: str) -> None:
+    try:
+        scontrol(["show", "node", name], retry=False)
+    except Exception as e:
+        logging.debug(f"Node {name} does not exist. Will not revert nodeaddr. Caught exception: {e}")
+        return
+    logging.info(f"Reverting nodeaddr for {name}")
+    scontrol(
+        [
+            "update",
+            "NodeName=%s" % name,
+            "NodeAddr=%s" % name,
+            "NodeHostName=%s" % name,
+        ]
+    )
+
+
 def is_slurmctld_up() -> bool:
     try:
         SLURM_CLI.scontrol(["ping"], retry=False)

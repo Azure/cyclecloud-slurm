@@ -129,8 +129,13 @@ class WaitForResume:
             node = by_name.get(name)
             
             if not node:
+                logging.warning(f"Node {name} not found in the latest nodes. Assumed it was deleted / failed to start.")
                 deleted_nodes.append(node)
+                states["UNKNOWN"] = states.get("UNKNOWN", {})
+                states["UNKNOWN"]["Deleted"] = states["UNKNOWN"].get("Deleted", 0) + 1
+                slutil.revert_nodeaddr(name)
                 continue
+
             is_dynamic = node.software_configuration.get("slurm", {}).get("dynamic_config")
 
             relevant_nodes.append(node)
@@ -141,8 +146,7 @@ class WaitForResume:
                 states["Failed"] = states.get("Failed", 0) + 1
                 if name not in self.failed_node_names:
                     newly_failed_node_names.append(name)
-                    if not is_dynamic:
-                        slutil.scontrol(["update", f"NodeName={name}", f"NodeAddr={name}", f"NodeHostName={name}"])
+                    slutil.revert_nodeaddr(name)
                     self.failed_node_names.add(name)
 
                 continue
@@ -153,6 +157,7 @@ class WaitForResume:
             if not use_nodename_as_hostname:
                 ip_already_set_key = (name, node.private_ip)
                 if node.private_ip and ip_already_set_key not in self.ip_already_set:
+                    logging.info(f"Setting IP address for node {name} to {node.private_ip}")
                     slutil.scontrol(
                         [
                             "update",

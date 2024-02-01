@@ -267,6 +267,8 @@ class SlurmCLI(CommonCLI):
         nodes = _as_nodes(node_list_filtered, node_mgr)
         result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
         logging.info(str(result))
+        for node_name in node_list:
+            slutil.revert_nodeaddr(node_name)
 
     def suspend_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
