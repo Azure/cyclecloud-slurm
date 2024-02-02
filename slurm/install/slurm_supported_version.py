@@ -5,7 +5,7 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "22.05.10": {
+    "22.05.11-1": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
@@ -15,7 +15,7 @@ SUPPORTED_VERSIONS = {
             "ubuntu22": {"arch": "amd64"}
         }
     },
-    "23.02.6": {
+    "23.02.7-1": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
@@ -27,7 +27,7 @@ SUPPORTED_VERSIONS = {
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-10-27-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-02-01-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
@@ -44,7 +44,6 @@ def get_required_packages() -> Dict[str, List[str]]:
     referenced_versions = set()
     for tok in toks:
         _, _referenced_version = tok.strip("]").strip("[").split("=")
-        _referenced_version = _referenced_version.strip("-1")
         referenced_versions.add(_referenced_version)
 
     assert referenced_versions == set(
@@ -71,7 +70,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-openlava",
             ]:
                 ret.append(
-                    f"{distro}/{slurmpkg}_{slurm_version}-1_{pkg['arch']}.deb"
+                    f"slurm-pkgs-{distro}/debs/{slurmpkg}_{slurm_version}_{pkg['arch']}.deb"
                 )
         for distro,pkg in ostype["rhel"].items():
 
@@ -91,7 +90,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-contribs"
             ]:
                 ret.append(
-                    f"{distro}/{slurmpkg}-{slurm_version}-1.{pkg['platform_version']}.{pkg['arch']}.rpm"
+                    f"slurm-pkgs-{distro}/RPMS/{slurmpkg}-{slurm_version}.{pkg['platform_version']}.{pkg['arch']}.rpm"
                 )
     return ret
 

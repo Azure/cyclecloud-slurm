@@ -64,18 +64,18 @@ fi
 
 
 for pkg in $slurm_packages; do
-    yum -y install $(ls $PACKAGE_DIR/$pkg-${SLURM_VERSION}.el${OS_VERSION}*.rpm)
+    yum -y install $(ls $PACKAGE_DIR/RPMS/$pkg-${SLURM_VERSION}.el${OS_VERSION}*.rpm)
 done
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
     for pkg in $sched_packages; do
-        yum  -y install $(ls $PACKAGE_DIR/$pkg-${SLURM_VERSION}.el${OS_VERSION}*.rpm)
+        yum  -y install $(ls $PACKAGE_DIR/RPMS/$pkg-${SLURM_VERSION}.el${OS_VERSION}*.rpm)
     done
 fi
 
 if [ ${SLURM_ROLE} == "execute" ]; then
     for pkg in $execute_packages; do
-        yum  -y install $(ls $PACKAGE_DIR/$pkg-${SLURM_VERSION}.el${OS_VERSION}*.rpm)
+        yum  -y install $(ls $PACKAGE_DIR/RPMS/$pkg-${SLURM_VERSION}.el${OS_VERSION}*.rpm)
     done
 fi
 

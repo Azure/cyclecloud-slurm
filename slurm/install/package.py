@@ -49,8 +49,8 @@ def execute() -> None:
     expected_cwd = os.path.abspath(os.path.dirname(__file__))
     os.chdir(expected_cwd)
 
-    pkgs = slurm_supported_version.get_required_packages()
-    slurm_required_bins = [f"slurm-pkgs-{pkg}" for pkg in pkgs]
+    slurm_required_bins = slurm_supported_version.get_required_packages()
+
     download_bins(slurm_required_bins)
 
     if not os.path.exists("libs"):

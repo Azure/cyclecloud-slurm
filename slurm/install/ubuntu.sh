@@ -95,11 +95,11 @@ else
     PACKAGE_DIR=slurm-pkgs-ubuntu20
 fi
 
-dpkg -i --force-all $(ls $PACKAGE_DIR/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
+dpkg -i --force-all $(ls $PACKAGE_DIR/debs/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    dpkg -i --force-all $PACKAGE_DIR/slurm-slurmctld_${SLURM_VERSION}*.deb
-    dpkg -i --force-all $PACKAGE_DIR/slurm-slurmdbd_${SLURM_VERSION}*.deb
+    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-slurmctld_${SLURM_VERSION}*.deb
+    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-slurmdbd_${SLURM_VERSION}*.deb
 fi
 
 touch $INSALLED_FILE
