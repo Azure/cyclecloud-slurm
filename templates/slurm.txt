@@ -109,7 +109,7 @@ Autoscale = $Autoscale
     
         [[[configuration]]]
         # Disable NFS mount of built-in /sched since it is a local volume mount: cyclecloud.mounts.builtinsched
-        cyclecloud.mounts.nfs_sched.disabled = ${UseBuiltinShared && !configuration_slurm_ha_enabled}
+        cyclecloud.mounts.nfs_sched.disabled = ${UseBuiltinSched && !configuration_slurm_ha_enabled}
         cyclecloud.mounts.nfs_shared.disabled = ${UseBuiltinShared && !configuration_slurm_ha_enabled}
         slurm.secondary_scheduler_name = ${ifThenElse(configuration_slurm_ha_enabled, "scheduler-ha-1", undefined)}
 
