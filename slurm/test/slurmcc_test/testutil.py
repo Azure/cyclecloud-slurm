@@ -43,7 +43,10 @@ def _show_hostlist(node_list: List[str]) -> str:
     for prefix, names in by_prefix.items():
         nums = []
         for name in names:
-            nums.append(int(name.split("-")[-1]))
+            try:
+                nums.append(int(name.split("-")[-1]))
+            except ValueError:
+                raise RuntimeError(f"Bad name - {name} from list {node_list}")
         nums = sorted(nums)
         min_num = nums[0]
         last_num = min_num
@@ -52,7 +55,6 @@ def _show_hostlist(node_list: List[str]) -> str:
             if num > last_num + 1 or n == len(nums) - 2:
                 if n == len(nums) - 2:
                     last_num = num
-                print(f"n={n} min_num={min_num} last_num={last_num}")
                 ret.append(f"{prefix}-[{min_num}-{last_num}]")
                 last_num = min_num = num
             else:
@@ -68,6 +70,10 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
         if args[0:2] == ["show", "hostnames"]:
             assert len(args) == 3
             return "\n".join(_show_hostnames(args[-1]))
+        
+        if args[0:2] == ["show", "hostlist"]:
+            assert len(args) == 3
+            return _show_hostlist(args[-1].split(","))
 
         if args[0:2] == ["show", "nodes"]:
             assert len(args) == 3

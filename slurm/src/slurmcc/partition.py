@@ -31,6 +31,7 @@ class Partition:
         dynamic_config: Optional[str] = None,
         over_allocation_thresholds: Dict = {},
         nodearray_machine_types: Optional[List[str]] = None,
+        dampen_memory: Optional[float] = None,
     ) -> None:
         self.name = name
         self.nodearray = nodearray
@@ -45,11 +46,19 @@ class Partition:
         assert len(buckets) > 0
         self.max_scaleset_size = max_scaleset_size
         self.vcpu_count = buckets[0].vcpu_count
-        slurm_memory = buckets[0].resources.get("slurm_memory")
-        if slurm_memory:
-            self.memory = int(slurm_memory.convert_to("m").value)
+        memory_mb = buckets[0].memory.convert_to("m").value 
+        if dampen_memory is not None:
+            if buckets[0].resources.get("slurm_memory"):
+                logging.warning("Because slurm.dampen_memory is defined, slurm_memory as defined in the autoscale.json will be ignored.")
+            to_decrement = max(1024, memory_mb * dampen_memory)
+            self.memory = int(memory_mb - to_decrement)
         else:
-            self.memory = int(buckets[0].memory.convert_to("m").value)
+            slurm_memory = buckets[0].resources.get("slurm_memory")
+            if slurm_memory:
+                self.memory = int(slurm_memory.convert_to("m").value)
+            else:
+                to_decrement = max(1024, memory_mb * 0.05)
+                self.memory = int(memory_mb - to_decrement)
 
         self.max_vm_count = sum([b.max_count for b in buckets])
         self.buckets = buckets
@@ -195,7 +204,6 @@ def _construct_static_node_list(
         while vm_count < partition.max_vm_count:
             name_index = vm_count + 1
             node_name = name_format.format(partition.nodearray) % (name_index)
-            # print(f"RDH node_name={node_name}")
             valid_node_names[bucket.placement_group].append(node_name)
             vm_count += 1
     return valid_node_names
@@ -345,7 +353,11 @@ def fetch_partitions(
 
             max_scaleset_size = buckets[0].max_placement_group_size
 
-            # dampen_memory = float(slurm_config.get("dampen_memory") or 5) / 100
+            dampen_memory = None
+            dampen_memory_str = slurm_config.get("dampen_memory")
+            if dampen_memory_str:
+                dampen_memory = int(dampen_memory_str) / 100.0
+
 
             if not is_hpc:
                 max_scaleset_size = 2 ** 31
@@ -374,6 +386,7 @@ def fetch_partitions(
                     dynamic_config=dynamic_config,
                     over_allocation_thresholds=over_allocation_thresholds,
                     nodearray_machine_types=nodearray_vm_size.get(nodearray_name),
+                    dampen_memory=dampen_memory,
                 )
             )
 

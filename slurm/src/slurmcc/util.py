@@ -85,7 +85,9 @@ def to_hostlist(nodes: Union[str, List[str]]) -> str:
         nodes_str = ",".join(nodes)
     else:
         nodes_str = nodes
-
+    # prevent poor sorting of nodes and getting node lists like htc-1,htc-10-19, htc-2, htc-20-29 etc
+    sorted_nodes = sorted(nodes_str.split(","), key=get_sort_key_func(is_hpc=False))
+    nodes_str = ",".join(sorted_nodes)
     return scontrol(["show", "hostlist", nodes_str])
 
 

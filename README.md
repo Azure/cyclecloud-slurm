@@ -234,6 +234,27 @@ A common solution is to add a specific override for that VM size. In this case, 
 
 Simply run `azslurm scale` again for the changes to take effect. Note that if you need to iterate on this, you may also run `azslurm partitions`, which will write the partition definition out to stdout. This output will match what is in `/etc/slurm/azure.conf` after `azslurm scale` is run.
 
+### Dampening Memory
+
+Slurm requires that you define the amount of free memory, after OS/Applications are considered, when reporting memory as a resource. If the reported memory is too low, then Slurm will reject this node. To overcome this, by default we dampen the memory by 5% or 1g, whichever is larger.
+
+To change this dampening, there are two options.
+1) You can define `slurm.dampen_memory=X` where X is an integer percentage (5 == 5%)
+2) Create a default_resource definition in the /opt/azurehpc/slurm/autoscale.json file. 
+  ```json
+    "default_resources": [
+    {
+      "select": {},
+      "name": "slurm_memory",
+      "value": "node.memory"
+    }
+  ],
+  ```
+
+  Default resources are a powerful tool that the underlying library ScaleLib provides. [see the ScaleLib documentation](https://github.com/Azure/cyclecloud-scalelib?tab=readme-ov-file#resources)
+
+  **Note:** `slurm.dampen_memory` takes precedence, so the default_resource `slurm_memory` will be ignored if `slurm.dampen_memory` is defined.
+
 
 ### Transitioning from 2.7 to 3.0
 

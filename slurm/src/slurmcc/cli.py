@@ -623,6 +623,19 @@ def _partitions(
 
     written_dynamic_partitions = set()
 
+    writer.write(
+        f"# Note: To account for OS/VM overhead, by default we reduce the reported memory from CycleCloud by 5%.\n"
+    )
+    writer.write(
+        "# We do this because Slurm will reject a node that reports less than what is defined in this config.\n"
+    )
+    writer.write(
+        "# There are two ways to change this:\n" +
+        "#  1) edit slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).\n"
+        "#  2) Edit the slurm_memory value defined in /opt/azurehpc/slurm/autosacle.json.\n" + 
+        "# Note that slurm.dampen_memory will take precedence.\n"
+    )
+
     for partition in partitions:
         if partition.dynamic_config:
             if partition.name in written_dynamic_partitions:
@@ -648,21 +661,7 @@ def _partitions(
             threads = 1
         def_mem_per_cpu = memory // cpus
 
-        writer.write(
-            "# Note: CycleCloud reported a RealMemory of %d but we reduced it by %d (i.e. max(1gb, %d%%)) to account for OS/VM overhead which\n"
-            % (
-                int(partition.memory * 1024),
-                -1,
-                -1,
-                # int(partition.dampen_memory * 100),
-            )
-        )
-        writer.write(
-            "# would result in the nodes being rejected by Slurm if they report a number less than defined here.\n"
-        )
-        writer.write(
-            "# To pick a different percentage to dampen, set slurm.dampen_memory=X in the nodearray's Configuration where X is percentage (5 = 5%).\n"
-        )
+
         writer.write(
             "PartitionName={} Nodes={} Default={} DefMemPerCPU={} MaxTime=INFINITE State=UP\n".format(
                 partition.name, partition.node_list, default_yn, def_mem_per_cpu
