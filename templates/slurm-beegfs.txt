@@ -41,11 +41,6 @@ Autoscale = $Autoscale
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
 
-        [[[input-endpoint ganglia]]]
-        PrivatePort = 8652
-        PublicPort = 8652
-
-
     [[nodearray hpc]]
     MachineType = $HPCMachineType
     ImageName = $HPCImageName
