@@ -35,5 +35,5 @@ done
 if [ $ret -eq 0 ]; then
 	echo "ERROR: Could not process get node info for admincomment" >> $log
 else
-	$scontrol update job=$job admincomment="$output"
+	$scontrol update job=$job admincomment="$output" || true
 fi
