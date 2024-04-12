@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 from setuptools.command.test import Command
 from setuptools.command.test import test as TestCommand  # noqa: N812
 
-__version__ = "3.0.6"
+__version__ = "3.0.7"
 CWD = os.path.dirname(os.path.abspath(__file__))
 
 
