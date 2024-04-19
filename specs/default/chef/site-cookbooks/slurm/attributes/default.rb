@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-default[:slurm][:version] = "23.02.7-1"
 default[:slurm][:autoscale_version] = "3.0.7"
+default[:slurm][:version] = "23.11.5-1"
 default[:slurm][:user][:name] = 'slurm'
 default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.4.1-py2.py3-none-any.whl"
 default[:slurm][:autoscale_dir] = "/opt/azurehpc/slurm"

@@ -20,7 +20,7 @@ fi
 
 apt -y install munge
  
-apt -y install libmariadbclient-dev-compat libssl-dev
+apt -y install libmysqlclient-dev libmariadbclient-dev-compat libssl-dev
 
 if [ $UBUNTU_VERSION == 22.04 ]; then
     REPO=slurm-ubuntu-jammy
@@ -47,19 +47,19 @@ Pin-Priority: -1" > /etc/apt/preferences.d/slurm-repository-pin-990
         rm packages-microsoft-prod.deb
     fi
     apt update
-    slurm_packages="slurm slurm-slurmrestd slurm-libpmi slurm-devel slurm-pam-slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs"
+    slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-slurmrestd slurm-smd-sview"
     for pkg in $slurm_packages; do
         apt install -y $pkg=$SLURM_VERSION
         apt-mark hold $pkg
     done
 
     if [ ${SLURM_ROLE} == "scheduler" ]; then
-        apt install -y slurm-slurmctld=$SLURM_VERSION slurm-slurmdbd=$SLURM_VERSION
-        apt-mark hold slurm-slurmctld slurm-slurmdbd
+        apt install -y slurm-smd-slurmctld=$SLURM_VERSION slurm-smd-slurmdbd=$SLURM_VERSION
+        apt-mark hold slurm-smd-slurmctld slurm-smd-slurmdbd
     fi
     if [ ${SLURM_ROLE} == "execute" ]; then
-        apt install -y slurm-slurmd=$SLURM_VERSION
-        apt-mark hold slurm-slurmd
+        apt install -y slurm-smd-slurmd=$SLURM_VERSION
+        apt-mark hold slurm-smd-slurmd
     fi
 
     touch $INSALLED_FILE
@@ -95,11 +95,11 @@ else
     PACKAGE_DIR=slurm-pkgs-ubuntu20
 fi
 
-dpkg -i --force-all $(ls $PACKAGE_DIR/debs/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
+dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-slurmctld_${SLURM_VERSION}*.deb
-    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-slurmdbd_${SLURM_VERSION}*.deb
+    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-smd-slurmctld_${SLURM_VERSION}*.deb
+    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-smd-slurmdbd_${SLURM_VERSION}*.deb
 fi
 
 touch $INSALLED_FILE

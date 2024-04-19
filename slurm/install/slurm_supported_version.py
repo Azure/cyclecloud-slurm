@@ -5,7 +5,7 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "22.05.11-1": {
+    "23.11.5-1": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
@@ -15,7 +15,7 @@ SUPPORTED_VERSIONS = {
             "ubuntu22": {"arch": "amd64"}
         }
     },
-    "23.02.7-1": {
+    "23.02.7-2": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
@@ -27,7 +27,7 @@ SUPPORTED_VERSIONS = {
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-02-01-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-04-12-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
@@ -55,22 +55,20 @@ def get_required_packages() -> Dict[str, List[str]]:
 
         for distro,pkg in ostype["debian"].items():
             for slurmpkg in [
-                "slurm",
-                "slurm-devel",
-                "slurm-example-configs",
-                "slurm-libpmi",
-                "slurm-perlapi",
-                "slurm-slurmctld",
-                "slurm-slurmdbd",
-                "slurm-slurmd",
-                "slurm-slurmrestd",
-                "slurm-contribs",
-                "slurm-pam-slurm",
-                "slurm-torque",
-                "slurm-openlava",
+                "slurm-smd",
+                "slurm-smd-dev",
+                "slurm-smd-client",
+                "slurm-smd-libnss-slurm",
+                "slurm-smd-slurmctld",
+                "slurm-smd-slurmdbd",
+                "slurm-smd-slurmd",
+                "slurm-smd-slurmrestd",
+                "slurm-smd-sview",
+                "slurm-smd-libslurm-perl",
+                "slurm-smd-libpam-slurm-adopt"
             ]:
                 ret.append(
-                    f"slurm-pkgs-{distro}/debs/{slurmpkg}_{slurm_version}_{pkg['arch']}.deb"
+                    f"slurm-pkgs-{distro}/slurm-{slurm_version}/debs/{slurmpkg}_{slurm_version}_{pkg['arch']}.deb"
                 )
         for distro,pkg in ostype["rhel"].items():
 
@@ -90,7 +88,7 @@ def get_required_packages() -> Dict[str, List[str]]:
                 "slurm-contribs"
             ]:
                 ret.append(
-                    f"slurm-pkgs-{distro}/RPMS/{slurmpkg}-{slurm_version}.{pkg['platform_version']}.{pkg['arch']}.rpm"
+                    f"slurm-pkgs-{distro}/slurm-{slurm_version}/RPMS/{slurmpkg}-{slurm_version}.{pkg['platform_version']}.{pkg['arch']}.rpm"
                 )
     return ret
 
