@@ -27,13 +27,14 @@ from hpc.autoscale.job.demandprinter import OutputFormat
 from hpc.autoscale.job.driver import SchedulerDriver
 from hpc.autoscale.node.node import Node
 from hpc.autoscale.node.nodemanager import NodeManager
+from hpc.autoscale.results import ShutdownResult
 
 from slurmcc import allocation
 
 from . import AzureSlurmError
 from . import partition as partitionlib
 from . import util as slutil
-from .util import is_autoscale_enabled
+from .util import is_autoscale_enabled, scontrol
 from . import cost
 
 
@@ -257,17 +258,44 @@ class SlurmCLI(CommonCLI):
 
         allocation.wait_for_resume(config, "noop", node_list, get_latest_nodes)
 
-    def _shutdown(self, node_list: List[str], node_mgr: NodeManager) -> None:
+    def _shutdown(self, config: Dict, node_list: List[str], node_mgr: NodeManager) -> None:
         by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
         node_list_filtered = []
+        to_keep_alive = []
         for node_name in node_list:
             if node_name in by_name:
-                node_list_filtered.append(node_name)
+                node = by_name[node_name]
+                if node.keep_alive:
+                    to_keep_alive.append(node_name)
+                    logging.warning(f"{node_name} has KeepAlive=true in CycleCloud. Cannot terminate.")
+                else:
+                    node_list_filtered.append(node_name)
             else:
                 logging.info(f"{node_name} does not exist. Skipping.")
-        nodes = _as_nodes(node_list_filtered, node_mgr)
-        result = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
-        logging.info(str(result))
+
+        if to_keep_alive:
+            # This will prevent the node from falsely being resume/resume_fail over and over again.
+            logging.warning(f"Nodes {to_keep_alive} have KeepAlive=true in CycleCloud. Cannot terminate." +
+                            " Setting state to down reason=keep_alive")
+            to_keep_alive_str = slutil.to_hostlist(to_keep_alive)
+            scontrol(["update", f"nodename={to_keep_alive_str}", "state=down", "reason=keep_alive"])
+
+        if not node_list_filtered:
+            logging.warning(f"No nodes out of node list {node_list} could be shutdown." +
+                            " Post-processing the nodes only.")
+        else:
+            result = _safe_shutdown(node_list_filtered, node_mgr)
+            
+            if not result:
+                raise AzureSlurmError(f"Failed to shutdown {node_list_filtered} - {result.message}")
+
+        if slutil.is_autoscale_enabled():
+            # undo internal DNS
+            for node_name in node_list:
+                _undo_internal_dns(node_name)
+        else:
+            # set states back to future and set NodeAddr/NodeHostName to node name
+            _update_future_states(self._get_node_manager(config, force=True), node_list)
 
     def suspend_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
@@ -280,7 +308,7 @@ class SlurmCLI(CommonCLI):
         """
         Equivalent to SuspendProgram, shutsdown nodes
         """
-        return self._shutdown(node_list, self._node_mgr(config))
+        return self._shutdown(config, node_list, self._node_mgr(config))
 
     def resume_fail_parser(self, parser: ArgumentParser) -> None:
         self.suspend_parser(parser)
@@ -293,7 +321,8 @@ class SlurmCLI(CommonCLI):
         Equivalent to SuspendFailProgram, shutsdown nodes
         """
         node_mgr = self._node_mgr(config, self._driver(config))
-        self._shutdown(node_list=node_list, node_mgr=node_mgr)
+        self._shutdown(config, node_list=node_list, node_mgr=node_mgr)
+
 
     def _get_node_manager(self, config: Dict, force: bool = False) -> NodeManager:
         return self._node_mgr(config, self._driver(config), force=force)
@@ -592,6 +621,15 @@ def _move_with_permissions(src: str, dst: str) -> None:
     logging.debug("Moving %s to %s", src, dst)
     shutil.move(src, dst)
 
+    if not slutil.is_autoscale_enabled():
+        def sync_future_states_parser(self, parser: ArgumentParser) -> None:
+            parser.add_argument(
+                "--node-list", type=hostlist_null_star, help="Optional subset of nodes to sync. Default is all."
+            )
+
+        def sync_future_states(self, config: Dict, node_list: Optional[List[str]] = None) -> None:
+            _update_future_states(self._get_node_manager(config), node_list)
+
 
 def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> None:
     assert partition.dynamic_config
@@ -774,13 +812,17 @@ def _generate_gres_conf(partitions: List[partitionlib.Partition], writer: TextIO
 
             writer.write("\n")
 
-def _update_future_states(node_mgr: NodeManager) -> None:
+
+def _update_future_states(node_mgr: NodeManager, node_list: Optional[List[str]] = None) -> None:
     autoscale_enabled = is_autoscale_enabled()
     if autoscale_enabled:
         return
     nodes = node_mgr.get_nodes()
 
     for node in nodes:
+        if node_list and node.name not in node_list:
+            continue
+
         if node.target_state != "Started":
             name = node.name
             try:
@@ -795,6 +837,20 @@ def _update_future_states(node_mgr: NodeManager) -> None:
                 check_output(cmd)
             except SubprocessError:
                 logging.warning(f"Could not set {node.get('Name')} state=FUTURE")
+
+
+def _undo_internal_dns(node_name: str) -> None:
+    try:
+        cmd = [
+            "scontrol",
+            "update",
+            f"NodeName={node_name}",
+            f"NodeAddr={node_name}",
+            f"NodeHostName={node_name}",
+        ]
+        check_output(cmd)
+    except SubprocessError:
+        logging.warning(f"Could not set {node_name}'s nodeaddr/nodehostname!")
 
 
 def _retry_rest(func: Callable, attempts: int = 5) -> Any:
@@ -828,6 +884,18 @@ def hostlist_null_star(hostlist_expr: str) -> Optional[List[str]]:
     return slutil.from_hostlist(hostlist_expr)
 
 
+def _safe_shutdown(node_list: List[str], node_mgr: NodeManager) -> ShutdownResult:
+    assert node_list
+    logging.info(f"Shutting down nodes {node_list}")
+    nodes = _as_nodes(node_list, node_mgr)
+    ret = _retry_rest(lambda: node_mgr.shutdown_nodes(nodes))
+    if ret:
+        logging.info(str(ret))
+    else:
+        logging.error(str(ret))
+    return ret
+
+
 def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
     nodes: List[Node] = []
     by_name = hpcutil.partition_single(node_mgr.get_nodes(), lambda node: node.name)
@@ -840,7 +908,15 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:
-    clilibmain(argv or sys.argv[1:], "slurm", SlurmCLI())
+    try:
+        clilibmain(argv or sys.argv[1:], "slurm", SlurmCLI())
+    except AzureSlurmError as e:
+        logging.error(e.message)
+        sys.exit(1)
+    except Exception:
+        log_files = [x.baseFileName for x in logging.getLogger().handlers if hasattr(x, "baseFilename")]
+        logging.exception(f"Unexpected error. See {','.join(log_files)} for more information.")
+        raise
 
 
 if __name__ == "__main__":
