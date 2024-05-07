@@ -496,7 +496,7 @@ Order = 15
         [[[parameter About shared part 2]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template = ''' <p>To disable the built-in NFS export of the <code>/sched</code> directory, and to use an external filesystem, select the checkbox below.</p>'''
+        Config.Template = ''' <p>To disable the built-in NFS export of the <code>/shared</code> directory, and to use an external filesystem, select the checkbox below.</p>'''
         Order = 7
         Conditions.Hidden := configuration_slurm_ha_enabled
 
