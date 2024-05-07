@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+set +e
 
 log=/var/log/slurmctld/prolog_slurmctld.log
 script=/opt/azurehpc/slurm/get_acct_info.sh
@@ -37,3 +38,5 @@ if [ $ret -eq 0 ]; then
 else
 	$scontrol update job=$job admincomment="$output"
 fi
+
+exit 0
