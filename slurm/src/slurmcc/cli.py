@@ -323,6 +323,110 @@ class SlurmCLI(CommonCLI):
         node_mgr = self._node_mgr(config, self._driver(config))
         self._shutdown(config, node_list=node_list, node_mgr=node_mgr)
 
+    def return_to_idle_parser(self, parser: ArgumentParser) -> None:
+        parser.set_defaults(read_only=False)
+        parser.add_argument("--terminate-zombie-nodes", action="store_true", default=False)
+
+    def return_to_idle(
+        self, config: Dict, terminate_zombie_nodes: bool = False
+    ) -> None:
+        """
+        Nodes that fail to resume in ResumeTimeout seconds will be left
+        in a down~ state - i.e. down and powered_down. It is also possible
+        the nodes will be in a drained~ state, if the node was drained during
+        resume. This command will set those nodes to idle~.
+
+        The one exception is for nodes that have KeepAlive set in CycleCloud.
+        Those nodes will be left as down~ and will be logged. When the user
+        unclicks the KeepAlive, the node can be automatically shutdown if --terminate-zombie-nodes
+        is set, or config["return-to-idle"]["terminate-zombie-nodes"] is true.
+        """
+        if not slutil.is_autoscale_enabled():
+            return
+
+        # this is always run as root, so bump up the loglevel to info
+        stream_handlers = [
+            x
+            for x in logging.getLogger().handlers
+            if isinstance(x, logging.StreamHandler)
+        ]
+        for sh in stream_handlers:
+            sh.setLevel(logging.INFO)
+
+        node_mgr = self._node_mgr(config)
+        ccnodes = node_mgr.get_nodes()
+        ccnodes_by_name = hpcutil.partition_single(ccnodes, lambda node: node.name)
+
+        snodes = slutil.show_nodes()
+        if terminate_zombie_nodes:
+            if "return_to_idle" not in config:
+                config["return-to-idle"] = {}
+            config["return-to-idle"]["terminate-zombie-nodes"] = True
+            
+        SlurmCLI._return_to_idle(config, snodes, ccnodes_by_name, scontrol, node_mgr)
+
+    @staticmethod
+    def _return_to_idle(
+        config: Dict,
+        snodes: List[Dict],
+        ccnodes_by_name: Dict[str, Node],
+        scontrol_func: Callable,
+        node_mgr: NodeManager,
+    ) -> None:
+        to_set_to_idle = []
+        to_power_down = []
+
+        for snode in snodes:
+            slurm_states = set(snode["State"].split("+"))
+            # ignore non-cloud nodes, as they aren't our responsibility
+            if "CLOUD" not in slurm_states:
+                continue
+
+            power_down_states = set(["POWERED_DOWN"])
+            if not power_down_states.intersection(slurm_states):
+                continue
+            node_name = snode["NodeName"]
+
+            if "DOWN" in slurm_states or "DRAINED" in slurm_states:
+                # Only nodes that do not exist in CycleCloud can be set to idle~
+                if node_name not in ccnodes_by_name:
+                    to_set_to_idle.append(node_name)
+                    continue
+                
+                # keepalive nodes must be left alone, and obviously cannot be terminated.
+                ccnode = ccnodes_by_name[node_name]
+                if ccnode.keep_alive:
+                    logging.warning(
+                        f"{node_name} exists and has KeepAlive=true in CycleCloud. Cannot set to idle."
+                    )
+                    continue
+                
+                terminate_zombie_nodes = config.get("return-to-idle", {}).get(
+                        "terminate-zombie-nodes", False
+                )
+                
+                if terminate_zombie_nodes:
+                    logging.warning(
+                        f"Found zombie node {node_name}. Will set to power_down because terminate-zombie-nodes is set."
+                    )
+                    # Terminate the node - note that the next round the node will be set to idle.
+                    to_power_down.append(node_name)
+                else:
+                    logging.warning(
+                        f"Node {node_name} is in DOWN~ state but exists in CycleCloud. To terminate the node"
+                        + ", shutdown the node manually (via azslurm suspend or the UI) or, if you want the node"
+                        + " to join the cluster, login to it and restart slurmd."
+                    )
+
+        if to_power_down:
+            to_power_down_idle_str = slutil.to_hostlist(to_power_down, scontrol_func=scontrol_func)
+            slutil.scontrol(["update", f"nodename={to_power_down_idle_str}", "state=power_down"])
+
+        if to_set_to_idle:
+            to_set_to_idle_str = slutil.to_hostlist(to_set_to_idle, scontrol_func=scontrol_func)
+            logging.warning(f"Setting nodes {to_set_to_idle} to idle.")
+            scontrol_func(["update", f"nodename={to_set_to_idle_str}", "state=idle"])
+    
 
     def _get_node_manager(self, config: Dict, force: bool = False) -> NodeManager:
         return self._node_mgr(config, self._driver(config), force=force)

@@ -157,6 +157,7 @@ def execute() -> None:
     _add("sbin/prolog.sh", "sbin/prolog.sh")
     _add("sbin/resume_program.sh", "sbin/resume_program.sh")
     _add("sbin/return_to_idle.sh", "sbin/return_to_idle.sh")
+    _add("sbin/return_to_idle_legacyfin.sh", "sbin/return_to_idle_legacy.sh")
     _add("sbin/suspend_program.sh", "sbin/suspend_program.sh")
     _add("sbin/get_acct_info.sh", "sbin/get_acct_info.sh")
     _add("logging.conf", "slurm/conf/logging.conf")
