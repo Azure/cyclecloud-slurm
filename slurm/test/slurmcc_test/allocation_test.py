@@ -1,11 +1,11 @@
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
-from hpc.autoscale import clock
 from hpc.autoscale import util as hpcutil
 from hpc.autoscale.ccbindings.mock import MockClusterBinding
 from hpc.autoscale.node.node import Node
 from slurmcc import allocation
 from slurmcc import partition
+from slurmcc import util as slutil
 from slurmcc.partition import fetch_partitions
 
 from . import testutil
@@ -13,6 +13,7 @@ from . import testutil
 import logging
 import sys
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stderr)
+
 
 class MockWaiter(allocation.WaitForResume):
     def __init__(self) -> None:
@@ -22,6 +23,14 @@ class MockWaiter(allocation.WaitForResume):
         self, node_list: List[str], latest_nodes: List[Node]
     ) -> Tuple[Dict, List[Node]]:
         return super().check_nodes(node_list, latest_nodes)
+
+
+def setup():
+    slutil.TEST_MODE = True
+
+
+def teardown():
+    slutil.TEST_MODE = False
 
 
 def test_basic_resume() -> None:
@@ -89,15 +98,16 @@ def test_resume_dynamic_by_feature() -> None:
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
     native_cli = testutil.make_native_cli()
-    native_cli.create_nodes(["mydynamic"], features=["dyn"])
+    native_cli.create_nodes(["mydynamic-1"], features=["dyn"])
     
-    assert 3 == len(partition.fetch_partitions(node_mgr, include_dynamic=True))
+    partitions = partition.fetch_partitions(node_mgr, include_dynamic=True)
+    assert 3 == len(partitions)
 
-    result = allocation.resume(testutil.CONFIG, node_mgr, ["mydynamic"], fetch_partitions(node_mgr))
+    result = allocation.resume(testutil.CONFIG, node_mgr, ["mydynamic-1"], partitions)
     assert result
     assert result.nodes
     assert len(result.nodes) == 1
-    assert result.nodes[0].name == "mydynamic"
+    assert result.nodes[0].name == "mydynamic-1"
 
     assert 1 == len(bindings.get_nodes().nodes)
 
@@ -111,10 +121,10 @@ def test_resume_dynamic_by_feature() -> None:
     node_mgr = testutil.refresh_test_node_manager(node_mgr)
     assert 4 == len(partition.fetch_partitions(node_mgr, include_dynamic=True))
 
-    native_cli.create_nodes(["f2"], features=["dyn", "Standard_F2"])
-    native_cli.create_nodes(["f4"], features=["dyn", "Standard_F4"])
+    native_cli.create_nodes(["f2-1"], features=["dyn", "Standard_F2"])
+    native_cli.create_nodes(["f4-1"], features=["dyn", "Standard_F4"])
 
-    result = allocation.resume(testutil.CONFIG, node_mgr, ["f2", "f4"], fetch_partitions(node_mgr))
+    result = allocation.resume(testutil.CONFIG, node_mgr, ["f2-1", "f4-1"], fetch_partitions(node_mgr))
     assert result
     assert result.nodes
     assert 2 == len(result.nodes)
