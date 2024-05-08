@@ -186,29 +186,16 @@ def _node_index_and_pg_as_sort_key(nodename: str) -> Union[str, int]:
 _IS_AUTOSCALE_ENABLED = None
 
 
-def is_autoscale_enabled(subprocess_module: Optional[Any] = None) -> bool:
+def is_autoscale_enabled() -> bool:
     global _IS_AUTOSCALE_ENABLED
     if _IS_AUTOSCALE_ENABLED is not None:
         return _IS_AUTOSCALE_ENABLED
-    if subprocess_module is None:
-        import subprocess as subprocess_module_tmp
-
-        subprocess_module = subprocess_module_tmp
-
     try:
-        lines = (
-            subprocess_module.check_output(["scontrol", "show", "config"])
-            .decode()
-            .strip()
-            .splitlines()
-        )
+        with open("/etc/slurm/slurm.conf") as fr:
+            lines = fr.readlines()
     except Exception:
-        try:
-            with open("/etc/slurm/slurm.conf") as fr:
-                lines = fr.readlines()
-        except Exception:
-            _IS_AUTOSCALE_ENABLED = True
-            return _IS_AUTOSCALE_ENABLED
+        _IS_AUTOSCALE_ENABLED = True
+        return _IS_AUTOSCALE_ENABLED
 
     for line in lines:
         line = line.strip()
