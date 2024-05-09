@@ -20,7 +20,7 @@ fi
 
 apt -y install munge
  
-apt -y install libmysqlclient-dev libmariadbclient-dev-compat libssl-dev
+apt -y install libmysqlclient-dev libssl-dev jq
 
 if [ $UBUNTU_VERSION == 22.04 ]; then
     REPO=slurm-ubuntu-jammy
