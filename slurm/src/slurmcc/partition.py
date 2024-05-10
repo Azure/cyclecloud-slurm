@@ -32,6 +32,7 @@ class Partition:
         over_allocation_thresholds: Dict = {},
         nodearray_machine_types: Optional[List[str]] = None,
         dampen_memory: Optional[float] = None,
+        gpu_device_config: str = "",
     ) -> None:
         self.name = name
         self.nodearray = nodearray
@@ -71,6 +72,7 @@ class Partition:
         ] = _construct_node_list(self)
         
         self.over_allocation_thresholds = over_allocation_thresholds
+        self.gpu_device_config = gpu_device_config
 
         self.features = []
         if self.dynamic_config:
@@ -371,6 +373,8 @@ def fetch_partitions(
                     partition_name, overallocation_expr
                 )
 
+            gpu_device_config = slurm_config.get("gpu_device_config") or ""
+
             all_partitions.append(
                 Partition(
                     partition_name,
@@ -387,6 +391,7 @@ def fetch_partitions(
                     over_allocation_thresholds=over_allocation_thresholds,
                     nodearray_machine_types=nodearray_vm_size.get(nodearray_name),
                     dampen_memory=dampen_memory,
+                    gpu_device_config=gpu_device_config,
                 )
             )
 

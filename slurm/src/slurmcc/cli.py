@@ -705,6 +705,40 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
         writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
 
 
+def _generate_nvidia_devices(gpu_count: int) -> str:
+    if gpu_count == 1:
+        return "/dev/nvidia0"
+    return "/dev/nvidia[0-{}]".format(gpu_count - 1)
+
+
+def _generate_amd_devices(gpu_count: int) -> str:
+    if gpu_count == 1:
+        return "/dev/dri/renderD128"
+    amd_gpu_list = ", ".join([f"{128+8*index}" for index in range(0, gpu_count)])
+    return "/dev/dri/renderD[{}]".format(amd_gpu_list)
+
+
+def _generate_gpu_devices(partition: partitionlib.Partition) -> str:
+    
+    # Override from node configuration
+    if partition.gpu_device_config:
+        return partition.gpu_device_config
+    
+    try:
+        # TODO: azure sku should eventually indicate the GPU type
+        #       (currently, attribute is not available, so gpu_family is not available to the partition)   
+        #       We'll fall back to parsing machine type until it is available
+        has_amd_gpu = "amd" in partition.gpu_family.lower()
+    except AttributeError:           
+        has_amd_gpu = "mi300" in partition.machine_type.lower()
+
+    if has_amd_gpu:
+        gpu_devices = _generate_amd_devices(partition.gpu_count)
+    else:
+        gpu_devices = _generate_nvidia_devices(partition.gpu_count)
+    return gpu_devices
+
+
 def _generate_gres_conf(partitions: List[partitionlib.Partition], writer: TextIO):
     for partition in partitions:
         if partition.node_list is None:
@@ -731,18 +765,14 @@ def _generate_gres_conf(partitions: List[partitionlib.Partition], writer: TextIO
             # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
 
             if partition.gpu_count:
-                if partition.gpu_count > 1:
-                    nvidia_devices = "/dev/nvidia[0-{}]".format(partition.gpu_count - 1)
-                else:
-                    nvidia_devices = "/dev/nvidia0"
+                gpu_devices = _generate_gpu_devices(partition)
                 writer.write(
                     "Nodename={} Name=gpu Count={} File={}".format(
-                        node_list, partition.gpu_count, nvidia_devices
+                        node_list, partition.gpu_count, gpu_devices
                     )
                 )
 
             writer.write("\n")
-
 
 def _update_future_states(node_mgr: NodeManager) -> None:
     autoscale_enabled = is_autoscale_enabled()
