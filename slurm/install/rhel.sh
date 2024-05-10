@@ -14,7 +14,7 @@ DISABLE_PMC=$3
 OS_VERSION=$(cat /etc/os-release  | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
 
 yum -y install epel-release
-yum -y install munge
+yum -y install munge jq
 if [ "$OS_VERSION" -gt "7" ]; then
     dnf -y --enablerepo=powertools install -y perl-Switch
     PACKAGE_DIR=slurm-pkgs-rhel8
