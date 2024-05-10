@@ -238,9 +238,9 @@ def _accounting_primary(s: InstallSettings) -> None:
         f"{s.config_dir}/accounting.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
-        content="""
+        content=f"""
 AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageHost="localhost"
+AccountingStorageHost={s.hostname}
 AccountingStorageTRES=gres/gpu
 """,
     )
@@ -312,6 +312,17 @@ def _accounting_all(s: InstallSettings) -> None:
         group=s.slurm_grp,
     )
 
+    if s.secondary_scheduler_name:
+        ilib.append_file(
+            f"{s.config_dir}/accounting.conf",
+            content=f"AccountingStorageBackupHost={s.secondary_scheduler_name}\n",
+            comment_prefix="\n# Additional HA Storage Backup host -"
+        )
+        ilib.append_file(
+            f"{s.config_dir}/slurmdbd.conf",
+            content=f"DbdBackupHost={s.secondary_scheduler_name}\n",
+            comment_prefix="\n# Additional HA dbd host -"
+        )
     ilib.enable_service("slurmdbd")
 
 
