@@ -3,6 +3,7 @@
 # Licensed under the MIT License.
 #
 set -e
+
 if [ $(whoami) != root ]; then
   echo "Please run as root"
   exit 1
@@ -11,6 +12,8 @@ fi
 SCHEDULER=slurm
 INSTALL_PYTHON3=0
 VENV=/opt/azurehpc/slurm/venv
+NO_JETPACK=0
+
 export PATH=$PATH:/root/bin
 
 while (( "$#" )); do
@@ -19,9 +22,17 @@ while (( "$#" )); do
             INSTALL_PYTHON3=1
             shift
             ;;
+        --no-jetpack)
+            NO_JETPACK=1
+            shift
+            ;;
         --venv)
             VENV=$2
             shift 2
+            ;;
+        --help)
+            echo "Usage: $0 [--install-python3] [--venv <path>] [--no-jetpack]"
+            exit 0
             ;;
         -*|--*=)
             echo "Unknown option $1" >&2
@@ -51,7 +62,6 @@ if [ $? != 0 ]; then
 fi
 set -e
 
-
 python3 -m venv $VENV
 mkdir -p $VENV/../logs
 source $VENV/bin/activate
@@ -72,11 +82,11 @@ chmod +x $VENV/bin/azslurm
 azslurm -h 2>&1 > /dev/null || exit 1
 
 
-if [ ! -e /root/bin ]; then
-    mkdir /root/bin
+if [ ! -e ~/bin ]; then
+    mkdir ~/bin
 fi
 
-ln -sf $VENV/bin/azslurm /root/bin/
+ln -sf $VENV/bin/azslurm ~/bin/
 
 INSTALL_DIR=$(dirname $VENV)
 
@@ -92,7 +102,12 @@ eval "\$(/opt/azurehpc/slurm/venv/bin/register-python-argcomplete azslurm)" || e
 EOF
 fi
 
-which jetpack || exit 0
+if [ $NO_JETPACK == 1 ]; then
+    echo "--no-jetpack is set. Please run azslurm initconfig and azslurm scale manually, as well as chown slurm:slurm $VENV/../logs/*.log."
+    exit 0
+fi
+
+which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
 
 # note: lower case the tag names, and use a sane default 'unknown'
 tag=$(jetpack config azure.metadata.compute.tags | python3 -c "\
