@@ -224,6 +224,11 @@ def _accounting_primary(s: InstallSettings) -> None:
     Only the primary scheduler should be creating files under
     {s.config_dir} for accounting.
     """
+
+    if s.secondary_scheduler_name:
+        secondary_scheduler = ilib.await_node_hostname(
+            s.config, s.secondary_scheduler_name
+        )
     if not s.acct_enabled:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
         ilib.file(
@@ -288,6 +293,18 @@ AccountingStorageTRES=gres/gpu
         },
     )
 
+    if s.secondary_scheduler_name:
+        ilib.append_file(
+            f"{s.config_dir}/accounting.conf",
+            content=f"AccountingStorageBackupHost={secondary_scheduler.hostname}\n",
+            comment_prefix="\n# Additional HA Storage Backup host -"
+        )
+        ilib.append_file(
+            f"{s.config_dir}/slurmdbd.conf",
+            content=f"DbdBackupHost={secondary_scheduler.hostname}\n",
+            comment_prefix="\n# Additional HA dbd host -"
+        )
+
 
 def _accounting_all(s: InstallSettings) -> None:
     """
@@ -312,17 +329,6 @@ def _accounting_all(s: InstallSettings) -> None:
         group=s.slurm_grp,
     )
 
-    if s.secondary_scheduler_name:
-        ilib.append_file(
-            f"{s.config_dir}/accounting.conf",
-            content=f"AccountingStorageBackupHost={s.secondary_scheduler_name}\n",
-            comment_prefix="\n# Additional HA Storage Backup host -"
-        )
-        ilib.append_file(
-            f"{s.config_dir}/slurmdbd.conf",
-            content=f"DbdBackupHost={s.secondary_scheduler_name}\n",
-            comment_prefix="\n# Additional HA dbd host -"
-        )
     ilib.enable_service("slurmdbd")
 
 
