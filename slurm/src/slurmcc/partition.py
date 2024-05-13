@@ -148,8 +148,9 @@ class Partition:
                                     node["NodeName"],
                                     self.machine_type)
                         ret.append(node["NodeName"])
-
-            self.__dynamic_node_list_cache = slutil.to_hostlist(ret)
+                        
+            self.__dynamic_node_list_cache = slutil.to_hostlist(ret) if ret else ""
+            
         return self.__dynamic_node_list_cache
     
     def _static_all_nodes(self) -> List[str]:

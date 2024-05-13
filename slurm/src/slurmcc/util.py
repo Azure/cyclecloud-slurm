@@ -37,8 +37,10 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
 
-
+TEST_MODE = False
 def is_slurmctld_up() -> bool:
+    if TEST_MODE:
+        return True
     try:
         SLURM_CLI.scontrol(["ping"], retry=False)
         return True
@@ -72,15 +74,18 @@ def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
                 current_node = {}
             assert current_node is not None
             current_node[key] = value
-
-    ret.append(current_node)
+    if current_node:
+        ret.append(current_node)
     return ret
 
 
-def to_hostlist(nodes: Union[str, List[str]]) -> str:
+def to_hostlist(nodes: Union[str, List[str]], scontrol_func: Callable=scontrol) -> str:
     """
     convert name-[1-5] into name-1 name-2 name-3 name-4 name-5
     """
+    assert nodes
+    for n in nodes:
+        assert n
     if isinstance(nodes, list):
         nodes_str = ",".join(nodes)
     else:
@@ -88,13 +93,14 @@ def to_hostlist(nodes: Union[str, List[str]]) -> str:
     # prevent poor sorting of nodes and getting node lists like htc-1,htc-10-19, htc-2, htc-20-29 etc
     sorted_nodes = sorted(nodes_str.split(","), key=get_sort_key_func(is_hpc=False))
     nodes_str = ",".join(sorted_nodes)
-    return scontrol(["show", "hostlist", nodes_str])
+    return scontrol_func(["show", "hostlist", nodes_str])
 
 
 def from_hostlist(hostlist_expr: str) -> List[str]:
     """
     convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
     """
+    assert isinstance(hostlist_expr, str)
     stdout = scontrol(["show", "hostnames", hostlist_expr])
     return [x.strip() for x in stdout.split()]
 

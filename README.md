@@ -256,6 +256,21 @@ To change this dampening, there are two options.
   **Note:** `slurm.dampen_memory` takes precedence, so the default_resource `slurm_memory` will be ignored if `slurm.dampen_memory` is defined.
 
 
+### KeepAlive set in CycleCloud and Zombie nodes
+If you choose to set KeepAlive=true in CycleCloud, then Slurm will still change its internal power state to `powered_down`. At this point, that node is now a `zombie` node. A `zombie` node is one where it exists in CycleCloud but is in a powered_down state in Slurm.
+
+Previous to 3.0.7, Slurm would try and fail to resume `zombie` nodes over and over again. As of 3.0.7, the `zombie` node will be left in a `down~` (or `drained~`). If you want the `zombie` node to rejoin the cluster, g=you must log into it and restart the `slurmd`, typically via `systemctl restart slurmd`. If you want these nodes to be terminated, you can either manually terminate them via the UI or `azslurm suspend`, or to do this automatically, you can add the following to the autoscale.json file found at `/opt/azurehpc/slurm/autoscale.json`
+
+This will change the behavior of the `azslurm return_to_idle` command that is, by default, run as a cronjob every 5 minutes. You can also execute it manually, with the argument `--terminate-zombie-nodes`.
+
+```json
+{
+  "return-to-idle": {
+    "terminate-zombie-nodes": true
+  }
+}
+```
+
 ### Transitioning from 2.7 to 3.0
 
 1. The installation folder changed
