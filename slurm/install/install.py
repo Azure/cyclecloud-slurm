@@ -43,6 +43,7 @@ class InstallSettings:
         self.slurm_cluster_name = _escape(self.cyclecloud_cluster_name)
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
+        self.ipv4 = config["ipaddress"]
         self.slurmver = config["slurm"]["version"]
         self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
 
@@ -348,7 +349,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         mode="0644",
         source="templates/slurm.conf.template",
         variables={
-            "slurmctldhost": s.hostname,
+            "slurmctldhost": f"{s.hostname}({s.ipv4})",
             "cluster_name": s.slurm_cluster_name,
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
@@ -358,7 +359,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
     if secondary_scheduler:
         ilib.append_file(
             f"{s.config_dir}/slurm.conf",
-            content=f"SlurmCtldHost={secondary_scheduler.hostname}\n",
+            content=f"SlurmCtldHost={secondary_scheduler.hostname}({secondary_scheduler.private_ipv4})\n",
             comment_prefix="\n# Additional HA scheduler host -",
         )
 
