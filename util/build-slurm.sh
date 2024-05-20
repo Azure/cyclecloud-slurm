@@ -23,7 +23,7 @@ function build_slurm() {
 
     case ${DISTRO_FAMILY} in
         suse)
-            zypper install --no-confirm bzip2 rpmbuild munge-devel pam-devel mysql-devel autoconf readline-devel
+            zypper install --no-confirm bzip2 rpmbuild munge-devel pam-devel mysql-devel autoconf readline-devel libjwt-devel
             ;;
         centos)
             CENTOS_VERSION=$(cat /etc/centos-release | sed 's/ /\n/g' | grep -E '[0-9.]+')
@@ -41,7 +41,7 @@ function build_slurm() {
              # munge is in EPEL
             yum -y install epel-release && yum -q makecache
             yum install -y make $PYTHON which rpm-build munge-devel munge-libs readline-devel openssl openssl-devel pam-devel perl-ExtUtils-MakeMaker gcc mysql mysql-devel wget gtk2-devel.x86_64 glib2-devel.x86_64 $LIBTOOL m4 automake rsync lua-devel
-            yum install -y http-parser-devel json-c-devel hwloc-devel
+            yum install -y http-parser-devel json-c-devel hwloc-devel libjwt-devel
             ;;
 
     esac
@@ -64,7 +64,7 @@ function build_slurm() {
         wget "${DOWNLOAD_URL}/${SLURM_PKG}"
     fi
 
-    rpmbuild --with mysql --define '_with_pmix --with-pmix=/opt/pmix/v4' --with=hwloc --with=lua --with=slurmrestd -ta ${SLURM_PKG}
+    rpmbuild --with mysql --define '_with_pmix --with-pmix=/opt/pmix/v4' --with=hwloc --with=lua --with=slurmrestd --with=jwt -ta ${SLURM_PKG}
 }
 
 function install_pmix() {
