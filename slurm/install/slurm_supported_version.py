@@ -5,7 +5,7 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "23.11.6-1": {
+    "23.11.6-2": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
@@ -15,7 +15,7 @@ SUPPORTED_VERSIONS = {
             "ubuntu22": {"arch": "amd64"}
         }
     },
-    "23.02.7-3": {
+    "23.02.7-4": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
