@@ -30,6 +30,7 @@ PidFile=/var/run/slurmdbd.pid
 # Database info
 StorageType=accounting_storage/mysql
 StorageHost={accountdb}
+StorageLoc={storageloc}
 {storagepass}
 StorageUser={dbuser}
 {storage_parameters}

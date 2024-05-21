@@ -36,6 +36,7 @@ Autoscale = $Autoscale
         slurm.accounting.user = $configuration_slurm_accounting_user
         slurm.accounting.password = $configuration_slurm_accounting_password
         slurm.accounting.certificate_url = $configuration_slurm_accounting_certificate_url
+        slurm.accounting.storageloc = $configuration_slurm_accounting_storageloc
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
         slurm.launch_parameters = $configuration_slurm_launch_parameters
@@ -649,9 +650,20 @@ Order = 20
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Configure Slurm job accounting
 
+	[[[parameter slurm_database_warning]]]
+	HideLabel = true
+	Config.Plugin = pico.widget.HtmlTemplateWidget
+	Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
+	Config.Template := "<table role=\"presentation\"><tr><td> <b>Note: Checking this box will create persistent databases and tables in SQL DB provided. Deleting this cluster will not automatically delete those databases. User is responsible for periodically purging/archiving their slurm databases to maintain costs.</b></td></tr></table>"
+
         [[[parameter configuration_slurm_accounting_url]]]
         Label = Slurm DBD URL
         Description = URL of the database to use for Slurm job accounting
+        Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
+
+        [[[parameter configuration_slurm_accounting_storageloc]]]
+        Label = Database name
+        Description = Database name to store slurm accounting records
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
         [[[parameter configuration_slurm_accounting_user]]]
