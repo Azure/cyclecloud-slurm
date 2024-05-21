@@ -94,12 +94,12 @@ if [ $UBUNTU_VERSION == 22.04 ]; then
 else
     PACKAGE_DIR=slurm-pkgs-ubuntu20
 fi
-
-dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*${SLURM_VERSION}*.deb | grep -v -e slurmdbd -e slurmctld)
+dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*.deb | grep -v -e slurmdbd -e slurmctld)
+apt --fix-broken -y install
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-smd-slurmctld_${SLURM_VERSION}*.deb
-    dpkg -i --force-all $PACKAGE_DIR/debs/slurm-smd-slurmdbd_${SLURM_VERSION}*.deb
+    dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*.deb | grep slurmctld)
+    dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*.deb | grep slurmdbd)
 fi
-
+apt --fix-broken -y install
 touch $INSALLED_FILE
