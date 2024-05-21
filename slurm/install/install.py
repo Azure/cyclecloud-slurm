@@ -62,6 +62,7 @@ class InstallSettings:
         self.acct_pass: Optional[str] = config["slurm"]["accounting"].get("password")
         self.acct_url: Optional[str] = config["slurm"]["accounting"].get("url")
         self.acct_cert_url: Optional[str] = config["slurm"]["accounting"].get("certificate_url")
+        self.acct_storageloc :Optional[str] = config["slurm"]["accounting"].get("storageloc")
         self.disable_pmc = config["slurm"].get("disable_pmc") or False
 
         self.use_nodename_as_hostname = config["slurm"].get(
@@ -291,6 +292,7 @@ AccountingStorageTRES=gres/gpu
                                   if s.acct_cert_url
                                   else "#StorageParameters=",
             "slurmver": s.slurmver,
+            "storageloc": s.acct_storageloc or f"{s.slurm_cluster_name}_acct_db",
         },
     )
 
