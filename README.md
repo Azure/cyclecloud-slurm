@@ -37,6 +37,10 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
       # Set to true if nodes are used for tightly-coupled multi-node jobs
       slurm.hpc = false
 
+      # Optionally over-ride the Device File locations for gres.conf 
+      # (The example here shows the default for an NVidia sku with 8 GPUs)
+      # slurm.gpu_device_config = /dev/nvidia[0-7]
+
       [[[cluster-init cyclecloud/slurm:execute:3.0.7]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
