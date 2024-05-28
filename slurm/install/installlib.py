@@ -205,19 +205,22 @@ def template(
     mode: Union[str, int] = 600,
     variables: Optional[Dict] = None,
 ) -> None:
-    if not os.path.exists(dest):
-        variables = variables or {}
-        if isinstance(mode, str):
-            mode = int(mode)
 
-        if not os.path.exists(source):
-            raise ConvergeError(f"Template {source} does not exist!")
-        with open(source) as fr:
-            contents = fr.read()
+    if os.path.exists(dest):
+        shutil.move(dest, f"{dest}.backup")
 
-        with open(dest, "w") as fw:
+    variables = variables or {}
+    if isinstance(mode, str):
+        mode = int(mode)
 
-            fw.write(contents.format(**variables))
+    if not os.path.exists(source):
+        raise ConvergeError(f"Template {source} does not exist!")
+
+    with open(source) as fr:
+        contents = fr.read()
+
+    with open(dest, "w") as fw:
+        fw.write(contents.format(**variables))
 
     chmod(dest, mode)
     if owner and group:
