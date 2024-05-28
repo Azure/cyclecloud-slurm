@@ -287,6 +287,7 @@ AccountingStorageTRES=gres/gpu
         variables={
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
+            "dbdhost": s.hostname,
             "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
             "storage_parameters": "StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem"
                                   if s.acct_cert_url

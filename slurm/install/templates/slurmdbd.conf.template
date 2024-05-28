@@ -15,7 +15,7 @@ AuthType=auth/munge
 #
 # slurmDBD info
 DbdAddr=localhost
-DbdHost=localhost
+DbdHost={dbdhost}
 #DbdPort=7031
 SlurmUser=slurm
 #MessageTimeout=300
