@@ -5,7 +5,7 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "23.11.6-2": {
+    "23.11.7-1": {
         "rhel": {
             "rhel8": {"platform_version": "el8", "arch": "x86_64"},
             "centos7": {"platform_version": "el7", "arch": "x86_64"}
@@ -27,7 +27,7 @@ SUPPORTED_VERSIONS = {
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-05-14-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-05-28-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
