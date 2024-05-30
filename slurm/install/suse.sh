@@ -9,7 +9,7 @@ if [ -e $INSTALLED_FILE ]; then
 fi
 
 SLURM_ROLE=$1
-SLURM_VERSION=$(echo $2 | cut -d. -f1-2 | sed 's/\./_/g')
+SLURM_VERSION=$(echo $2 | cut -d- -f1)
 
 
 which munge 2>/dev/null
@@ -25,12 +25,12 @@ fi
 set -e 
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    zypper install -y slurm_${SLURM_VERSION} \
-                      slurm_${SLURM_VERSION}-slurmdbd \
-                      slurm_${SLURM_VERSION}-lua \
-                      slurm_${SLURM_VERSION}-sql
+    zypper install -y slurm-${SLURM_VERSION} \
+                      slurm-slurmdbd-${SLURM_VERSION} \
+                      slurm-lua-${SLURM_VERSION} \
+                      slurm-sql-${SLURM_VERSION}
 else
-    zypper install -y slurm_${SLURM_VERSION}
+    zypper install -y slurm-${SLURM_VERSION}
 fi
 
 for fil in slurm.conf cgroup.conf slurmdbd.conf; do
