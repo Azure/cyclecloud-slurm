@@ -633,6 +633,8 @@ Order = 20
         [[[parameter slurm_version_warning]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
+        Config.Template := "<table role=\"presentation\"><tr><td> <b>Note: For SLES HPC, we can only install the version supported by SLES HPC's zypper repos. At the time of this release, that is 23.02.7</b></td></tr></table>"
+
 
         [[[parameter configuration_slurm_version]]]
         Required = True
