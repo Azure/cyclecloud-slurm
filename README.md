@@ -47,7 +47,7 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
 ```
 
 ### Dynamic Partitions
-As of `3.0.1`, we support dynamic partitions. You can make a `nodearray` map to a dynamic partition by adding the following.
+In cyclelcoud slurm projects >= `3.0.1`, we support dynamic partitions. You can make a `nodearray` map to a dynamic partition by adding the following.
 Note that `mydyn` could be any valid Feature. It could also be more than one, separated by a comma.
 ```ini
       [[[configuration]]]
@@ -66,11 +66,11 @@ PartitionName=mydynamic Nodes=mydynamicns
 ```
 
 ### Using Dynamic Partitions to Autoscale
-By default, we define no nodes in the dynamic partition. Instead, you can start nodes via CycleCloud or by manually invoking `azslurm resume` and they will join the cluster with whatever name you picked. However, Slurm does not know about these nodes so it can not autoscale them up.
+By default, we define no nodes in the dynamic partition. 
 
-Instead, you can also pre-create node records like so, which allows Slurm to autoscale them up.
+You can pre-create node records like so, which allows Slurm to autoscale them up.
 ```bash
-scontrol create nodename=f4-[1-10] Feature=mydyn State=CLOUD
+scontrol create nodename=f4-[1-10] Feature=mydyn,Standard_F2s_V2 cpus=2 State=CLOUD
 ```
 
 One other advantage of dynamic partitions is that you can support **multiple VM sizes in the same partition**.
@@ -85,7 +85,8 @@ scontrol create nodename=f8-[1-10] Feature=mydyn,Standard_F8 State=CLOUD
 
 Either way, once you have created these nodes in a `State=Cloud` they are now available to autoscale like other nodes.
 
-To support **multiple VM sizes in a CycleCloud nodearray**, you can alter the template to allow multiple VM sizes by adding `Config.Mutiselect = true`.
+Multiple VM_Sizes are supported by default for dynamic partitions, and that is configured via `Config.Multiselect` field in slurm template as shown here:
+
 ```ini
         [[[parameter DynamicMachineType]]]
         Label = Dyn VM Type
@@ -94,6 +95,19 @@ To support **multiple VM sizes in a CycleCloud nodearray**, you can alter the te
         DefaultValue = Standard_F2s_v2
         Config.Multiselect = true
 ```
+
+### Note for slurm 23.11.7 users:
+
+Dynamic partition behaviour has changed in new version of Slurm 23.11.7. When adding dynamic nodes containing GRES such as gpu's, the `/etc/slurm/gres.conf` file needs to be modified **first** before
+running `scontrol create nodename` command. If this is not done, slurm will report invalid nodename like shown here:
+
+```bash
+root@s3072-scheduler:~# scontrol create NodeName=e1 CPUs=24 Gres=gpu:4 Feature=dyn,nv24 State=cloud
+scontrol: error: Invalid argument (e1)
+Error creating node(s): Invalid argument
+```
+Simply add the node `e1` in `/etc/slurm/gres.conf` and then the command will work.
+
 
 ### Dynamic Scaledown
 
