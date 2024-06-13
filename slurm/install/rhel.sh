@@ -3,8 +3,8 @@
 # Licensed under the MIT License.
 #
 set -e
-INSALLED_FILE=/etc/azslurm-bins.installed
-if [ -e $INSALLED_FILE ]; then
+INSTALLED_FILE=/etc/azslurm-bins.installed
+if [ -e $INSTALLED_FILE ]; then
     exit 0
 fi
 
@@ -12,11 +12,16 @@ SLURM_ROLE=$1
 SLURM_VERSION=$2
 DISABLE_PMC=$3
 OS_VERSION=$(cat /etc/os-release  | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
+OS_ID=$(cat /etc/os-release  | grep ^ID= | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
 
 yum -y install epel-release
 yum -y install munge jq
 if [ "$OS_VERSION" -gt "7" ]; then
-    dnf -y --enablerepo=powertools install -y perl-Switch
+    if [ "${OS_ID,,}" = "rhel" ]; then
+        dnf -y install -y perl-Switch
+    else
+        dnf -y --enablerepo=powertools install -y perl-Switch
+    fi
     PACKAGE_DIR=slurm-pkgs-rhel8
 else
     yum -y install python3
