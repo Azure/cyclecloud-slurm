@@ -17,7 +17,7 @@ OS_ID=$(cat /etc/os-release  | grep ^ID= | cut -d= -f2 | cut -d\" -f2 | cut -d. 
 yum -y install epel-release
 yum -y install munge jq
 if [ "$OS_VERSION" -gt "7" ]; then
-    if [ "${OS_ID,,}" = "rhel" ]; then
+    if [ "${OS_ID,,}" == "rhel" ]; then
         dnf -y install -y perl-Switch
     else
         dnf -y --enablerepo=powertools install -y perl-Switch
@@ -62,7 +62,7 @@ if [ "$DISABLE_PMC" == "False" ]; then
             yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
         done
     fi
-    touch $INSALLED_FILE
+    touch $INSTALLED_FILE
 
     exit
 fi
@@ -84,4 +84,4 @@ if [ ${SLURM_ROLE} == "execute" ]; then
     done
 fi
 
-touch $INSALLED_FILE
+touch $INSTALLED_FILE
