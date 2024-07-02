@@ -97,7 +97,7 @@ chmod +x $INSTALL_DIR/*.sh
 
 if [ -e /etc/profile.d ]; then
     cat > /etc/profile.d/azslurm_autocomplete.sh<<EOF
-which azslurm 2>/dev/null || export PATH=\$PATH:/root/bin
+which azslurm > /dev/null 2>&1 || export PATH=$PATH:/root/bin
 eval "\$(/opt/azurehpc/slurm/venv/bin/register-python-argcomplete azslurm)" || echo "Warning: Autocomplete is disabled" 1>&2
 EOF
 fi
