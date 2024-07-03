@@ -71,9 +71,21 @@ set -e
 pip install wheel
 pip install --upgrade --no-deps packages/*
 
+if [ $NO_JETPACK == 1 ]; then
+    log_user="slurm"
+    log_group="slurm"
+else
+    log_user=$(jetpack config slurm.user.name slurm)
+    log_group=$log_user
+fi
+
 cat > $VENV/bin/azslurm <<EOF
 #!$VENV/bin/python
-
+import os
+if not os.environ.get("SCALELIB_LOG_USER"):
+    os.environ["SCALELIB_LOG_USER"] = "$log_user"
+if not os.environ.get("SCALELIB_LOG_GROUP"):
+    os.environ["SCALELIB_LOG_GROUP"] = "$log_group"
 from ${SCHEDULER}cc.cli import main
 main()
 EOF
@@ -97,7 +109,7 @@ chmod +x $INSTALL_DIR/*.sh
 
 if [ -e /etc/profile.d ]; then
     cat > /etc/profile.d/azslurm_autocomplete.sh<<EOF
-which azslurm 2>/dev/null || export PATH=\$PATH:/root/bin
+which azslurm 2>/dev/null 1>&2 || export PATH=\$PATH:/root/bin
 eval "\$(/opt/azurehpc/slurm/venv/bin/register-python-argcomplete azslurm)" || echo "Warning: Autocomplete is disabled" 1>&2
 EOF
 fi
