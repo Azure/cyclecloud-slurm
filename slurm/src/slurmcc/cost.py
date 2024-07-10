@@ -201,8 +201,8 @@ class CostSlurm:
                 cpupernode = comment_d['pcpu_count']
                 region = comment_d['location']
                 spot = comment_d['spot']
-            except json.JSONDecodeError as e:
-                log.debug(f"Cannot parse admincomment job={row.jobid} cluster={row.cluster}")
+            except (json.JSONDecodeError,IndexError) as e:
+                log.debug(f"Cannot parse admincomment job={row.jobid} cluster={row.cluster} admincomment={admincomment}")
                 self.stats.admincomment_err += 1
                 self.stats.unprocessed += 1
                 continue
