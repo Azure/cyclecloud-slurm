@@ -338,7 +338,7 @@ def restart_service(name: str) -> None:
 
 
 def cron(desc: str, minute: str, command: str) -> None:
-    temp_name = tempfile.mktemp(".crontab")
+    temp_name = tempfile.NamedTemporaryFile(delete=False).name
     try:
         with open(temp_name, "w") as fw:
             fw.write(f"# {desc}\n")
