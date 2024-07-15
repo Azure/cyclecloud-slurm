@@ -903,6 +903,9 @@ def _generate_gres_conf(partitions: List[partitionlib.Partition], writer: TextIO
                 partition.max_vm_count, (pg_index + 1) * partition.max_scaleset_size
             )
             subset_of_nodes = all_nodes[start:end]
+            if not subset_of_nodes:
+                continue
+            
             node_list = slutil.to_hostlist(",".join((subset_of_nodes)))
             # cut out 1gb so that the node reports at least this amount of memory. - recommended by schedmd
 
@@ -1018,7 +1021,7 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         logging.error(e.message)
         sys.exit(1)
     except Exception:
-        log_files = [x.baseFileName for x in logging.getLogger().handlers if hasattr(x, "baseFilename")]
+        log_files = [x.baseFilename for x in logging.getLogger().handlers if hasattr(x, "baseFilename")]
         logging.exception(f"Unexpected error. See {','.join(log_files)} for more information.")
         raise
 
