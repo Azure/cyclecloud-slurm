@@ -5,7 +5,13 @@ import os
 import random
 from typing import Any, Callable, Optional
 
-import requests
+try:
+    from requests.exceptions import ConnectionError
+except ImportError:
+    # this is only used during live testing with scalelib, so this should never happen
+    import logging
+    logging.exception()
+    ConnectionError = RuntimeError
 
 
 class AzureSlurmError(RuntimeError):
@@ -22,7 +28,7 @@ def custom_chaos_mode(action: Callable) -> Callable:
 def chaos_mode(func: Callable, action: Optional[Callable] = None) -> Callable:
     def default_action() -> Any:
         raise random.choice(
-            [RuntimeError, ValueError, requests.exceptions.ConnectionError]
+            [RuntimeError, ValueError, ConnectionError]
         )("Random failure")
 
     action = action or default_action
