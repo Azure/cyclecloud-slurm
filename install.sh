@@ -71,8 +71,18 @@ set -e
 pip install wheel
 pip install --upgrade --no-deps packages/*
 
+SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
+SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
+
 cat > $VENV/bin/azslurm <<EOF
 #!$VENV/bin/python
+
+import os
+
+if "SCALELIB_LOG_USER" not in os.environ:
+    os.environ["SCALELIB_LOG_USER"] = "$SCALELIB_LOG_USER"
+if "SCALELIB_LOG_GROUP" not in os.environ:
+    os.environ["SCALELIB_LOG_GROUP"] = "$SCALELIB_LOG_GROUP"
 
 from ${SCHEDULER}cc.cli import main
 main()
@@ -135,4 +145,4 @@ azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
 
 azslurm scale --no-restart
 
-chown slurm:slurm $VENV/../logs/*.log
+chown $SCALELIB_LOG_USER:$SCALELIB_LOG_GROUP $VENV/../logs/*.log
