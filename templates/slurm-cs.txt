@@ -22,8 +22,8 @@ Autoscale = $Autoscale
 
         [[[configuration]]]
 
-        slurm.install_pkg = azure-slurm-install-pkg-3.0.8.tar.gz
-        slurm.autoscale_pkg = azure-slurm-pkg-3.0.8.tar.gz
+        slurm.install_pkg = azure-slurm-install-pkg-3.0.9.tar.gz
+        slurm.autoscale_pkg = azure-slurm-pkg-3.0.9.tar.gz
 
         slurm.version = $configuration_slurm_version
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
@@ -40,7 +40,7 @@ Autoscale = $Autoscale
         # For fast spin-up after Deallocate, force an immediate re-converge on boot
         cyclecloud.converge_on_boot = false
 
-        [[[cluster-init cyclecloud/slurm:default:3.0.8]]]
+        [[[cluster-init cyclecloud/slurm:default:3.0.9]]]
         Optional = true
 
         
@@ -297,21 +297,21 @@ Order = 20
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "cycle.image.sles12-hpc", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos8", "cycle.image.ubuntu18", "cycle.image.sles12-hpc", "cycle.image.sles15-hpc", "almalinux8"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "cycle.image.sles12-hpc", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos8", "cycle.image.ubuntu18", "cycle.image.sles12-hpc", "cycle.image.sles15-hpc", "almalinux8"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.centos8", "cycle.image.ubuntu18", "cycle.image.sles12-hpc", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.centos8", "cycle.image.ubuntu18", "cycle.image.sles12-hpc", "cycle.image.sles15-hpc", "almalinux8"}
 	
 
     [[parameters Advanced Networking]]
