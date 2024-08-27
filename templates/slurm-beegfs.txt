@@ -212,8 +212,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="19.05.8-1"], [Value="18.08.9-1"]}
-        DefaultValue = 19.05.8-1
+        Config.Entries := {[Value="23.02.8-1"], [Value="23.11.9-1"]}
+        DefaultValue = 23.11.9-1
 
     [[parameters Software]]
     Description = "Specify the scheduling software, and base OS installed on all nodes, and optionally the cluster-init and chef versions from your Locker."
@@ -223,22 +223,22 @@ Order = 20
         Label = Scheduler OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+        DefaultValue = cycle.image.ubuntu20
+        Config.Filter := Package in {"cycle.image.ubuntu20"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+        DefaultValue = cycle.image.ubuntu20
+        Config.Filter := Package in {"cycle.image.ubuntu20"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.centos7
-        Config.Filter := Package in {"cycle.image.centos7", "cycle.image.ubuntu18"}
+        DefaultValue = cycle.image.ubuntu20
+        Config.Filter := Package in {"cycle.image.ubuntu20"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init
