@@ -14,20 +14,22 @@ DISABLE_PMC=$3
 OS_VERSION=$(cat /etc/os-release  | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
 OS_ID=$(cat /etc/os-release  | grep ^ID= | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
 
-yum -y install epel-release
-yum -y install munge jq
+
 if [ "$OS_VERSION" -gt "7" ]; then
     if [ "${OS_ID,,}" == "rhel" ]; then
         dnf -y install -y perl-Switch
+        dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
     else
+        yum -y install epel-release
         dnf -y --enablerepo=powertools install -y perl-Switch
     fi
     PACKAGE_DIR=slurm-pkgs-rhel8
 else
-    yum -y install python3
-    PACKAGE_DIR=slurm-pkgs-centos7
+    echo "RHEL versions < 8 no longer supported"
+    exit 1
 fi
 
+yum -y install munge jq
 slurm_packages="slurm slurm-slurmrestd slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs"
 sched_packages="slurm-slurmctld slurm-slurmdbd"
 execute_packages="slurm-slurmd"
