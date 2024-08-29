@@ -39,8 +39,18 @@ class InstallSettings:
         # We use a "safe" form of the CycleCloud ClusterName
         # First we lowercase the cluster name, then replace anything
         # that is not letters, digits and '-' with a '-'
-        # eg My Cluster == my-cluster
+        # eg My Cluster == my-cluster.
+        # This is needed because cluster names are used to create hostnames
+        # hostname conventions do not allow underscores and spaces
+        # https://en.wikipedia.org/wiki/Hostname#Restrictions_on_valid_host_names.
+        # Since this PR: https://github.com/Azure/cyclecloud-slurm/pull/241 we now have
+        # to use cluster name to create a database name if one is not provided. But database naming
+        # conventions conflict witn hostname naming conventions and it cannot contain "-" hyphens.
+        # For now we use a second sanitized cluster name that derives from the escaped cluster name
+        # but converts all hyphens to underscores.
         self.slurm_cluster_name = _escape(self.cyclecloud_cluster_name)
+        self.slurm_db_cluster_name = re.sub(r'-', '_', self.slurm_cluster_name)
+
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
         self.ipv4 = config["ipaddress"]
@@ -293,7 +303,7 @@ AccountingStorageTRES=gres/gpu
                                   if s.acct_cert_url
                                   else "#StorageParameters=",
             "slurmver": s.slurmver,
-            "storageloc": s.acct_storageloc or f"{s.slurm_cluster_name}_acct_db",
+            "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
         },
     )
 
