@@ -162,6 +162,9 @@ Autoscale = $Autoscale
     IsReturnProxy = false
     InitialCount = $configuration_slurm_ha_enabled
     Zone = $SchedulerHAZone
+    # Do not inherit property from node that is not used in nodearray
+    # The equivalent is ComputerNamePrefix for nodearray, however Cluster-init will handle renaming of all hosts in a VMSS
+    ComputerName := undefined
         [[[configuration]]]
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
