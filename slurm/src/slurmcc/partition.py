@@ -104,6 +104,9 @@ class Partition:
     @property
     def node_list(self) -> str:
         if not self.dynamic_config:
+            static_nodes = self._static_all_nodes()
+            if not static_nodes:
+                return ""
             return slutil.to_hostlist(self._static_all_nodes())
         # with dynamic nodes, we only look at those defined in the partition
         if not self.__dynamic_node_list_cache:
@@ -349,10 +352,10 @@ def fetch_partitions(
 
             if limits.max_count <= 0:
                 logging.info(
-                    "Bucket has a max_count <= 0, defined for machinetype=='%s'. Skipping",
+                    "Bucket has a max_count <= 0, defined for machinetype=='%s'.",
                     machine_type,
                 )
-                continue
+                # keep this partition around, but we will ignore it when generating later.
 
             max_scaleset_size = buckets[0].max_placement_group_size
 
