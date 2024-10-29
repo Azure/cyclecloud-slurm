@@ -856,7 +856,8 @@ def _generate_nvidia_devices(gpu_count: int) -> str:
 def _generate_amd_devices(gpu_count: int) -> str:
     if gpu_count == 1:
         return "/dev/dri/renderD128"
-    amd_gpu_list = ", ".join([f"{128+8*index}" for index in range(0, gpu_count)])
+    # NOTE: AMD GPU devices should be comma-separated and may not have spaces in the list
+    amd_gpu_list = ",".join([f"{128+8*index}" for index in range(0, gpu_count)])
     return "/dev/dri/renderD[{}]".format(amd_gpu_list)
 
 
