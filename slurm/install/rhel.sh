@@ -14,21 +14,22 @@ DISABLE_PMC=$3
 OS_VERSION=$(cat /etc/os-release  | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
 OS_ID=$(cat /etc/os-release  | grep ^ID= | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
 
+if [ "$OS_VERSION" -lt "8" ]; then
+    echo "RHEL versions < 8 no longer supported"
+    exit 1
+elif [ "$OS_VERSION" -gt "8" ]; then
+    PACKAGE_DIR=slurm-pkgs-rhel9
+else
+    PACKAGE_DIR=slurm-pkgs-rhel8
+fi
 
-if [ "$OS_VERSION" -gt "7" ]; then
-    if [ "${OS_ID,,}" == "rhel" ]; then
+if [ "${OS_ID,,}" == "rhel" ]; then
         dnf -y install -y perl-Switch
         dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
     else
         yum -y install epel-release
         dnf -y --enablerepo=powertools install -y perl-Switch
-    fi
-    PACKAGE_DIR=slurm-pkgs-rhel8
-else
-    echo "RHEL versions < 8 no longer supported"
-    exit 1
 fi
-
 yum -y install munge jq
 slurm_packages="slurm slurm-slurmrestd slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd"
@@ -37,10 +38,10 @@ execute_packages="slurm-slurmd"
 
 if [ "$DISABLE_PMC" == "False" ]; then
 
-    if [ "$OS_VERSION" -gt "7" ]; then
-        cp slurmel8.repo /etc/yum.repos.d/slurm.repo
+    if [ "$OS_VERSION" -gt "8" ]; then
+        cp slurmel9.repo /etc/yum.repos.d/slurm.repo
     else
-        cp slurmel7.repo /etc/yum.repos.d/slurm.repo
+        cp slurmel8.repo /etc/yum.repos.d/slurm.repo
     fi
 
     ## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to

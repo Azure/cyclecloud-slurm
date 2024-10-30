@@ -1,6 +1,6 @@
 [slurm]
 name=Slurm Workload Manager
-baseurl=https://packages.microsoft.com/yumrepos/slurm-el7-insiders
+baseurl=https://packages.microsoft.com/yumrepos/slurm-el9
 enabled=1
 gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
