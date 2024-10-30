@@ -803,18 +803,18 @@ def _partitions(
             threads = 1
         def_mem_per_cpu = memory // cpus
 
-
+        comment_out = ""
+        if max_count <= 0:
+            writer.write(f"# The following partition has no capacity! {partition.name} - {partition.nodearray} - {partition.machine_type} \n")
+            comment_out = "# "
+        
         writer.write(
-            "PartitionName={} Nodes={} Default={} DefMemPerCPU={} MaxTime=INFINITE State=UP\n".format(
-                partition.name, partition.node_list, default_yn, def_mem_per_cpu
-            )
+            f"{comment_out}PartitionName={partition.name} Nodes={partition.node_list} Default={default_yn} DefMemPerCPU={def_mem_per_cpu} MaxTime=INFINITE State=UP\n"
         )
 
         state = "CLOUD" if autoscale else "FUTURE"
         writer.write(
-            "Nodename={} Feature=cloud STATE={} CPUs={} ThreadsPerCore={} RealMemory={}".format(
-                node_list, state, cpus, threads, memory
-            )
+           f"{comment_out}Nodename={node_list} Feature=cloud STATE={state} CPUs={cpus} ThreadsPerCore={threads} RealMemory={memory}"
         )
 
         if partition.gpu_count:
