@@ -116,7 +116,7 @@ class Partition:
             ret: List[str] = []
             all_slurm_nodes = Partition._slurm_nodes()
             for node in all_slurm_nodes:
-                partitions = node["Partitions"].split(",")
+                partitions = node.get("Partitions", "").split(",")
                 if self.name in partitions:
                     # only include nodes that have the same vm_size declared as a feature
                     features = (node.get("AvailableFeatures") or "").lower().split(",")
