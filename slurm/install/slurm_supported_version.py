@@ -5,18 +5,20 @@ import os
 
 
 SUPPORTED_VERSIONS = {
-    "23.11.9-1": {
+    "23.11.10-1": {
         "rhel": {
-            "rhel8": {"platform_version": "el8", "arch": "x86_64"}
+            "rhel8": {"platform_version": "el8", "arch": "x86_64"},
+            "rhel9": {"platform_version": "el9", "arch": "x86_64"}
         },
         "debian": {
             "ubuntu20": {"arch": "amd64"},
             "ubuntu22": {"arch": "amd64"}
         }
     },
-    "23.02.8-1": {
+    "24.05.4-1": {
         "rhel": {
-            "rhel8": {"platform_version": "el8", "arch": "x86_64"}
+            "rhel8": {"platform_version": "el8", "arch": "x86_64"},
+            "rhel9": {"platform_version": "el9", "arch": "x86_64"}
         },
         "debian": {
             "ubuntu20": {"arch": "amd64"},
@@ -25,7 +27,7 @@ SUPPORTED_VERSIONS = {
     }
 }
 
-CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-08-22-bins"
+CURRENT_DOWNLOAD_URL = "https://github.com/Azure/cyclecloud-slurm/releases/download/2024-10-29-bins"
 
 
 def get_required_packages() -> Dict[str, List[str]]:
