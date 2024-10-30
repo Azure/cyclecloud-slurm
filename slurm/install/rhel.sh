@@ -30,7 +30,7 @@ else
 fi
 
 yum -y install munge jq
-slurm_packages="slurm slurm-slurmrestd slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs"
+slurm_packages="slurm slurm-slurmrestd slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd"
 execute_packages="slurm-slurmd"
 
