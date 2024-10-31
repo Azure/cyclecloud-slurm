@@ -1,6 +1,6 @@
 import base64
 import grp
-from hashlib import md5
+from hashlib import sha512
 import json
 import logging
 import os
@@ -169,16 +169,16 @@ def file(
 def append_file(dest: str, content: str, comment_prefix: str) -> None:
     """
     provides monotonic appending of content to a file.
-    This relies on the fact that we can append "md5 = <hash>" to the end
+    This relies on the fact that we can append "sha512 = <hash>" to the end
     of the comment to prevent duplicate appends.
     """
-    hash = md5(content.encode()).hexdigest()
+    hash = sha512(content.encode()).hexdigest()
     with open(dest, "r") as fr:
         already_written = hash in fr.read()
     if not already_written:
         logging.info(f"Appending to {dest}: content='{content}'")
         with open(dest, "a") as fa:
-            fa.write(f"{comment_prefix} md5 = {hash}\n")
+            fa.write(f"{comment_prefix} sha512 = {hash}\n")
             fa.write(content)
 
 
