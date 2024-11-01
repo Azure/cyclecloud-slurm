@@ -174,7 +174,7 @@ def _node_index_as_sort_key(nodename: str) -> Union[str, int]:
     try:
         return int(nodename.split("-")[-1])
     except Exception:
-        return nodename
+        return int.from_bytes(nodename.encode(), byteorder="little")
 
 
 def _node_index_and_pg_as_sort_key(nodename: str) -> Union[str, int]:
