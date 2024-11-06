@@ -186,7 +186,7 @@ def _node_index_and_pg_as_sort_key(nodename: str) -> Union[str, int]:
         pg = int(nodename.split("-")[-2].replace("pg", "")) * 100000
         return pg + node_index
     except Exception:
-        return nodename
+        return int.from_bytes(nodename.encode(), byteorder="little")
 
 
 _IS_AUTOSCALE_ENABLED = None

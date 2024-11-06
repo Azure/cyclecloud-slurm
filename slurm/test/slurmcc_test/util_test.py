@@ -30,6 +30,9 @@ def fake_to_hostlist(expr: str) -> str:
 def test_get_sort_key_func() -> None:
     assert ["name-1", "dyn"] == sorted(["name-1","dyn"], key=get_sort_key_func(is_hpc=False))
     assert ["dyna", "dynb"] == sorted(["dyna","dynb"], key=get_sort_key_func(is_hpc=False))
+    # deprecated 2.x style names, using is_hpc=True
+    assert ["name-pg0-1", "dyn"] == sorted(["name-pg0-1","dyn"], key=get_sort_key_func(is_hpc=True))
+    assert ["dyna", "dynb"] == sorted(["dyna","dynb"], key=get_sort_key_func(is_hpc=True))
 
 
 def test_to_hostlist() -> None:
