@@ -365,7 +365,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         secondary_scheduler = ilib.await_node_hostname(
             s.config, s.secondary_scheduler_name
         )
-    
+ 
     state_save_location = f"/shared/spool/slurmctld/{s.slurm_cluster_name}"
 
     if not os.path.exists(state_save_location):
