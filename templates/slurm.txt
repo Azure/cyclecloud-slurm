@@ -256,7 +256,7 @@ Order = 1
 Order = 10
 
     
-    [[parameters Virtual Machines ]]
+    [[parameters Virtual Machines]]
     Description = "The cluster, in this case, has two roles: the scheduler node with shared filer and the execute hosts. Configure which VM types to use based on the requirements of your application."
     Order = 20
 
@@ -424,13 +424,13 @@ Order = 15
         [[[parameter About sched]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template = ''' <p>Slurm's configuration is linked in from the <code>/sched</code> directory. It is managed by the scheduler node</p>'''
+        Config.Template = ''' <p>Slurm's configuration is linked in from the <code>/sched</code> directory. It is managed by the scheduler node.</p>'''
         Order = 6
 
         [[[parameter About sched part 2]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template = ''' <p>To disable the built-in NFS export of the <code>/sched</code> directory, and to use an external filesystem, select the checkbox below.</p>'''
+        Config.Template = ''' <p>Uncheck the box below to disable the built-in NFS export of the <code>/sched</code> directory and use an external file-system.</p>'''
         Order = 7
         Conditions.Hidden := configuration_slurm_ha_enabled
 
@@ -500,13 +500,13 @@ Order = 15
         [[[parameter About shared part 2]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template = ''' <p>To disable the built-in NFS export of the <code>/shared</code> directory, and to use an external filesystem, select the checkbox below.</p>'''
+        Config.Template = ''' <p>Uncheck the box below to disable the built-in NFS export of the <code>/shared</code> directory and use an external file-system.</p>'''
         Order = 7
         Conditions.Hidden := configuration_slurm_ha_enabled
 
         [[[parameter UseBuiltinShared]]]
         Label = Use Builtin NFS
-        Description = Use the builtin NFS for /share
+        Description = Use the builtin NFS for /shared
         DefaultValue = true
         ParameterType = Boolean
         Conditions.Hidden := configuration_slurm_ha_enabled
@@ -561,7 +561,7 @@ Order = 15
         [[[parameter Additional Shared FS Mount Readme]]]
         HideLabel = true
         Config.Plugin = pico.widget.HtmlTemplateWidget
-        Config.Template := "<p>Mount another shared filesystem endpoint on the cluster nodes.</p>"
+        Config.Template := "<p>Mount another shared file-system endpoint on the cluster nodes.</p>"
         Order = 20
 
         [[[parameter AdditionalNFS]]]
