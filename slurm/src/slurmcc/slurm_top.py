@@ -28,10 +28,10 @@ def run_parallel_cmd(hosts, private_key, cmd):
     except Exception as e:
         raise Exception(f"Error running command: {cmd}: {str(e)}")
 
-def run_command(cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+def run_command(cmd, env= os.environ.copy(),stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     log.debug(cmd)
     try:
-        output = subprocess.run(cmd,stdout=stdout,stderr=stderr, check=True,
+        output = subprocess.run(cmd,env=env,stdout=stdout,stderr=stderr, check=True,
                        encoding='utf-8')
         log.debug(output.stdout)
     except subprocess.CalledProcessError as e:
@@ -106,13 +106,13 @@ class TorsetTool:
 
     def generate_topo_file(self):
         env=os.environ.copy()
-        #env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
+        env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
         if 'SHARP_CMD' not in env:
             command = [ f"{self.sharp_cmd_path}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         else:
             command = [ f"{env['SHARP_CMD']}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         with open(f"{self.output_dir}/logs/topology.log",'w') as fp:
-            run_command(command,stdout=fp)
+            run_command(command,env=env,stdout=fp)
     def group_guids_per_switch(self) -> list:
         guids_per_switch = []
         with open(self.topo_file, 'r') as f:
