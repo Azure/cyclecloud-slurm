@@ -80,10 +80,10 @@ class TorsetTool:
         if partition:
             pass
         else:
-            cmd=['scontrol','show','hostnames', hosts, ''\n'', '','' ]
+            cmd=['scontrol','show','hostnames', hosts]
             output = run_command(cmd)
             print(output)
-            self.hosts=output.split(',')[:-1]
+            self.hosts=output.split('\n')[:-1]
             print(self.hosts)
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
