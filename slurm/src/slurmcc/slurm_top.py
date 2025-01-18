@@ -82,8 +82,8 @@ class TorsetTool:
         else:
             cmd=['scontrol','show','hostnames', hosts]
             output = run_command(cmd)
-            print(output)
-            self.hosts=output.split('\n')[:-1]
+            print(output.stdout)
+            self.hosts=output.stdout.split('\n')[:-1]
             print(self.hosts)
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
