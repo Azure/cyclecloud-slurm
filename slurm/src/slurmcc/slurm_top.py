@@ -23,7 +23,7 @@ def run_parallel_cmd(hosts, private_key, cmd):
     try:
         client = ParallelSSHClient(hosts,pkey=f'{private_key}')
         output = client.run_command(cmd)
-        #client.join(output)
+        client.join(output)
         return output
     except Exception as e:
         raise Exception(f"Error running command: {cmd}: {str(e)}")
