@@ -79,10 +79,11 @@ class TorsetTool:
         if partition:
             pass
         else:
-            cmd=['scontrol','show','hostnames', hosts]
-        with open(self.hosts_file,'w') as fp:
-            run_command(cmd,stdout=fp)
-
+            cmd=['scontrol','show','hostnames', hosts, ''\n'', '','' ]
+            output = run_command(cmd)
+            print(output)
+            self.hosts=output.split(',')[:-1]
+            print(self.hosts)
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
         with open(self.hosts_file, 'r') as f:
@@ -112,7 +113,7 @@ class TorsetTool:
         else:
             command = [ f"{env['SHARP_CMD']}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         with open(f"{self.output_dir}/logs/topology.log",'w') as fp:
-            run_command(command,env=env,stdout=fp)
+            run_command(command,env=env, stdout=fp)
     def group_guids_per_switch(self) -> list:
         guids_per_switch = []
         with open(self.topo_file, 'r') as f:
