@@ -166,6 +166,8 @@ class TorsetTool:
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_handler)
+        logging.info("checking that sharp_hello_works")
+        self.check_sharp_hello()
         logging.info("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
         logging.info(f"Finished writing hostnames to {self.hosts_file}")
