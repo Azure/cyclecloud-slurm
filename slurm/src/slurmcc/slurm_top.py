@@ -8,11 +8,7 @@ from pathlib import Path
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
 import datetime
 
-logging.basicConfig( level=logging.DEBUG, # Set the log level to DEBUG to capture all levels of log messages
-        format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
-        filename='/data/azreen/topology/slurm_top.log', # Set the log file name
-        filemode='w' # Use 'w' to overwrite the log file each time or 'a' to append to it
-        )
+
 log=logging.getLogger()
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -63,12 +59,18 @@ class TorsetTool:
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = f"/data/azreen/topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(exist_ok=True)
+        Path(f"{self.output_dir}/logs").mkdir(exist_ok=True)
         self.hosts_file = f"{self.output_dir}/hostnames.txt"
         self.sharp_cmd_path = '/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/'
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= "slurm_topology.conf"
+        logging.basicConfig( level=logging.DEBUG, # Set the log level to DEBUG to capture all levels of log messages
+        format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
+        filename=f'{self.output_dir}/logs/slurm_top.log', # Set the log file name
+        filemode='w' # Use 'w' to overwrite the log file each time or 'a' to append to it
+        )
     
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
