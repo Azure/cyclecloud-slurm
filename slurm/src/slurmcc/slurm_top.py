@@ -64,6 +64,7 @@ class TorsetTool:
         filename=f'{self.output_dir}/logs/slurm_top.log', # Set the log file name
         filemode='w' # Use 'w' to overwrite the log file each time or 'a' to append to it
         )
+        self.hosts=[]
         self.hosts_file = f"{self.output_dir}/hostnames.txt"
         self.sharp_cmd_path = '/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/'
         self.pkey="~/.ssh/id_rsa"
