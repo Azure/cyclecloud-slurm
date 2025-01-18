@@ -8,7 +8,6 @@ from pathlib import Path
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
 import datetime
 
-
 log=logging.getLogger()
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -60,17 +59,17 @@ class TorsetTool:
         self.output_dir = f"/data/azreen/topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(exist_ok=True)
         Path(f"{self.output_dir}/logs").mkdir(exist_ok=True)
+        logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels of log messages
+        format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
+        filename=f'{self.output_dir}/logs/slurm_top.log', # Set the log file name
+        filemode='w' # Use 'w' to overwrite the log file each time or 'a' to append to it
+        )
         self.hosts_file = f"{self.output_dir}/hostnames.txt"
         self.sharp_cmd_path = '/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/'
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= "slurm_topology.conf"
-        logging.basicConfig( level=logging.DEBUG, # Set the log level to DEBUG to capture all levels of log messages
-        format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
-        filename=f'{self.output_dir}/logs/slurm_top.log', # Set the log file name
-        filemode='w' # Use 'w' to overwrite the log file each time or 'a' to append to it
-        )
     
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
@@ -162,6 +161,11 @@ class TorsetTool:
                     file.write(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
     def run(self,hosts,partition,output):
+        console_handler=logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(console_handler)
         logging.info("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
         logging.info(f"Finished writing hostnames to {self.hosts_file}")
@@ -193,11 +197,11 @@ class TorsetTool:
 def main():
     args = parse_args()
     #log.add(f"/data/azreen/topology/torset-tool.log", rotation = "500 MB", enqueue= True, level="INFO")
-    console_handler =logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    logging.getLogger().addHandler(console_handler)
+    # console_handler =logging.StreamHandler()
+    # console_handler.setLevel(logging.INFO)
+    # formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    # console_handler.setFormatter(formatter)
+    # logging.getLogger().addHandler(console_handler)
     torset_tool = TorsetTool()
     torset_tool.run(args.hosts, args.partition, args.output)
     # logging.info("Retrieving hostnames")
