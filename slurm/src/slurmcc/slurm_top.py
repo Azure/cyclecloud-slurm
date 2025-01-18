@@ -82,19 +82,13 @@ class TorsetTool:
         else:
             cmd=['scontrol','show','hostnames', hosts]
             output = run_command(cmd)
-            print(output.stdout)
             self.hosts=output.stdout.split('\n')[:-1]
-            print(self.hosts)
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
-        with open(self.hosts_file, 'r') as f:
-            hosts = [host.strip() for host in f.readlines()]
-        output = run_parallel_cmd(hosts, private_key, cmd)
+        output = run_parallel_cmd(self.hosts, private_key, cmd)
     def retrieve_guids(self, private_key) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
-        with open(self.hosts_file, 'r') as f:
-            hosts = [host.strip() for host in f.readlines()]
-        output = run_parallel_cmd(hosts, private_key, cmd)
+        output = run_parallel_cmd(self.hosts, private_key, cmd)
         for host_out in output:
             for guid in host_out.stdout:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999, but Sharp will return 0x99999999999999
