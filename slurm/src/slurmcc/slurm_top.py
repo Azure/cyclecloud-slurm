@@ -85,6 +85,9 @@ class TorsetTool:
             down_hosts=command_output.stdout.split('\n')
             hosts=cmd_output.stdout.split('\n')
             self.hosts = list(set(hosts)-set(down_hosts))
+            print(hosts)
+            print(down_hosts)
+            print(self.hosts)
         else:
             cmd=['scontrol','show','hostnames', hosts]
             command = f'scontrol show hostnames $(sinfo -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
@@ -93,9 +96,13 @@ class TorsetTool:
             down_hosts=command_output.stdout.split('\n')
             hosts=cmd_output.stdout.split('\n')
             self.hosts = list(set(hosts)-set(down_hosts))
+            print(hosts)
+            print(down_hosts)
+            print(self.hosts)
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
         output = run_parallel_cmd(self.hosts, private_key, cmd)
+        print(output.stdout)
     def retrieve_guids(self, private_key) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
         output = run_parallel_cmd(self.hosts, private_key, cmd)
