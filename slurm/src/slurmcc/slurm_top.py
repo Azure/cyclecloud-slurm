@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import argparse
 #from loguru import logger
@@ -72,9 +73,6 @@ class TorsetTool:
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= "slurm_topology.conf"
     
-    def check_sharp_hello(self):
-        cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
-        run_command(cmd)
     
     def get_hostnames(self,hosts,partition) -> None:
         if partition:
@@ -99,13 +97,18 @@ class TorsetTool:
             print(hosts)
             print(down_hosts)
             print(self.hosts)
-    def check_ibstat(self, private_key) -> None:
-        cmd= 'ibstat'
-        output = run_parallel_cmd(self.hosts, private_key, cmd)
-        print(output)
-    def retrieve_guids(self, private_key) -> dict:
+    def check_sharp_hello(self):
+        cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
+        run_parallel_cmd(self.hosts[0],self.pkey,cmd)
+    def check_ibstatus(self) -> None:
+        if shutil.which('ibstatus'): 
+            logging.debug("The 'ibstatus' command is available.") 
+        else: 
+            logging.error("The 'ibstatus' command is not available ")
+            sys.exit(1)
+    def retrieve_guids(self) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
-        output = run_parallel_cmd(self.hosts, private_key, cmd)
+        output = run_parallel_cmd(self.hosts, self.pkey, cmd)
         for host_out in output:
             for guid in host_out.stdout:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999, but Sharp will return 0x99999999999999
@@ -161,6 +164,7 @@ class TorsetTool:
         #delete this when not testing
         #self.torsets={"torset-00":["hpc-1","hpc-2","hpc-3"], "torset-01":["hpc-4","hpc-5"],"torset-02":["hpc-5","hpc-6"]}
         switches=[]
+
         with open(self.slurm_top_file,'w') as file:
             for torset, hosts in self.torsets.items():
                 torset_index=torset[-2:]
@@ -179,27 +183,27 @@ class TorsetTool:
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_handler)
-        logging.info("checking that sharp_hello_works")
+        logging.debug("checking that sharp_hello_works")
         self.check_sharp_hello()
-        logging.info("Retrieving hostnames")
+        logging.debug("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
-        logging.info(f"Finished writing hostnames to {self.hosts_file}")
-        logging.info("Checking ibstat can be run on all hosts")
-        self.check_ibstat(self.pkey)
-        logging.info("Running ibstat on hosts to collect InfiniBand device GUIDs")
+        logging.debug(f"Finished writing hostnames to {self.hosts_file}")
+        logging.debug("Checking ibstat can be run on all hosts")
+        self.check_ibstatus()
+        logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
         #guid_to_host_map = torset_tool.retrieve_guids(args.pkey_path)
-        guid_to_host_map = self.retrieve_guids(self.pkey)
-        logging.info("Finished collecting InfiniBand device GUIDs from hosts")
+        guid_to_host_map = self.retrieve_guids()
+        logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
-        logging.info(f"Finished writing guids to {self.guids_file}")
+        logging.debug(f"Finished writing guids to {self.guids_file}")
         self.generate_topo_file()
-        logging.info(f"Topology file generated at {self.topo_file}")
+        logging.debug(f"Topology file generated at {self.topo_file}")
         self.device_guids_per_switch =  self.group_guids_per_switch()
-        logging.info("Finished grouping device guids per switch")
+        logging.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
-        logging.info("Identified torsets for hosts")
+        logging.debug("Identified torsets for hosts")
         self.torsets = self.group_hosts_by_torset()
-        logging.info("Finished grouping hosts by torsets")
+        logging.debug("Finished grouping hosts by torsets")
         self.write_slurm_topology(output)
         if output:
             logging.info(f"Finished writing slurm topology from torsets to {self.slurm_top_file}")
