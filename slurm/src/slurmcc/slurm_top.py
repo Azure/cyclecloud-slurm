@@ -102,7 +102,7 @@ class TorsetTool:
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
         output = run_parallel_cmd(self.hosts, private_key, cmd)
-        print(output.stdout)
+        print(output)
     def retrieve_guids(self, private_key) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
         output = run_parallel_cmd(self.hosts, private_key, cmd)
