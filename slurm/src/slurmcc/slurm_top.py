@@ -23,6 +23,7 @@ def parse_args():
 def run_parallel_cmd(hosts, private_key, cmd):
     try:
         client = ParallelSSHClient(hosts,pkey=f'{private_key}')
+        logging.getLogger("pssh").setLevel(logging.WARNING)
         output = client.run_command(cmd)
         client.join(output)
         return output
