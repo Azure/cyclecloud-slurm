@@ -75,28 +75,18 @@ class TorsetTool:
     
     
     def get_hostnames(self,hosts,partition) -> None:
-        if partition:
-            cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)'
-            command = f'scontrol show hostnames $(sinfo -p {partition} -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
-            cmd_output = run_command(cmd)
-            command_output = run_command(command)
-            down_hosts=command_output.stdout.split('\n')
-            hosts=cmd_output.stdout.split('\n')
-            self.hosts = list(set(hosts)-set(down_hosts))
-            logging.debug(hosts)
-            logging.debug(down_hosts)
-            logging.debug(self.hosts)
-        else:
-            cmd=f'scontrol show hostnames {hosts}'
-            command = f'scontrol show hostnames $(sinfo -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
-            cmd_output = run_command(cmd)
-            command_output = run_command(command)
-            down_hosts=command_output.stdout.split('\n')
-            hosts=cmd_output.stdout.split('\n')
-            self.hosts = list(set(hosts)-set(down_hosts))
-            logging.debug(hosts)
-            logging.debug(down_hosts)
-            logging.debug(self.hosts)
+        partition_cmd = f'-p {partition} ' if partition else ''
+        cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)' if partition else f'scontrol show hostnames {hosts}'
+        command = f'scontrol show hostnames $(sinfo {partition_cmd}-t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
+        cmd_output = run_command(cmd)
+        command_output = run_command(command)
+        down_hosts=command_output.stdout.split('\n')
+        hosts=cmd_output.stdout.split('\n')
+        self.hosts = list(set(hosts)-set(down_hosts))
+        logging.debug(hosts)
+        logging.debug(down_hosts)
+        logging.debug(self.hosts)
+
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
         run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
@@ -191,7 +181,6 @@ class TorsetTool:
         logging.debug("Checking ibstat can be run on all hosts")
         self.check_ibstatus()
         logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
-        #guid_to_host_map = torset_tool.retrieve_guids(args.pkey_path)
         guid_to_host_map = self.retrieve_guids()
         logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
@@ -209,44 +198,10 @@ class TorsetTool:
             logging.info(f"Finished writing slurm topology from torsets to {self.slurm_top_file}")
         else:
             logging.info("Printed slurm topology")
-        # torset_tool.write_hosts_by_torset()
-        # logger.info(f"Hosts grouped by torset are written to files in {torset_tool.output_dir} directory")
-
 
 def main():
     args = parse_args()
-    #log.add(f"/data/azreen/topology/torset-tool.log", rotation = "500 MB", enqueue= True, level="INFO")
-    # console_handler =logging.StreamHandler()
-    # console_handler.setLevel(logging.INFO)
-    # formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    # console_handler.setFormatter(formatter)
-    # logging.getLogger().addHandler(console_handler)
     torset_tool = TorsetTool()
     torset_tool.run(args.hosts, args.partition, args.output)
-    # logging.info("Retrieving hostnames")
-    # torset_tool.get_hostnames(args.hosts, args.partition)
-    # logging.info(f"Finished writing hostnames to {torset_tool.hosts_file}")
-    # logging.info("Checking ibstat can be run on all hosts")
-    # torset_tool.check_ibstat("~/.ssh/id_rsa")
-    # logging.info("Running ibstat on hosts to collect InfiniBand device GUIDs")
-    # #guid_to_host_map = torset_tool.retrieve_guids(args.pkey_path)
-    # guid_to_host_map = torset_tool.retrieve_guids("~/.ssh/id_rsa")
-    # logging.info("Finished collecting InfiniBand device GUIDs from hosts")
-    # torset_tool.write_guids_to_file()
-    # logging.info(f"Finished writing guids to {torset_tool.guids_file}")
-    # torset_tool.generate_topo_file()
-    # logging.info(f"Topology file generated at {torset_tool.topo_file}")
-    # torset_tool.device_guids_per_switch =  torset_tool.group_guids_per_switch()
-    # logging.info("Finished grouping device guids per switch")
-    # torset_tool.host_to_torset_map = torset_tool.identify_torsets()
-    # logging.info("Identified torsets for hosts")
-    # torset_tool.torsets = torset_tool.group_hosts_by_torset()
-    # logging.info("Finished grouping hosts by torsets")
-    # if args.output:
-    #     torset_tool.write_slurm_topology()
-    #     logging.info(f"Finished writing slurm topology from torsets to {torset_tool.slurm_top_file}")
-    # torset_tool.write_hosts_by_torset()
-    # logger.info(f"Hosts grouped by torset are written to files in {torset_tool.output_dir} directory")
-
 if __name__ == '__main__':
     main()
