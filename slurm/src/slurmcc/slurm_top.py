@@ -83,10 +83,14 @@ class TorsetTool:
         command_output = run_command(command)
         down_hosts=command_output.stdout.split('\n')
         hosts=cmd_output.stdout.split('\n')
+        #TODO: add in a statement to tell user we are using a subset of nodes bc some of them may be down
         self.hosts = list(set(hosts)-set(down_hosts))
         logging.debug(hosts)
         logging.debug(down_hosts)
         logging.debug(self.hosts)
+        if self.hosts<2:
+            logging.error("Need more than 2 nodes to create slurm topology")
+            sys.exit(1)
 
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
