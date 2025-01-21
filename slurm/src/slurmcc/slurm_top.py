@@ -88,7 +88,7 @@ class TorsetTool:
         logging.debug(hosts)
         logging.debug(down_hosts)
         logging.debug(self.hosts)
-        if self.hosts<2:
+        if len(self.hosts)<2:
             logging.error("Need more than 2 nodes to create slurm topology")
             sys.exit(1)
 
