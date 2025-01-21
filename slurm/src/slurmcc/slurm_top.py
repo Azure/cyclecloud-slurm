@@ -93,6 +93,11 @@ class TorsetTool:
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
         for line in output[0].stdout:
             logging.debug(line)
+            passed=line
+        if "Passed" not in passed:
+            logging.error("sharp_hello command failed")
+            sys.exit(1)
+        
     def check_ibstatus(self) -> None:
         if shutil.which('ibstatus'): 
             logging.debug("The 'ibstatus' command is available.") 
