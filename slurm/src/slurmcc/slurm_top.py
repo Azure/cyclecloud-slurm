@@ -89,7 +89,7 @@ class TorsetTool:
             print(down_hosts)
             print(self.hosts)
         else:
-            cmd=['scontrol','show','hostnames', hosts]
+            cmd=f'scontrol show hostnames {hosts}'
             command = f'scontrol show hostnames $(sinfo -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
             cmd_output = run_command(cmd)
             command_output = run_command(command)
