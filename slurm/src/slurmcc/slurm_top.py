@@ -31,7 +31,7 @@ def run_parallel_cmd(hosts, private_key, cmd):
 def run_command(cmd, env= os.environ.copy(),stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     log.debug(cmd)
     try:
-        output = subprocess.run(cmd,env=env,stdout=stdout,stderr=stderr, check=True,
+        output = subprocess.run(cmd,env=env,stdout=stdout,stderr=stderr, shell=True, check=True,
                        encoding='utf-8')
         log.debug(output.stdout)
     except subprocess.CalledProcessError as e:
@@ -78,11 +78,21 @@ class TorsetTool:
     
     def get_hostnames(self,hosts,partition) -> None:
         if partition:
-            pass
+            cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)'
+            command = f'scontrol show hostnames $(sinfo -p {partition} -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
+            cmd_output = run_command(cmd)
+            command_output = run_command(command)
+            down_hosts=command_output.stdout.split('\n')
+            hosts=cmd_output.stdout.split('\n')
+            self.hosts = list(set(hosts)-set(down_hosts))
         else:
             cmd=['scontrol','show','hostnames', hosts]
-            output = run_command(cmd)
-            self.hosts=output.stdout.split('\n')[:-1]
+            command = f'scontrol show hostnames $(sinfo -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
+            cmd_output = run_command(cmd)
+            command_output = run_command(command)
+            down_hosts=command_output.stdout.split('\n')
+            hosts=cmd_output.stdout.split('\n')
+            self.hosts = list(set(hosts)-set(down_hosts))
     def check_ibstat(self, private_key) -> None:
         cmd= 'ibstat'
         output = run_parallel_cmd(self.hosts, private_key, cmd)
@@ -102,7 +112,7 @@ class TorsetTool:
 
     def generate_topo_file(self):
         env=os.environ.copy()
-        env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
+        #env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
         if 'SHARP_CMD' not in env:
             command = [ f"{self.sharp_cmd_path}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         else:
