@@ -83,9 +83,9 @@ class TorsetTool:
             down_hosts=command_output.stdout.split('\n')
             hosts=cmd_output.stdout.split('\n')
             self.hosts = list(set(hosts)-set(down_hosts))
-            print(hosts)
-            print(down_hosts)
-            print(self.hosts)
+            logging.debug(hosts)
+            logging.debug(down_hosts)
+            logging.debug(self.hosts)
         else:
             cmd=f'scontrol show hostnames {hosts}'
             command = f'scontrol show hostnames $(sinfo -t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
@@ -94,12 +94,12 @@ class TorsetTool:
             down_hosts=command_output.stdout.split('\n')
             hosts=cmd_output.stdout.split('\n')
             self.hosts = list(set(hosts)-set(down_hosts))
-            print(hosts)
-            print(down_hosts)
-            print(self.hosts)
+            logging.debug(hosts)
+            logging.debug(down_hosts)
+            logging.debug(self.hosts)
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
-        run_parallel_cmd(self.hosts[0],self.pkey,cmd)
+        run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
     def check_ibstatus(self) -> None:
         if shutil.which('ibstatus'): 
             logging.debug("The 'ibstatus' command is available.") 
