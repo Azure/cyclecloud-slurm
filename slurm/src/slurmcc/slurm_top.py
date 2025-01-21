@@ -112,9 +112,9 @@ class TorsetTool:
 
     def generate_topo_file(self):
         env=os.environ.copy()
-        #env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
+        env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
         if 'SHARP_CMD' not in env:
-            command = [ f"{self.sharp_cmd_path}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
+            command = f"{self.sharp_cmd_path}sharp/bin/sharp_cmd topology --ib-dev mlx5_ib0:1 --guids_file {self.guids_file} --topology_file {self.topo_file}"
         else:
             command = [ f"{env['SHARP_CMD']}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         with open(f"{self.output_dir}/logs/topology.log",'w') as fp:
