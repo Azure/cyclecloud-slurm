@@ -86,15 +86,11 @@ class TorsetTool:
         all_hosts= validate_output.stdout.split('\n')[:-1]
         down_hosts=command_output.stdout.split('\n')[:-1]
         hosts=cmd_output.stdout.split('\n')[:-1]
-        valid_hosts = [item for item in hosts if item in all_hosts]
-        invalid_hosts = [item for item in hosts if item not in all_hosts]
-        powered_down_hosts = [item for item in hosts if item in down_hosts]
-        self.hosts = [item for item in valid_hosts if item not in down_hosts]
-        # valid_hosts = set(hosts)&set(all_hosts)
-        # invalid_hosts = set(hosts)-set(all_hosts)
-        # powered_down_hosts = set(hosts)&set(down_hosts)
-        # self.hosts = list(valid_hosts-powered_down_hosts)
-        #validated_hosts=set(hosts)&set(all_hosts)
+        valid_hosts = set(hosts)&set(all_hosts)
+        invalid_hosts = set(hosts)-set(all_hosts)
+        powered_down_hosts = set(hosts)&set(down_hosts)
+        self.hosts = list(valid_hosts-powered_down_hosts)
+        validated_hosts=set(hosts)&set(all_hosts)
         #TODO: add in a statement to tell user we are using a subset of nodes bc some of them may be down
         #self.hosts = list(validated_hosts-set(down_hosts))
         if len(self.hosts)<len(hosts):
