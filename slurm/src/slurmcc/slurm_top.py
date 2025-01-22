@@ -126,7 +126,7 @@ class TorsetTool:
         for line in output[0].stdout:
             logging.debug(line)
             path=line
-        if not path:
+        if path=="None":
             logging.error("The 'ibstatus' command is not available")
             sys.exit(1)
         else:
