@@ -7,6 +7,7 @@ from pathlib import Path
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
 import datetime
 import platform
+import glob
 
 log=logging.getLogger()
 def parse_args():
@@ -47,6 +48,8 @@ def get_os_name():
             lines = f.readlines()
         info = {}
         for line in lines:
+            if '=' not in line:
+                continue
             key, value = line.strip().split('=')
             info[key] = value.strip('"')
         os_name = info.get('NAME', 'Unknown').lower().replace(' ', '')
@@ -56,7 +59,19 @@ def get_os_name():
     else:
         logging.debug(platform.system() + platform.release())
         return platform.system() + platform.release()
+def get_sharp_cmd():
 
+# Define the pattern to search for directories
+    pattern = '/opt/hpcx-v2.18-gcc-mlnx_ofed-*-cuda12-x86_64/'
+
+# Search for directories matching the pattern
+    directories = glob.glob(pattern)
+
+# Print the matching directories
+    print("Matching directories:")
+    for directory in directories:
+        print(directory)
+    return directory
 class TorsetTool:
 
     output_dir: Path
@@ -82,7 +97,7 @@ class TorsetTool:
         self.os_name=get_os_name()
         self.hosts=[]
         self.hosts_file = f"{self.output_dir}/hostnames.txt"
-        self.sharp_cmd_path = f'/opt/hpcx-v2.18-gcc-mlnx_ofed-{self.os_name}-cuda12-x86_64/'
+        self.sharp_cmd_path = get_sharp_cmd()
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
