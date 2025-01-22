@@ -120,7 +120,7 @@ class TorsetTool:
         
     def check_ibstatus(self) -> None:
         #TODO: Do parallel command for this using python console if output=None then exit
-        cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
+        cmd ="python3 -c \"import shutil; print(shutil.which('kjfhksdjf'))\""
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
         path=None
         for line in output[0].stdout:
