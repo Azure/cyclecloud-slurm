@@ -1,5 +1,4 @@
 import os
-import shutil
 import sys
 import argparse
 import logging
@@ -7,7 +6,6 @@ import subprocess
 from pathlib import Path
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
 import datetime
-import time
 
 log=logging.getLogger()
 def parse_args():
@@ -69,7 +67,7 @@ class TorsetTool:
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
-        self.slurm_top_file= output
+        self.slurm_top_file= output if output else ""
     
     
     def get_hostnames(self,hosts,partition) -> None:
