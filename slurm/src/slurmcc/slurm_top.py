@@ -102,7 +102,6 @@ class TorsetTool:
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
         for line in output[0].stdout:
             logging.debug(line)
-        #TODO: Get exit code for this and validate
         if output[0].exit_code!=0:
             logging.error("sharp_hello command failed")
             sys.exit(output[0].exit_code)
