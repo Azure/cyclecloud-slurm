@@ -15,7 +15,6 @@ def parse_args():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-n','--nodes', type=str, help="Specify the hostnames for the nodes")
     group.add_argument('-p,','--partition', type=str, help="Specify the parititon")
-    #TODO: let user specify output directory
     parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
     return parser.parse_args()
 def run_parallel_cmd(hosts, private_key, cmd):
@@ -70,28 +69,20 @@ class TorsetTool:
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
-        #TODO: Is output file required?
-        self.slurm_top_file= output if output else "slurm_topology.conf"
+        self.slurm_top_file= output
     
     
     def get_hostnames(self,hosts,partition) -> None:
         def get_hostlist(cmd) -> list:
             output=run_command(cmd)
             return output.stdout.split('\n')[:-1]
-        #TODO: get all hosts from cluster then take the ones in union then subtract 
         partition_cmd = f'-p {partition} ' if partition else ''
-        validate= f'scontrol show hostnames $(sinfo -o "%N" -h)'
-        cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)' if partition else f'scontrol show hostnames {hosts}'
-        command = f'scontrol show hostnames $(sinfo {partition_cmd}-t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
-        # validate_output = run_command(validate)
-        # cmd_output = run_command(cmd)
-        # command_output = run_command(command)
-        # all_hosts= validate_output.stdout.split('\n')[:-1]
-        # down_hosts=command_output.stdout.split('\n')[:-1]
-        # hosts=cmd_output.stdout.split('\n')[:-1]
-        hosts=get_hostlist(cmd)
-        all_hosts=get_hostlist(validate)
-        down_hosts=get_hostlist(command)
+        validate_cmd= f'scontrol show hostnames $(sinfo -o "%N" -h)'
+        host_cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)' if partition else f'scontrol show hostnames {hosts}'
+        down_cmd = f'scontrol show hostnames $(sinfo {partition_cmd}-t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
+        all_hosts=get_hostlist(validate_cmd)
+        hosts=get_hostlist(host_cmd)
+        down_hosts=get_hostlist(down_cmd)
         valid_hosts = set(hosts)&set(all_hosts)
         invalid_hosts = set(hosts)-set(all_hosts)
         powered_down_hosts = set(hosts)&set(down_hosts)
@@ -119,7 +110,6 @@ class TorsetTool:
             sys.exit(output[0].exit_code)
         
     def check_ibstatus(self) -> None:
-        #TODO: Do parallel command for this using python console if output=None then exit
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
         path=None
@@ -187,10 +177,7 @@ class TorsetTool:
                 torsets[torset].append(host)
         return torsets
     def write_slurm_topology(self,output)-> None:
-        #delete this when not testing
-        #self.torsets={"torset-00":["hpc-1","hpc-2","hpc-3"], "torset-01":["hpc-4","hpc-5"],"torset-02":["hpc-5","hpc-6"]}
         switches=[]
-
         with open(self.slurm_top_file,'w') as file:
             for torset, hosts in self.torsets.items():
                 torset_index=torset[-2:]
@@ -209,7 +196,6 @@ class TorsetTool:
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_handler)
-
         logging.debug("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
         logging.debug("checking that sharp_hello_works")
@@ -217,7 +203,7 @@ class TorsetTool:
         logging.debug("Checking ibstat can be run on all hosts")
         self.check_ibstatus()
         logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
-        guid_to_host_map = self.retrieve_guids()
+        self.guid_to_host_map = self.retrieve_guids()
         logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
         logging.debug(f"Finished writing guids to {self.guids_file}")
