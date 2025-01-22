@@ -221,6 +221,6 @@ class TorsetTool:
 def main():
     args = parse_args()
     torset_tool = TorsetTool(args.output)
-    torset_tool.run(args.hosts, args.partition, args.output)
+    torset_tool.run(args.nodes, args.partition, args.output)
 if __name__ == '__main__':
     main()
