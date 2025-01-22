@@ -82,19 +82,19 @@ class TorsetTool:
         validate_output = run_command(validate)
         cmd_output = run_command(cmd)
         command_output = run_command(command)
-        all_hosts= validate_output.stdout.split('\n')
-        down_hosts=command_output.stdout.split('\n')
-        hosts=cmd_output.stdout.split('\n')
+        all_hosts= validate_output.stdout.split('\n')[:-1]
+        down_hosts=command_output.stdout.split('\n')[:-1]
+        hosts=cmd_output.stdout.split('\n')[:-1]
         validated_hosts=set(hosts)&set(all_hosts)
         #TODO: add in a statement to tell user we are using a subset of nodes bc some of them may be down
         self.hosts = list(validated_hosts-set(down_hosts))
         if len(self.hosts)<len(hosts):
-            logging.info("Some nodes were either powered down or invalid, running on subset of nodes")
+            logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes")
         logging.debug(hosts)
         logging.debug(down_hosts)
         logging.debug(self.hosts)
         if len(self.hosts)<2:
-            logging.error("Need more than 2 nodes to create slurm topology")
+            logging.error("Need more than 2 nodes to create slurm topology, nodes given were either invalid or powered down")
             sys.exit(1)
 
     def check_sharp_hello(self):
@@ -188,7 +188,7 @@ class TorsetTool:
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
     def run(self,hosts,partition,output):
         console_handler=logging.StreamHandler()
-        console_handler.setLevel(logging.ERROR)
+        console_handler.setLevel(logging.WARNING)
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_handler)
