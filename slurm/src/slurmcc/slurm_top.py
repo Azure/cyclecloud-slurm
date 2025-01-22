@@ -104,7 +104,7 @@ class TorsetTool:
             logging.debug(line)
         if output[0].exit_code!=0:
             logging.error("sharp_hello command failed")
-            for line in output.stderr:
+            for line in output[0].stderr:
                 logging.error(line)
             sys.exit(output[0].exit_code)
         
