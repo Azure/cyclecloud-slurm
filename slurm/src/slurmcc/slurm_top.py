@@ -67,7 +67,7 @@ class TorsetTool:
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
-        self.slurm_top_file= output if output else ""
+        self.slurm_top_file= output if output else "topology.conf"
     
     
     def get_hostnames(self,hosts,partition) -> None:
