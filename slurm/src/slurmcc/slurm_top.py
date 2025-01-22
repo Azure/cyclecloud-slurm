@@ -67,7 +67,7 @@ class TorsetTool:
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
-        self.slurm_top_file= output if output else "topology.conf"
+        self.slurm_top_file= output
     
     
     def get_hostnames(self,hosts,partition) -> None:
@@ -176,17 +176,24 @@ class TorsetTool:
         return torsets
     def write_slurm_topology(self,output)-> None:
         switches=[]
-        with open(self.slurm_top_file,'w') as file:
+        if output:
+            with open(self.slurm_top_file,'w') as file:
+                for torset, hosts in self.torsets.items():
+                    torset_index=torset[-2:]
+                    file.write(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
+                    print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
+                    switches.append(f"sw{torset_index}")
+                if len(self.torsets)>1:
+                    switch_name=int(torset_index)+1
+                    file.write(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
+                    print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
+        else:
             for torset, hosts in self.torsets.items():
                 torset_index=torset[-2:]
-                if output:
-                    file.write(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                 print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                 switches.append(f"sw{torset_index}")
             if len(self.torsets)>1:
                 switch_name=int(torset_index)+1
-                if output:
-                    file.write(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
     def run(self,hosts,partition,output):
         console_handler=logging.StreamHandler()
