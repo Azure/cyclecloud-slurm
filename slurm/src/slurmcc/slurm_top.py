@@ -75,24 +75,27 @@ class TorsetTool:
     
     
     def get_hostnames(self,hosts,partition) -> None:
+        def get_hostlist(cmd) -> list:
+            output=run_command(cmd)
+            return output.stdout.split('\n')[:-1]
         #TODO: get all hosts from cluster then take the ones in union then subtract 
         partition_cmd = f'-p {partition} ' if partition else ''
         validate= f'scontrol show hostnames $(sinfo -o "%N" -h)'
         cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)' if partition else f'scontrol show hostnames {hosts}'
         command = f'scontrol show hostnames $(sinfo {partition_cmd}-t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
-        validate_output = run_command(validate)
-        cmd_output = run_command(cmd)
-        command_output = run_command(command)
-        all_hosts= validate_output.stdout.split('\n')[:-1]
-        down_hosts=command_output.stdout.split('\n')[:-1]
-        hosts=cmd_output.stdout.split('\n')[:-1]
+        # validate_output = run_command(validate)
+        # cmd_output = run_command(cmd)
+        # command_output = run_command(command)
+        # all_hosts= validate_output.stdout.split('\n')[:-1]
+        # down_hosts=command_output.stdout.split('\n')[:-1]
+        # hosts=cmd_output.stdout.split('\n')[:-1]
+        hosts=get_hostlist(cmd)
+        all_hosts=get_hostlist(validate)
+        down_hosts=get_hostlist(command)
         valid_hosts = set(hosts)&set(all_hosts)
         invalid_hosts = set(hosts)-set(all_hosts)
         powered_down_hosts = set(hosts)&set(down_hosts)
         self.hosts = list(valid_hosts-powered_down_hosts)
-        validated_hosts=set(hosts)&set(all_hosts)
-        #TODO: add in a statement to tell user we are using a subset of nodes bc some of them may be down
-        #self.hosts = list(validated_hosts-set(down_hosts))
         if len(self.hosts)<len(hosts):
             logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes that are powered on")
             if invalid_hosts:
