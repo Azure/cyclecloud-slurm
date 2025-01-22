@@ -60,7 +60,7 @@ class TorsetTool:
         Path(f"{self.output_dir}/logs").mkdir(exist_ok=True)
         logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels of log messages
         format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
-        filename=f'/data/azreen/logs/slurm_top.log', # Set the log file name
+        filename=f'/data/azreen/topology/logs/slurm_top.log', # Set the log file name
         filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
         )
         self.hosts=[]
