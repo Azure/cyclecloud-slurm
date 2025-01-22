@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
 import datetime
+import platform
 
 log=logging.getLogger()
 def parse_args():
@@ -39,6 +40,23 @@ def run_command(cmd, env= os.environ.copy(),stdout=subprocess.PIPE, stderr=subpr
         log.error(e)
         raise
     return output
+
+def get_os_name():
+    if os.path.exists('/etc/os-release'):
+        with open('/etc/os-release') as f:
+            lines = f.readlines()
+        info = {}
+        for line in lines:
+            key, value = line.strip().split('=')
+            info[key] = value.strip('"')
+        os_name = info.get('NAME', 'Unknown').lower().replace(' ', '')
+        version_id = info.get('VERSION_ID', 'Unknown')
+        logging.debug(f"{os_name}{version_id}")
+        return f"{os_name}{version_id}"
+    else:
+        logging.debug(platform.system() + platform.release())
+        return platform.system() + platform.release()
+
 class TorsetTool:
 
     output_dir: Path
@@ -61,9 +79,10 @@ class TorsetTool:
         filename=f'/data/azreen/topology/logs/slurm_top.log', # Set the log file name
         filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
         )
+        self.os_name=get_os_name()
         self.hosts=[]
         self.hosts_file = f"{self.output_dir}/hostnames.txt"
-        self.sharp_cmd_path = '/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/'
+        self.sharp_cmd_path = f'/opt/hpcx-v2.18-gcc-mlnx_ofed-{self.os_name}-cuda12-x86_64/'
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
