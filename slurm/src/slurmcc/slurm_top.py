@@ -208,11 +208,7 @@ class TorsetTool:
         logging.getLogger().addHandler(console_handler)
 
         logging.debug("Retrieving hostnames")
-        start= time.time()
         self.get_hostnames(hosts, partition)
-        end= time.time()
-        elapsed = end-start
-        logging.warning(f"time to get hostnames: {elapsed:.6f}")
         logging.debug("checking that sharp_hello_works")
         self.check_sharp_hello()
         logging.debug("Checking ibstat can be run on all hosts")
