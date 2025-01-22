@@ -89,7 +89,7 @@ class TorsetTool:
         #TODO: add in a statement to tell user we are using a subset of nodes bc some of them may be down
         self.hosts = list(validated_hosts-set(down_hosts))
         if len(self.hosts)<len(hosts):
-            logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes")
+            logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes that are powered on")
         logging.debug(hosts)
         logging.debug(down_hosts)
         logging.debug(self.hosts)
@@ -102,19 +102,23 @@ class TorsetTool:
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
         for line in output[0].stdout:
             logging.debug(line)
-            passed=line
         #TODO: Get exit code for this and validate
-        if "Passed" not in passed:
+        if output[0].exit_code!=0:
             logging.error("sharp_hello command failed")
-            sys.exit(1)
+            sys.exit(output[0].exit_code)
         
     def check_ibstatus(self) -> None:
         #TODO: Do parallel command for this using python console if output=None then exit
-        if shutil.which('ibstatus'): 
-            logging.debug("The 'ibstatus' command is available.") 
-        else: 
-            logging.error("The 'ibstatus' command is not available ")
+        cmd = f'python3 -c "import shutil; print(shutil.which("ibstatus"))"'
+        output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
+        for line in output[0].stdout:
+            path=line
+        if not path:
+            logging.error("The 'ibstatus' command is not available")
             sys.exit(1)
+        else:
+            logging.debug("The 'ibstatus' command is available.")
+
     def retrieve_guids(self) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
         output = run_parallel_cmd(self.hosts, self.pkey, cmd)
