@@ -124,6 +124,7 @@ class TorsetTool:
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
         path=None
         for line in output[0].stdout:
+            logging.debug(line)
             path=line
         if not path:
             logging.error("The 'ibstatus' command is not available")
