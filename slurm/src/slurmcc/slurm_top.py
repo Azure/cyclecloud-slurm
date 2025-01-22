@@ -85,16 +85,23 @@ class TorsetTool:
         all_hosts= validate_output.stdout.split('\n')[:-1]
         down_hosts=command_output.stdout.split('\n')[:-1]
         hosts=cmd_output.stdout.split('\n')[:-1]
-        validated_hosts=set(hosts)&set(all_hosts)
+        valid_hosts = [item for item in hosts and all_hosts]
+        invalid_hosts = [item for item in hosts and not all_hosts]
+        powered_down_hosts = [item for item in hosts and down_hosts]
+        self.hosts = [item for item in valid_hosts and not down_hosts]
+        #validated_hosts=set(hosts)&set(all_hosts)
         #TODO: add in a statement to tell user we are using a subset of nodes bc some of them may be down
-        self.hosts = list(validated_hosts-set(down_hosts))
+        #self.hosts = list(validated_hosts-set(down_hosts))
         if len(self.hosts)<len(hosts):
             logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes that are powered on")
+            if invalid_hosts:
+                logging.warning(f"Invalid Nodes: {invalid_hosts}")
+            if powered_down_hosts:
+                logging.warning(f"Powered Down Nodes: {powered_down_hosts}")
         logging.debug(hosts)
-        logging.debug(down_hosts)
         logging.debug(self.hosts)
         if len(self.hosts)<2:
-            logging.error("Need more than 2 nodes to create slurm topology, nodes given were either invalid or powered down")
+            logging.error("Need more than 2 nodes to create slurm topology, nodes given were either invalid or powered down or less than two nodes")
             sys.exit(1)
 
     def check_sharp_hello(self):
@@ -111,6 +118,7 @@ class TorsetTool:
         #TODO: Do parallel command for this using python console if output=None then exit
         cmd = f'python3 -c "import shutil; print(shutil.which("ibstatus"))"'
         output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
+        path=None
         for line in output[0].stdout:
             path=line
         if not path:
