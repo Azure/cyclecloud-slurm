@@ -203,7 +203,7 @@ class TorsetTool:
         logging.debug("Checking ibstat can be run on all hosts")
         self.check_ibstatus()
         logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
-        self.guid_to_host_map = self.retrieve_guids()
+        self.retrieve_guids()
         logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
         logging.debug(f"Finished writing guids to {self.guids_file}")
