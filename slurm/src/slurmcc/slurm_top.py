@@ -6,8 +6,6 @@ import subprocess
 from pathlib import Path
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
 import datetime
-import platform
-import glob
 
 log=logging.getLogger()
 def parse_args():
@@ -42,36 +40,6 @@ def run_command(cmd, env= os.environ.copy(),stdout=subprocess.PIPE, stderr=subpr
         raise
     return output
 
-def get_os_name():
-    if os.path.exists('/etc/os-release'):
-        with open('/etc/os-release') as f:
-            lines = f.readlines()
-        info = {}
-        for line in lines:
-            if '=' not in line:
-                continue
-            key, value = line.strip().split('=')
-            info[key] = value.strip('"')
-        os_name = info.get('NAME', 'Unknown').lower().replace(' ', '')
-        version_id = info.get('VERSION_ID', 'Unknown')
-        logging.debug(f"{os_name}{version_id}")
-        return f"{os_name}{version_id}"
-    else:
-        logging.debug(platform.system() + platform.release())
-        return platform.system() + platform.release()
-def get_sharp_cmd():
-
-# Define the pattern to search for directories
-    pattern = '/opt/hpcx-v2.18-gcc-mlnx_ofed-*-cuda12-x86_64/'
-
-# Search for directories matching the pattern
-    directories = glob.glob(pattern)
-
-# Print the matching directories
-    print("Matching directories:")
-    for directory in directories:
-        print(directory)
-    return directory
 class TorsetTool:
 
     output_dir: Path
@@ -94,15 +62,12 @@ class TorsetTool:
         filename=f'/data/azreen/topology/logs/slurm_top.log', # Set the log file name
         filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
         )
-        self.os_name=get_os_name()
         self.hosts=[]
-        self.hosts_file = f"{self.output_dir}/hostnames.txt"
-        self.sharp_cmd_path = get_sharp_cmd()
+        self.sharp_cmd_path = None
         self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= output
-    
     
     def get_hostnames(self,hosts,partition) -> None:
         def get_hostlist(cmd) -> list:
@@ -130,6 +95,32 @@ class TorsetTool:
         if len(self.hosts)<2:
             logging.error("Need more than 2 nodes to create slurm topology, nodes given were either invalid or powered down or less than two nodes")
             sys.exit(1)
+    
+    def get_os_name(self):
+        cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
+        output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
+        exit_code=output[0].exit_code
+        stdout=output[0].stdout
+        stderr = output[0].stderr
+        if exit_code==0:
+            os_id = ''.join(stdout).strip()
+            logging.debug(os_id)
+            return os_id
+        else:
+            logging.error(f"Exit code: {exit_code}")
+            for line in stderr:
+                logging.error(line)
+            return 0
+    def get_sharp_cmd(self):
+        os_id=self.get_os_name()
+        if os_id == 'ubuntu':
+            return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
+        elif os_id=='almalinux':
+            return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
+        else:
+            logging.error("OS Not supported, exiting")
+            sys.exit(1)
+
 
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
@@ -141,6 +132,8 @@ class TorsetTool:
             for line in output[0].stderr:
                 logging.error(line)
             sys.exit(output[0].exit_code)
+        else:
+            logging.debug("sharp_hello command passed")
         
     def check_ibstatus(self) -> None:
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
@@ -238,6 +231,8 @@ class TorsetTool:
         logging.getLogger().addHandler(console_handler)
         logging.debug("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
+        logging.debug("Retrieving sharp_cmd directory")
+        self.sharp_cmd_path=self.get_sharp_cmd()
         logging.debug("checking that sharp_hello_works")
         self.check_sharp_hello()
         logging.debug("Checking ibstat can be run on all hosts")
