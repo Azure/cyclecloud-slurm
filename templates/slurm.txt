@@ -174,7 +174,8 @@ Autoscale = $Autoscale
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
         MachineType = $loginMachineType
-        ImageName = $SchedulerImageName
+        ImageName = $LoginImageName
+        AdditionalClusterInitSpecs = $LoginClusterInitSpecs
 
         [[[cluster-init cyclecloud/slurm:login:3.0.10]]]
         [[[configuration]]]
@@ -758,6 +759,13 @@ Order = 20
         DefaultValue = almalinux8
         Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
 
+        [[[parameter LoginImageName]]]
+        Label = Login Node OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = almalinux8
+        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
@@ -784,7 +792,13 @@ Order = 20
         DefaultValue = =undefined
         Description = Cluster init specs to apply to the scheduler node
         ParameterType = Cloud.ClusterInitSpecs
-    
+
+        [[[parameter LoginClusterInitSpecs]]]
+        Label = Login Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to Login nodes
+        ParameterType = Cloud.ClusterInitSpecs
+
         [[[parameter HTCClusterInitSpecs]]]
         Label = HTC Cluster-Init
         DefaultValue = =undefined
