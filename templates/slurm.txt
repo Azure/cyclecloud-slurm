@@ -195,6 +195,21 @@ Autoscale = $Autoscale
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
 
+    [[nodearray hpc]]
+    Extends = nodearraybase
+    MachineType = $HPCMachineType
+    ImageName = $HPCImageName
+    MaxCount = $MaxHPCExecuteNodeCount
+    Azure.MaxScalesetSize = $HPCMaxScalesetSize
+    AdditionalClusterInitSpecs = $HPCClusterInitSpecs
+    EnableNodeHealthChecks = $EnableNodeHealthChecks
+
+
+        [[[configuration]]]
+        slurm.default_partition = true
+        slurm.hpc = true
+        slurm.partition = hpc
+
     [[nodearray htc]]
     Extends = nodearraybase
     MachineType = $HTCMachineType
@@ -210,22 +225,6 @@ Autoscale = $Autoscale
         slurm.partition = htc
         # set pcpu = false for all hyperthreaded VMs
         slurm.use_pcpu = false
-
-
-    [[nodearray hpc]]
-    Extends = nodearraybase
-    MachineType = $HPCMachineType
-    ImageName = $HPCImageName
-    MaxCount = $MaxHPCExecuteNodeCount
-    Azure.MaxScalesetSize = $HPCMaxScalesetSize
-    AdditionalClusterInitSpecs = $HPCClusterInitSpecs
-    EnableNodeHealthChecks = $EnableNodeHealthChecks
-
-
-        [[[configuration]]]
-        slurm.default_partition = true
-        slurm.hpc = true
-        slurm.partition = hpc
 
     [[nodearray gpu]]
     Extends = nodearraybase
@@ -294,15 +293,15 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_D8as_v4
 
-        [[[parameter HTCMachineType]]]
-        Label = HTC VM Type
-        Description = The VM type for HTC execute nodes
-        ParameterType = Cloud.MachineType
-        DefaultValue = Standard_F2s_v2
-
         [[[parameter HPCMachineType]]]
         Label = HPC VM Type
         Description = The VM type for HPC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_F2s_v2
+
+        [[[parameter HTCMachineType]]]
+        Label = HTC VM Type
+        Description = The VM type for HTC execute nodes
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
 
