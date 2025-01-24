@@ -174,7 +174,7 @@ Autoscale = $Autoscale
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
         MachineType = $loginMachineType
-        ImageName = $SchedulerImageName
+        ImageName = $LoginImageName
         AdditionalClusterInitSpecs = $LoginClusterInitSpecs
 
         [[[cluster-init cyclecloud/slurm:login:3.0.10]]]
@@ -754,6 +754,13 @@ Order = 20
 
         [[[parameter SchedulerImageName]]]
         Label = Scheduler OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = almalinux8
+        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+
+        [[[parameter LoginImageName]]]
+        Label = Login Node OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
