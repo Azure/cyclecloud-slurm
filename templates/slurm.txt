@@ -206,7 +206,7 @@ Autoscale = $Autoscale
     AdditionalClusterInitSpecs = $HTCClusterInitSpecs
 
         [[[configuration]]]
-        slurm.hpc = true
+        slurm.hpc = false
         slurm.partition = htc
         # set pcpu = false for all hyperthreaded VMs
         slurm.use_pcpu = false
