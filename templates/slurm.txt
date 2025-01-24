@@ -195,11 +195,28 @@ Autoscale = $Autoscale
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
 
+    [[nodearray htc]]
+    Extends = nodearraybase
+    MachineType = $HTCMachineType
+    ImageName = $HTCImageName
+    MaxCount = $MaxHTCExecuteNodeCount
+
+    Interruptible = $HTCUseLowPrio
+    MaxPrice = $HTCSpotMaxPrice
+    AdditionalClusterInitSpecs = $HTCClusterInitSpecs
+
+        [[[configuration]]]
+        slurm.hpc = true
+        slurm.partition = htc
+        # set pcpu = false for all hyperthreaded VMs
+        slurm.use_pcpu = false
+
+
     [[nodearray hpc]]
     Extends = nodearraybase
     MachineType = $HPCMachineType
     ImageName = $HPCImageName
-    MaxCoreCount = $MaxHPCExecuteCoreCount
+    MaxCount = $MaxHPCExecuteNodeCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
     AdditionalClusterInitSpecs = $HPCClusterInitSpecs
     EnableNodeHealthChecks = $EnableNodeHealthChecks
@@ -210,22 +227,22 @@ Autoscale = $Autoscale
         slurm.hpc = true
         slurm.partition = hpc
 
-
-    [[nodearray htc]]
+    [[nodearray gpu]]
     Extends = nodearraybase
-    MachineType = $HTCMachineType
-    ImageName = $HTCImageName
-    MaxCoreCount = $MaxHTCExecuteCoreCount
+    MachineType = $GPUMachineType
+    ImageName = $GPUImageName
+    MaxCount = $MaxGPUExecuteNodeCount
+    Azure.MaxScalesetSize = $HPCMaxScalesetSize
+    EnableNodeHealthChecks = $EnableNodeHealthChecks
 
-    Interruptible = $HTCUseLowPrio
-    MaxPrice = $HTCSpotMaxPrice
-    AdditionalClusterInitSpecs = $HTCClusterInitSpecs
+    Interruptible = $GPUUseLowPrio
+    MaxPrice = $GPUSpotMaxPrice
+    AdditionalClusterInitSpecs = $GPUClusterInitSpecs
 
         [[[configuration]]]
-        slurm.hpc = false
-        slurm.partition = htc
-        # set pcpu = false for all hyperthreaded VMs
-        slurm.use_pcpu = false
+        slurm.default_partition = true
+        slurm.hpc = true
+        slurm.partition = gpu
 
     [[nodearray dynamic]]
     Extends = nodearraybase
@@ -277,17 +294,23 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_D8as_v4
 
+        [[[parameter HTCMachineType]]]
+        Label = HTC VM Type
+        Description = The VM type for HTC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_F2s_v2
+
         [[[parameter HPCMachineType]]]
         Label = HPC VM Type
         Description = The VM type for HPC execute nodes
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
 
-        [[[parameter HTCMachineType]]]
-        Label = HTC VM Type
-        Description = The VM type for HTC execute nodes
+        [[[parameter GPUMachineType]]]
+        Label = GPU VM Type
+        Description = The VM type for HPC execute nodes
         ParameterType = Cloud.MachineType
-        DefaultValue = Standard_F2s_v2
+        DefaultValue = Standard_NC24rs_v3
 
         [[[parameter DynamicMachineType]]]
         Label = Dyn VM Type
@@ -307,18 +330,26 @@ Order = 10
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Start and stop execute instances automatically
 
-        [[[parameter MaxHPCExecuteCoreCount]]]
-        Label = Max HPC Cores
-        Description = The total number of HPC execute cores to start
+        [[[parameter MaxHTCExecuteNodeCount]]]
+        Label = Max HTC Nodes
+        Description = The total number of HTC execute nodes to start
         DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
 
-        [[[parameter MaxHTCExecuteCoreCount]]]
-        Label = Max HTC Cores
-        Description = The total number of HTC execute cores to start
-        DefaultValue = 100
+        [[[parameter MaxHPCExecuteNodeCount]]]
+        Label = Max HPC Nodes
+        Description = The total number of HPC execute nodes to start
+        DefaultValue = 16
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter MaxGPUExecuteNodeCount]]]
+        Label = Max GPU Nodes
+        Description = The total number of GPU execute nodes to start
+        DefaultValue = 8
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
@@ -352,6 +383,20 @@ Order = 10
         Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
         Config.Plugin = pico.form.NumberTextBox
         Conditions.Excluded := HTCUseLowPrio isnt true
+        Config.MinValue = -1
+
+        [[[parameter GPUUseLowPrio]]]
+        Label = GPU Spot
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Use Spot VMs for GPU execute hosts
+
+        [[[parameter GPUSpotMaxPrice]]]
+        Label = Max Price GPU
+        DefaultValue = -1
+        Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
+        Config.Plugin = pico.form.NumberTextBox
+        Conditions.Excluded := GPUUseLowPrio isnt true
         Config.MinValue = -1
 
         [[[parameter DynamicUseLowPrio]]]
@@ -772,6 +817,13 @@ Order = 20
         DefaultValue = almalinux8
         Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
 
+        [[[parameter GPUImageName]]]
+        Label = GPU OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = almalinux8
+        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+
         [[[parameter DynamicImageName]]]
         Label = Dynamic OS
         ParameterType = Cloud.Image
@@ -795,6 +847,12 @@ Order = 20
         Label = HPC Cluster-Init
         DefaultValue = =undefined
         Description = Cluster init specs to apply to HPC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+
+        [[[parameter GPUClusterInitSpecs]]]
+        Label = GPU Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to GPU execute nodes
         ParameterType = Cloud.ClusterInitSpecs
 
         [[[parameter DynamicClusterInitSpecs]]]
