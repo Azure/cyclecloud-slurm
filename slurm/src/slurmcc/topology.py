@@ -17,7 +17,8 @@ def parse_args():
     return parser.parse_args()
 def run_parallel_cmd(hosts, private_key, cmd):
     try:
-        client = ParallelSSHClient(hosts,pkey=f'{private_key}')
+        #client = ParallelSSHClient(hosts,pkey=f'{private_key}')
+        client = ParallelSSHClient(hosts)
         logging.getLogger("pssh").setLevel(logging.WARNING)
         output = client.run_command(cmd)
         client.join(output)
@@ -25,10 +26,10 @@ def run_parallel_cmd(hosts, private_key, cmd):
     except Exception as e:
         raise Exception(f"Error running command: {cmd}: {str(e)}")
 
-def run_command(cmd, env= os.environ.copy(),stdout=subprocess.PIPE, stderr=subprocess.PIPE):
+def run_command(cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE):
     log.debug(cmd)
     try:
-        output = subprocess.run(cmd,env=env,stdout=stdout,stderr=stderr, shell=True, check=True,
+        output = subprocess.run(cmd,stdout=stdout,stderr=stderr, shell=True, check=True,
                        encoding='utf-8')
         log.debug(output.stdout)
     except subprocess.CalledProcessError as e:
@@ -110,7 +111,7 @@ class Topology:
             logging.error(f"Exit code: {exit_code}")
             for line in stderr:
                 logging.error(line)
-            return 0
+            sys.exit(1)
     def get_sharp_cmd(self):
         os_id=self.get_os_name()
         if os_id == "ubuntu":
