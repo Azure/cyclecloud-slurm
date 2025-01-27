@@ -2,12 +2,11 @@ import os
 import sys
 import argparse
 import logging
-import subprocess
 from pathlib import Path
-from pssh.clients.ssh import ParallelSSHClient, SSHClient
+from . import util as util
+
 import datetime
 
-log=logging.getLogger()
 def parse_args():
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group(required=True)
@@ -15,31 +14,6 @@ def parse_args():
     group.add_argument('-p,','--partition', type=str, help="Specify the parititon")
     parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
     return parser.parse_args()
-def run_parallel_cmd(hosts, private_key, cmd):
-    try:
-        #client = ParallelSSHClient(hosts,pkey=f'{private_key}')
-        client = ParallelSSHClient(hosts)
-        logging.getLogger("pssh").setLevel(logging.WARNING)
-        output = client.run_command(cmd)
-        client.join(output)
-        return output
-    except Exception as e:
-        raise Exception(f"Error running command: {cmd}: {str(e)}")
-
-def run_command(cmd,stdout=subprocess.PIPE, stderr=subprocess.PIPE):
-    log.debug(cmd)
-    try:
-        output = subprocess.run(cmd,stdout=stdout,stderr=stderr, shell=True, check=True,
-                       encoding='utf-8')
-        log.debug(output.stdout)
-    except subprocess.CalledProcessError as e:
-        log.error(f"cmd: {e.cmd}, rc: {e.returncode}")
-        log.error(e.stderr)
-        sys.exit(1)
-    except Exception as e:
-        log.error(e)
-        raise
-    return output
 
 class Topology:
 
@@ -52,7 +26,7 @@ class Topology:
     device_guids_per_switch: list = []
     host_to_torset_map: dict = {}
     torsets: dict = {}
-
+    TEST_TOPOLOGY=False
     def __init__(self,output):
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = f"/data/azreen/topology/topology_ouput_{self.timestamp}"
@@ -65,14 +39,14 @@ class Topology:
         )
         self.hosts=[]
         self.sharp_cmd_path = None
-        self.pkey="~/.ssh/id_rsa"
+        #self.pkey="~/.ssh/id_rsa"
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= output
     
     def get_hostnames(self,hosts,partition) -> None:
         def get_hostlist(cmd) -> list:
-            output=run_command(cmd)
+            output=util.run_command(cmd)
             return output.stdout.split('\n')[:-1]
         partition_cmd = f'-p {partition} ' if partition else ''
         validate_cmd= f'scontrol show hostnames $(sinfo -o "%N" -h)'
@@ -99,7 +73,7 @@ class Topology:
     
     def get_os_name(self):
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
-        output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
+        output = util.run_parallel_cmd([self.hosts[0]],cmd)
         exit_code=output[0].exit_code
         stdout=output[0].stdout
         stderr = output[0].stderr
@@ -125,7 +99,7 @@ class Topology:
 
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
-        output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
+        output = util.run_parallel_cmd([self.hosts[0]],cmd)
         for line in output[0].stdout:
             logging.debug(line)
         if output[0].exit_code!=0:
@@ -138,7 +112,7 @@ class Topology:
         
     def check_ibstatus(self) -> None:
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
-        output = run_parallel_cmd([self.hosts[0]],self.pkey,cmd)
+        output = util.run_parallel_cmd([self.hosts[0]],cmd)
         path=None
         for line in output[0].stdout:
             logging.debug(line)
@@ -151,7 +125,7 @@ class Topology:
 
     def retrieve_guids(self) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
-        output = run_parallel_cmd(self.hosts, self.pkey, cmd)
+        output = util.run_parallel_cmd(self.hosts, cmd)
         for host_out in output:
             for guid in host_out.stdout:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999, but Sharp will return 0x99999999999999
@@ -171,7 +145,7 @@ class Topology:
         else:
             command = [ f"{env['SHARP_CMD']}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         with open(f"{self.output_dir}/logs/topology.log",'w') as fp:
-            run_command(command,env=env, stdout=fp)
+            util.run_command(command,env=env, stdout=fp)
     def group_guids_per_switch(self) -> list:
         guids_per_switch = []
         with open(self.topo_file, 'r') as f:
@@ -225,6 +199,7 @@ class Topology:
                 switch_name=int(torset_index)+1
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
     def run(self,hosts,partition,output):
+        TEST_TOPOLOGY=False
         console_handler=logging.StreamHandler()
         console_handler.setLevel(logging.WARNING)
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -235,16 +210,19 @@ class Topology:
         logging.debug("Retrieving sharp_cmd directory")
         self.sharp_cmd_path=self.get_sharp_cmd()
         logging.debug("checking that sharp_hello_works")
-        self.check_sharp_hello()
-        logging.debug("Checking ibstat can be run on all hosts")
-        self.check_ibstatus()
-        logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
-        self.retrieve_guids()
-        logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
-        self.write_guids_to_file()
-        logging.debug(f"Finished writing guids to {self.guids_file}")
-        self.generate_topo_file()
-        logging.debug(f"Topology file generated at {self.topo_file}")
+        if not TEST_TOPOLOGY:
+            self.check_sharp_hello()
+            logging.debug("Checking ibstat can be run on all hosts")
+            self.check_ibstatus()
+            logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
+            self.retrieve_guids()
+            logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
+            self.write_guids_to_file()
+            logging.debug(f"Finished writing guids to {self.guids_file}")
+            self.generate_topo_file()
+            logging.debug(f"Topology file generated at {self.topo_file}")
+        else:
+            pass
         self.device_guids_per_switch =  self.group_guids_per_switch()
         logging.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
