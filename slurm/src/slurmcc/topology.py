@@ -40,7 +40,7 @@ def run_command(cmd, env= os.environ.copy(),stdout=subprocess.PIPE, stderr=subpr
         raise
     return output
 
-class TorsetTool:
+class Topology:
 
     output_dir: Path
     guids_file: Path
@@ -113,9 +113,9 @@ class TorsetTool:
             return 0
     def get_sharp_cmd(self):
         os_id=self.get_os_name()
-        if os_id == 'ubuntu':
+        if os_id == "ubuntu":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
-        elif os_id=='almalinux':
+        elif os_id=="almalinux":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
         else:
             logging.error("OS Not supported, exiting")
@@ -258,7 +258,7 @@ class TorsetTool:
 
 def main():
     args = parse_args()
-    torset_tool = TorsetTool(args.output)
-    torset_tool.run(args.nodes, args.partition, args.output)
+    topology = Topology(args.output)
+    topology.run(args.nodes, args.partition, args.output)
 if __name__ == '__main__':
     main()
