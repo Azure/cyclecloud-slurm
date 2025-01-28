@@ -17,6 +17,7 @@ Autoscale = $Autoscale
     Region = $Region
     KeyPairLocation = ~/.ssh/cyclecloud.pem
     Azure.Identities = $ManagedIdentity
+    Tags = $NodeTags
     
     # Slurm autoscaling supports both Terminate and Deallocate shutdown policies
     ShutdownPolicy = $configuration_slurm_shutdown_policy
@@ -319,7 +320,6 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
         Config.MultiSelect = true
-
 
     [[parameters Auto-Scaling]]
     Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster."
@@ -674,6 +674,13 @@ Order = 20
         Config.IntegerOnly = true
         Config.Increment = 64
         DefaultValue = 0
+
+        [[[parameter NodeTags]]]
+        Label = VM Tags
+        Description = Tags applied to all nodes
+        ParameterType = Record
+        DefaultValue := []
+        Config.MultiSelect = false
 
     [[parameters Slurm Settings ]]
 
