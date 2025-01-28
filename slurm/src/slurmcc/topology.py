@@ -1,10 +1,12 @@
+"""Module providing slurm topology.conf for IB Cluster"""
 import os
 import sys
 import argparse
 import logging
 from pathlib import Path
-from . import util as slutil
 import datetime
+from . import util as slutil
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -25,15 +27,14 @@ class Topology:
     device_guids_per_switch: list = []
     host_to_torset_map: dict = {}
     torsets: dict = {}
-    TEST_TOPOLOGY=False
     def __init__(self,output):
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = f"/data/azreen/topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(exist_ok=True)
         Path(f"{self.output_dir}/logs").mkdir(exist_ok=True)
-        logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels of log messages
+        logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels
         format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
-        filename=f'/data/azreen/topology/logs/slurm_top.log', # Set the log file name
+        filename='/data/azreen/topology/logs/slurm_top.log', # Set the log file name
         filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
         )
         self.hosts=[]
@@ -42,15 +43,23 @@ class Topology:
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= output
-    
+
     def get_hostnames(self,hosts,partition) -> None:
         def get_hostlist(cmd) -> list:
             output=slutil.run_command(cmd)
             return output.stdout.split('\n')[:-1]
         partition_cmd = f'-p {partition} ' if partition else ''
-        validate_cmd= f'scontrol show hostnames $(sinfo -o "%N" -h)'
-        host_cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)' if partition else f'scontrol show hostnames {hosts}'
-        down_cmd = f'scontrol show hostnames $(sinfo {partition_cmd}-t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
+        validate_cmd= 'scontrol show hostnames $(sinfo -o "%N" -h)'
+        #host_cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)' if partition else f'scontrol show hostnames {hosts}'
+        if partition:
+            host_cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)'
+        else:
+            host_cmd = f'scontrol show hostnames {hosts}'
+        #down_cmd = f'scontrol show hostnames $(sinfo {partition_cmd}-t powered_down,powering_up,powering_down,power_down -o "%N" -h)'
+        partition_states = "powered_down,powering_up,powering_down,power_down"
+        sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h'
+        down_cmd = f'scontrol show hostnames $({sinfo_cmd})'
+
         all_hosts=get_hostlist(validate_cmd)
         hosts=get_hostlist(host_cmd)
         down_hosts=get_hostlist(down_cmd)
@@ -59,17 +68,28 @@ class Topology:
         powered_down_hosts = set(hosts)&set(down_hosts)
         self.hosts = list(valid_hosts-powered_down_hosts)
         if len(self.hosts)<len(hosts):
-            logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes that are powered on")
+            #logging.warning("Some nodes were either powered down or invalid, running on a subset of nodes that are powered on")
+            logging.warning(
+                "Some nodes were either powered down or invalid, "
+                "running on a subset of nodes that are powered on"
+            )
             if invalid_hosts:
-                logging.warning(f"Invalid Nodes: {invalid_hosts}")
+                logging.warning("Invalid Nodes: %s",
+                                {invalid_hosts})
             if powered_down_hosts:
-                logging.warning(f"Powered Down Nodes: {powered_down_hosts}")
+                logging.warning("Powered Down Nodes: %s",
+                                {powered_down_hosts})
         logging.debug(hosts)
         logging.debug(self.hosts)
         if len(self.hosts)<2:
-            logging.error("Need more than 2 nodes to create slurm topology, nodes given were either invalid or powered down or less than two nodes")
+            #logging.error("Need more than 2 nodes to create slurm topology, nodes given were either invalid or powered down or less than two nodes")
+            logging.error(
+                "Need more than 2 nodes to create slurm topology, "
+                "nodes given were either invalid, powered down, "
+                "or less than two nodes"
+            )
             sys.exit(1)
-    
+
     def get_os_name(self):
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
         output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
@@ -81,7 +101,7 @@ class Topology:
             logging.debug(os_id)
             return os_id
         else:
-            logging.error(f"Exit code: {exit_code}")
+            logging.error("Exit code: %s",{exit_code})
             for line in stderr:
                 logging.error(line)
             sys.exit(1)
@@ -89,11 +109,10 @@ class Topology:
         os_id=self.get_os_name()
         if os_id == "ubuntu":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
-        elif os_id=="almalinux":
+        if os_id=="almalinux":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
-        else:
-            logging.error("OS Not supported, exiting")
-            sys.exit(1)
+        logging.error("OS Not supported, exiting")
+        sys.exit(1)
 
 
     def check_sharp_hello(self):
@@ -108,7 +127,7 @@ class Topology:
             sys.exit(output[0].exit_code)
         else:
             logging.debug("sharp_hello command passed")
-        
+
     def check_ibstatus(self) -> None:
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
         output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
@@ -123,31 +142,48 @@ class Topology:
             logging.debug("The 'ibstatus' command is available.")
 
     def retrieve_guids(self) -> dict:
-        cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
+        #cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
+        cmd = (
+            'ibstatus | grep mlx5_ib | cut -d" " -f3 | '
+            'xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
+        )
+
         output = slutil.run_parallel_cmd(self.hosts, cmd)
         for host_out in output:
             for guid in host_out.stdout:
-                # Querying GUIDs from ibstat will have pattern 0x0099999999999999, but Sharp will return 0x99999999999999
+                # Querying GUIDs from ibstat will have pattern 0x0099999999999999,
+                # but Sharp will return 0x99999999999999
                 # - So we need to remove the leading 00 after 0x
                 self.guid_to_host_map[guid.replace('0x00', '0x').strip()]=host_out.host
 
     def write_guids_to_file(self):
-        with open(self.guids_file, 'w') as f:
-            for guid in self.guid_to_host_map.keys():
+        with open(self.guids_file, 'w', encoding="utf-8") as f:
+            for guid in self.guid_to_host_map:
                 f.write(f"{guid}\n")
 
     def generate_topo_file(self):
         env=os.environ.copy()
         env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
         if 'SHARP_CMD' not in env:
-            command = f"{self.sharp_cmd_path}sharp/bin/sharp_cmd topology --ib-dev mlx5_ib0:1 --guids_file {self.guids_file} --topology_file {self.topo_file}"
+            #command = f"{self.sharp_cmd_path}sharp/bin/sharp_cmd topology --ib-dev mlx5_ib0:1 --guids_file {self.guids_file} --topology_file {self.topo_file}"
+            command = (
+                f"{self.sharp_cmd_path}sharp/bin/sharp_cmd topology "
+                f"--ib-dev mlx5_ib0:1 "
+                f"--guids_file {self.guids_file} "
+                f"--topology_file {self.topo_file}"
+            )
         else:
-            command = [ f"{env['SHARP_CMD']}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
-        with open(f"{self.output_dir}/logs/topology.log",'w') as fp:
-            slutil.run_command(command,env=env, stdout=fp)
+            command = (
+                f"{env['SHARP_CMD']}sharp/bin/sharp_cmd topology "
+                f"--ib-dev mlx5_ib0:1 "
+                f"--guids_file {self.guids_file} "
+                f"--topology_file {self.topo_file}"
+            )
+        with open(f"{self.output_dir}/logs/topology.log",'w',encoding="utf-8") as fp:
+            slutil.run_command(command, stdout=fp)
     def group_guids_per_switch(self) -> list:
         guids_per_switch = []
-        with open(self.topo_file, 'r') as f:
+        with open(self.topo_file, 'r', encoding="utf-8") as f:
             for line in f:
                 if 'Nodes=' not in line:
                     continue
@@ -179,7 +215,7 @@ class Topology:
     def write_slurm_topology(self,output)-> None:
         switches=[]
         if output:
-            with open(self.slurm_top_file,'w') as file:
+            with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
                 for torset, hosts in self.torsets.items():
                     torset_index=torset[-2:]
                     file.write(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
@@ -198,7 +234,7 @@ class Topology:
                 switch_name=int(torset_index)+1
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
     def run(self,hosts,partition,output):
-        TEST_TOPOLOGY=False
+
         console_handler=logging.StreamHandler()
         console_handler.setLevel(logging.WARNING)
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -208,20 +244,17 @@ class Topology:
         self.get_hostnames(hosts, partition)
         logging.debug("Retrieving sharp_cmd directory")
         self.sharp_cmd_path=self.get_sharp_cmd()
-        if not TEST_TOPOLOGY:
-            logging.debug("checking that sharp_hello_works")
-            self.check_sharp_hello()
-            logging.debug("Checking ibstat can be run on all hosts")
-            self.check_ibstatus()
-            logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
-            self.retrieve_guids()
-            logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
-            self.write_guids_to_file()
-            logging.debug(f"Finished writing guids to {self.guids_file}")
-            self.generate_topo_file()
-            logging.debug(f"Topology file generated at {self.topo_file}")
-        else:
-            self.topo_file='~/topology/topology_archive/topology_ouput_20250121_220326/topology.txt'
+        logging.debug("checking that sharp_hello_works")
+        self.check_sharp_hello()
+        logging.debug("Checking ibstat can be run on all hosts")
+        self.check_ibstatus()
+        logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
+        self.retrieve_guids()
+        logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
+        self.write_guids_to_file()
+        logging.debug("Finished writing guids to %s", {self.guids_file})
+        self.generate_topo_file()
+        logging.debug("Topology file generated at %s", {self.topo_file})
         self.device_guids_per_switch =  self.group_guids_per_switch()
         logging.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
@@ -230,7 +263,8 @@ class Topology:
         logging.debug("Finished grouping hosts by torsets")
         self.write_slurm_topology(output)
         if output:
-            logging.info(f"Finished writing slurm topology from torsets to {self.slurm_top_file}")
+            logging.info("Finished writing slurm topology from torsets to %s",
+                          {self.slurm_top_file})
         else:
             logging.info("Printed slurm topology")
 
@@ -239,4 +273,4 @@ def main():
     topology = Topology(args.output)
     topology.run(args.nodes, args.partition, args.output)
 if __name__ == '__main__':
-    main()
+    main() 
