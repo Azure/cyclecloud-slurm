@@ -75,10 +75,10 @@ class Topology:
             )
             if invalid_hosts:
                 logging.warning("Invalid Nodes: %s",
-                                {invalid_hosts})
+                                invalid_hosts)
             if powered_down_hosts:
                 logging.warning("Powered Down Nodes: %s",
-                                {powered_down_hosts})
+                                powered_down_hosts)
         logging.debug(hosts)
         logging.debug(self.hosts)
         if len(self.hosts)<2:
@@ -101,7 +101,7 @@ class Topology:
             logging.debug(os_id)
             return os_id
         else:
-            logging.error("Exit code: %s",{exit_code})
+            logging.error("Exit code: %s",exit_code)
             for line in stderr:
                 logging.error(line)
             sys.exit(1)
@@ -252,9 +252,9 @@ class Topology:
         self.retrieve_guids()
         logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
-        logging.debug("Finished writing guids to %s", {self.guids_file})
+        logging.debug("Finished writing guids to %s", self.guids_file)
         self.generate_topo_file()
-        logging.debug("Topology file generated at %s", {self.topo_file})
+        logging.debug("Topology file generated at %s", self.topo_file)
         self.device_guids_per_switch =  self.group_guids_per_switch()
         logging.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
@@ -264,7 +264,7 @@ class Topology:
         self.write_slurm_topology(output)
         if output:
             logging.info("Finished writing slurm topology from torsets to %s",
-                          {self.slurm_top_file})
+                          self.slurm_top_file)
         else:
             logging.info("Printed slurm topology")
 
