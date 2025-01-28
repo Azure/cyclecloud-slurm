@@ -3,9 +3,7 @@ import sys
 import argparse
 import logging
 from pathlib import Path
-from util import run_command
-from util import run_parallel_cmd
-
+from . import util as slutil
 import datetime
 
 def parse_args():
@@ -47,7 +45,7 @@ class Topology:
     
     def get_hostnames(self,hosts,partition) -> None:
         def get_hostlist(cmd) -> list:
-            output=run_command(cmd)
+            output=slutil.run_command(cmd)
             return output.stdout.split('\n')[:-1]
         partition_cmd = f'-p {partition} ' if partition else ''
         validate_cmd= f'scontrol show hostnames $(sinfo -o "%N" -h)'
@@ -74,7 +72,7 @@ class Topology:
     
     def get_os_name(self):
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
-        output = run_parallel_cmd([self.hosts[0]],cmd)
+        output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
         exit_code=output[0].exit_code
         stdout=output[0].stdout
         stderr = output[0].stderr
@@ -100,7 +98,7 @@ class Topology:
 
     def check_sharp_hello(self):
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
-        output = run_parallel_cmd([self.hosts[0]],cmd)
+        output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
         for line in output[0].stdout:
             logging.debug(line)
         if output[0].exit_code!=0:
@@ -113,7 +111,7 @@ class Topology:
         
     def check_ibstatus(self) -> None:
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
-        output = run_parallel_cmd([self.hosts[0]],cmd)
+        output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
         path=None
         for line in output[0].stdout:
             logging.debug(line)
@@ -126,7 +124,7 @@ class Topology:
 
     def retrieve_guids(self) -> dict:
         cmd = 'ibstatus | grep mlx5_ib | cut -d" " -f3 | xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
-        output = run_parallel_cmd(self.hosts, cmd)
+        output = slutil.run_parallel_cmd(self.hosts, cmd)
         for host_out in output:
             for guid in host_out.stdout:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999, but Sharp will return 0x99999999999999
@@ -146,7 +144,7 @@ class Topology:
         else:
             command = [ f"{env['SHARP_CMD']}sharp/bin/sharp_cmd", "topology", "--ib-dev", "mlx5_ib0:1", "--guids_file", self.guids_file, "--topology_file", self.topo_file]
         with open(f"{self.output_dir}/logs/topology.log",'w') as fp:
-            run_command(command,env=env, stdout=fp)
+            slutil.run_command(command,env=env, stdout=fp)
     def group_guids_per_switch(self) -> list:
         guids_per_switch = []
         with open(self.topo_file, 'r') as f:
@@ -210,8 +208,8 @@ class Topology:
         self.get_hostnames(hosts, partition)
         logging.debug("Retrieving sharp_cmd directory")
         self.sharp_cmd_path=self.get_sharp_cmd()
-        logging.debug("checking that sharp_hello_works")
         if not TEST_TOPOLOGY:
+            logging.debug("checking that sharp_hello_works")
             self.check_sharp_hello()
             logging.debug("Checking ibstat can be run on all hosts")
             self.check_ibstatus()
@@ -223,7 +221,7 @@ class Topology:
             self.generate_topo_file()
             logging.debug(f"Topology file generated at {self.topo_file}")
         else:
-            pass
+            self.topo_file='~/topology/topology_archive/topology_ouput_20250121_220326/topology.txt'
         self.device_guids_per_switch =  self.group_guids_per_switch()
         logging.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
