@@ -297,13 +297,6 @@ Order = 10
         DefaultValue = Standard_F2s_v2
         Config.MultiSelect = true
 
-        [[[parameter NodeTags]]]
-        Label = VM Tags
-        Description = Tags applied to all nodes
-        ParameterType = Record
-        DefaultValue := {}
-        Config.MultiSelect = false
-
     [[parameters Auto-Scaling]]
     Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster."
     Order = 30
@@ -635,6 +628,13 @@ Order = 20
         Config.IntegerOnly = true
         Config.Increment = 64
         DefaultValue = 0
+
+        [[[parameter NodeTags]]]
+        Label = VM Tags
+        Description = Tags applied to all nodes
+        ParameterType = Record
+        DefaultValue := {}
+        Config.MultiSelect = false
 
     [[parameters Slurm Settings ]]
 
