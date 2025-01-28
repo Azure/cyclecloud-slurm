@@ -633,7 +633,7 @@ Order = 20
         Label = VM Tags
         Description = Tags applied to all nodes
         ParameterType = Record
-        DefaultValue := {}
+        DefaultValue := []
         Config.MultiSelect = false
 
     [[parameters Slurm Settings ]]
