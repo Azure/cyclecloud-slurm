@@ -28,6 +28,10 @@ Autoscale = $Autoscale
         [[[configuration]]]
 
         slurm.version = $configuration_slurm_version
+        slurm.user.uid = 11100
+        slurm.user.gid = 11100
+        munge.user.uid = 11101
+        munge.user.gid = 11101
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
         slurm.accounting.url = $configuration_slurm_accounting_url
         slurm.accounting.user = $configuration_slurm_accounting_user
