@@ -675,6 +675,12 @@ Order = 20
         Config.Increment = 64
         DefaultValue = 0
 
+        [[[parameter EnableDynamicPartition]]]
+        Label = Enable Dynamic Partition
+        DefaultValue = true
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Create a partition for the dynamic nodearray
+
         [[[parameter NodeTags]]]
         Label = VM Tags
         Description = Tags applied to all nodes
