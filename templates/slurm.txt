@@ -126,7 +126,7 @@ Autoscale = $Autoscale
         Size = $SchedFilesystemSize
         SSD = True
         Mount = builtinsched
-        Persistent = False
+        Persistent = True
         Disabled = ${!UseBuiltinSched || configuration_slurm_ha_enabled}
 
         [[[volume shared]]]
