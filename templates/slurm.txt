@@ -82,7 +82,7 @@ Autoscale = $Autoscale
         type = $NFSSchedType
         mountpoint = /sched        
         export_path = ${ifThenElse(NFSSchedType == "lustre", strcat("tcp:/lustrefs", NFSSchedExportPath), NFSSchedExportPath)}
-        address = $NFSSchedAddress
+        address = ${ifThenElse(UseBuiltinSched, undefined, NFSSchedAddress)}
         options = $NFSSchedMountOptions
 
         [[[configuration cyclecloud.mounts.additional_nfs]]]
@@ -126,7 +126,7 @@ Autoscale = $Autoscale
         Size = $SchedFilesystemSize
         SSD = True
         Mount = builtinsched
-        Persistent = False
+        Persistent = True
         Disabled = ${!UseBuiltinSched || configuration_slurm_ha_enabled}
 
         [[[volume shared]]]
