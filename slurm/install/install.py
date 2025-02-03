@@ -91,10 +91,14 @@ class InstallSettings:
         self.platform_family = platform_family
         self.mode = mode
 
-        self.dynamic_config = config["slurm"].get("dynamic_config")
+        self.dynamic_config = config["slurm"].get("dynamic_config", None)
+        self.dynamic_feature = config["slurm"].get("dynamic_feature", None)
+
+        #TODO: Dynamic_config will be deprecated. Remove for 4.x
         if self.dynamic_config:
             self.dynamic_config = _inject_vm_size(self.dynamic_config, self.vm_size)
-        self.dynamic_config
+        elif self.dynamic_feature:
+            self.dynamic_feature = f"{self.dynamic_feature},{self.vm_size}"
 
         self.max_node_count = int(config["slurm"].get("max_node_count", 10000))
 
@@ -110,6 +114,7 @@ class InstallSettings:
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
+
     lc = dynamic_config.lower()
     if "feature=" not in lc:
         logging.warning("Dynamic config is specified but no 'Feature={some_flag}' is set under slurm.dynamic_config.")
@@ -508,11 +513,44 @@ def _complete_install_all(s: InstallSettings) -> None:
 
     ilib.create_service("munged", user=s.munge_user, exec_start="/sbin/munged")
 
+def get_gres_count(hostname):
+    count = 0
+    try:
+        with open("/etc/slurm/gres.conf", 'r') as file:
+            for line in file:
+                nodename_match = re.search(r'Nodename=([^\s]+)', line, re.IGNORECASE)
+                count_match = re.search(r'count=(\d+)', line, re.IGNORECASE)
+                if nodename_match and count_match:
+                    nodename = nodename_match.group(1)
+                    # This command is local to the node and does not send an RPC to the controller.
+                    if hostname in subprocess.run(['scontrol', 'show', 'hostnames', nodename], stdout=subprocess.PIPE, universal_newlines=True).stdout:
+                        count = int(count_match.group(1))
+
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+
+    return count
+
 
 def setup_slurmd(s: InstallSettings) -> None:
     slurmd_config = f"SLURMD_OPTIONS=-b -N {s.node_name}"
-    if s.dynamic_config:
-        slurmd_config = f"SLURMD_OPTIONS={s.dynamic_config} -N {s.node_name}"
+    if s.dynamic_feature or s.dynamic_config:
+        if s.dynamic_feature:
+            override_conf = ""
+            # Dynamic GPU nodes have to have their gres manually defined by the user before they can be started.
+            # Check if gres is defined for this node and then add that to configuration options.
+            gpu_count = get_gres_count(s.node_name)
+            if gpu_count > 0:
+                gres_str = f"gres=gpu:{gpu_count}"
+                override_conf += f" {gres_str}"
+            override_conf += f" Feature={s.dynamic_feature}"
+            dynamic_config = f"-Z --conf \"{override_conf}\""
+        else:
+            # If user has supplied us dynamic config in the template.
+            #TODO: dynamic_config will be removed for 4.x
+            dynamic_config = f"{s.dynamic_config}"
+        logging.debug("Dynamic config: %s" % dynamic_config)
+        slurmd_config = f"SLURMD_OPTIONS={dynamic_config} -N {s.node_name}"
         if "-b" not in slurmd_config.split():
             slurmd_config = slurmd_config + " -b"
 
