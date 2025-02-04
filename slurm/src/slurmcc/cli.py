@@ -736,20 +736,20 @@ def _move_with_permissions(src: str, dst: str) -> None:
 
 
 def _dynamic_partition(partition: partitionlib.Partition, writer: TextIO) -> None:
-    assert partition.dynamic_config
+    assert partition.dynamic_feature
 
     writer.write(
-        "# Creating dynamic nodeset and partition using slurm.dynamic_config=%s\n"
-        % partition.dynamic_config
+        "# Creating dynamic nodeset and partition using slurm.dynamic_feature=%s\n"
+        % partition.dynamic_feature
     )
     if not partition.features:
         logging.error(
-            f"slurm.dynamic_config was set for {partition.name}"
+            f"slurm.dynamic_feature was set for {partition.name}"
             + "but it did not include a feature declaration. Slurm requires this! Skipping for now.ß"
         )
         return
 
-    writer.write(f"Nodeset={partition.name}ns Feature={','.join(partition.features)}\n")
+    writer.write(f"Nodeset={partition.name}ns Feature={partition.features[0]}\n")
     writer.write(f"PartitionName={partition.name} Nodes={partition.name}ns")
     if partition.is_default:
         writer.write(" Default=YES")
@@ -779,7 +779,7 @@ def _partitions(
     )
 
     for partition in partitions:
-        if partition.dynamic_config:
+        if partition.dynamic_feature:
             if partition.name in written_dynamic_partitions:
                 logging.warning("Duplicate partition found mapped to the same name." +
                                 " Using first Feature= declaration and ignoring the rest!")

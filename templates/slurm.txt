@@ -257,7 +257,10 @@ Autoscale = $Autoscale
     AdditionalClusterInitSpecs = $DynamicClusterInitSpecs
         [[[configuration]]]
         slurm.hpc = false
-        slurm.dynamic_config := "-Z --conf \"Feature=dyn\""
+        # Slurm only allows a single feature to be defined in a Nodeset. If multiple features are defined here, only first value will be used for the nodeset.
+        slurm.dynamic_feature := "dyn"
+        # If this option is used, slurmd is started with this configuration for dynamic nodes.
+        #slurm.dynamic_config := "-Z --conf \"Feature=dyn\""
         # set pcpu = false for all hyperthreaded VMs
         slurm.use_pcpu = false
         slurm.autoscale = $EnableDynamicPartition
