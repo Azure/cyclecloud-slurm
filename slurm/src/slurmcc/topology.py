@@ -7,7 +7,8 @@ from pathlib import Path
 import datetime
 from . import util as slutil
 
-
+TOPOLOGY_DIR="/opt/azurehpc/slurm"
+log=logging.getLogger('topology')
 def parse_args():
     """
     Parses command-line arguments.
@@ -91,14 +92,14 @@ class Topology:
     torsets: dict = {}
     def __init__(self,output):
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.output_dir = f"/home/azreenzaman/data/azreen/topology/topology_ouput_{self.timestamp}"
-        Path(self.output_dir).mkdir(exist_ok=True)
+        self.output_dir = f"{TOPOLOGY_DIR}/.topology/topology_ouput_{self.timestamp}"
+        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         Path(f"{self.output_dir}/logs").mkdir(exist_ok=True)
-        logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels
-        format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
-        filename='/home/azreenzaman/data/azreen/topology/logs/slurm_top.log', # Set the log file name
-        filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
-        )
+        # logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels
+        # format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
+        # filename='/home/azreenzaman/data/azreen/topology/logs/slurm_top.log', # Set the log file name
+        # filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
+        # )
         self.hosts=[]
         self.sharp_cmd_path = None
         self.guids_file = f"{self.output_dir}/guids.txt"
@@ -144,20 +145,20 @@ class Topology:
         powered_down_hosts = set(hosts)&set(down_hosts)
         self.hosts = list(valid_hosts-powered_down_hosts)
         if len(self.hosts)<len(hosts):
-            logging.warning(
+            log.warning(
                 "Some nodes were either powered down or invalid, "
                 "running on a subset of nodes that are powered on"
             )
             if invalid_hosts:
-                logging.warning("Invalid Nodes: %s",
+                log.warning("Invalid Nodes: %s",
                                 invalid_hosts)
             if powered_down_hosts:
-                logging.warning("Powered Down Nodes: %s",
+                log.warning("Powered Down Nodes: %s",
                                 powered_down_hosts)
-        logging.debug(hosts)
-        logging.debug(self.hosts)
+        log.debug(hosts)
+        log.debug(self.hosts)
         if len(self.hosts)<2:
-            logging.error(
+            log.error(
                 "Need more than 2 nodes to create slurm topology, "
                 "nodes given were either invalid, powered down, "
                 "or less than two nodes"
@@ -185,12 +186,12 @@ class Topology:
         stderr = output[0].stderr
         if exit_code==0:
             os_id = ''.join(stdout).strip()
-            logging.debug(os_id)
+            log.debug(os_id)
             return os_id
         else:
-            logging.error("Exit code: %s",exit_code)
+            log.error("Exit code: %s",exit_code)
             for line in stderr:
-                logging.error(line)
+                log.error(line)
             sys.exit(1)
     def get_sharp_cmd(self):
         """
@@ -207,7 +208,7 @@ class Topology:
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
         if os_id=="almalinux":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
-        logging.error("OS Not supported, exiting")
+        log.error("OS Not supported, exiting")
         sys.exit(1)
 
 
@@ -234,14 +235,14 @@ class Topology:
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
         output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
         for line in output[0].stdout:
-            logging.debug(line)
+            log.debug(line)
         if output[0].exit_code!=0:
-            logging.error("sharp_hello command failed")
+            log.error("sharp_hello command failed")
             for line in output[0].stderr:
-                logging.error(line)
+                log.error(line)
             sys.exit(output[0].exit_code)
         else:
-            logging.debug("sharp_hello command passed")
+            log.debug("sharp_hello command passed")
             return 0
 
     def check_ibstatus(self) -> None:
@@ -262,13 +263,13 @@ class Topology:
         output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
         path=None
         for line in output[0].stdout:
-            logging.debug(line)
+            log.debug(line)
             path=line
         if path=="None":
-            logging.error("The 'ibstatus' command is not available")
+            log.error("The 'ibstatus' command is not available")
             sys.exit(1)
         else:
-            logging.debug("The 'ibstatus' command is available.")
+            log.debug("The 'ibstatus' command is available.")
             return 0
 
     def retrieve_guids(self) -> dict:
@@ -456,38 +457,38 @@ class Topology:
             None
         """
 
-        console_handler=logging.StreamHandler()
-        console_handler.setLevel(logging.WARNING)
-        formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        console_handler=log.StreamHandler()
+        console_handler.setLevel(log.WARNING)
+        formatter=log.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
-        logging.getLogger().addHandler(console_handler)
-        logging.debug("Retrieving hostnames")
+        log.getLogger().addHandler(console_handler)
+        log.debug("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
-        logging.debug("Retrieving sharp_cmd directory")
+        log.debug("Retrieving sharp_cmd directory")
         self.sharp_cmd_path=self.get_sharp_cmd()
-        logging.debug("checking that sharp_hello_works")
+        log.debug("checking that sharp_hello_works")
         self.check_sharp_hello()
-        logging.debug("Checking ibstat can be run on all hosts")
+        log.debug("Checking ibstat can be run on all hosts")
         self.check_ibstatus()
-        logging.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
+        log.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
         self.retrieve_guids()
-        logging.debug("Finished collecting InfiniBand device GUIDs from hosts")
+        log.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
-        logging.debug("Finished writing guids to %s", self.guids_file)
+        log.debug("Finished writing guids to %s", self.guids_file)
         self.generate_topo_file()
-        logging.debug("Topology file generated at %s", self.topo_file)
+        log.debug("Topology file generated at %s", self.topo_file)
         self.device_guids_per_switch =  self.group_guids_per_switch()
-        logging.debug("Finished grouping device guids per switch")
+        log.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
-        logging.debug("Identified torsets for hosts")
+        log.debug("Identified torsets for hosts")
         self.torsets = self.group_hosts_by_torset()
-        logging.debug("Finished grouping hosts by torsets")
+        log.debug("Finished grouping hosts by torsets")
         self.write_slurm_topology(output)
         if output:
-            logging.info("Finished writing slurm topology from torsets to %s",
+            log.info("Finished writing slurm topology from torsets to %s",
                           self.slurm_top_file)
         else:
-            logging.info("Printed slurm topology")
+            log.info("Printed slurm topology")
 
 def main():
     args = parse_args()
