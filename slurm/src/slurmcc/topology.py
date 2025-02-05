@@ -458,7 +458,7 @@ class Topology:
         """
 
         console_handler=logging.StreamHandler()
-        console_handler.setLevel(log.WARNING)
+        console_handler.setLevel(logging.WARNING)
         formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_handler)
