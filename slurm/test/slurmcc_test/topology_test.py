@@ -328,7 +328,7 @@ def test_write_slurm_topology():
     test_obj.host_to_torset_map = test_obj.identify_torsets()
     test_obj.torsets = test_obj.group_hosts_by_torset()
     test_obj.write_slurm_topology(output)
-    with open('test/slurmcc_test/topology_test_output/slurm_topology.txt','r', encoding='utf-8') as file:
+    with open('test/slurmcc_test/topology_test_output/slurm_topology_1.txt','r', encoding='utf-8') as file:
         result= file.read()
     with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
