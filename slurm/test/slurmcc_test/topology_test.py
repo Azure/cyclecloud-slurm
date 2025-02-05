@@ -17,6 +17,7 @@ Functions:
     '''
 from slurmcc.topology import Topology
 from slurmcc import util as slutil
+from pathlib import Path
 
 class OutputContainer:
     """
@@ -138,7 +139,8 @@ def run_command(cmd,stdout=None):
         out=None
     return OutputContainer(out)
 
-    
+def setup():
+      Path("test/slurmcc_test/topology_test_output").mkdir(parents=True, exist_ok=True)
 def test_get_hostnames():
     """
     Test the get_hostnames method of the Topology class.
