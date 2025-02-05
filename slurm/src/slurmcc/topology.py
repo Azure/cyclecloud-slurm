@@ -457,11 +457,11 @@ class Topology:
             None
         """
 
-        console_handler=log.StreamHandler()
+        console_handler=logging.StreamHandler()
         console_handler.setLevel(log.WARNING)
-        formatter=log.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        formatter=logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
-        log.getLogger().addHandler(console_handler)
+        logging.getLogger().addHandler(console_handler)
         log.debug("Retrieving hostnames")
         self.get_hostnames(hosts, partition)
         log.debug("Retrieving sharp_cmd directory")
