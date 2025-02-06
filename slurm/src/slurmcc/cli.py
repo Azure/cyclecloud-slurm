@@ -36,6 +36,7 @@ from . import partition as partitionlib
 from . import util as slutil
 from .util import is_autoscale_enabled, scontrol
 from . import cost
+from . import topology
 
 
 VERSION = "3.0.10"
@@ -184,7 +185,17 @@ class SlurmCLI(CommonCLI):
         azcost = azurecost(config)
         driver = cost.CostDriver(azcost, config)
         driver.run(start, end, out, fmt)
-
+    
+    def topology_parser(self, parser: ArgumentParser) -> None:
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument('-n','--nodes', type=str, help="Specify the hostnames for the nodes")
+        group.add_argument('-p,','--partition', type=str, help="Specify the parititon")
+        parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
+    
+    def topology(self, config: Dict, nodes, partition, output):
+        topo = topology.Topology(output)
+        topo.run(nodes, partition, output)
+    
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
 
