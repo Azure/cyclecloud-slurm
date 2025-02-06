@@ -17,6 +17,7 @@ Autoscale = $Autoscale
     Region = $Region
     KeyPairLocation = ~/.ssh/cyclecloud.pem
     Azure.Identities = $ManagedIdentity
+    Tags = $NodeTags
     
     # Slurm autoscaling supports both Terminate and Deallocate shutdown policies
     ShutdownPolicy = $configuration_slurm_shutdown_policy
@@ -27,10 +28,11 @@ Autoscale = $Autoscale
 
         [[[configuration]]]
 
-        slurm.install_pkg = azure-slurm-install-pkg-3.0.10.tar.gz
-        slurm.autoscale_pkg = azure-slurm-pkg-3.0.10.tar.gz
-
         slurm.version = $configuration_slurm_version
+        slurm.user.uid = 11100
+        slurm.user.gid = 11100
+        munge.user.uid = 11101
+        munge.user.gid = 11101
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
         slurm.accounting.url = $configuration_slurm_accounting_url
         slurm.accounting.user = $configuration_slurm_accounting_user
@@ -62,7 +64,7 @@ Autoscale = $Autoscale
         # May be used to identify the ID in cluster-init scripts
         cluster.identities.default = $ManagedIdentity
 
-        [[[cluster-init cyclecloud/slurm:default:3.0.10]]]
+        [[[cluster-init cyclecloud/slurm:default:3.0.11]]]
         Optional = true
 
         [[[volume boot]]]
@@ -80,7 +82,7 @@ Autoscale = $Autoscale
         type = $NFSSchedType
         mountpoint = /sched        
         export_path = ${ifThenElse(NFSSchedType == "lustre", strcat("tcp:/lustrefs", NFSSchedExportPath), NFSSchedExportPath)}
-        address = $NFSSchedAddress
+        address = ${ifThenElse(UseBuiltinSched, undefined, NFSSchedAddress)}
         options = $NFSSchedMountOptions
 
         [[[configuration cyclecloud.mounts.additional_nfs]]]
@@ -115,7 +117,7 @@ Autoscale = $Autoscale
         slurm.secondary_scheduler_name = ${ifThenElse(configuration_slurm_ha_enabled, "scheduler-ha-1", undefined)}
 
 
-        [[[cluster-init cyclecloud/slurm:scheduler:3.0.10]]]
+        [[[cluster-init cyclecloud/slurm:scheduler:3.0.11]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -124,7 +126,7 @@ Autoscale = $Autoscale
         Size = $SchedFilesystemSize
         SSD = True
         Mount = builtinsched
-        Persistent = False
+        Persistent = True
         Disabled = ${!UseBuiltinSched || configuration_slurm_ha_enabled}
 
         [[[volume shared]]]
@@ -174,9 +176,10 @@ Autoscale = $Autoscale
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
         MachineType = $loginMachineType
-        ImageName = $SchedulerImageName
+        ImageName = $LoginImageName
+        AdditionalClusterInitSpecs = $LoginClusterInitSpecs
 
-        [[[cluster-init cyclecloud/slurm:login:3.0.10]]]
+        [[[cluster-init cyclecloud/slurm:login:3.0.11]]]
         [[[configuration]]]
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
@@ -190,7 +193,7 @@ Autoscale = $Autoscale
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
-        [[[cluster-init cyclecloud/slurm:execute:3.0.10]]]
+        [[[cluster-init cyclecloud/slurm:execute:3.0.11]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -199,7 +202,7 @@ Autoscale = $Autoscale
     Extends = nodearraybase
     MachineType = $HPCMachineType
     ImageName = $HPCImageName
-    MaxCoreCount = $MaxHPCExecuteCoreCount
+    MaxCount = $MaxHPCExecuteNodeCount
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
     AdditionalClusterInitSpecs = $HPCClusterInitSpecs
     EnableNodeHealthChecks = $EnableNodeHealthChecks
@@ -210,12 +213,11 @@ Autoscale = $Autoscale
         slurm.hpc = true
         slurm.partition = hpc
 
-
     [[nodearray htc]]
     Extends = nodearraybase
     MachineType = $HTCMachineType
     ImageName = $HTCImageName
-    MaxCoreCount = $MaxHTCExecuteCoreCount
+    MaxCount = $MaxHTCExecuteNodeCount
 
     Interruptible = $HTCUseLowPrio
     MaxPrice = $HTCSpotMaxPrice
@@ -226,6 +228,23 @@ Autoscale = $Autoscale
         slurm.partition = htc
         # set pcpu = false for all hyperthreaded VMs
         slurm.use_pcpu = false
+
+    [[nodearray gpu]]
+    Extends = nodearraybase
+    MachineType = $GPUMachineType
+    ImageName = $GPUImageName
+    MaxCount = $MaxGPUExecuteNodeCount
+    Azure.MaxScalesetSize = $HPCMaxScalesetSize
+    EnableNodeHealthChecks = $EnableNodeHealthChecks
+
+    Interruptible = $GPUUseLowPrio
+    MaxPrice = $GPUSpotMaxPrice
+    AdditionalClusterInitSpecs = $GPUClusterInitSpecs
+
+        [[[configuration]]]
+        slurm.default_partition = true
+        slurm.hpc = true
+        slurm.partition = gpu
 
     [[nodearray dynamic]]
     Extends = nodearraybase
@@ -238,9 +257,13 @@ Autoscale = $Autoscale
     AdditionalClusterInitSpecs = $DynamicClusterInitSpecs
         [[[configuration]]]
         slurm.hpc = false
-        slurm.dynamic_config := "-Z --conf \"Feature=dyn\""
+        # Slurm only allows a single feature to be defined in a Nodeset. If multiple features are defined here, only first value will be used for the nodeset.
+        slurm.dynamic_feature := "dyn"
+        # If this option is used, slurmd is started with this configuration for dynamic nodes.
+        #slurm.dynamic_config := "-Z --conf \"Feature=dyn\""
         # set pcpu = false for all hyperthreaded VMs
         slurm.use_pcpu = false
+        slurm.autoscale = $EnableDynamicPartition
 
 [parameters About]
 Order = 1
@@ -289,13 +312,18 @@ Order = 10
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
 
+        [[[parameter GPUMachineType]]]
+        Label = GPU VM Type
+        Description = The VM type for HPC execute nodes
+        ParameterType = Cloud.MachineType
+        DefaultValue = Standard_NC24rs_v3
+
         [[[parameter DynamicMachineType]]]
         Label = Dyn VM Type
         Description = The VM type for Dynamic execute nodes
         ParameterType = Cloud.MachineType
         DefaultValue = Standard_F2s_v2
         Config.MultiSelect = true
-
 
     [[parameters Auto-Scaling]]
     Description = "The cluster can autoscale to the workload, adding execute hosts as jobs are queued. To enable this check the box below and choose the initial and maximum core counts for the cluster."
@@ -307,18 +335,26 @@ Order = 10
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Start and stop execute instances automatically
 
-        [[[parameter MaxHPCExecuteCoreCount]]]
-        Label = Max HPC Cores
-        Description = The total number of HPC execute cores to start
+        [[[parameter MaxHTCExecuteNodeCount]]]
+        Label = Max HTC Nodes
+        Description = The total number of HTC execute nodes to start
         DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
 
-        [[[parameter MaxHTCExecuteCoreCount]]]
-        Label = Max HTC Cores
-        Description = The total number of HTC execute cores to start
-        DefaultValue = 100
+        [[[parameter MaxHPCExecuteNodeCount]]]
+        Label = Max HPC Nodes
+        Description = The total number of HPC execute nodes to start
+        DefaultValue = 16
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 1
+        Config.IntegerOnly = true
+
+        [[[parameter MaxGPUExecuteNodeCount]]]
+        Label = Max GPU Nodes
+        Description = The total number of GPU execute nodes to start
+        DefaultValue = 8
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 1
         Config.IntegerOnly = true
@@ -352,6 +388,20 @@ Order = 10
         Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
         Config.Plugin = pico.form.NumberTextBox
         Conditions.Excluded := HTCUseLowPrio isnt true
+        Config.MinValue = -1
+
+        [[[parameter GPUUseLowPrio]]]
+        Label = GPU Spot
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Use Spot VMs for GPU execute hosts
+
+        [[[parameter GPUSpotMaxPrice]]]
+        Label = Max Price GPU
+        DefaultValue = -1
+        Description = Max price for Spot VMs in USD (value of -1 will not evict based on price)
+        Config.Plugin = pico.form.NumberTextBox
+        Conditions.Excluded := GPUUseLowPrio isnt true
         Config.MinValue = -1
 
         [[[parameter DynamicUseLowPrio]]]
@@ -629,6 +679,19 @@ Order = 20
         Config.Increment = 64
         DefaultValue = 0
 
+        [[[parameter EnableDynamicPartition]]]
+        Label = Enable Dynamic Partition
+        DefaultValue = true
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Create a partition for the dynamic nodearray
+
+        [[[parameter NodeTags]]]
+        Label = VM Tags
+        Description = Tags applied to all nodes
+        ParameterType = Record
+        DefaultValue := []
+        Config.MultiSelect = false
+
     [[parameters Slurm Settings ]]
 
     Order = 5
@@ -758,6 +821,13 @@ Order = 20
         DefaultValue = almalinux8
         Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
 
+        [[[parameter LoginImageName]]]
+        Label = Login Node OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = almalinux8
+        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
@@ -767,6 +837,13 @@ Order = 20
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
+        ParameterType = Cloud.Image
+        Config.OS = linux
+        DefaultValue = almalinux8
+        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+
+        [[[parameter GPUImageName]]]
+        Label = GPU OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = almalinux8
@@ -784,7 +861,13 @@ Order = 20
         DefaultValue = =undefined
         Description = Cluster init specs to apply to the scheduler node
         ParameterType = Cloud.ClusterInitSpecs
-    
+
+        [[[parameter LoginClusterInitSpecs]]]
+        Label = Login Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to Login nodes
+        ParameterType = Cloud.ClusterInitSpecs
+
         [[[parameter HTCClusterInitSpecs]]]
         Label = HTC Cluster-Init
         DefaultValue = =undefined
@@ -795,6 +878,12 @@ Order = 20
         Label = HPC Cluster-Init
         DefaultValue = =undefined
         Description = Cluster init specs to apply to HPC execute nodes
+        ParameterType = Cloud.ClusterInitSpecs
+
+        [[[parameter GPUClusterInitSpecs]]]
+        Label = GPU Cluster-Init
+        DefaultValue = =undefined
+        Description = Cluster init specs to apply to GPU execute nodes
         ParameterType = Cloud.ClusterInitSpecs
 
         [[[parameter DynamicClusterInitSpecs]]]

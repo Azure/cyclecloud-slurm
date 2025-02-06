@@ -28,7 +28,7 @@ class Partition:
         buckets: List[NodeBucket],
         max_vm_count: int,
         use_pcpu: bool = False,
-        dynamic_config: Optional[str] = None,
+        dynamic_feature: Optional[str] = None,
         over_allocation_thresholds: Dict = {},
         nodearray_machine_types: Optional[List[str]] = None,
         dampen_memory: Optional[float] = None,
@@ -64,7 +64,7 @@ class Partition:
         self.max_vm_count = sum([b.max_count for b in buckets])
         self.buckets = buckets
         self.use_pcpu = use_pcpu
-        self.dynamic_config = dynamic_config
+        self.dynamic_feature = dynamic_feature
         # cache node_list property for dynamic partitions
         self.__dynamic_node_list_cache = None
         self.node_list_by_pg: Dict[
@@ -75,14 +75,8 @@ class Partition:
         self.gpu_device_config = gpu_device_config
 
         self.features = []
-        if self.dynamic_config:
-            toks = self.dynamic_config.replace('"', "").replace("'", "").split()
-
-            for tok in toks:
-                if "=" in tok:
-                    key, value = tok.split("=", 1)
-                    if key.lower() == "feature":
-                        self.features = value.strip().split(",")
+        if self.dynamic_feature:
+            self.features = self.dynamic_feature.split(',')
 
         
     def bucket_for_node(self, node_name: str) -> NodeBucket:
@@ -103,7 +97,7 @@ class Partition:
 
     @property
     def node_list(self) -> str:
-        if not self.dynamic_config:
+        if not self.dynamic_feature:
             static_nodes = self._static_all_nodes()
             if not static_nodes:
                 return ""
@@ -166,7 +160,7 @@ class Partition:
         return ret
     
     def all_nodes(self) -> List[str]:
-        if not self.dynamic_config:
+        if not self.dynamic_feature:
             return self._static_all_nodes()        
         return slutil.from_hostlist(self.node_list)
 
@@ -184,7 +178,7 @@ class Partition:
 def _construct_node_list(
     partition: Partition,
 ) -> Dict[Optional[PlacementGroup], List[str]]:
-    if partition.dynamic_config:
+    if partition.dynamic_feature:
         return _construct_dynamic_node_list(partition)
     else:
         return _construct_static_node_list(partition)
@@ -284,7 +278,20 @@ def fetch_partitions(
     for buckets in split_buckets.values():
         nodearray_name = buckets[0].nodearray
         slurm_config = buckets[0].software_configuration.get("slurm", {})
-        dynamic_config = slurm_config.get("dynamic_config")
+        dynamic_feature = slurm_config.get("dynamic_feature")
+        # This is added for backwards compatibility.
+        # TODO: Remove this for 4.x
+        if not dynamic_feature:
+            dynamic_config = slurm_config.get("dynamic_config")
+            if dynamic_config:
+                toks = dynamic_config.replace('"', "").replace("'", "").split()
+
+                for tok in toks:
+                    if "=" in tok:
+                        key, value = tok.split("=", 1)
+                        if key.lower() == "feature":
+                            dynamic_feature = value.strip()
+
         is_hpc = str(slurm_config.get("hpc", True)).lower() == "true"
         is_autoscale = slurm_config.get("autoscale", True)  # TODO
         if is_autoscale is None:
@@ -333,9 +340,9 @@ def fetch_partitions(
                 nodename_prefix,
             )
 
-        if len(buckets) > 1 and not dynamic_config:
+        if len(buckets) > 1 and not dynamic_feature:
             logging.warning(
-                "Multiple buckets defined for nodearray %s, but no dynamic_config. Using first bucket (vm_size or placement group) only.",
+                "Multiple buckets defined for nodearray %s, but no dynamic_feature. Using first bucket (vm_size or placement group) only.",
                 nodearray_name,
             )
             buckets = [buckets[0]]
@@ -391,7 +398,7 @@ def fetch_partitions(
                     buckets,
                     limits.max_count,
                     use_pcpu=use_pcpu,
-                    dynamic_config=dynamic_config,
+                    dynamic_feature=dynamic_feature,
                     over_allocation_thresholds=over_allocation_thresholds,
                     nodearray_machine_types=nodearray_vm_size.get(nodearray_name),
                     dampen_memory=dampen_memory,
@@ -402,7 +409,7 @@ def fetch_partitions(
     filtered_partitions = []
     by_name = hpcutil.partition(all_partitions, lambda p: p.name)
     for pname, parts in by_name.items():
-        all_dyn = set([bool(p.dynamic_config) for p in parts])
+        all_dyn = set([bool(p.dynamic_feature) for p in parts])
 
         if len(all_dyn) > 1:
             logging.error(
@@ -413,7 +420,7 @@ def fetch_partitions(
         else:
             if len(parts) > 1 and False in all_dyn:
                 logging.error(
-                    "Only partitions with slurm.dynamic_config may point to more than one nodearray."
+                    "Only partitions with slurm.dynamic_feature may point to more than one nodearray."
                 )
                 disabled_parts_message = [
                     "/".join([p.name, p.nodearray]) for p in parts

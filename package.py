@@ -11,8 +11,8 @@ from argparse import Namespace
 from subprocess import check_call
 from typing import Dict, List, Optional
 
-SCALELIB_VERSION = "1.0.4"
-CYCLECLOUD_API_VERSION = "8.4.1"
+SCALELIB_VERSION = "1.0.6"
+CYCLECLOUD_API_VERSION = "8.7.1"
 
 
 def build_sdist() -> str:
@@ -41,7 +41,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
         SCALELIB_VERSION
     )
     
-    cyclecloud_api_url = "https://github.com/Azure/cyclecloud-slurm/releases/download/2023-09-14-bins/cyclecloud_api-8.4.1-py2.py3-none-any.whl"
+    cyclecloud_api_url = f"https://github.com/Azure/cyclecloud-scalelib/releases/download/{SCALELIB_VERSION}/cyclecloud_api-{CYCLECLOUD_API_VERSION}-py2.py3-none-any.whl"
     to_download = {
         scalelib_file: (args.scalelib, scalelib_url),
         cyclecloud_api_file: (args.cyclecloud_api, cyclecloud_api_url),
