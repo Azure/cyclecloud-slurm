@@ -503,6 +503,20 @@ def _complete_install_all(s: InstallSettings) -> None:
         mode=644,
     )
 
+    ilib.directory(
+        "/etc/systemd/system/munge.service.d", owner="root", group="root", mode=755
+    )
+
+    ilib.template(
+        "/etc/systemd/system/munge.service.d/override.conf",
+        source="templates/munge.override",
+        owner="root",
+        group="root",
+        mode=644,
+    )
+
+    ilib.enable_service("munge")
+
     ilib.template(
         "/etc/slurm/job_submit.lua.azurehpc.example",
         source="templates/job_submit.lua",
@@ -510,8 +524,6 @@ def _complete_install_all(s: InstallSettings) -> None:
         group="root",
         mode=644,
     )
-
-    ilib.create_service("munged", user=s.munge_user, exec_start="/sbin/munged")
 
 def get_gres_count(hostname):
     count = 0
