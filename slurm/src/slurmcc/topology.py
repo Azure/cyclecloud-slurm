@@ -37,8 +37,6 @@ class Topology:
         Path to the file containing GUIDs.
     guid_to_host_map : dict
         Mapping of GUIDs to hostnames.
-    hosts_file : Path
-        Path to the file containing hostnames.
     topo_file : Path
         Path to the topology file.
     slurm_top_file : Path
@@ -81,32 +79,24 @@ class Topology:
         Executes the entire process of generating the Slurm topology.
     """
 
-    output_dir: Path
-    guids_file: Path
-    guid_to_host_map: dict = {}
-    hosts_file: Path
-    topo_file: Path
-    slurm_top_file: Path
-    device_guids_per_switch: list = []
-    host_to_torset_map: dict = {}
-    torsets: dict = {}
-    def __init__(self,output):
+    def __init__(self,nodes, partition, output):
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = f"{TOPOLOGY_DIR}/.topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         Path(f"{self.output_dir}/logs").mkdir(exist_ok=True)
-        # logging.basicConfig(level=logging.DEBUG, # Set the log level to DEBUG to capture all levels
-        # format='%(asctime)s - %(levelname)s - %(message)s', # Define the log message format
-        # filename='/home/azreenzaman/data/azreen/topology/logs/slurm_top.log', # Set the log file name
-        # filemode='a' # Use 'w' to overwrite the log file each time or 'a' to append to it
-        # )
+        self.guid_to_host_map = {}
+        self.device_guids_per_switch = []
+        self.host_to_torset_map = {}
+        self.torsets = {}
+        self.nodes=nodes
+        self.partition=partition
         self.hosts=[]
         self.sharp_cmd_path = None
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= output
 
-    def get_hostnames(self,hosts,partition) -> None:
+    def get_hostnames(self) -> None:
         """
         Retrieves and validates the list of hostnames for a given partition.
         This method fetches the list of hostnames from the SLURM scheduler based on the provided
@@ -127,12 +117,12 @@ class Topology:
         def get_hostlist(cmd) -> list:
             output=slutil.run_command(cmd)
             return output.stdout.split('\n')[:-1]
-        partition_cmd = f'-p {partition} ' if partition else ''
+        partition_cmd = f'-p {self.partition} ' if self.partition else ''
         validate_cmd= 'scontrol show hostnames $(sinfo -o "%N" -h)'
-        if partition:
-            host_cmd = f'scontrol show hostnames $(sinfo -p {partition} -o "%N" -h)'
+        if self.partition:
+            host_cmd = f'scontrol show hostnames $(sinfo -p {self.partition} -o "%N" -h)'
         else:
-            host_cmd = f'scontrol show hostnames {hosts}'
+            host_cmd = f'scontrol show hostnames {self.nodes}'
         partition_states = "powered_down,powering_up,powering_down,power_down"
         sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h'
         down_cmd = f'scontrol show hostnames $({sinfo_cmd})'
@@ -411,7 +401,7 @@ class Topology:
             else:
                 torsets[torset].append(host)
         return torsets
-    def write_slurm_topology(self,output)-> None:
+    def write_slurm_topology(self)-> None:
         """
         Writes the SLURM topology configuration to a file or prints it to the console.
 
@@ -427,7 +417,7 @@ class Topology:
             None
         """
         switches=[]
-        if output:
+        if self.slurm_top_file:
             with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
                 for torset, hosts in self.torsets.items():
                     torset_index=torset[-2:]
@@ -446,7 +436,7 @@ class Topology:
             if len(self.torsets)>1:
                 switch_name=int(torset_index)+1
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
-    def run(self,hosts,partition,output):
+    def run(self):
         """
         Executes the sequence of steps to generate and write the SLURM topology.
         Args:
@@ -463,7 +453,7 @@ class Topology:
         console_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_handler)
         log.debug("Retrieving hostnames")
-        self.get_hostnames(hosts, partition)
+        self.get_hostnames()
         log.debug("Retrieving sharp_cmd directory")
         self.sharp_cmd_path=self.get_sharp_cmd()
         log.debug("checking that sharp_hello_works")
@@ -483,8 +473,8 @@ class Topology:
         log.debug("Identified torsets for hosts")
         self.torsets = self.group_hosts_by_torset()
         log.debug("Finished grouping hosts by torsets")
-        self.write_slurm_topology(output)
-        if output:
+        self.write_slurm_topology()
+        if self.topo_file:
             log.info("Finished writing slurm topology from torsets to %s",
                           self.slurm_top_file)
         else:
@@ -492,7 +482,7 @@ class Topology:
 
 def main():
     args = parse_args()
-    topology = Topology(args.output)
-    topology.run(args.nodes, args.partition, args.output)
+    topology = Topology(args.nodes, args.partition, args.output)
+    topology.run()
 if __name__ == '__main__':
     main() 
