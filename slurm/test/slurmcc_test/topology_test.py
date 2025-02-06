@@ -162,13 +162,14 @@ def test_get_hostnames():
         AssertionError: If the retrieved hostnames do not match the expected hostnames.
     """
     slutil.run_command=run_command
-    test_obj   = Topology(None)
-    test_obj.get_hostnames(None,"hpc")
+    test_obj   = Topology(None,"hpc",None)
+    test_obj.get_hostnames()
     result=test_obj.hosts
     with open('test/slurmcc_test/topology_test_input/valid_hostnames.txt','r', encoding='utf-8') as file:
         actual= file.read().splitlines()
     assert set(result)==set(actual)
-    test_obj.get_hostnames("hpc",None)
+    test_obj   = Topology("hpc",None,None)
+    test_obj.get_hostnames()
     result=test_obj.hosts
     assert set(result)==set(actual)
 
@@ -187,7 +188,7 @@ def test_get_os_name():
     5. Assert that the result is 'ubuntu'.
     """
     slutil.run_parallel_cmd=run_parallel_cmd
-    test_obj   = Topology(None)
+    test_obj   = Topology(None,"hpc",None)
     test_obj.hosts=['node1']
     result=test_obj.get_os_name()
     assert result=='ubuntu'
@@ -201,7 +202,7 @@ def test_get_sharp_cmd():
     Assertions:
         - The result of get_sharp_cmd() should be "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
     """
-    test_obj   = Topology(None)
+    test_obj   = Topology(None,"hpc",None)
     test_obj.hosts=['node1']
     result=test_obj.get_sharp_cmd()
     assert result=="/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
@@ -225,7 +226,7 @@ def test_check_sharp_hello():
         None
     """
     slutil.run_parallel_cmd=run_parallel_cmd
-    test_obj   = Topology(None)
+    test_obj   = Topology(None,"hpc",None)
     test_obj.hosts=['node1']
     test_obj.sharp_cmd_path="/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
     result=test_obj.check_sharp_hello()
@@ -250,7 +251,7 @@ def test_check_ibstatus():
         None
     """
     slutil.run_parallel_cmd=run_parallel_cmd
-    test_obj   = Topology(None)
+    test_obj   = Topology(None,"hpc",None)
     test_obj.hosts=['node1']
     result=test_obj.check_ibstatus()
     assert result==0
@@ -273,7 +274,7 @@ def test_retrieve_guids():
         AssertionError: If the contents of the output GUIDs file do not match the expected GUIDs.
     """
     slutil.run_parallel_cmd=run_parallel_cmd
-    test_obj   = Topology(None)
+    test_obj   = Topology(None,"hpc",None)
     with open('test/slurmcc_test/topology_test_input/guid_hostnames.txt','r', encoding='utf-8') as file:
         test_obj.hosts= file.read().splitlines()
     test_obj.retrieve_guids()
@@ -300,7 +301,7 @@ def test_generate_topo_file():
                         expected content.
     """
     slutil.run_command=run_command
-    test_obj   = Topology(None)
+    test_obj   = Topology(None,"hpc",None)
     test_obj.generate_topo_file()
     with open('test/slurmcc_test/topology_test_output/topology.txt','r', encoding='utf-8') as file:
         result= file.read()
@@ -324,12 +325,12 @@ def test_write_slurm_topology():
     The test asserts that the content of the generated output file matches the expected output file.
     """
     output= 'test/slurmcc_test/topology_test_output/slurm_topology_1.txt'
-    test_obj   = Topology(output)
+    test_obj   = Topology(None,"hpc",output)
     test_obj.topo_file = 'test/slurmcc_test/topology_test_input/topology.txt'
     test_obj.device_guids_per_switch =  test_obj.group_guids_per_switch()
     test_obj.host_to_torset_map = test_obj.identify_torsets()
     test_obj.torsets = test_obj.group_hosts_by_torset()
-    test_obj.write_slurm_topology(output)
+    test_obj.write_slurm_topology()
     with open('test/slurmcc_test/topology_test_output/slurm_topology_1.txt','r', encoding='utf-8') as file:
         result= file.read()
     with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
@@ -352,9 +353,9 @@ def test_run():
         AssertionError: If the generated output does not match the expected output.
     """
     output= 'test/slurmcc_test/topology_test_output/slurm_topology_2.txt'
-    test_obj   = Topology(output)
+    test_obj   = Topology(None,"hpc",output)
     test_obj.topo_file = 'test/slurmcc_test/topology_test_input/topology.txt'
-    test_obj.run("hpc",None,output)
+    test_obj.run()
     with open('test/slurmcc_test/topology_test_output/slurm_topology_2.txt','r', encoding='utf-8') as file:
         result= file.read()
     with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
