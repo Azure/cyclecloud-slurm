@@ -326,6 +326,8 @@ def test_write_slurm_topology():
     """
     output= 'test/slurmcc_test/topology_test_output/slurm_topology_1.txt'
     test_obj   = Topology(None,"hpc",output)
+    test_obj.get_hostnames()
+    test_obj.retrieve_guids()
     test_obj.topo_file = 'test/slurmcc_test/topology_test_input/topology.txt'
     test_obj.device_guids_per_switch =  test_obj.group_guids_per_switch()
     test_obj.host_to_torset_map = test_obj.identify_torsets()
