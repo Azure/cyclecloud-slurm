@@ -93,7 +93,7 @@ class Topology:
         """
         Retrieves and validates the list of hostnames for a given partition.
         This method fetches the list of hostnames from the SLURM scheduler based on the provided
-        partition and validates them against the list of all available hostnames. It also checks
+        partition or string of nodes and validates them against the list of all available hostnames. It also checks
         for hosts that are powered down and filters them out.
             None
         Raises:
@@ -251,15 +251,14 @@ class Topology:
             log.debug("The 'ibstatus' command is available.")
             return 0
 
-    def retrieve_guids(self) -> dict:
+    def retrieve_guids(self) -> None:
         """
         Retrieve GUIDs (Globally Unique Identifiers) from the hosts.
         This method runs a command on multiple hosts to retrieve the Port GUIDs
         from the InfiniBand status. The command extracts the GUIDs using a series
         of shell commands and processes the output to map each GUID to its
         corresponding host.
-        Returns:
-            dict: A dictionary mapping each processed GUID to its corresponding host.
+        The GUIDs are stored in the `guid_to_host_map` attribute.
         """
         cmd = (
             'ibstatus | grep mlx5_ib | cut -d" " -f3 | '
@@ -274,7 +273,7 @@ class Topology:
                 # - So we need to remove the leading 00 after 0x
                 self.guid_to_host_map[guid.replace('0x00', '0x').strip()]=host_out.host
 
-    def write_guids_to_file(self):
+    def write_guids_to_file(self) -> None:
         """
         Writes the GUIDs from the guid_to_host_map to a file.
 
@@ -286,7 +285,7 @@ class Topology:
             for guid in self.guid_to_host_map:
                 f.write(f"{guid}\n")
 
-    def generate_topo_file(self):
+    def generate_topo_file(self) -> None:
         """
         Generates the topology file for SHARP (Scalable Hierarchical Aggregation and Reduction Protocol).
 
