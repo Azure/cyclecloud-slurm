@@ -14,6 +14,16 @@ class Topology:
     A class to represent and manage the topology of a Slurm cluster.
     Attributes:
     -----------
+    timestamp : str
+        Timestamp of the current run.
+    hosts : list
+        List of hostnames.
+    sharp_cmd_path : str
+        Path to the SHARP command.
+    nodes : str
+        String of nodes to run on.
+    partition : str
+        Partition to run on.
     output_dir : Path
         Directory where output files will be stored.
     guids_file : Path
@@ -32,9 +42,9 @@ class Topology:
         Mapping of torsets to hosts.
     Methods:
     --------
-    __init__(self, output):
-        Initializes the Topology object with the given output directory.
-    get_hostnames(self, hosts, partition) -> None:
+    __init__(self, nodes, partition, output):
+        Initializes the Topology object with the given nodes, partition and output directory.
+    get_hostnames(self) -> None:
         Retrieves and validates hostnames based on the given partition or list of hostnames.
     get_os_name(self):
         Retrieves the operating system name of the first host.
@@ -56,9 +66,9 @@ class Topology:
         Identifies torsets for hosts based on device GUIDs.
     group_hosts_by_torset(self) -> dict:
         Groups hosts by torsets.
-    write_slurm_topology(self, output) -> None:
+    write_slurm_topology(self) -> None:
         Writes the Slurm topology to a file or prints it.
-    run(self, hosts, partition, output):
+    run(self):
         Executes the entire process of generating the Slurm topology.
     """
 
@@ -85,10 +95,6 @@ class Topology:
         This method fetches the list of hostnames from the SLURM scheduler based on the provided
         partition and validates them against the list of all available hostnames. It also checks
         for hosts that are powered down and filters them out.
-        Args:
-            hosts (str): A string representing the hosts to be queried.
-            partition (str): The partition name to filter the hosts. If None, only given hosts are considered.
-        Returns:
             None
         Raises:
             SystemExit: If the number of valid and powered-on hosts is less than 2.
@@ -392,10 +398,6 @@ class Topology:
         and either writes it to a file specified by `self.slurm_top_file` or prints it to the console,
         depending on the value of the `output` parameter.
 
-        Args:
-            output (bool): If True, the topology configuration is written to a file.
-                           If False, the topology configuration is printed to the console.
-
         Returns:
             None
         """
@@ -422,10 +424,6 @@ class Topology:
     def run(self):
         """
         Executes the sequence of steps to generate and write the SLURM topology.
-        Args:
-            hosts (list): List of hostnames to be processed.
-            partition (str): The partition name to which the hosts belong.
-            output (bool): Flag indicating whether to write the output to a file.
         Returns:
             None
         """
