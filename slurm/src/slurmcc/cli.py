@@ -193,8 +193,8 @@ class SlurmCLI(CommonCLI):
         parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
     
     def topology(self, config: Dict, nodes, partition, output):
-        topo = topology.Topology(output)
-        topo.run(nodes, partition, output)
+        topo = topology.Topology(nodes,partition,output)
+        topo.run()
     
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
