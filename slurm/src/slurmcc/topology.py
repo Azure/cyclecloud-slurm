@@ -1,7 +1,6 @@
 """Module providing slurm topology.conf for IB Cluster"""
 import os
 import sys
-import argparse
 import logging
 from pathlib import Path
 import datetime
