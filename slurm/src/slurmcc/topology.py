@@ -9,22 +9,6 @@ from . import util as slutil
 
 TOPOLOGY_DIR="/opt/azurehpc/slurm"
 log=logging.getLogger('topology')
-def parse_args():
-    """
-    Parses command-line arguments.
-
-    Returns:
-        argparse.Namespace: Parsed command-line arguments with the following attributes:
-            - nodes (str): Hostnames for the nodes (mutually exclusive with partition).
-            - partition (str): Partition name (mutually exclusive with nodes).
-            - output (str): Slurm topology file output.
-    """
-    parser = argparse.ArgumentParser()
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('-n','--nodes', type=str, help="Specify the hostnames for the nodes")
-    group.add_argument('-p,','--partition', type=str, help="Specify the parititon")
-    parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
-    return parser.parse_args()
 
 class Topology:
     """
@@ -473,10 +457,3 @@ class Topology:
                           self.slurm_top_file)
         else:
             log.info("Printed slurm topology")
-
-def main():
-    args = parse_args()
-    topology = Topology(args.nodes, args.partition, args.output)
-    topology.run()
-if __name__ == '__main__':
-    main() 
