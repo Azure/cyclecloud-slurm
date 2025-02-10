@@ -1,7 +1,9 @@
 import logging
 from abc import ABC, abstractmethod
+import os
 import random
 import subprocess as subprocesslib
+import tempfile
 import time
 import traceback
 from abc import ABC, abstractmethod
@@ -10,11 +12,26 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from . import AzureSlurmError, custom_chaos_mode
 
 
+class SrunExitCodeException(Exception):
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+        super().__init__(f"srun command failed with exit code {returncode}")
+class SrunOutput:
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
 class NativeSlurmCLI(ABC):
     @abstractmethod
     def scontrol(self, args: List[str], retry: bool = True) -> str:
         ...
 
+    @abstractmethod
+    def srun(self, hostname: List[str], user_command: str, timeout: int) -> SrunOutput:
+        ...
 
 class NativeSlurmCLIImpl(NativeSlurmCLI):
     def scontrol(self, args: List[str], retry: bool = True) -> str:
@@ -24,6 +41,22 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             return retry_subprocess(lambda: check_output(full_args)).strip()
         return check_output(full_args).strip()
 
+    def srun(self, hostlist: List[str], user_command: str, timeout: int) -> SrunOutput:
+        with tempfile.NamedTemporaryFile(delete=True) as temp_file:
+            temp_file_path = temp_file.name
+
+            try:
+                srun_command = f"srun -w {','.join(hostlist)} --error {temp_file_path} {user_command}"
+                logging.debug(srun_command)
+                result = subprocesslib.run(srun_command, check=True, timeout=timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
+                return SrunOutput(returncode=result.returncode, stdout=result.stdout, stderr=None)
+            except subprocesslib.CalledProcessError as e:
+                with open(temp_file_path, 'r') as f:
+                    stderr_content = f.read()
+                raise SrunExitCodeException(returncode=e.returncode,stdout=e.stdout, stderr=stderr_content)
+            except subprocesslib.TimeoutExpired:
+                logging.error("Srun command timed out!")
+                raise
 
 SLURM_CLI: NativeSlurmCLI = NativeSlurmCLIImpl()
 
@@ -36,6 +69,11 @@ def set_slurm_cli(cli: NativeSlurmCLI) -> None:
 def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
+
+def srun(hostlist: List[str], user_command: str, timeout: int = 120) -> SrunOutput:
+    assert hostlist != None
+    assert user_command != None
+    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout)
 
 TEST_MODE = False
 def is_slurmctld_up() -> bool:
