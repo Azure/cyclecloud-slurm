@@ -140,7 +140,13 @@ def run_command(cmd,stdout=None):
     return OutputContainer(out)
 
 def setup():
-      Path("test/slurmcc_test/topology_test_output").mkdir(parents=True, exist_ok=True)
+    """
+    Creates the directory 'test/slurmcc_test/topology_test_output' if it does not already exist.
+
+    This function ensures that the directory structure is created, including any necessary parent directories.
+    If the directory already exists, no exception is raised.
+    """
+    Path("test/slurmcc_test/topology_test_output").mkdir(parents=True, exist_ok=True)
 def test_get_hostnames():
     """
     Test the get_hostnames method of the Topology class.
@@ -308,7 +314,7 @@ def test_generate_topo_file():
     with open('test/slurmcc_test/topology_test_input/topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
     assert result==actual
-    
+
 def test_write_slurm_topology():
     """
     Test the write_slurm_topology method of the Topology class.
