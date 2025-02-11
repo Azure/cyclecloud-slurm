@@ -10,25 +10,10 @@ import logging
 import subprocess
 from collections import namedtuple
 from hpc.autoscale.cost.azurecost import azurecost
+from .util import run
 
 log = logging.getLogger('cost')
 
-def run_command(cmd: list, stdout=subprocess.PIPE, stderr=subprocess.PIPE):
-    """
-    run arbitrary command
-    """
-    log.debug(cmd)
-    try:
-        output = subprocess.run(cmd,stdout=stdout,stderr=stderr, check=True,
-                       encoding='utf-8')
-    except subprocess.CalledProcessError as e:
-        log.error(f"cmd: {e.cmd}, rc: {e.returncode}")
-        log.error(e.stderr)
-        sys.exit(1)
-    except Exception as e:
-        log.error(e)
-        raise
-    return output
 
 class Statistics:
 
@@ -103,7 +88,7 @@ class CostSlurm:
 
         options = []
         cmd = [self.sacct, "-e"]
-        out = run_command(cmd)
+        out = run(cmd)
         for line in out.stdout.splitlines():
             for opt in line.split():
                 options.append(opt.lower())
@@ -140,7 +125,7 @@ class CostSlurm:
 
         cmd = [self.squeue, "--json"]
         with open(_queue_rec_file, 'w') as fp:
-            output = run_command(cmd, stdout=fp)
+            output = run(cmd, stdout=fp)
             if output.returncode:
                 log.error("could not read slurm queue")
         return _queue_rec_file
@@ -166,7 +151,7 @@ class CostSlurm:
             return _job_rec_file
         cmd = self._construct_command()
         with open(_job_rec_file, 'w') as fp:
-            output = run_command(cmd, stdout=fp)
+            output = run(cmd, stdout=fp)
             if output.returncode:
                 log.error("Could not fetch slurm records")
         return _job_rec_file
