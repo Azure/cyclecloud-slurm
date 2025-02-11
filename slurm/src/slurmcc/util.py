@@ -4,6 +4,7 @@ import os
 import random
 import subprocess as subprocesslib
 import tempfile
+import sys
 import time
 import traceback
 from abc import ABC, abstractmethod
@@ -143,6 +144,27 @@ def from_hostlist(hostlist_expr: str) -> List[str]:
     return [x.strip() for x in stdout.split()]
 
 
+def run(args: list, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, timeout=120, shell=False, check=True, universal_newlines=True, **kwargs):
+    """
+    run arbitrary command through subprocess.run with some sensible defaults.
+    Standard streams are defaulted to subprocess stdout/stderr pipes.
+    Encoding defaulted to string
+    Timeout defaulted to 2 minutes.
+    """
+    try:
+        output = subprocesslib.run(args=args, stdout=stdout, stderr=stderr, timeout=timeout, shell=shell, check=check, universal_newlines=universal_newlines, **kwargs)
+    except subprocesslib.CalledProcessError as e:
+        logging.error(f"cmd: {e.cmd}, rc: {e.returncode}")
+        logging.error(e.stderr)
+        raise
+    except subprocesslib.TimeoutExpired as t:
+        logging.error("Timeout Expired")
+        raise
+    except Exception as e:
+        logging.error(e)
+        raise
+    return output
+
 def retry_rest(func: Callable, attempts: int = 5) -> Any:
     attempts = max(1, attempts)
     last_exception = None
@@ -196,7 +218,6 @@ class SubprocessModuleWithChaosMode:
     @custom_chaos_mode(_raise_proc_exception)
     def check_output(self, *args, **kwargs):  # type: ignore
         return subprocesslib.check_output(*args, **kwargs)
-
 
 _SUBPROCESS_MODULE = SubprocessModuleWithChaosMode()
 
