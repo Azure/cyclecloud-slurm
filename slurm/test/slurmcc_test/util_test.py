@@ -1,4 +1,4 @@
-from slurmcc.util import to_hostlist, get_sort_key_func
+from slurmcc.util import to_hostlist, get_sort_key_func, run
 from typing import List
 
 def scontrol_func(args: List[str], retry: bool = True) -> str:
@@ -35,3 +35,14 @@ def test_get_sort_key_func() -> None:
 def test_to_hostlist() -> None:
     assert "name-1,dyn" == to_hostlist(["name-1","dyn"], scontrol_func)
     assert "name-1,dyn" == to_hostlist(["dyn","name-1"], scontrol_func)
+
+def test_run_function() -> None:
+    out = run(['ls', '-l'], shell=True)
+    assert out.returncode == 0
+
+    out = run(['cat', '/proc/loadavg'], shell=False)
+    assert out.returncode == 0
+
+    # test case for permissions errors
+    out=run(['touch', '/root/.test'])
+    assert out.returncode != 0
