@@ -159,7 +159,7 @@ class Topology:
             SystemExit: If the command fails, logs the error and exits the program.
         """
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
-        output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
+        output = slutil.srun([self.hosts[0]],cmd)
         exit_code=output[0].exit_code
         stdout=output[0].stdout
         stderr = output[0].stderr
@@ -197,7 +197,7 @@ class Topology:
 
         This method constructs a command to run the `sharp_hello` executable located in the 
         `sharp_cmd_path` directory on the first host in the `hosts` list. It then executes 
-        this command in parallel using `slutil.run_parallel_cmd`.
+        this command in parallel using `slutil.srun`.
 
         The standard output of the command is logged at the debug level. If the command 
         fails (i.e., the exit code is not 0), the standard error output is logged at the 
@@ -212,7 +212,7 @@ class Topology:
                         corresponding exit code.
         """
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
-        output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
+        output = slutil.srun([self.hosts[0]],cmd)
         for line in output[0].stdout:
             log.debug(line)
         if output[0].exit_code!=0:
@@ -239,7 +239,7 @@ class Topology:
             SystemExit: If 'ibstatus' is not available on the first host.
         """
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
-        output = slutil.run_parallel_cmd([self.hosts[0]],cmd)
+        output = slutil.srun([self.hosts[0]],cmd)
         path=None
         for line in output[0].stdout:
             log.debug(line)
@@ -265,7 +265,7 @@ class Topology:
             'xargs -I% ibstat "%" | grep "Port GUID" | cut -d: -f2'
         )
 
-        output = slutil.run_parallel_cmd(self.hosts, cmd)
+        output = slutil.srun(self.hosts, cmd)
         for host_out in output:
             for guid in host_out.stdout:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999,

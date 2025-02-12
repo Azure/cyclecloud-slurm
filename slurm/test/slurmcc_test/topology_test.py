@@ -221,7 +221,7 @@ def test_check_sharp_hello():
     that the result is 0, indicating success.
 
     Steps:
-    1. Assign the run_parallel_cmd function to slutil.run_parallel_cmd.
+    1. Assign the srun function to slutil.run_parallel_cmd.
     2. Create a Topology object with no initial parameters.
     3. Set the hosts attribute of the Topology object to a list containing 'node1'.
     4. Set the sharp_cmd_path attribute of the Topology object to the specified path.
@@ -231,7 +231,7 @@ def test_check_sharp_hello():
     Returns:
         None
     """
-    slutil.run_parallel_cmd=run_parallel_cmd
+    slutil.srun=run_parallel_cmd
     test_obj   = Topology(None,"hpc",None)
     test_obj.hosts=['node1']
     test_obj.sharp_cmd_path="/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
@@ -247,7 +247,7 @@ def test_check_ibstatus():
     that the InfiniBand status check passed.
 
     Steps:
-    1. Assign the run_parallel_cmd function to slutil.run_parallel_cmd.
+    1. Assign the srun function to slutil.run_parallel_cmd.
     2. Create a Topology object with no initial parameters.
     3. Set the hosts attribute of the Topology object to ['node1'].
     4. Call the check_ibstatus method on the Topology object.
@@ -256,7 +256,7 @@ def test_check_ibstatus():
     Returns:
         None
     """
-    slutil.run_parallel_cmd=run_parallel_cmd
+    slutil.srun=run_parallel_cmd
     test_obj   = Topology(None,"hpc",None)
     test_obj.hosts=['node1']
     result=test_obj.check_ibstatus()
@@ -279,7 +279,7 @@ def test_retrieve_guids():
     Raises:
         AssertionError: If the contents of the output GUIDs file do not match the expected GUIDs.
     """
-    slutil.run_parallel_cmd=run_parallel_cmd
+    slutil.srun=run_parallel_cmd
     test_obj   = Topology(None,"hpc",None)
     with open('test/slurmcc_test/topology_test_input/guid_hostnames.txt','r', encoding='utf-8') as file:
         test_obj.hosts= file.read().splitlines()
