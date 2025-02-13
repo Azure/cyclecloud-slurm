@@ -47,8 +47,8 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             temp_file_path = temp_file.name
 
             try:
-                prepend = "| awk '{print "'"$(hostname)"'", $0}'"
-                command = f"{user_command} {prepend}"
+                prepend = "| while IFS= read -r line; do echo \"$(hostname): $line\"; done'"
+                command = f"bash -c {user_command} {prepend}"
                 srun_command = f"srun -w {','.join(hostlist)} --error {temp_file_path} {command}"
                 logging.debug(srun_command)
                 result = subprocesslib.run(srun_command, check=True, timeout=timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
