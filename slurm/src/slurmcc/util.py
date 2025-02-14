@@ -30,7 +30,7 @@ class NativeSlurmCLI(ABC):
         ...
 
     @abstractmethod
-    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool = False) -> SrunOutput:
+    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool) -> SrunOutput:
         ...
 
 class NativeSlurmCLIImpl(NativeSlurmCLI):
