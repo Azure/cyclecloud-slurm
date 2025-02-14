@@ -8,7 +8,8 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
-
+from pssh.clients.ssh import ParallelSSHClient, SSHClient
+import sys
 from . import AzureSlurmError, custom_chaos_mode
 
 
@@ -259,3 +260,27 @@ def is_autoscale_enabled() -> bool:
         return _IS_AUTOSCALE_ENABLED
     logging.warning("Could not determine if autoscale is enabled. Assuming yes")
     return True
+def run_parallel_cmd(hosts, cmd, private_key="~/.ssh/id_rsa"):
+    try:
+        client = ParallelSSHClient(hosts,pkey=f'{private_key}')
+        logging.getLogger("pssh").setLevel(logging.WARNING)
+        output = client.run_command(cmd)
+        client.join(output)
+        return output
+    except Exception as e:
+        raise Exception(f"Error running command: {cmd}: {str(e)}")
+
+def run_command(cmd,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE):
+    logging.debug(cmd)
+    try:
+        output = subprocesslib.run(cmd,stdout=stdout,stderr=stderr, shell=True, check=True,
+                       encoding='utf-8')
+        logging.debug(output.stdout)
+    except subprocesslib.CalledProcessError as e:
+        logging.error(f"cmd: {e.cmd}, rc: {e.returncode}")
+        logging.error(e.stderr)
+        sys.exit(1)
+    except Exception as e:
+        logging.error(e)
+        raise
+    return output
