@@ -183,9 +183,9 @@ class Topology:
             SystemExit: If the operating system is not supported.
         """
         os_id=self.get_os_name()
-        if os_id == "ubuntu":
+        if os_id == "\"ubuntu\"":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
-        if os_id=="almalinux":
+        if os_id=="\"almalinux\"":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
         log.error("OS Not supported, exiting")
         sys.exit(1)
