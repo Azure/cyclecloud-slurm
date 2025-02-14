@@ -160,7 +160,7 @@ class Topology:
         """
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
         output = slutil.srun([self.hosts[0]],cmd)
-        exit_code=output.exit_code
+        exit_code=output.returncode
         stdout=output.stdout
         stderr = output.stderr
         if exit_code==0:
