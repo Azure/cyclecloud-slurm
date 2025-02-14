@@ -41,7 +41,7 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             return retry_subprocess(lambda: check_output(full_args)).strip()
         return check_output(full_args).strip()
 
-    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell=True) -> SrunOutput:
+    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell=False) -> SrunOutput:
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             temp_file_path = temp_file.name
 
