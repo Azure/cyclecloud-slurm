@@ -212,17 +212,17 @@ class Topology:
                         corresponding exit code.
         """
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
-        output = slutil.srun([self.hosts[0]],cmd)
-        for line in output[0].stdout:
-            log.debug(line)
-        if output[0].exit_code!=0:
+        try:
+            output = slutil.srun([self.hosts[0]],cmd)
+            log.debug(output.stdout)
+        except slutil.SrunExitCodeException as e:
             log.error("sharp_hello command failed")
-            for line in output[0].stderr:
-                log.error(line)
-            sys.exit(output[0].exit_code)
-        else:
+            log.error(e.stderr)
+            sys.exit(e.returncode)
+        if output.returncode==0:
             log.debug("sharp_hello command passed")
             return 0
+
 
     def check_ibstatus(self) -> None:
         """
