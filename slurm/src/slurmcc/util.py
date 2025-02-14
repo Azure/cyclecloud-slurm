@@ -30,7 +30,7 @@ class NativeSlurmCLI(ABC):
         ...
 
     @abstractmethod
-    def srun(self, hostname: List[str], user_command: str, timeout: int) -> SrunOutput:
+    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool = False) -> SrunOutput:
         ...
 
 class NativeSlurmCLIImpl(NativeSlurmCLI):
@@ -41,7 +41,7 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             return retry_subprocess(lambda: check_output(full_args)).strip()
         return check_output(full_args).strip()
 
-    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell=False) -> SrunOutput:
+    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell: bool = False) -> SrunOutput:
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             temp_file_path = temp_file.name
 
@@ -71,10 +71,10 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
 
-def srun(hostlist: List[str], user_command: str, timeout: int = 120) -> SrunOutput:
+def srun(hostlist: List[str], user_command: str, timeout: int = 120, shell: bool = False) -> SrunOutput:
     assert hostlist != None
     assert user_command != None
-    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout)
+    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout, shell=shell)
 
 TEST_MODE = False
 def is_slurmctld_up() -> bool:
