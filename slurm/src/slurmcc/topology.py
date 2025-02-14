@@ -164,7 +164,7 @@ class Topology:
         stdout=output.stdout
         stderr = output.stderr
         if exit_code==0:
-            os_id = ''.join(stdout).strip()
+            os_id = stdout
             log.debug(os_id)
             return os_id
         # else:
