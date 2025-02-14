@@ -42,13 +42,12 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             return retry_subprocess(lambda: check_output(full_args)).strip()
         return check_output(full_args).strip()
 
-    def srun(self, hostlist: List[str], user_command: str, timeout: int) -> SrunOutput:
+    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell=False) -> SrunOutput:
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             temp_file_path = temp_file.name
 
             try:
-                prepend = "| while IFS= read -r line; do echo \"$(hostname): $line\"; done'"
-                command = f"bash -c {user_command} {prepend}"
+                command = f"bash -c '{user_command}'" if shell else user_command
                 srun_command = f"srun -w {','.join(hostlist)} --error {temp_file_path} {command}"
                 logging.debug(srun_command)
                 result = subprocesslib.run(srun_command, check=True, timeout=timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
