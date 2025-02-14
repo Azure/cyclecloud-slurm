@@ -240,10 +240,8 @@ class Topology:
         """
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
         output = slutil.srun([self.hosts[0]],cmd)
-        path=None
-        for line in output[0].stdout:
-            log.debug(line)
-            path=line
+        path=output.stdout.strip()
+        log.debug(path)
         if path=="None":
             log.error("The 'ibstatus' command is not available")
             sys.exit(1)
