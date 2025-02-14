@@ -160,18 +160,18 @@ class Topology:
         """
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
         output = slutil.srun([self.hosts[0]],cmd)
-        exit_code=output[0].exit_code
-        stdout=output[0].stdout
-        stderr = output[0].stderr
+        exit_code=output.exit_code
+        stdout=output.stdout
+        stderr = output.stderr
         if exit_code==0:
             os_id = ''.join(stdout).strip()
             log.debug(os_id)
             return os_id
-        else:
-            log.error("Exit code: %s",exit_code)
-            for line in stderr:
-                log.error(line)
-            sys.exit(1)
+        # else:
+        #     log.error("Exit code: %s",exit_code)
+        #     for line in stderr:
+        #         log.error(line)
+        #     sys.exit(1)
     def get_sharp_cmd(self):
         """
         Determines the appropriate SHARP command based on the operating system.
