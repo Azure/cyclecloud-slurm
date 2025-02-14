@@ -159,12 +159,12 @@ class Topology:
             SystemExit: If the command fails, logs the error and exits the program.
         """
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
-        output = slutil.srun([self.hosts[0]],cmd)
+        output = slutil.srun([self.hosts[0]],cmd,shell=True)
         exit_code=output.returncode
         stdout=output.stdout
         stderr = output.stderr
         if exit_code==0:
-            os_id = stdout
+            os_id = stdout.strip()
             log.debug(os_id)
             return os_id
         # else:
