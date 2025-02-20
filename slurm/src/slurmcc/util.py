@@ -292,18 +292,3 @@ def is_autoscale_enabled() -> bool:
         return _IS_AUTOSCALE_ENABLED
     logging.warning("Could not determine if autoscale is enabled. Assuming yes")
     return True
-
-def run_command(cmd,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE):
-    logging.debug(cmd)
-    try:
-        output = subprocesslib.run(cmd,stdout=stdout,stderr=stderr, shell=True, check=True,
-                       encoding='utf-8')
-        logging.debug(output.stdout)
-    except subprocesslib.CalledProcessError as e:
-        logging.error(f"cmd: {e.cmd}, rc: {e.returncode}")
-        logging.error(e.stderr)
-        sys.exit(1)
-    except Exception as e:
-        logging.error(e)
-        raise
-    return output
