@@ -91,7 +91,7 @@ def run_parallel_cmd(hosts,cmd,shell=False):
             stderr = ""
             exit_code = 0
             return ParallelOutputContainer(stdout,stderr,exit_code)
-def run_command(cmd):
+def run_command(cmd,shell=True):
     """
     Executes a given command and returns the output based on predefined conditions.
 
@@ -179,7 +179,7 @@ def test_get_os_name():
     test_obj   = Topology("hpc",None,TESTDIR)
     test_obj.hosts=['node1']
     result=test_obj.get_os_name()
-    assert result=='\"ubuntu\"'
+    assert result=='ubuntu'
 def test_get_sharp_cmd():
     """
     Test the get_sharp_cmd method of the Topology class.

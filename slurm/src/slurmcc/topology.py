@@ -99,8 +99,8 @@ class Topology:
         except subprocesslib.TimeoutExpired:
             sys.exit(1)
         if exit_code==0:
-            os_id = stdout.strip()
-            log.debug(os_id)
+            os_id = stdout.strip().strip('"')
+            log.debug(f"OS ID for host {self.hosts[0]}: {os_id}")
             return os_id
 
     def get_sharp_cmd(self):
@@ -114,9 +114,9 @@ class Topology:
             SystemExit: If the operating system is not supported.
         """
         os_id=self.get_os_name()
-        if os_id == "\"ubuntu\"":
+        if os_id == "ubuntu":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
-        if os_id=="\"almalinux\"":
+        if os_id=="almalinux":
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
         log.error("OS Not supported, exiting")
         sys.exit(1)
