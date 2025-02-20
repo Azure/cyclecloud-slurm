@@ -9,9 +9,21 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
-
+import sys
 from . import AzureSlurmError, custom_chaos_mode
 
+
+class SrunExitCodeException(Exception):
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+        super().__init__(f"srun command failed with exit code {returncode}")
+class SrunOutput:
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
 
 class SrunExitCodeException(Exception):
     def __init__(self, returncode: int, stdout: str, stderr: str):
@@ -280,3 +292,18 @@ def is_autoscale_enabled() -> bool:
         return _IS_AUTOSCALE_ENABLED
     logging.warning("Could not determine if autoscale is enabled. Assuming yes")
     return True
+
+def run_command(cmd,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE):
+    logging.debug(cmd)
+    try:
+        output = subprocesslib.run(cmd,stdout=stdout,stderr=stderr, shell=True, check=True,
+                       encoding='utf-8')
+        logging.debug(output.stdout)
+    except subprocesslib.CalledProcessError as e:
+        logging.error(f"cmd: {e.cmd}, rc: {e.returncode}")
+        logging.error(e.stderr)
+        sys.exit(1)
+    except Exception as e:
+        logging.error(e)
+        raise
+    return output

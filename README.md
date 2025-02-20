@@ -323,6 +323,7 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
       scale                - 
       shell                - Interactive python shell with relevant objects in local scope. Use --script to run python scripts
       suspend              - Equivalent to SuspendProgram, shutsdown nodes
+      topology             - Generates topology plugin configuration
       wait_for_resume      - Wait for a set of nodes to converge.
       ```
 4. Nodes are no longer pre-populated in CycleCloud. They are only created when needed.
