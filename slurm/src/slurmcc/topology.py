@@ -54,27 +54,26 @@ class Topology:
             return set(output.stdout.split('\n')[:-1])
         partition_cmd = f'-p {self.partition} '
         host_cmd = f'scontrol show hostnames $(sinfo -p {self.partition} -o "%N" -h)'
-        partition_states = "powered_down,powering_up,powering_down,power_down"
+        partition_states = "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
         sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h'
         down_cmd = f'scontrol show hostnames $({sinfo_cmd})'
         hosts=get_hostlist(host_cmd)
         down_hosts=get_hostlist(down_cmd)
-        powered_down_hosts = hosts&down_hosts
-        self.hosts = list(hosts-powered_down_hosts)
+        #powered_down_hosts = hosts&down_hosts
+        self.hosts = list(hosts-down_hosts)
         if len(self.hosts)<len(hosts):
             log.warning(
-                "Some nodes were powered down, powering down, or powering up, "
-                "running on a subset of nodes that are powered on"
+                "Some nodes were not fully powered up and idle, "
+                "running on a subset of nodes that are powered on and idle"
             )
-            if powered_down_hosts:
-                log.warning("Powered Down Nodes: %s",
-                                powered_down_hosts)
+            log.warning("Excluded Nodes: %s",
+                                down_hosts)
         log.debug(hosts)
         log.debug(self.hosts)
         if len(self.hosts)<2:
             log.error(
                 "Need more than 2 nodes to create slurm topology, "
-                "less than 2 nodes were powered up. "
+                "less than 2 nodes were powered up and idle. "
             )
             sys.exit(1)
 
