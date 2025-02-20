@@ -152,7 +152,7 @@ class Topology:
             output = slutil.srun([self.hosts[0]],cmd)
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
-            log.error("sharp_hello command failed")
+            log.error("SHARP is disabled on cluster")
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
