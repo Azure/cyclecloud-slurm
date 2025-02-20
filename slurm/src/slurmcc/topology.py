@@ -45,7 +45,7 @@ class Topology:
             Error if the number of valid and powered-on hosts is less than 2.
         """
         def get_hostlist(cmd) -> list:
-            output=slutil.run_command(cmd)
+            output=slutil.run(cmd)
             return set(output.stdout.split('\n')[:-1])
         partition_cmd = f'-p {self.partition} '
         host_cmd = f'scontrol show hostnames $(sinfo -p {self.partition} -o "%N" -h)'

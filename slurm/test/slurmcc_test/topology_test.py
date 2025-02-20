@@ -153,7 +153,7 @@ def test_get_hostnames():
     Raises:
         AssertionError: If the retrieved hostnames do not match the expected hostnames.
     """
-    slutil.run_command=run_command
+    slutil.run=run_command
     test_obj   = Topology("hpc",None,TESTDIR)
     test_obj.get_hostnames()
     result=test_obj.hosts
@@ -313,7 +313,7 @@ def test_write_slurm_topology():
     The test asserts that the content of the generated output file matches the expected output file.
     """
     slutil.srun=run_parallel_cmd
-    slutil.run_command=run_command
+    slutil.run=run_command
     output= 'test/slurmcc_test/topology_test_output/slurm_topology_1.txt'
     test_obj   = Topology("hpc",output,TESTDIR)
     test_obj.get_hostnames()
@@ -345,7 +345,7 @@ def test_run():
         AssertionError: If the generated output does not match the expected output.
     """
     slutil.srun=run_parallel_cmd
-    slutil.run_command=run_command
+    slutil.run=run_command
     output= 'test/slurmcc_test/topology_test_output/slurm_topology_2.txt'
     test_obj   = Topology("hpc",output,TESTDIR)
     test_obj.run()
