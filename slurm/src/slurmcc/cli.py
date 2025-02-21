@@ -228,12 +228,6 @@ class SlurmCLI(CommonCLI):
             autoscale=is_autoscale_enabled(),
         )
 
-    # def generate_topology(self, config: Dict) -> None:
-    #     """
-    #     Generates topology plugin configuration
-    #     """
-    #     return _generate_topology(self._get_node_manager(config), sys.stdout)
-
     def resume_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
         parser.add_argument(
