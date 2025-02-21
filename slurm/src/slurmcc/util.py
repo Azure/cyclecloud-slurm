@@ -9,21 +9,9 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
-import sys
+
 from . import AzureSlurmError, custom_chaos_mode
 
-
-class SrunExitCodeException(Exception):
-    def __init__(self, returncode: int, stdout: str, stderr: str):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
-        super().__init__(f"srun command failed with exit code {returncode}")
-class SrunOutput:
-    def __init__(self, returncode: int, stdout: str, stderr: str):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
 
 class SrunExitCodeException(Exception):
     def __init__(self, returncode: int, stdout: str, stderr: str):
