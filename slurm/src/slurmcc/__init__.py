@@ -10,7 +10,7 @@ try:
 except ImportError:
     # this is only used during live testing with scalelib, so this should never happen
     import logging
-    logging.exception()
+    logging.exception("Failed to import ConnectionError from requests.exceptions")
     ConnectionError = RuntimeError
 
 

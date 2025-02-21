@@ -36,6 +36,7 @@ from . import partition as partitionlib
 from . import util as slutil
 from .util import is_autoscale_enabled, scontrol
 from . import cost
+from . import topology
 
 
 VERSION = "4.0.0"
@@ -184,7 +185,33 @@ class SlurmCLI(CommonCLI):
         azcost = azurecost(config)
         driver = cost.CostDriver(azcost, config)
         driver.run(start, end, out, fmt)
-
+    
+    def topology_parser(self, parser: ArgumentParser) -> None:
+        group = parser.add_mutually_exclusive_group(required=False)
+        #group.add_argument('-n','--nodes', type=str, help="Specify the hostnames for the nodes")
+        parser.add_argument('-p,','--partition', type=str, help="Specify the parititon")
+        parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
+        group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS (default: True)')
+        group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager (default: False)')
+    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager):
+        """
+        Generates Topology Plugin Configuration
+        """
+        if use_fabric_manager:
+            if not partition:
+                raise ValueError("--partition is required when using --use_fabric_manager")
+            config_dir = config.get("config_dir")
+            topo = topology.Topology(partition,output,config_dir)
+            topo.run()
+        elif use_vmss:
+            if output:
+                with open(output, 'w', encoding='utf-8') as file_writer:
+                    return _generate_topology(self._get_node_manager(config), file_writer)
+            else:
+                return _generate_topology(self._get_node_manager(config), sys.stdout)
+        else:
+            raise ValueError("Please specify either --use_vmss or --use_fabric_manager")
+    
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
 
@@ -200,12 +227,6 @@ class SlurmCLI(CommonCLI):
             allow_empty=allow_empty,
             autoscale=is_autoscale_enabled(),
         )
-
-    def generate_topology(self, config: Dict) -> None:
-        """
-        Generates topology plugin configuration
-        """
-        return _generate_topology(self._get_node_manager(config), sys.stdout)
 
     def resume_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)

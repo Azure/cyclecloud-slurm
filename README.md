@@ -309,7 +309,6 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
       connect              - Tests connection to CycleCloud
       cost                 - Cost analysis and reporting tool that maps Azure costs to SLURM Job Accounting data. This is an experimental feature.
       default_output_columns - Output what are the default output columns for an optional command.
-      generate_topology    - Generates topology plugin configuration
       initconfig           - Creates an initial autoscale config. Writes to stdout
       keep_alive           - Add, remeove or set which nodes should be prevented from being shutdown.
       limits               - 
@@ -323,6 +322,7 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
       scale                - 
       shell                - Interactive python shell with relevant objects in local scope. Use --script to run python scripts
       suspend              - Equivalent to SuspendProgram, shutsdown nodes
+      topology             - Generates topology plugin configuration
       wait_for_resume      - Wait for a set of nodes to converge.
       ```
 4. Nodes are no longer pre-populated in CycleCloud. They are only created when needed.

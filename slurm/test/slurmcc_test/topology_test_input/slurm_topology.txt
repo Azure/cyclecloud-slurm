@@ -1,0 +1,6 @@
+SwitchName=sw00 Nodes=hpcbench-hpc-36,hpcbench-hpc-39,hpcbench-hpc-42
+SwitchName=sw01 Nodes=hpcbench-hpc-1,hpcbench-hpc-35,hpcbench-hpc-38,hpcbench-hpc-41,hpcbench-hpc-44,hpcbench-hpc-49
+SwitchName=sw02 Nodes=hpcbench-hpc-37,hpcbench-hpc-45,hpcbench-hpc-46
+SwitchName=sw03 Nodes=hpcbench-hpc-40,hpcbench-hpc-43
+SwitchName=sw04 Nodes=hpcbench-hpc-47,hpcbench-hpc-48
+SwitchName=sw05 Switches=sw00,sw01,sw02,sw03,sw04
