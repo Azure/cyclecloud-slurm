@@ -215,7 +215,7 @@ class Topology:
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
             sys.exit(1)
-        lines=output.stdout.split('\n')
+        lines=output.stdout.split('\n')[:-1]
         for line in lines:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999,
                 # but Sharp will return 0x99999999999999
