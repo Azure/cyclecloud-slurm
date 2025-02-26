@@ -31,7 +31,7 @@ class NativeSlurmCLI(ABC):
         ...
 
     @abstractmethod
-    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool) -> SrunOutput:
+    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool, partition: str) -> SrunOutput:
         ...
 
 class NativeSlurmCLIImpl(NativeSlurmCLI):
@@ -42,13 +42,14 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             return retry_subprocess(lambda: check_output(full_args)).strip()
         return check_output(full_args).strip()
 
-    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell: bool) -> SrunOutput:
+    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell: bool, partition: str) -> SrunOutput:
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             temp_file_path = temp_file.name
 
             try:
                 command = f"bash -c '{user_command}'" if shell else user_command
-                srun_command = f"srun -w {','.join(hostlist)} --error {temp_file_path} {command}"
+                partition_flag = f"-p {partition} " if partition else ""
+                srun_command = f"srun {partition_flag}-w {','.join(hostlist)} --error {temp_file_path} {command}"
                 logging.debug(srun_command)
                 result = subprocesslib.run(srun_command, check=True, timeout=timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
                 return SrunOutput(returncode=result.returncode, stdout=result.stdout, stderr=None)
@@ -72,10 +73,10 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
 
-def srun(hostlist: List[str], user_command: str, timeout: int = 120, shell: bool = False) -> SrunOutput:
+def srun(hostlist: List[str], user_command: str, timeout: int = 120, shell: bool = False, partition: str = None) -> SrunOutput:
     assert hostlist != None
     assert user_command != None
-    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout, shell=shell)
+    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout, shell=shell, partition=partition)
 
 TEST_MODE = False
 def is_slurmctld_up() -> bool:
