@@ -48,8 +48,8 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
 
             try:
                 command = f"bash -c '{user_command}'" if shell else user_command
-                partition_flag = f"-p {partition}" if partition else ""
-                srun_command = f"srun {partition_flag} -w {','.join(hostlist)} --error {temp_file_path} {command}"
+                partition_flag = f"-p {partition} " if partition else ""
+                srun_command = f"srun {partition_flag}-w {','.join(hostlist)} --error {temp_file_path} {command}"
                 logging.debug(srun_command)
                 result = subprocesslib.run(srun_command, check=True, timeout=timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
                 return SrunOutput(returncode=result.returncode, stdout=result.stdout, stderr=None)
