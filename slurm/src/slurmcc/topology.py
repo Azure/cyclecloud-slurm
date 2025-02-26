@@ -259,9 +259,9 @@ class Topology:
             Any exceptions raised by `slutil.run_command` will propagate.
         """
         env=os.environ.copy()
-        env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
         if 'SHARP_CMD' not in env:
             command = (
+                f"SHARP_SMX_UCX_INTERFACE=mlx5_ib0:1 "
                 f"{self.sharp_cmd_path}sharp/bin/sharp_cmd topology "
                 f"--ib-dev mlx5_ib0:1 "
                 f"--guids_file {self.guids_file} "
@@ -269,6 +269,7 @@ class Topology:
             )
         else:
             command = (
+                f"SHARP_SMX_UCX_INTERFACE=mlx5_ib0:1 "
                 f"{env['SHARP_CMD']}sharp/bin/sharp_cmd topology "
                 f"--ib-dev mlx5_ib0:1 "
                 f"--guids_file {self.guids_file} "
@@ -276,7 +277,7 @@ class Topology:
             )
 
         try:
-            output = slutil.srun([self.hosts[0]], command)
+            output = slutil.srun([self.hosts[0]], command, shell = True)
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("Error running sharp_command on host %s",self.hosts[0])
