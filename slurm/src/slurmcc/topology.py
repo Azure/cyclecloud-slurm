@@ -67,8 +67,8 @@ class Topology:
             )
             log.warning("Excluded Nodes: %s",
                                 down_hosts)
-        log.debug(hosts)
-        log.debug(self.hosts)
+        log.debug("Original hosts: %s", hosts)
+        log.debug("Powered On and Idle Hosts: %s", self.hosts)
         if len(self.hosts)<2:
             log.error(
                 "Need more than 2 nodes to create slurm topology, "
@@ -96,7 +96,7 @@ class Topology:
             exit_code=output.returncode
             stdout=output.stdout
         except slutil.SrunExitCodeException as e:
-            log.error("Error running command on host %s",self.hosts[0])
+            log.error("Error running get_os_id command on host %s",self.hosts[0])
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -118,8 +118,10 @@ class Topology:
         """
         os_id=self.get_os_name()
         if os_id == "ubuntu":
+            log.debug("sharp_cmd_path: /opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/")
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
         if os_id=="almalinux":
+            log.debug("sharp_cmd_path: /opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/")
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
         log.error("OS Not supported, exiting")
         sys.exit(1)
@@ -180,7 +182,7 @@ class Topology:
             path=output.stdout.strip()
             log.debug(path)
         except slutil.SrunExitCodeException as e:
-            log.error("Error running command on host %s",self.hosts[0])
+            log.error("Error running check_ibstatus command on host %s",self.hosts[0])
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -209,7 +211,7 @@ class Topology:
         try:
             output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition)
         except slutil.SrunExitCodeException as e:
-            log.error("Error running command on hosts")
+            log.error("Error running retrieve_guids command on hosts")
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
