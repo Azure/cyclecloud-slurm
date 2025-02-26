@@ -59,7 +59,6 @@ class Topology:
         down_cmd = f'scontrol show hostnames $({sinfo_cmd})'
         hosts=get_hostlist(host_cmd)
         down_hosts=get_hostlist(down_cmd)
-        #powered_down_hosts = hosts&down_hosts
         self.hosts = list(hosts-down_hosts)
         if len(self.hosts)<len(hosts):
             log.warning(

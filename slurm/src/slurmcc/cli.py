@@ -188,7 +188,6 @@ class SlurmCLI(CommonCLI):
     
     def topology_parser(self, parser: ArgumentParser) -> None:
         group = parser.add_mutually_exclusive_group(required=False)
-        #group.add_argument('-n','--nodes', type=str, help="Specify the hostnames for the nodes")
         parser.add_argument('-p,','--partition', type=str, help="Specify the parititon")
         parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
         group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS (default: True)')
