@@ -32,7 +32,7 @@ class ParallelOutputContainer:
         self.stdout=stdout
         self.stderr=stderr
         self.returncode=exit_code
-def run_parallel_cmd(hosts,cmd,shell=False):
+def run_parallel_cmd(hosts,cmd,shell=False, partition=None):
     """
     Executes a command in parallel on a list of hosts and returns the output.
 

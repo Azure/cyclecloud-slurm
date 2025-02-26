@@ -93,7 +93,7 @@ class Topology:
         """
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
         try:
-            output = slutil.srun([self.hosts[0]],cmd,shell=True)
+            output = slutil.srun([self.hosts[0]],cmd,shell=True, partition=self.partition)
             exit_code=output.returncode
             stdout=output.stdout
         except slutil.SrunExitCodeException as e:
@@ -148,7 +148,7 @@ class Topology:
         """
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
         try:
-            output = slutil.srun([self.hosts[0]],cmd)
+            output = slutil.srun([self.hosts[0]],cmd, partition=self.partition)
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("SHARP is disabled on cluster")
@@ -177,7 +177,7 @@ class Topology:
         """
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
         try:
-            output = slutil.srun([self.hosts[0]],cmd)
+            output = slutil.srun([self.hosts[0]],cmd, partition=self.partition)
             path=output.stdout.strip()
             log.debug(path)
         except slutil.SrunExitCodeException as e:
@@ -208,7 +208,7 @@ class Topology:
             'while IFS= read -r line; do echo \"$(hostname): $line\"; done'
         )
         try:
-            output = slutil.srun(self.hosts, cmd, shell=True)
+            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition)
         except slutil.SrunExitCodeException as e:
             log.error("Error running command on hosts")
             log.error(e.stderr)
@@ -277,7 +277,7 @@ class Topology:
             )
 
         try:
-            output = slutil.srun([self.hosts[0]], command, shell = True)
+            output = slutil.srun([self.hosts[0]], command, shell = True, partition=self.partition)
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("Error running sharp_command on host %s",self.hosts[0])
