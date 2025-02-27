@@ -54,7 +54,7 @@ class Topology:
             return set(output.stdout.split('\n')[:-1])
         partition_cmd = f'-p {self.partition} '
         host_cmd = f'scontrol show hostnames $(sinfo -p {self.partition} -o "%N" -h)'
-        partition_states = "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
+        partition_states = "resv,powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
         sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h'
         down_cmd = f'scontrol show hostnames $({sinfo_cmd})'
         hosts=get_hostlist(host_cmd)
