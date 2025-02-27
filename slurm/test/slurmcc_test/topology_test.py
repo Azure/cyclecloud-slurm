@@ -112,7 +112,10 @@ def run_command(cmd,shell=True):
     Note:
         The function reads from and writes to files located in 'test/slurmcc_test/topology_test_input' and 'test/slurmcc_test/topology_test_output' directories.
     """
-    if 'powered_down' in cmd:
+    if 'sinfo -o %P' in cmd:
+        with open('test/slurmcc_test/topology_test_input/partitions.txt', 'r', encoding='utf-8') as file:
+            out= file.read()
+    elif 'powered_down' in cmd:
         with open('test/slurmcc_test/topology_test_input/powered_down_hostnames.txt', 'r', encoding='utf-8') as file:
             out= file.read()
     elif cmd=='scontrol show hostnames $(sinfo -o "%N" -h)':

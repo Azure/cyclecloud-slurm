@@ -32,10 +32,8 @@ class Topology:
 
     def get_hostnames(self) -> None:
         """
-        Retrieves and validates the list of hostnames for a given partition.
-        This method fetches the list of hostnames from the SLURM scheduler based on the provided
-        partition or string of nodes and validates them against the list of all available hostnames. It also checks
-        for hosts that are powered down and filters them out.
+        Validates partition and retrieves a list of hostnames from the SLURM scheduler based on the provided parition.
+        It also checks for hosts that are not idle and powered on and filters them out.
             None
         Raises:
             SystemExit: If the number of valid and powered-on hosts is less than 2.
@@ -44,6 +42,20 @@ class Topology:
             Debug information for the list of hosts and the filtered valid hosts.
             Error if the number of valid and powered-on hosts is less than 2.
         """
+        def validate_partition(partition) -> None:
+            try:
+                output=slutil.run("sinfo -o %P | tr -d '*'", shell=True)
+            except subprocesslib.CalledProcessError:
+                sys.exit(1)
+            except subprocesslib.TimeoutExpired:
+                sys.exit(1)
+            partitions=set(output.stdout.strip('*').split('\n')[1:-1])
+            log.debug("Valid Partitions: %s", partitions)
+            if partition not in partitions:
+                log.error("Partition %s does not exist", partition)
+                sys.exit(1)
+            else:
+                log.debug("Partition %s exists", partition)
         def get_hostlist(cmd) -> list:
             try:
                 output=slutil.run(cmd, shell=True)
@@ -52,6 +64,7 @@ class Topology:
             except subprocesslib.TimeoutExpired:
                 sys.exit(1)
             return set(output.stdout.split('\n')[:-1])
+        validate_partition(self.partition)
         partition_cmd = f'-p {self.partition} '
         host_cmd = f'scontrol show hostnames $(sinfo -p {self.partition} -o "%N" -h)'
         partition_states = "resv,powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
@@ -78,7 +91,7 @@ class Topology:
 
     def get_os_name(self):
         """
-        Retrieves the operating system name from the first host in the list.
+        Retrieves the operating system name from the first host in self.hosts.
 
         This method runs a command on the first host to extract the OS ID from the
         /etc/os-release file. It uses the `grep` command to find the line starting
@@ -129,10 +142,10 @@ class Topology:
 
     def check_sharp_hello(self):
         """
-        Executes the sharp_hello command on the first host in the list and logs the output.
+        Executes the sharp_hello command on the first host in self.hosts and logs the output.
 
         This method constructs a command to run the `sharp_hello` executable located in the 
-        `sharp_cmd_path` directory on the first host in the `hosts` list. It then executes 
+        `sharp_cmd_path` directory on the first host in self.hosts. It then executes 
         this command in parallel using `slutil.srun`.
 
         The standard output of the command is logged at the debug level. If the command 
@@ -164,7 +177,7 @@ class Topology:
 
     def check_ibstatus(self) -> None:
         """
-        Checks the availability of the 'ibstatus' command on the first host in the list.
+        Checks the availability of the 'ibstatus' command on the first host in self.hosts.
 
         This method runs a Python command to check if 'ibstatus' is available on the first host.
         If 'ibstatus' is not found, it logs an error message and exits the program.
@@ -197,7 +210,7 @@ class Topology:
     def retrieve_guids(self) -> None:
         """
         Retrieve GUIDs (Globally Unique Identifiers) from the hosts.
-        This method runs a command on multiple hosts to retrieve the Port GUIDs
+        This method runs a command on self.hosts to retrieve the Port GUIDs
         from the InfiniBand status. The command extracts the GUIDs using a series
         of shell commands and processes the output to map each GUID to its
         corresponding host.
@@ -252,9 +265,6 @@ class Topology:
             guids_file (str): The path to the GUIDs file.
             topo_file (str): The path to the output topology file.
             output_dir (str): The directory where the log file will be saved.
-
-        Logs:
-            The output of the SHARP command is logged to `output_dir/logs/topology.log`.
 
         Raises:
             Any exceptions raised by `slutil.run_command` will propagate.
