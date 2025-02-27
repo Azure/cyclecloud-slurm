@@ -203,10 +203,11 @@ Autoscale = $Autoscale
     MachineType = $HPCMachineType
     ImageName = $HPCImageName
     MaxCount = $MaxHPCExecuteNodeCount
+    Zone = ${ifThenElse(DefineNodesAvailabilityZone, HPCAvailabilityZone, {})}
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
     AdditionalClusterInitSpecs = $HPCClusterInitSpecs
     EnableNodeHealthChecks = $EnableNodeHealthChecks
-
+    
 
         [[[configuration]]]
         slurm.default_partition = true
@@ -218,7 +219,7 @@ Autoscale = $Autoscale
     MachineType = $HTCMachineType
     ImageName = $HTCImageName
     MaxCount = $MaxHTCExecuteNodeCount
-
+    Zone = ${ifThenElse(DefineNodesAvailabilityZone, HTCAvailabilityZone, {})}
     Interruptible = $HTCUseLowPrio
     MaxPrice = $HTCSpotMaxPrice
     AdditionalClusterInitSpecs = $HTCClusterInitSpecs
@@ -234,6 +235,7 @@ Autoscale = $Autoscale
     MachineType = $GPUMachineType
     ImageName = $GPUImageName
     MaxCount = $MaxGPUExecuteNodeCount
+    Zone = ${ifThenElse(DefineNodesAvailabilityZone, GPUAvailabilityZone, {})}
     Azure.MaxScalesetSize = $HPCMaxScalesetSize
     EnableNodeHealthChecks = $EnableNodeHealthChecks
 
@@ -417,6 +419,30 @@ Order = 10
         Config.Plugin = pico.form.NumberTextBox
         Conditions.Excluded := DynamicUseLowPrio isnt true
         Config.MinValue = -1
+
+        [[[parameter DefineNodesAvailabilityZone]]]
+        Label = Specify Availability Zones
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Specify availability zones for nodes
+        
+        [[[parameter HPCAvailabilityZone]]]
+        Label = HPC Availability Zone
+        ParameterType = StringList
+        Conditions.Hidden := !DefineNodesAvailabilityZone
+        Description = List of availability zones where HPC nodes will be spread
+
+        [[[parameter HTCAvailabilityZone]]]
+        Label = HTC Availability Zone
+        ParameterType = StringList
+        Conditions.Hidden := !DefineNodesAvailabilityZone
+        Description = List of availability zones where HTC nodes will be spread
+
+        [[[parameter GPUAvailabilityZone]]]
+        Label = GPU Availability Zone
+        ParameterType = StringList
+        Conditions.Hidden := !DefineNodesAvailabilityZone
+        Description = List of availability zones where GPU nodes will be spread
 
         [[[parameter NumberLoginNodes]]]
         Label = Num Login Nodes
