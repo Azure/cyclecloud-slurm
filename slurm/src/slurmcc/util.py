@@ -49,11 +49,16 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             try:
                 command = f"bash -c '{user_command}'" if shell else user_command
                 partition_flag = f"-p {partition} " if partition else ""
-                srun_command = f"srun {partition_flag}-w {','.join(hostlist)} --error {temp_file_path} {command}"
+                #adding deadline timeout 1 minute more than the srun timeout to avoid deadline timeout before srun can finish running
+                srun_command = f"srun {partition_flag}-w {','.join(hostlist)} --error {temp_file_path} --deadline=now+{timeout+1}minute --time={timeout} {command}"
                 logging.debug(srun_command)
-                result = subprocesslib.run(srun_command, check=True, timeout=timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
+                #subprocess timeout is in seconds, so we need to convert the timeout to seconds
+                #add 3 minutes to it so it doesnt timeout before the srun command can kill the job from its own timeout
+                subp_timeout=timeout*60+180
+                result = subprocesslib.run(srun_command, check=True, timeout=subp_timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
                 return SrunOutput(returncode=result.returncode, stdout=result.stdout, stderr=None)
             except subprocesslib.CalledProcessError as e:
+                logging.error(f"Command: {srun_command} failed with return code {e.returncode}")
                 with open(temp_file_path, 'r') as f:
                     stderr_content = f.read()
                 raise SrunExitCodeException(returncode=e.returncode,stdout=e.stdout, stderr=stderr_content)
@@ -73,7 +78,9 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
 
-def srun(hostlist: List[str], user_command: str, timeout: int = 120, shell: bool = False, partition: str = None) -> SrunOutput:
+def srun(hostlist: List[str], user_command: str, timeout: int = 2, shell: bool = False, partition: str = None) -> SrunOutput:
+    #srun --time option is in minutes and needs atleast 1 minute to run
+    assert timeout >= 1
     assert hostlist != None
     assert user_command != None
     return SLURM_CLI.srun(hostlist, user_command, timeout=timeout, shell=shell, partition=partition)

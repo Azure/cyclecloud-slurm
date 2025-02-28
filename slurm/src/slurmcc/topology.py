@@ -32,10 +32,8 @@ class Topology:
 
     def get_hostnames(self) -> None:
         """
-        Retrieves and validates the list of hostnames for a given partition.
-        This method fetches the list of hostnames from the SLURM scheduler based on the provided
-        partition or string of nodes and validates them against the list of all available hostnames. It also checks
-        for hosts that are powered down and filters them out.
+        Validates partition and retrieves a list of hostnames from the SLURM scheduler based on the provided parition.
+        It also checks for hosts that are not idle and powered on and filters them out.
             None
         Raises:
             SystemExit: If the number of valid and powered-on hosts is less than 2.
@@ -44,6 +42,20 @@ class Topology:
             Debug information for the list of hosts and the filtered valid hosts.
             Error if the number of valid and powered-on hosts is less than 2.
         """
+        def validate_partition(partition) -> None:
+            try:
+                output=slutil.run("sinfo -o %P | tr -d '*'", shell=True)
+            except subprocesslib.CalledProcessError:
+                sys.exit(1)
+            except subprocesslib.TimeoutExpired:
+                sys.exit(1)
+            partitions=set(output.stdout.strip('*').split('\n')[1:-1])
+            log.debug("Valid Partitions: %s", partitions)
+            if partition not in partitions:
+                log.error("Partition %s does not exist", partition)
+                sys.exit(1)
+            else:
+                log.debug("Partition %s exists", partition)
         def get_hostlist(cmd) -> list:
             try:
                 output=slutil.run(cmd, shell=True)
@@ -52,6 +64,7 @@ class Topology:
             except subprocesslib.TimeoutExpired:
                 sys.exit(1)
             return set(output.stdout.split('\n')[:-1])
+        validate_partition(self.partition)
         partition_cmd = f'-p {self.partition} '
         host_cmd = f'scontrol show hostnames $(sinfo -p {self.partition} -o "%N" -h)'
         partition_states = "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
@@ -59,7 +72,6 @@ class Topology:
         down_cmd = f'scontrol show hostnames $({sinfo_cmd})'
         hosts=get_hostlist(host_cmd)
         down_hosts=get_hostlist(down_cmd)
-        #powered_down_hosts = hosts&down_hosts
         self.hosts = list(hosts-down_hosts)
         if len(self.hosts)<len(hosts):
             log.warning(
@@ -68,8 +80,8 @@ class Topology:
             )
             log.warning("Excluded Nodes: %s",
                                 down_hosts)
-        log.debug(hosts)
-        log.debug(self.hosts)
+        log.debug("Original hosts: %s", hosts)
+        log.debug("Powered On and Idle Hosts: %s", self.hosts)
         if len(self.hosts)<2:
             log.error(
                 "Need more than 2 nodes to create slurm topology, "
@@ -79,7 +91,7 @@ class Topology:
 
     def get_os_name(self):
         """
-        Retrieves the operating system name from the first host in the list.
+        Retrieves the operating system name from the first host in self.hosts.
 
         This method runs a command on the first host to extract the OS ID from the
         /etc/os-release file. It uses the `grep` command to find the line starting
@@ -93,11 +105,11 @@ class Topology:
         """
         cmd = "grep '^ID=' /etc/os-release | cut -d'=' -f2"
         try:
-            output = slutil.srun([self.hosts[0]],cmd,shell=True)
+            output = slutil.srun([self.hosts[0]],cmd,shell=True, partition=self.partition)
             exit_code=output.returncode
             stdout=output.stdout
         except slutil.SrunExitCodeException as e:
-            log.error("Error running command on host %s",self.hosts[0])
+            log.error("Error running get_os_id command on host %s",self.hosts[0])
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -119,8 +131,10 @@ class Topology:
         """
         os_id=self.get_os_name()
         if os_id == "ubuntu":
+            log.debug("sharp_cmd_path: /opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/")
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
         if os_id=="almalinux":
+            log.debug("sharp_cmd_path: /opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/")
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
         log.error("OS Not supported, exiting")
         sys.exit(1)
@@ -128,10 +142,10 @@ class Topology:
 
     def check_sharp_hello(self):
         """
-        Executes the sharp_hello command on the first host in the list and logs the output.
+        Executes the sharp_hello command on the first host in self.hosts and logs the output.
 
         This method constructs a command to run the `sharp_hello` executable located in the 
-        `sharp_cmd_path` directory on the first host in the `hosts` list. It then executes 
+        `sharp_cmd_path` directory on the first host in self.hosts. It then executes 
         this command in parallel using `slutil.srun`.
 
         The standard output of the command is logged at the debug level. If the command 
@@ -148,7 +162,7 @@ class Topology:
         """
         cmd = f"{self.sharp_cmd_path}sharp/bin/sharp_hello"
         try:
-            output = slutil.srun([self.hosts[0]],cmd)
+            output = slutil.srun([self.hosts[0]],cmd, partition=self.partition)
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("SHARP is disabled on cluster")
@@ -163,7 +177,7 @@ class Topology:
 
     def check_ibstatus(self) -> None:
         """
-        Checks the availability of the 'ibstatus' command on the first host in the list.
+        Checks the availability of the 'ibstatus' command on the first host in self.hosts.
 
         This method runs a Python command to check if 'ibstatus' is available on the first host.
         If 'ibstatus' is not found, it logs an error message and exits the program.
@@ -177,11 +191,11 @@ class Topology:
         """
         cmd ="python3 -c \"import shutil; print(shutil.which('ibstatus'))\""
         try:
-            output = slutil.srun([self.hosts[0]],cmd)
+            output = slutil.srun([self.hosts[0]],cmd, partition=self.partition)
             path=output.stdout.strip()
             log.debug(path)
         except slutil.SrunExitCodeException as e:
-            log.error("Error running command on host %s",self.hosts[0])
+            log.error("Error running check_ibstatus command on host %s",self.hosts[0])
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -196,7 +210,7 @@ class Topology:
     def retrieve_guids(self) -> None:
         """
         Retrieve GUIDs (Globally Unique Identifiers) from the hosts.
-        This method runs a command on multiple hosts to retrieve the Port GUIDs
+        This method runs a command on self.hosts to retrieve the Port GUIDs
         from the InfiniBand status. The command extracts the GUIDs using a series
         of shell commands and processes the output to map each GUID to its
         corresponding host.
@@ -208,14 +222,14 @@ class Topology:
             'while IFS= read -r line; do echo \"$(hostname): $line\"; done'
         )
         try:
-            output = slutil.srun(self.hosts, cmd, shell=True)
+            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition)
         except slutil.SrunExitCodeException as e:
-            log.error("Error running command on hosts")
+            log.error("Error running retrieve_guids command on hosts")
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
             sys.exit(1)
-        lines=output.stdout.split('\n')
+        lines=output.stdout.split('\n')[:-1]
         for line in lines:
                 # Querying GUIDs from ibstat will have pattern 0x0099999999999999,
                 # but Sharp will return 0x99999999999999
@@ -252,16 +266,13 @@ class Topology:
             topo_file (str): The path to the output topology file.
             output_dir (str): The directory where the log file will be saved.
 
-        Logs:
-            The output of the SHARP command is logged to `output_dir/logs/topology.log`.
-
         Raises:
             Any exceptions raised by `slutil.run_command` will propagate.
         """
         env=os.environ.copy()
-        env["SHARP_SMX_UC_INTERFACE"]= "mlx5_ib0:1"
         if 'SHARP_CMD' not in env:
             command = (
+                f"SHARP_SMX_UCX_INTERFACE=mlx5_ib0:1 "
                 f"{self.sharp_cmd_path}sharp/bin/sharp_cmd topology "
                 f"--ib-dev mlx5_ib0:1 "
                 f"--guids_file {self.guids_file} "
@@ -269,6 +280,7 @@ class Topology:
             )
         else:
             command = (
+                f"SHARP_SMX_UCX_INTERFACE=mlx5_ib0:1 "
                 f"{env['SHARP_CMD']}sharp/bin/sharp_cmd topology "
                 f"--ib-dev mlx5_ib0:1 "
                 f"--guids_file {self.guids_file} "
@@ -276,7 +288,7 @@ class Topology:
             )
 
         try:
-            output = slutil.srun([self.hosts[0]], command)
+            output = slutil.srun([self.hosts[0]], command, shell = True, partition=self.partition)
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("Error running sharp_command on host %s",self.hosts[0])
@@ -364,6 +376,9 @@ class Topology:
             with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
                 for torset, hosts in self.torsets.items():
                     torset_index=torset[-2:]
+                    num_nodes = len(hosts)
+                    file.write(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
+                    print(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
                     file.write(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                     print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                     switches.append(f"sw{torset_index}")
@@ -374,6 +389,8 @@ class Topology:
         else:
             for torset, hosts in self.torsets.items():
                 torset_index=torset[-2:]
+                num_nodes = len(hosts)
+                print(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
                 print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                 switches.append(f"sw{torset_index}")
             if len(self.torsets)>1:
