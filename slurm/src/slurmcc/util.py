@@ -58,6 +58,7 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
                 result = subprocesslib.run(srun_command, check=True, timeout=subp_timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
                 return SrunOutput(returncode=result.returncode, stdout=result.stdout, stderr=None)
             except subprocesslib.CalledProcessError as e:
+                logging.error(f"Command: {srun_command} failed with return code {e.returncode}")
                 with open(temp_file_path, 'r') as f:
                     stderr_content = f.read()
                 raise SrunExitCodeException(returncode=e.returncode,stdout=e.stdout, stderr=stderr_content)
