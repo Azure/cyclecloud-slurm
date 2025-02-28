@@ -376,6 +376,8 @@ class Topology:
             with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
                 for torset, hosts in self.torsets.items():
                     torset_index=torset[-2:]
+                    num_nodes = len(hosts)
+                    file.write(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
                     file.write(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                     print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                     switches.append(f"sw{torset_index}")
@@ -386,6 +388,8 @@ class Topology:
         else:
             for torset, hosts in self.torsets.items():
                 torset_index=torset[-2:]
+                num_nodes = len(hosts)
+                file.write(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
                 print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
                 switches.append(f"sw{torset_index}")
             if len(self.torsets)>1:
