@@ -110,6 +110,8 @@ class Topology:
             stdout=output.stdout
         except slutil.SrunExitCodeException as e:
             log.error("Error running get_os_id command on host %s",self.hosts[0])
+            if e.stderr_content.strip("\n"):
+                log.error(e.stderr_content)
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -166,6 +168,8 @@ class Topology:
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("SHARP is disabled on cluster")
+            if e.stderr_content.strip("\n"):
+                log.error(e.stderr_content)
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -196,6 +200,8 @@ class Topology:
             log.debug(path)
         except slutil.SrunExitCodeException as e:
             log.error("Error running check_ibstatus command on host %s",self.hosts[0])
+            if e.stderr_content.strip("\n"):
+                log.error(e.stderr_content)
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -225,6 +231,8 @@ class Topology:
             output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition)
         except slutil.SrunExitCodeException as e:
             log.error("Error running retrieve_guids command on hosts")
+            if e.stderr_content.strip("\n"):
+                log.error(e.stderr_content)
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
@@ -292,6 +300,8 @@ class Topology:
             log.debug(output.stdout)
         except slutil.SrunExitCodeException as e:
             log.error("Error running sharp_command on host %s",self.hosts[0])
+            if e.stderr_content.strip("\n"):
+                log.error(e.stderr_content)
             log.error(e.stderr)
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
