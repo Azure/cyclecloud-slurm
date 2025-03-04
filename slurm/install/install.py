@@ -644,6 +644,7 @@ def main() -> None:
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
     )
     parser.add_argument("--bootstrap-config", default="jetpack")
+    parser.add_argument("--do-install", default=True)
 
     args = parser.parse_args()
 
@@ -663,7 +664,8 @@ def main() -> None:
     munge_key(settings)
 
     # runs either rhel.sh or ubuntu.sh to install the packages
-    run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
+    if args.do_install:
+        run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
 
     # various permissions fixes
     fix_permissions(settings)
