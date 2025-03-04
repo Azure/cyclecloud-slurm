@@ -62,6 +62,8 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
                 logging.error(f"Command: {srun_command} failed with return code {e.returncode}")
                 with open(temp_file_path, 'r') as f:
                     stderr_content = f.read()
+                    if not stderr_content.strip("\n"):
+                        stderr_content = None
                 raise SrunExitCodeException(returncode=e.returncode,stdout=e.stdout, stderr=e.stderr, stderr_content=stderr_content)
             except subprocesslib.TimeoutExpired:
                 logging.error("Srun command timed out!")
