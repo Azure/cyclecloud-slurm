@@ -14,13 +14,14 @@ from . import AzureSlurmError, custom_chaos_mode
 
 
 class SrunExitCodeException(Exception):
-    def __init__(self, returncode: int, stdout: str, stderr: str):
+    def __init__(self, returncode: int, stdout: str, stderr: str, stderr_content: str):
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
+        self.stderr_content = stderr_content
         super().__init__(f"srun command failed with exit code {returncode}")
 class SrunOutput:
-    def __init__(self, returncode: int, stdout: str, stderr: str):
+    def __init__(self, returncode: int, stdout: str, stderr: str,):
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
@@ -61,7 +62,9 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
                 logging.error(f"Command: {srun_command} failed with return code {e.returncode}")
                 with open(temp_file_path, 'r') as f:
                     stderr_content = f.read()
-                raise SrunExitCodeException(returncode=e.returncode,stdout=e.stdout, stderr=stderr_content)
+                    if not stderr_content.strip("\n"):
+                        stderr_content = None
+                raise SrunExitCodeException(returncode=e.returncode,stdout=e.stdout, stderr=e.stderr, stderr_content=stderr_content)
             except subprocesslib.TimeoutExpired:
                 logging.error("Srun command timed out!")
                 raise
