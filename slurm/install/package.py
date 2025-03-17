@@ -5,53 +5,10 @@ import sys
 import tarfile
 from typing import Optional
 
-import slurm_supported_version
-
-## temporarily while our rpms/debs are not in PMC we have to download zip files
-## from  github. We will have to modify this function to download binaries from
-## PMC once they are there.
-def download_bins(slurm_required_bins: None) -> None:
-    with open("download-slurm-pkgs.sh", "w") as fw:
-        fw.write(f"""#!/usr/bin/env bash
-cd $(dirname $0)
-""")    
-
-        url_root = slurm_supported_version.CURRENT_DOWNLOAD_URL
-        if not slurm_required_bins:
-            slurm_required_bins = slurm_supported_version.get_required_packages()
-        for pkg in slurm_required_bins:
-                zipfile = pkg.split("/")[0]
-                fw.write(f"""
-if [ ! -e {pkg} ]; then
-    rm -rf {zipfile}.zip
-    rm -rf {zipfile}
-    wget -O {zipfile}.zip {url_root}/{zipfile}.zip
-    unzip {zipfile}.zip
-fi
-""")
-
-    print(
-        "Downloading slurm packages... if you hit an error, just run ./download-slurm-pkgs.sh again"
-    )
-    exit_code = subprocess.call(["bash", "download-slurm-pkgs.sh"])
-    if exit_code == 0:
-        print("Success. Deleting download-slurm-pkgs.sh")
-        # only remove this on the happy case
-        os.remove("download-slurm-pkgs.sh")
-    else:
-        print("  WARNING: Not all slurm packages were downloaded. You might be rate limited.")
-        print("  Just run 'bash download-slurm-pkgs.sh' again")
-        sys.exit(1)
-
-
 def execute() -> None:
 
     expected_cwd = os.path.abspath(os.path.dirname(__file__))
     os.chdir(expected_cwd)
-
-    slurm_required_bins = slurm_supported_version.get_required_packages()
-
-    download_bins(slurm_required_bins)
 
     if not os.path.exists("libs"):
         os.makedirs("libs")
@@ -100,11 +57,6 @@ def execute() -> None:
     for fil in os.listdir("templates"):
         if os.path.isfile(f"templates/{fil}"):
             _add(f"templates/{fil}", f"templates/{fil}")
-
-
-    for binary in slurm_required_bins:
-            _add(f"{binary}", os.path.abspath(f"{binary}"))
-
 
 if __name__ == "__main__":
     execute()
