@@ -36,7 +36,7 @@ if [ $UBUNTU_VERSION == 24.04 ]; then
 else
     if ["$arch" == "arm64"]; then
         echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
-        exit
+        exit 1
     fi
     echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
 fi
