@@ -20,14 +20,26 @@ fi
 apt -y install munge
  
 apt -y install libmysqlclient-dev libssl-dev jq
-
-if [ $UBUNTU_VERSION == 22.04 ]; then
+arch=$(dpkg --print-architecture)
+if [ $UBUNTU_VERSION == 24.04 ]; then
+    REPO=slurm-ubuntu-noble
+elif [ $UBUNTU_VERSION == 22.04 ]; then
     REPO=slurm-ubuntu-jammy
 else
     REPO=slurm-ubuntu-focal
 fi
 
-echo "deb [arch=amd64] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+if [ $UBUNTU_VERSION == 24.04 ]; then
+    # microsoft-prod no longer installs GPG key in /etc/apt/trusted.gpg.d
+    # so we need to use signed-by instead to specify the key for Ubuntu 24.04 onwards
+    echo "deb [arch=$arch signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+else
+    if ["$arch" == "arm64"]; then
+        echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
+        exit 1
+    fi
+    echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+fi
 echo "\
 Package: slurm, slurm-*
 Pin:  origin \"packages.microsoft.com\"
