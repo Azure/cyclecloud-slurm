@@ -20,14 +20,15 @@ fi
 apt -y install munge
  
 apt -y install libmysqlclient-dev libssl-dev jq
-
-if [ $UBUNTU_VERSION == 22.04 ]; then
+if [ $UBUNTU_VERSION == 24.04 ]; then
+    REPO=slurm-ubuntu-noble
+elif [ $UBUNTU_VERSION == 22.04 ]; then
     REPO=slurm-ubuntu-jammy
 else
     REPO=slurm-ubuntu-focal
 fi
-
-echo "deb [arch=amd64] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+arch=$(dpkg --print-architecture)
+echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
 echo "\
 Package: slurm, slurm-*
 Pin:  origin \"packages.microsoft.com\"
