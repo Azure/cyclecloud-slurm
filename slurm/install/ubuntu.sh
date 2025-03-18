@@ -10,7 +10,6 @@ fi
 
 SLURM_ROLE=$1
 SLURM_VERSION=$2
-DISABLE_PMC=$3
 
 apt update
 UBUNTU_VERSION=$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2)
@@ -28,9 +27,8 @@ else
     REPO=slurm-ubuntu-focal
 fi
 
-if [ "$DISABLE_PMC" = "False" ]; then
-    echo "deb [arch=amd64] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
-    echo "\
+echo "deb [arch=amd64] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+echo "\
 Package: slurm, slurm-*
 Pin:  origin \"packages.microsoft.com\"
 Pin-Priority: 990
@@ -39,32 +37,31 @@ Package: slurm, slurm-*
 Pin: origin *ubuntu.com*
 Pin-Priority: -1" > /etc/apt/preferences.d/slurm-repository-pin-990
 
-    ## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to
-    ## use generic ubuntu marketplace image then this package sets up the right gpg keys for PMC.
-    if [ ! -e /etc/apt/sources.list.d/microsoft-prod.list ]; then
-        curl -sSL -O https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb
-        dpkg -i packages-microsoft-prod.deb
-        rm packages-microsoft-prod.deb
-    fi
-    apt update
-    slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-slurmrestd slurm-smd-sview"
-    for pkg in $slurm_packages; do
-        apt install -y $pkg=$SLURM_VERSION
-        apt-mark hold $pkg
-    done
-
-    if [ ${SLURM_ROLE} == "scheduler" ]; then
-        apt install -y slurm-smd-slurmctld=$SLURM_VERSION slurm-smd-slurmdbd=$SLURM_VERSION
-        apt-mark hold slurm-smd-slurmctld slurm-smd-slurmdbd
-    fi
-    if [ ${SLURM_ROLE} == "execute" ]; then
-        apt install -y slurm-smd-slurmd=$SLURM_VERSION
-        apt-mark hold slurm-smd-slurmd
-    fi
-
-    touch $INSALLED_FILE
-    exit
+## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to
+## use generic ubuntu marketplace image then this package sets up the right gpg keys for PMC.
+if [ ! -e /etc/apt/sources.list.d/microsoft-prod.list ]; then
+    curl -sSL -O https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb
+    dpkg -i packages-microsoft-prod.deb
+    rm packages-microsoft-prod.deb
 fi
+apt update
+slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-slurmrestd slurm-smd-sview"
+for pkg in $slurm_packages; do
+    apt install -y $pkg=$SLURM_VERSION
+    apt-mark hold $pkg
+done
+
+if [ ${SLURM_ROLE} == "scheduler" ]; then
+    apt install -y slurm-smd-slurmctld=$SLURM_VERSION slurm-smd-slurmdbd=$SLURM_VERSION
+    apt-mark hold slurm-smd-slurmctld slurm-smd-slurmdbd
+fi
+if [ ${SLURM_ROLE} == "execute" ]; then
+    apt install -y slurm-smd-slurmd=$SLURM_VERSION
+    apt-mark hold slurm-smd-slurmd
+fi
+
+touch $INSALLED_FILE
+exit
 
 if [[ $UBUNTU_VERSION > "19" ]]; then
     apt install -y libhwloc15
@@ -88,18 +85,3 @@ else
     ln -sf /lib/x86_64-linux-gnu/libncurses.so.5 /usr/lib/x86_64-linux-gnu/libncurses.so.5
     ln -sf /lib/x86_64-linux-gnu/libtinfo.so.5 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
 fi
-
-if [ $UBUNTU_VERSION == 22.04 ]; then
-    PACKAGE_DIR=slurm-pkgs-ubuntu22
-else
-    PACKAGE_DIR=slurm-pkgs-ubuntu20
-fi
-dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*.deb | grep -v -e slurmdbd -e slurmctld)
-apt --fix-broken -y install
-
-if [ ${SLURM_ROLE} == "scheduler" ]; then
-    dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*.deb | grep slurmctld)
-    dpkg -i --force-all $(ls $PACKAGE_DIR/slurm-$SLURM_VERSION/debs/*.deb | grep slurmdbd)
-fi
-apt --fix-broken -y install
-touch $INSALLED_FILE
