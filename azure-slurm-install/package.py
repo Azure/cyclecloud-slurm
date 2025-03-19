@@ -14,7 +14,7 @@ def execute() -> None:
         os.makedirs("libs")
 
     parser = configparser.ConfigParser()
-    ini_path = os.path.abspath("../../project.ini")
+    ini_path = os.path.abspath("../project.ini")
 
     with open(ini_path) as fr:
         parser.read_file(fr)
