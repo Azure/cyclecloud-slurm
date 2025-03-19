@@ -117,8 +117,8 @@ class TypeChecking(Command):
 setup(
     name="azure-slurm",
     version=__version__,
-    packages=find_packages(where="slurmcc"),
-    package_dir={"": "slurmcc"},
+    packages=find_packages(),
+    #package_dir={"": "slurmcc"},
     package_data={
         "azure-slurm": [
             "BUILD_NUMBER",
