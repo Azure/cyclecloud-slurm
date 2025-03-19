@@ -1,5 +1,5 @@
 
-Slurm
+Cyclecloud Slurm
 ========
 
 This project sets up an auto-scaling Slurm cluster
