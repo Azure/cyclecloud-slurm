@@ -1,12 +1,36 @@
 
-Slurm
+Cyclecloud Slurm
 ========
 
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
-
-## Slurm Clusters in CycleCloud versions < 8.4.0
-See [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30) for more information.
+# Table of Contents:
+1. [Managing Slurm Clusters in 4.0.0](#managing-slurm-clusters)
+    1. [Making Cluster Changes](#making-cluster-changes)
+    2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
+    3. [Creating additional partitions](#creating-additional-partitions)
+    4. [Dynamic Partitions](#dynamic-partitions)
+    5. [Using Dynamic Partitions to Autoscale](#using-dynamic-partitions-to-autoscale)
+    6. [Dynamic Scaledown](#dynamic-scaledown)
+    7. [Manual scaling](#manual-scaling)
+    8. [Accounting](#accounting)
+        1. [AzureCA.pem and existing MariaDB/MySQL instances](#azurecapem-and-existing-mariadbmysql-instances)
+    9. [Cost Reporting](#cost-reporting)
+    10. [Topology](#topology)
+2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
+3. [Packaging](#packaging)
+    1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
+4. [Troubleshooting](#troubleshooting)
+    1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
+    2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
+    3. [Dampening Memory](#dampening-memory)
+    4. [KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
+    5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
+    6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
+    7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
+5. [Contributing](#contributing)
+---
+## Managing Slurm Clusters in 4.0.0
 
 ### Making Cluster Changes
 The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
@@ -199,6 +223,73 @@ Formatting is only available for jobs and not for partition and partition_hourly
 
 Do note: `azslurm cost` relies on slurm's admincomment feature to associate specific vm_size and meter info for jobs.
 
+### Topology
+`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the topology plugin configuration for slurm either using VMSS topology or a fabric manager that has SHARP enabled.
+
+```
+usage: azslurm topology [-h] [--config CONFIG] [-p, PARTITION] [-o OUTPUT]
+                        [-v | -f]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --config CONFIG, -c CONFIG
+  -p, PARTITION, --partition PARTITION
+                        Specify the parititon
+  -o OUTPUT, --output OUTPUT
+                        Specify slurm topology file output
+  -v, --use_vmss        Use VMSS (default: True)
+  -f, --use_fabric_manager
+                        Use Fabric Manager (default: False)
+```
+To generate slurm topology using VMSS:
+```
+azslurm topology
+azslurm topology -o topology.conf
+```
+This will print out a the topology in the tree plugin format slurm wants for topology.conf or create a file based on the output file given in the cli
+
+```
+SwitchName=htc Nodes=cluster-htc-1,cluster-htc-2,cluster-htc-3,cluster-htc-4,cluster-htc-5,cluster-htc-6,cluster-htc-7,cluster-htc-8,cluster-htc-9,cluster-htc-10,cluster-htc-11,cluster-htc-12,cluster-htc-13,cluster-htc-14,cluster-htc-15,cluster-htc-16,cluster-htc-17,cluster-htc-18,cluster-htc-19,cluster-htc-20,cluster-htc-21,cluster-htc-22,cluster-htc-23,cluster-htc-24,cluster-htc-25,cluster-htc-26,cluster-htc-27,cluster-htc-28,cluster-htc-29,cluster-htc-30,cluster-htc-31,cluster-htc-32,cluster-htc-33,cluster-htc-34,cluster-htc-35,cluster-htc-36,cluster-htc-37,cluster-htc-38,cluster-htc-39,cluster-htc-40,cluster-htc-41,cluster-htc-42,cluster-htc-43,cluster-htc-44,cluster-htc-45,cluster-htc-46,cluster-htc-47,cluster-htc-48,cluster-htc-49,cluster-htc-50
+SwitchName=Standard_F2s_v2_pg0 Nodes=cluster-hpc-1,cluster-hpc-10,cluster-hpc-11,cluster-hpc-12,cluster-hpc-13,cluster-hpc-14,cluster-hpc-15,cluster-hpc-16,cluster-hpc-2,cluster-hpc-3,cluster-hpc-4,cluster-hpc-5,cluster-hpc-6,cluster-hpc-7,cluster-hpc-8,cluster-hpc-9
+```
+To generate slurm topology using Fabric Manager you need a SHARP enabled cluster and it is required you specify a partition:
+```
+azslurm topology -f -p gpu
+azslurm topology -f -p gpu -o topology.conf
+```
+```
+# Number of Nodes in sw00: 6
+
+SwitchName=sw00 Nodes=ccw-gpu-7,ccw-gpu-99,ccw-gpu-151,ccw-gpu-140,ccw-gpu-167,ccw-gpu-194
+
+# Number of Nodes in sw01: 12
+
+SwitchName=sw01 Nodes=ccw-gpu-30,ccw-gpu-29,ccw-gpu-32,ccw-gpu-87,ccw-gpu-85,ccw-gpu-149,ccw-gpu-150,ccw-gpu-166,ccw-gpu-141,ccw-gpu-162,ccw-gpu-112,ccw-gpu-183
+
+# Number of Nodes in sw02: 1
+
+SwitchName=sw02 Nodes=ccw-gpu-192
+
+# Number of Nodes in sw03: 8
+
+SwitchName=sw03 Nodes=ccw-gpu-13,ccw-gpu-142,ccw-gpu-26,ccw-gpu-136,ccw-gpu-163,ccw-gpu-138,ccw-gpu-187,ccw-gpu-88
+```
+This either prints out the topology in slurm topology format or creates an output file with the topology
+## Supported Slurm and PMIX versions
+The current slurm versions supported are `24.11.3` and `24.05.6`. Both are compiled with PMIX version `4.2.9`.
+## Packaging
+Slurm and PMIX packages are fetched and downloaded exclusively from packages.microsoft.com.
+### Supported OS and PMC Repos
+
+| OS                    | PMC Repo                                      |
+|-----------------------|-----------------------------------------------|
+| Ubuntu 20.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-focal/` |
+| Ubuntu 22.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-jammy/` |
+| Ubuntu 24.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
+| Ubuntu 24.04 [arm64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
+| AlmaLinux 8 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
+| Almalinux 9 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
+
 ## Troubleshooting
 
 ### UID conflicts for Slurm and Munge users
@@ -328,7 +419,8 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
 4. Nodes are no longer pre-populated in CycleCloud. They are only created when needed.
 5. All slurm binaries are inside the `azure-slurm-install-pkg*.tar.gz` file, under `slurm-pkgs`. They are pulled from a specific binary release. The current binary releases is [2023-08-07](https://github.com/Azure/cyclecloud-slurm/releases/tag/2023-08-07-bins)
 6. For MPI jobs, the only network boundary that exists by default is the partition. There are not multiple "placement groups" per partition like 2.x. So you only have one colocated VMSS per partition. There is also no use of the topology plugin, which necessitated the use of a job submission plugin that is also no longer needed. Instead, submitting to multiple partitions is now the recommended option for use cases that require submitting jobs to multiple placement groups.
-
+### Transitioning from 3.0 to 4.0
+1. Disable PMC is no longer supported and all slurm downloads will come from packages.microsoft.com. All blobs from github have been removed.
 ### Ubuntu 22 or greater and DNS hostname resolution
 Due to an issue with the underlying DNS registration scheme that is used across Azure, our Slurm scripts use a mitigation that involves restarting `systemd-networkd` when changing the hostname of VMs deployed in a VMSS. This mitigation can be disabled by adding the following to your `Configuration` section.
 ```ini
