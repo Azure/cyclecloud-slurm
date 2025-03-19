@@ -5,7 +5,7 @@ Slurm
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Slurm Clusters in CycleCloud versions < 8.4.0](#slurm-clusters-in-cyclecloud-versions--840)
+1. [Managing Slurm Clusters in 4.0.0](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
@@ -13,22 +13,24 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     5. [Using Dynamic Partitions to Autoscale](#using-dynamic-partitions-to-autoscale)
     6. [Dynamic Scaledown](#dynamic-scaledown)
     7. [Manual scaling](#manual-scaling)
-2. [Accounting](#accounting)
-    1. [AzureCA.pem and existing MariaDB/MySQL instances](#azurecapem-and-existing-mariadbmysql-instances)
-3. [Cost Reporting](#cost-reporting)
-4. [Topology](#topology)
-5. [Troubleshooting](#troubleshooting)
+    8. [Accounting](#accounting)
+        1. [AzureCA.pem and existing MariaDB/MySQL instances](#azurecapem-and-existing-mariadbmysql-instances)
+    9. [Cost Reporting](#cost-reporting)
+    10. [Topology](#topology)
+2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
+3. [Packaging](#packaging)
+    1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
+4. [Troubleshooting](#troubleshooting)
     1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
     2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
     3. [Dampening Memory](#dampening-memory)
     4. [KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
-6. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
-7. [Contributing](#contributing)
+    7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
+5. [Contributing](#contributing)
 ---
-## Slurm Clusters in CycleCloud versions < 8.4.0
-See [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30) for more information.
+## Managing Slurm Clusters in 4.0.0
 
 ### Making Cluster Changes
 The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
@@ -221,8 +223,8 @@ Formatting is only available for jobs and not for partition and partition_hourly
 
 Do note: `azslurm cost` relies on slurm's admincomment feature to associate specific vm_size and meter info for jobs.
 
-## Topology
-`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the topology plugin configuration for slurm either using VMSS topology or a fabric manager in this case SHARP.
+### Topology
+`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the topology plugin configuration for slurm either using VMSS topology or a fabric manager that has SHARP enabled.
 
 ```
 usage: azslurm topology [-h] [--config CONFIG] [-p, PARTITION] [-o OUTPUT]
@@ -273,6 +275,20 @@ SwitchName=sw02 Nodes=ccw-gpu-192
 SwitchName=sw03 Nodes=ccw-gpu-13,ccw-gpu-142,ccw-gpu-26,ccw-gpu-136,ccw-gpu-163,ccw-gpu-138,ccw-gpu-187,ccw-gpu-88
 ```
 This either prints out the topology in slurm topology format or creates an output file with the topology
+## Supported Slurm and PMIX versions
+The current slurm versions supported are `24.11.3` and `24.05.6`. Both are compiled with PMIX version `4.2.9`.
+## Packaging
+Slurm and PMIX packages are fetched and downloaded exclusively from packages.microsoft.com.
+### Supported OS and PMC Repos
+
+| OS                    | PMC Repo                                      |
+|-----------------------|-----------------------------------------------|
+| Ubuntu 20.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-focal/` |
+| Ubuntu 22.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-jammy/` |
+| Ubuntu 24.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
+| Ubuntu 24.04 [arm64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
+| AlmaLinux 8 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
+| Almalinux 9 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
 
 ## Troubleshooting
 
