@@ -16,9 +16,9 @@ CYCLECLOUD_API_VERSION = "8.7.1"
 
 
 def build_sdist() -> str:
-    check_call([sys.executable, "setup.py", "sdist"], cwd="slurm")
-    sdists = glob.glob("slurm/dist/azure-slurm-*.tar.gz")
-    assert len(sdists) == 1, f"Found %d sdist packages, expected 1 - see {os.path.abspath('slurm/dist/azure-slurm-*.tar.gz')}" % len(sdists)
+    check_call([sys.executable, "setup.py", "sdist"])
+    sdists = glob.glob("dist/azure-slurm-*.tar.gz")
+    assert len(sdists) == 1, f"Found %d sdist packages, expected 1 - see {os.path.abspath('dist/azure-slurm-*.tar.gz')}" % len(sdists)
     path = sdists[0]
     fname = os.path.basename(path)
     dest = os.path.join("libs", fname)
@@ -90,7 +90,7 @@ def execute() -> None:
     cycle_libs = get_cycle_libs(args)
 
     parser = configparser.ConfigParser()
-    ini_path = os.path.abspath("project.ini")
+    ini_path = os.path.abspath("../project.ini")
 
     with open(ini_path) as fr:
         parser.read_file(fr)
@@ -160,7 +160,7 @@ def execute() -> None:
     _add("sbin/return_to_idle_legacyfin.sh", "sbin/return_to_idle_legacy.sh")
     _add("sbin/suspend_program.sh", "sbin/suspend_program.sh")
     _add("sbin/get_acct_info.sh", "sbin/get_acct_info.sh")
-    _add("logging.conf", "slurm/conf/logging.conf")
+    _add("logging.conf", "conf/logging.conf")
     
 
 

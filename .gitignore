@@ -341,8 +341,8 @@ blobs
 **/dist
 **/*egg-info
 **/creds.json
-slurm/install/*.zip
-slurm/install/AzureCA.pem
-install/docker/sched
+azure-slurm-install/dist
+azure-slurm-install/docker/
 .DS_Store
 .build.log
+azure-slurm-install/AzureCA.pem

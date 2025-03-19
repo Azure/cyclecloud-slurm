@@ -55,7 +55,7 @@ get_version_from_project_ini() {
   check_blobs_files_exist "$version"
 }
 
-local_azslurm=/source/azure-slurm
+local_azslurm=/source/
 if [ "$1" != "" ]; then
   scalelib=$(realpath $1)
   local_scalelib=/source/cyclecloud-scalelib
