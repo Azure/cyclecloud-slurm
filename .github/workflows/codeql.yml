@@ -58,7 +58,7 @@ jobs:
     - name: BuildPackage
       run: |
         echo "Build azslurm package"
-        python3 .azure-slurm/package.py
+        python3 azure-slurm/package.py
 
     
     - name: Perform CodeQL Analysis
