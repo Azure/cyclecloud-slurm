@@ -42,7 +42,6 @@ Autoscale = $Autoscale
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
         slurm.launch_parameters = $configuration_slurm_launch_parameters
-        slurm.disable_pmc = $configuration_slurm_disable_pmc
 
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
@@ -892,11 +891,6 @@ Order = 20
         Description = Cluster init specs to apply to Dynamic execute nodes
         ParameterType = Cloud.ClusterInitSpecs
 
-        [[[parameter configuration_slurm_disable_pmc]]]
-        Label = Disable PMC
-        Description = Disable packages from packages.microsoft.com
-        ParameterType = Boolean
-        DefaultValue = false
 	
 
     [[parameters Advanced Networking]]
