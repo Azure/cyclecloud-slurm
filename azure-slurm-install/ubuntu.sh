@@ -34,7 +34,7 @@ if [ $UBUNTU_VERSION == 24.04 ]; then
     # so we need to use signed-by instead to specify the key for Ubuntu 24.04 onwards
     echo "deb [arch=$arch signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
 else
-    if ["$arch" == "arm64"]; then
+    if [ "$arch" == "arm64" ]; then
         echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
         exit 1
     fi
