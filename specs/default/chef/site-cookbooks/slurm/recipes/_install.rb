@@ -80,9 +80,17 @@ when 'centos', 'rhel', 'redhat', 'almalinux'
     command "dnf --enablerepo=powertools install -y perl-Switch"
     action :run
     only_if { node[:platform_version] >= '8' }
+    not_if { node[:platform] == 'rocky' }
   end
 
-  slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
+  execute 'Install perl-Switch' do
+    command "dnf --enablerepo=crb install -y perl-Switch"
+    action :run
+    only_if { node[:platform_version] >= '8' }
+    only_if { node[:platform] == 'rocky' }
+  end
+
+  slurmrpms = %w[slurm slurm-devel slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
   slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
       project "slurm"

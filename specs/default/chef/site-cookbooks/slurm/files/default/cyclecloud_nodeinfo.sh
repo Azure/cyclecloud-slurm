@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-cyclecloud_slurm_python=/opt/cycle/jetpack/system/embedded/bin/python
-export PYTHONPATH=$(dirname $0)
-$cyclecloud_slurm_python -m cyclecloud_slurm nodeinfo "$@"
+source $bootstrap/venv/bin/activate
+export PYTHONPATH=$PYTHONPATH:$(dirname $0)
+python3 -m cyclecloud_slurm nodeinfo "$@"
 exit $?

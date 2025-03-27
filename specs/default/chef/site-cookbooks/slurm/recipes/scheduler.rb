@@ -83,7 +83,9 @@ bash 'Install cyclecloud python api' do
     #!/bin/bash
     cd #{node[:cyclecloud][:bootstrap]}
     jetpack download --project slurm #{node[:slurm][:cyclecloud_api]} #{node[:slurm][:cyclecloud_api]} || exit 1;
-    /opt/cycle/jetpack/system/embedded/bin/pip install #{node[:slurm][:cyclecloud_api]} || exit 1;
+    /usr/bin/python3 -m venv #{autoscale_dir}/venv
+    source #{autoscale_dir}/venv/bin/activate
+    pip3 install #{node[:slurm][:cyclecloud_api]} || exit 1;
     rm -f #{node[:slurm][:cyclecloud_api]}
     touch /etc/cyclecloud-api.installed
     EOH

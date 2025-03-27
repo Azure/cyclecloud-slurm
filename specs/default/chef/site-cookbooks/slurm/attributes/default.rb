@@ -35,11 +35,13 @@ case myplatform
     default[:slurm][:arch] = "amd64"
     default[:slurm][:user][:uid] = 64030
     default[:slurm][:user][:gid] = 64030
-  when 'centos', 'rhel', 'redhat', 'almalinux'
+  when 'centos', 'rhel', 'redhat', 'almalinux', 'rocky'
     if node[:platform_version] < "8";
       default[:slurm][:arch] = "el7.x86_64"
-    else
+    elif node[:platform_version] < "9";
       default[:slurm][:arch] = "el8.x86_64"
+    else node[:platform_version] >= "9";
+      default[:slurm][:arch] = "el9.x86_64"
     end
     default[:slurm][:user][:uid] = 11100
     default[:slurm][:user][:gid] = 11100
