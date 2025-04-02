@@ -38,7 +38,7 @@ from .util import is_autoscale_enabled, scontrol
 from . import cost
 
 
-VERSION = "3.0.11"
+VERSION = "3.0.12"
 
 
 def csv_list(x: str) -> List[str]:
