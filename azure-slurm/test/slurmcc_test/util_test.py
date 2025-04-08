@@ -46,6 +46,6 @@ def test_run_function() -> None:
 
     # test case for permissions errors
     try:
-        out=run(['touch', '/root/.test'])
+        run(['touch', '/root/.test'])
     except subprocess.CalledProcessError as e:
-        assert out.returncode != 0
+        assert e.returncode != 0
