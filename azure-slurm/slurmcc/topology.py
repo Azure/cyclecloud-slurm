@@ -124,6 +124,21 @@ class Topology:
             return os_id
         
     def get_rack_id(self):
+        """
+        Retrieves the rack ID (ClusterUUID) for each host and maps it to the corresponding hostname.
+        This method executes a shell command on the specified hosts to query the NVIDIA GPU ClusterUUID
+        using `nvidia-smi`. The output is processed to extract the hostname and ClusterUUID, which are
+        then stored in the `rack_to_host_map` attribute.
+        Raises:
+            slutil.SrunExitCodeException: If the `srun` command fails, logs the error and exits with the
+                                          corresponding return code.
+            subprocesslib.TimeoutExpired: If the command execution times out, exits with a status code of 1.
+        Attributes Updated:
+            rack_to_host_map (dict): A mapping of hostnames to their respective ClusterUUIDs.
+        Note:
+            - The `slutil.srun` function is used to execute the command on the specified hosts.
+            - The `partition` attribute is used to specify the Slurm partition for the `srun` command.
+        """
 
         cmd = "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2 | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
         try:
@@ -139,8 +154,8 @@ class Topology:
         lines=output.stdout.split('\n')[:-1]
         for line in lines:
             line = line.strip('"')
-            node,clusterUUID = line.split(':')
-            self.rack_to_host_map[node.strip()]=clusterUUID.strip()
+            node,cluster_uuid = line.split(':')
+            self.rack_to_host_map[node.strip()]=cluster_uuid.strip()
     def group_hosts_per_rack(self) -> dict:
         """
         Groups hosts based on their rack IDs.
@@ -506,6 +521,21 @@ class Topology:
             log.info("Printed slurm topology")
 
     def run_block(self):
+        """
+        Executes the process of generating and writing the Slurm Block topology.
+
+        This method performs the following steps:
+        1. Retrieves the rack ID for the current setup.
+        2. Groups hosts by their respective racks.
+        3. Writes the block topology based on the grouped racks.
+        4. Logs the completion of the topology writing process, either to a file
+           or to the console, depending on the configuration.
+
+        Logs:
+            - Debug: Indicates when hosts are grouped by racks.
+            - Info: Indicates the completion of writing the Slurm topology, 
+              specifying the file path if applicable.
+        """
         self.get_rack_id()
         self.racks = self.group_hosts_per_rack()
         log.debug("Grouped hosts by racks")
