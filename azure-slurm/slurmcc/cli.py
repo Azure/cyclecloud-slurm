@@ -192,7 +192,8 @@ class SlurmCLI(CommonCLI):
         parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
         group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS (default: True)')
         group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager (default: False)')
-    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager):
+        group.add_argument('-b', '--use_block_topology', action='store_true', default=False, help='Use Block Topology (default: False)')
+    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_block_topology) -> None:
         """
         Generates Topology Plugin Configuration
         """
@@ -202,6 +203,12 @@ class SlurmCLI(CommonCLI):
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition,output,config_dir)
             topo.run()
+        elif use_block_topology:
+            if not partition:
+                raise ValueError("--partition is required when using --use_block_topology")
+            config_dir = config.get("config_dir")
+            topo = topology.Topology(partition,output,config_dir)
+            topo.run_block()
         elif use_vmss:
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
@@ -209,7 +216,7 @@ class SlurmCLI(CommonCLI):
             else:
                 return _generate_topology(self._get_node_manager(config), sys.stdout)
         else:
-            raise ValueError("Please specify either --use_vmss or --use_fabric_manager")
+            raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_block_topology")
     
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)

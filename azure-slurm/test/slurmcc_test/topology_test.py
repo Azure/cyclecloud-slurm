@@ -91,6 +91,12 @@ def run_parallel_cmd(hosts,cmd,shell=False, partition=None):
             stderr = ""
             exit_code = 0
             return ParallelOutputContainer(stdout,stderr,exit_code)
+    elif cmd == "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2 | while IFS= read -r line; do echo \"$(hostname): $line\"; done":
+        with open('test/slurmcc_test/topology_test_input/nodes_clusterUUIDs.txt', 'r', encoding='utf-8') as file:
+            stdout = file.read()
+            stderr = ""
+            exit_code = 0
+            return ParallelOutputContainer(stdout,stderr,exit_code)
 def run_command(cmd,shell=True):
     """
     Executes a given command and returns the output based on predefined conditions.
@@ -332,6 +338,32 @@ def test_write_slurm_topology():
         actual= file.read()
     assert result==actual
 
+def test_run_block():
+    """
+    Test the run method of the Topology class.
+
+    This test performs the following steps:
+    1. Creates an instance of the Topology class with a specified output file.
+    2. Sets the topology input file for the Topology instance.
+    3. Runs the topology generation process.
+    4. Reads the generated output file.
+    5. Reads the expected output file.
+    6. Asserts that the generated output matches the expected output.
+
+    Raises:
+        AssertionError: If the generated output does not match the expected output.
+    """
+    slutil.srun=run_parallel_cmd
+    slutil.run=run_command
+    output= 'test/slurmcc_test/topology_test_output/slurm_block_topology.txt'
+    test_obj   = Topology("hpc",output,TESTDIR)
+    #test_obj.topo_file = 'test/slurmcc_test/topology_test_input/topology.txt'
+    with open('test/slurmcc_test/topology_test_output/slurm_block_topology.txt','r', encoding='utf-8') as file:
+        result= file.read()
+    with open('test/slurmcc_test/topology_test_input/block_topology.txt','r', encoding='utf-8') as file:
+        actual= file.read()
+    assert result==actual
+    test_obj.run_block()
 def test_run():
     """
     Test the Topology class by running a topology generation and comparing the output to the expected result.

@@ -20,9 +20,11 @@ class Topology:
         self.output_dir = f"{directory}/.topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         self.guid_to_host_map = {}
+        self.rack_to_host_map = {}
         self.device_guids_per_switch = []
         self.host_to_torset_map = {}
         self.torsets = {}
+        self.racks = {}
         self.partition=partition
         self.hosts=[]
         self.sharp_cmd_path = None
@@ -120,6 +122,43 @@ class Topology:
             os_id = stdout.strip().strip('"')
             log.debug(f"OS ID for host {self.hosts[0]}: {os_id}")
             return os_id
+        
+    def get_rack_id(self):
+
+        cmd = "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2 | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
+        try:
+            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition)
+        except slutil.SrunExitCodeException as e:
+            log.error("Error running get_rack_id command on hosts")
+            if e.stderr_content:
+                log.error(e.stderr_content)
+            log.error(e.stderr)
+            sys.exit(e.returncode)
+        except subprocesslib.TimeoutExpired:
+            sys.exit(1)
+        lines=output.stdout.split('\n')[:-1]
+        for line in lines:
+            line = line.strip('"')
+            node,clusterUUID = line.split(':')
+            self.rack_to_host_map[node.strip()]=clusterUUID.strip()
+    def group_hosts_per_rack(self) -> dict:
+        """
+        Groups hosts based on their rack IDs.
+
+        This method iterates over the `rack_to_host_map` dictionary and groups
+        hosts based on their associated rack ID. It returns a dictionary where the
+        keys are rack IDs and the values are lists of hosts that belong to each rack.
+
+        Returns:
+            dict: A dictionary with rack IDs as keys and lists of hosts as values.
+        """
+        racks = {}
+        for host, rack in self.rack_to_host_map.items():
+            if rack not in racks:
+                racks[rack] = [host]
+            else:
+                racks[rack].append(host)
+        return racks
 
     def get_sharp_cmd(self):
         """
@@ -370,6 +409,32 @@ class Topology:
             else:
                 torsets[torset].append(host)
         return torsets
+    def write_block_topology(self)-> None:
+        """
+        Writes the block topology configuration to a file or prints it to the console.
+
+        This method generates the block topology configuration based on the `torsets` attribute
+        and either writes it to a file specified by `self.topo_file` or prints it to the console,
+        depending on the value of the `output` parameter.
+
+        Returns:
+            None
+        """
+        if self.slurm_top_file:
+            with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
+                block_index=0
+                for rack, hosts in self.racks.items():
+                    block_index+=1
+                    num_nodes = len(hosts)
+                    file.write(f"# Number of Nodes in block{block_index}: {num_nodes}\n")
+                    file.write(f"BlockName=block{block_index} Nodes={','.join(hosts)}\n")
+        else:
+            block_index=0
+            for rack, hosts in self.racks.items():
+                block_index+=1
+                num_nodes = len(hosts)
+                print(f"# Number of Nodes in block{block_index}: {num_nodes}\n")
+                print(f"BlockName=block{block_index} Nodes={','.join(hosts)}\n")
     def write_slurm_topology(self)-> None:
         """
         Writes the SLURM topology configuration to a file or prints it to the console.
@@ -434,8 +499,19 @@ class Topology:
         self.torsets = self.group_hosts_by_torset()
         log.debug("Finished grouping hosts by torsets")
         self.write_slurm_topology()
-        if self.topo_file:
+        if self.slurm_top_file:
             log.info("Finished writing slurm topology from torsets to %s",
                           self.slurm_top_file)
+        else:
+            log.info("Printed slurm topology")
+
+    def run_block(self):
+        self.get_rack_id()
+        self.racks = self.group_hosts_per_rack()
+        log.debug("Grouped hosts by racks")
+        self.write_block_topology()
+        if self.slurm_top_file:
+            log.info("Finished writing slurm topology from racks to %s",
+                        self.slurm_top_file)
         else:
             log.info("Printed slurm topology")
