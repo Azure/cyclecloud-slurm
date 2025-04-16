@@ -110,6 +110,7 @@ Autoscale = $Autoscale
     Zone = ${ifThenElse(configuration_slurm_ha_enabled, SchedulerZone, undefined)}
     
         [[[configuration]]]
+        slurm.role = scheduler
         # Disable NFS mount of built-in /sched since it is a local volume mount: cyclecloud.mounts.builtinsched
         cyclecloud.mounts.nfs_sched.disabled = ${UseBuiltinSched && !configuration_slurm_ha_enabled}
         cyclecloud.mounts.nfs_shared.disabled = ${UseBuiltinShared && !configuration_slurm_ha_enabled}
@@ -180,6 +181,7 @@ Autoscale = $Autoscale
 
         [[[cluster-init slurm:login:4.0.0]]]
         [[[configuration]]]
+        slurm.role = login
         autoscale.enabled = false
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
@@ -187,6 +189,7 @@ Autoscale = $Autoscale
     [[node nodearraybase]]
     Abstract = true
         [[[configuration]]]
+        slurm.role = execute
         slurm.autoscale = true
 
         slurm.node_prefix = ${ifThenElse(NodeNamePrefix=="Cluster Prefix", StrJoin("-", ClusterName, ""), NodeNamePrefix)}
