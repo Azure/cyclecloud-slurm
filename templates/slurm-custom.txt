@@ -69,6 +69,7 @@ Autoscale = $Autoscale
     AdditionalClusterInitSpecs = $SchedulerClusterInitSpecs
     
         [[[configuration]]]
+        slurm.role = scheduler
         cyclecloud.mounts.nfs_sched.disabled = true
         cyclecloud.mounts.nfs_shared.disabled = ${NFSType != "External"}
 
@@ -121,6 +122,7 @@ Autoscale = $Autoscale
 
 
         [[[configuration]]]
+        slurm.role = execute
         slurm.autoscale = true
         slurm.default_partition = true
         slurm.hpc = true
@@ -143,6 +145,7 @@ Autoscale = $Autoscale
 
 
         [[[configuration]]]
+        slurm.role = execute
         slurm.autoscale = true
         slurm.hpc = false
 

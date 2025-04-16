@@ -50,6 +50,7 @@ Autoscale = $Autoscale
     IsReturnProxy = $ReturnProxy
 
         [[[configuration]]]
+        slurm.role = scheduler
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -60,12 +61,14 @@ Autoscale = $Autoscale
         ImageName = $SchedulerImageName
 
         [[[configuration]]]
+        slurm.role = login
         autoscale.enabled = false
         slurm.node_prefix = ${StrJoin("-", ClusterName, "")}
 
     [[node nodearraybase]]
     Abstract = true
         [[[configuration]]]
+        slurm.role = execute
         slurm.autoscale = true
         
         slurm.node_prefix = ${StrJoin("-", ClusterName, "")}
