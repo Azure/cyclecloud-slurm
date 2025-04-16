@@ -438,16 +438,13 @@ def _complete_install_primary(s: InstallSettings) -> None:
             content="",
         )
 
-    if not os.path.exists(f"{s.config_dir}/plugstack.conf.d"):
-        os.makedirs(f"{s.config_dir}/plugstack.conf.d")
-
     if not os.path.exists(f"{s.config_dir}/plugstack.conf"):
         ilib.file(
             f"{s.config_dir}/plugstack.conf",
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0644",
-            content=f"include {s.config_dir}/plugstack.conf.d/*"
+            content=f"include /etc/slurm/plugstack.conf.d/*"
         )
 
 def _complete_install_all(s: InstallSettings) -> None:
@@ -493,12 +490,13 @@ def _complete_install_all(s: InstallSettings) -> None:
         group=s.slurm_grp,
     )
 
-    ilib.link(
-        f"{s.config_dir}/plugstack.conf.d",
-        "/etc/slurm/plugstack.conf.d",
-        owner=s.slurm_user,
-        group=s.slurm_grp,
-    )
+    if not os.path.exists("/etc/slurm/plugstack.conf.d"):
+        os.makedirs("/etc/slurm/plugstack.conf.d")
+        ilib.directory("/etc/slurm/plugstack.conf.d",
+                       owner=s.slurm_user,
+                       group=s.slurm_grp,
+        )
+
 
     # Link the accounting.conf regardless
     ilib.link(
