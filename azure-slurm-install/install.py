@@ -438,6 +438,18 @@ def _complete_install_primary(s: InstallSettings) -> None:
             content="",
         )
 
+    if not os.path.exists(f"{s.config_dir}/plugstack.conf.d"):
+        os.makedirs(f"{s.config_dir}/plugstack.conf.d")
+
+    if not os.path.exists(f"{s.config_dir}/plugstack.conf"):
+        ilib.file(
+            f"{s.config_dir}/plugstack.conf",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0644",
+            content=f"include {s.config_dir}/plugstack.conf.d/*"
+        )
+
 def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
         f"{s.config_dir}/gres.conf",
@@ -470,6 +482,20 @@ def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
         f"{s.config_dir}/keep_alive.conf",
         "/etc/slurm/keep_alive.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        f"{s.config_dir}/plugstack.conf",
+        "/etc/slurm/plugstack.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        f"{s.config_dir}/plugstack.conf.d",
+        "/etc/slurm/plugstack.conf.d",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
