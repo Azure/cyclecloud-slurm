@@ -392,6 +392,8 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "cluster_name": s.slurm_cluster_name,
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
+            "prolog": "/etc/slurm/prolog.d/*",
+            "epilog": "/etc/slurm/epilog.d/*"
         },
     )
 
@@ -495,7 +497,7 @@ def _complete_install_all(s: InstallSettings) -> None:
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
-
+    
     ilib.link(
         f"{s.config_dir}/prolog.d",
         "/etc/slurm/prolog.d",
