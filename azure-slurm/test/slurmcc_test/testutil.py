@@ -135,6 +135,9 @@ NodeName=%(NodeName)s
             }
         clear_caches()
 
+    def srun(self, args: List[str], retry: bool = True) -> str:
+        raise RuntimeError("srun not implemented")
+
 
 set_slurm_cli(MockNativeSlurmCLI())
 
