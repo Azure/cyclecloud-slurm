@@ -375,6 +375,12 @@ def _complete_install_primary(s: InstallSettings) -> None:
     if not os.path.exists(state_save_location):
         ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
 
+    if not os.path.exists(f"{s.config_dir}/prolog.d"):
+        ilib.directory(f"{s.config_dir}/prolog.d", owner=s.slurm_user, group=s.slurm_grp)
+
+    if not os.path.exists(f"{s.config_dir}/epilog.d"):
+        ilib.directory(f"{s.config_dir}/epilog.d", owner=s.slurm_user, group=s.slurm_grp)
+
     ilib.template(
         f"{s.config_dir}/slurm.conf",
         owner=s.slurm_user,
@@ -486,6 +492,20 @@ def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
         f"{s.config_dir}/plugstack.conf",
         "/etc/slurm/plugstack.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        f"{s.config_dir}/prolog.d",
+        "/etc/slurm/prolog.d",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+    
+    ilib.link(
+        f"{s.config_dir}/epilog.d",
+        "/etc/slurm/epilog.d",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
