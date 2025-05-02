@@ -397,6 +397,22 @@ def _complete_install_primary(s: InstallSettings) -> None:
         },
     )
 
+    ilib.copy_file(
+        "imex_prolog.sh",
+        f"{s.config_dir}/prolog.d/imex_prolog.sh",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+        mode="0755",
+        )
+    
+    ilib.copy_file(
+        "imex_epilog.sh",
+        f"{s.config_dir}/epilog.d/imex_epilog.sh",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+        mode="0755",
+        )
+
     if secondary_scheduler:
         ilib.append_file(
             f"{s.config_dir}/slurm.conf",
