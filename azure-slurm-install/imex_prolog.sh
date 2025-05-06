@@ -1,6 +1,13 @@
 #!/bin/bash
+VMSIZE=$(jetpack config azure.metadata.compute.vmSize)
+
+# Check if GB200 is in the output
+if [[ "$VMSIZE" != *"GB200"* ]]; then
+  exit 0
+fi
+
 if ! systemctl list-units --full --all | grep -Fq "nvidia-imex.service"; then 
-exit 0 
+  exit 0 
 fi 
 {
   set -ex
