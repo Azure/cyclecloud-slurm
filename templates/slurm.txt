@@ -342,7 +342,7 @@ Order = 10
         Description = The total number of HTC execute nodes to start
         DefaultValue = 100
         Config.Plugin = pico.form.NumberTextBox
-        Config.MinValue = 1
+        Config.MinValue = 0
         Config.IntegerOnly = true
 
         [[[parameter MaxHPCExecuteNodeCount]]]
@@ -350,7 +350,7 @@ Order = 10
         Description = The total number of HPC execute nodes to start
         DefaultValue = 16
         Config.Plugin = pico.form.NumberTextBox
-        Config.MinValue = 1
+        Config.MinValue = 0
         Config.IntegerOnly = true
 
         [[[parameter MaxGPUExecuteNodeCount]]]
@@ -358,7 +358,7 @@ Order = 10
         Description = The total number of GPU execute nodes to start
         DefaultValue = 8
         Config.Plugin = pico.form.NumberTextBox
-        Config.MinValue = 1
+        Config.MinValue = 0
         Config.IntegerOnly = true
 
         [[[parameter MaxDynamicExecuteCoreCount]]]
