@@ -1,5 +1,4 @@
 #!/bin/bash
-set -ex
 
 run_epilog(){
   if ! systemctl list-units --full --all | grep -Fq "nvidia-imex.service"; then 
@@ -10,23 +9,26 @@ run_epilog(){
   > /etc/nvidia-imex/nodes_config.cfg
   NVIDIA_IMEX_STOP_TIMEOUT=15
   set +e
-  sudo timeout $NVIDIA_IMEX_STOP_TIMEOUT systemctl stop nvidia-imex
+  timeout $NVIDIA_IMEX_STOP_TIMEOUT systemctl stop nvidia-imex
   pkill -9 nvidia-imex
   set -e
 }
 # Get VM size from Jetpack
-VM_SIZE=$(jetpack config azure.metadata.compute.vmSize)
-IMEX_ENABLED=$(jetpack config slurm.imex.enabled)
+{
+  set -ex
+  VM_SIZE=$(jetpack config azure.metadata.compute.vmSize)
+  IMEX_ENABLED=$(jetpack config slurm.imex.enabled)
 
-# Main logic
-if [[ "$VM_SIZE" != *"GB200"* ]]; then
-    if [[ "$IMEX_ENABLED" == "False" ]]; then
-        exit 0  # No-op
-    else
-        run_epilog  # Run prolog for GB200 by default
-    fi
-elif [[ "$IMEX_ENABLED" == "True" ]]; then
-    run_epilog  # Run prolog for non-GB200 VM if explicitly enabled
-else
-    exit 0  # No-op
-fi
+  # Main logic
+  if [[ "$VM_SIZE" != *"GB200"* ]]; then
+      if [[ "$IMEX_ENABLED" == "False" ]]; then
+          exit 0  # No-op
+      else
+          run_epilog  # Run prolog for GB200 by default
+      fi
+  elif [[ "$IMEX_ENABLED" == "True" ]]; then
+      run_epilog  # Run prolog for non-GB200 VM if explicitly enabled
+  else
+      exit 0  # No-op
+  fi
+} > "/var/log/slurm/imex_epilog_$SLURM_JOB_ID.log" 2>&1
