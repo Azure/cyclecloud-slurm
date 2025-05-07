@@ -14,6 +14,7 @@ run_epilog(){
   set -e
 }
 # Get VM size from Jetpack
+mkdir -p /var/log/slurm
 {
   set -ex
   VM_SIZE=$(jetpack config azure.metadata.compute.vmSize)

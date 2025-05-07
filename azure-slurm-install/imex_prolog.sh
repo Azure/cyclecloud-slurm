@@ -36,22 +36,23 @@ run_prolog() {
    
 }
 # Get VM size from Jetpack
+mkdir -p /var/log/slurm
 {
-  set -ex
-  VM_SIZE=$(jetpack config azure.metadata.compute.vmSize)
-  IMEX_ENABLED=$(jetpack config slurm.imex.enabled)
-  echo "VM_SIZE: $VM_SIZE"
-  echo "IMEX_ENABLED: $IMEX_ENABLED"
-  # Main logic
-  if [[ "$VM_SIZE" != *"GB200"* ]]; then
-      if [[ "$IMEX_ENABLED" == "False" ]]; then
-          exit 0  # No-op
-      else
-          run_prolog  # Run prolog for GB200 by default
-      fi
-  elif [[ "$IMEX_ENABLED" == "True" ]]; then
-      run_prolog  # Run prolog for non-GB200 VM if explicitly enabled
-  else
-      exit 0  # No-op
-  fi
+set -ex
+VM_SIZE=$(jetpack config azure.metadata.compute.vmSize)
+IMEX_ENABLED=$(jetpack config slurm.imex.enabled)
+echo "VM_SIZE: $VM_SIZE"
+echo "IMEX_ENABLED: $IMEX_ENABLED"
+# Main logic
+if [[ "$VM_SIZE" != *"GB200"* ]]; then
+    if [[ "$IMEX_ENABLED" == "False" ]]; then
+        exit 0  # No-op
+    else
+        run_prolog  # Run prolog for GB200 by default
+    fi
+elif [[ "$IMEX_ENABLED" == "True" ]]; then
+    run_prolog  # Run prolog for non-GB200 VM if explicitly enabled
+else
+    exit 0  # No-op
+fi
 } > "/var/log/slurm/imex_prolog_$SLURM_JOB_ID.log" 2>&1
