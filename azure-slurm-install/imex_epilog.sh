@@ -16,12 +16,14 @@ run_epilog(){
 # Get VM size from Jetpack
 mkdir -p /var/log/slurm
 {
-  set -ex
-  VM_SIZE=$(jetpack config azure.metadata.compute.vmSize)
-  IMEX_ENABLED=$(jetpack config slurm.imex.enabled)
+  set -x
+  set +e
+  VM_SIZE=$(/opt/cycle/jetpack/bin/jetpack config azure.metadata.compute.vmSize)
+  IMEX_ENABLED=$(/opt/cycle/jetpack/bin/jetpack config slurm.imex.enabled)
 
   # Main logic
-  if [[ "$VM_SIZE" != *"GB200"* ]]; then
+  set -e
+  if [[ "$VM_SIZE" == *"GB200"* ]]; then
       if [[ "$IMEX_ENABLED" == "False" ]]; then
           exit 0  # No-op
       else
