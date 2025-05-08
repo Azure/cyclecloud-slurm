@@ -201,6 +201,8 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/slurm:execute:4.0.0]]]
 
+        [[[cluster-init slurm:pyxis:4.0.0]]]
+
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
 
