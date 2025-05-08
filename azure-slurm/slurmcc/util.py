@@ -32,7 +32,7 @@ class NativeSlurmCLI(ABC):
         ...
 
     @abstractmethod
-    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool, partition: str) -> SrunOutput:
+    def srun(self, hostname: List[str], user_command: str, timeout: int, shell: bool, partition: str, gpus: int) -> SrunOutput:
         ...
 
 class NativeSlurmCLIImpl(NativeSlurmCLI):
@@ -43,15 +43,16 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
             return retry_subprocess(lambda: check_output(full_args)).strip()
         return check_output(full_args).strip()
 
-    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell: bool, partition: str) -> SrunOutput:
+    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell: bool, partition: str, gpus: int) -> SrunOutput:
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             temp_file_path = temp_file.name
 
             try:
                 command = f"bash -c '{user_command}'" if shell else user_command
                 partition_flag = f"-p {partition} " if partition else ""
+                gpu_flag = f"--gpus={gpus} " if gpus else ""
                 #adding deadline timeout 1 minute more than the srun timeout to avoid deadline timeout before srun can finish running
-                srun_command = f"srun {partition_flag}-w {','.join(hostlist)} --error {temp_file_path} --deadline=now+{timeout+1}minute --time={timeout} {command}"
+                srun_command = f"srun {partition_flag}-w {','.join(hostlist)} {gpu_flag}--error {temp_file_path} --deadline=now+{timeout+1}minute --time={timeout} {command}"
                 logging.debug(srun_command)
                 #subprocess timeout is in seconds, so we need to convert the timeout to seconds
                 #add 3 minutes to it so it doesnt timeout before the srun command can kill the job from its own timeout
@@ -81,12 +82,12 @@ def scontrol(args: List[str], retry: bool = True) -> str:
     assert args[0] != "scontrol"
     return SLURM_CLI.scontrol(args, retry)
 
-def srun(hostlist: List[str], user_command: str, timeout: int = 2, shell: bool = False, partition: str = None) -> SrunOutput:
+def srun(hostlist: List[str], user_command: str, timeout: int = 2, shell: bool = False, partition: str = None, gpus: int = None) -> SrunOutput:
     #srun --time option is in minutes and needs atleast 1 minute to run
     assert timeout >= 1
     assert hostlist != None
     assert user_command != None
-    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout, shell=shell, partition=partition)
+    return SLURM_CLI.srun(hostlist, user_command, timeout=timeout, shell=shell, partition=partition, gpus=gpus)
 
 TEST_MODE = False
 def is_slurmctld_up() -> bool:
