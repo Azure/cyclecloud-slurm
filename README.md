@@ -17,6 +17,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
         1. [AzureCA.pem and existing MariaDB/MySQL instances](#azurecapem-and-existing-mariadbmysql-instances)
     9. [Cost Reporting](#cost-reporting)
     10. [Topology](#topology)
+    11. [GB200 IMEX Support](#gb200-imex-support) 
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
@@ -275,6 +276,16 @@ SwitchName=sw02 Nodes=ccw-gpu-192
 SwitchName=sw03 Nodes=ccw-gpu-13,ccw-gpu-142,ccw-gpu-26,ccw-gpu-136,ccw-gpu-163,ccw-gpu-138,ccw-gpu-187,ccw-gpu-88
 ```
 This either prints out the topology in slurm topology format or creates an output file with the topology
+
+### GB200 IMEX Support
+Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cleanup IMEX service on a per-job basis. The prolog script will attempt to kill an existing IMEX service before configuring a new instance that will be specific to the new, submitted job. The epilog script terminates the IMEX service. By default, these scripts will run for GB200 nodes and not run for non-GB200 nodes. A configurable parameter `slurm.imex.enabled` has been added to the slurm cluster configuration template to allow non-GB200 nodes to enable IMEX support for their jobs or allow GB200 nodes to disable IMEX support for their jobs.
+```
+#Parameter to enable or disable IMEX service on a per-job basis
+        slurm.imex.enabled=True
+                or
+        slurm.imex.enabled=False
+``` 
+
 ## Supported Slurm and PMIX versions
 The current slurm versions supported are `24.11.3` and `24.05.6`. Both are compiled with PMIX version `4.2.9`.
 ## Packaging

@@ -42,6 +42,8 @@ Autoscale = $Autoscale
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
         slurm.launch_parameters = $configuration_slurm_launch_parameters
+        #Parameter to enable or disable IMEX service on a per-job basis
+        #slurm.imex.enabled=True
 
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
