@@ -142,7 +142,7 @@ class Topology:
 
         cmd = "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2 | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
         try:
-            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=1)
+            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=len(self.hosts))
         except slutil.SrunExitCodeException as e:
             log.error("Error running get_rack_id command on hosts")
             if e.stderr_content:
