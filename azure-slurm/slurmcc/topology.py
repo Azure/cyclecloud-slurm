@@ -142,7 +142,7 @@ class Topology:
 
         cmd = "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2 | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
         try:
-            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition)
+            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=1)
         except slutil.SrunExitCodeException as e:
             log.error("Error running get_rack_id command on hosts")
             if e.stderr_content:
@@ -536,6 +536,9 @@ class Topology:
             - Info: Indicates the completion of writing the Slurm topology, 
               specifying the file path if applicable.
         """
+        log.debug("Retrieving hostnames")
+        self.get_hostnames()
+        log.debug("Retrieving rack IDs for hosts")
         self.get_rack_id()
         self.racks = self.group_hosts_per_rack()
         log.debug("Grouped hosts by racks")
