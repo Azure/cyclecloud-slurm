@@ -42,8 +42,6 @@ Autoscale = $Autoscale
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
         slurm.launch_parameters = $configuration_slurm_launch_parameters
-        #Parameter to enable or disable IMEX service on a per-job basis
-        #slurm.imex.enabled=True
 
         # Disable ip-XXXXXXXX hostname generation
         cyclecloud.hosts.standalone_dns.enabled = ${NodeNameIsHostname==false}
@@ -249,6 +247,9 @@ Autoscale = $Autoscale
         slurm.default_partition = true
         slurm.hpc = true
         slurm.partition = gpu
+        #Parameter to enable or disable IMEX service on a per-job basis
+        #IMEX Support is enabled by default for GB200 but can be disabled by setting param to False
+        #slurm.imex.enabled=True
 
     [[nodearray dynamic]]
     Extends = nodearraybase
