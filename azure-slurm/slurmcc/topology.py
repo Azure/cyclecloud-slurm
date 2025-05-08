@@ -140,7 +140,7 @@ class Topology:
             - The `partition` attribute is used to specify the Slurm partition for the `srun` command.
         """
 
-        cmd = "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2 | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
+        cmd = "echo \"$(nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2)$(nvidia-smi -q | grep 'CliqueId' | head -n 1 | cut -d: -f2)\" | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
         try:
             output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=len(self.hosts))
         except slutil.SrunExitCodeException as e:
