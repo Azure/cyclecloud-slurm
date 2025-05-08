@@ -247,6 +247,9 @@ Autoscale = $Autoscale
         slurm.default_partition = true
         slurm.hpc = true
         slurm.partition = gpu
+        #Parameter to enable or disable IMEX service on a per-job basis
+        #IMEX Support is enabled by default for GB200 but can be disabled by setting param to False
+        #slurm.imex.enabled=True
 
     [[nodearray dynamic]]
     Extends = nodearraybase

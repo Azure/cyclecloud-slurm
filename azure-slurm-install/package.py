@@ -50,6 +50,8 @@ def execute() -> None:
     _add("slurmel9.repo", "slurmel9.repo")
     _add("ubuntu.sh", "ubuntu.sh", 600)
     _add("rhel.sh", "rhel.sh", 600)
+    _add("imex_prolog.sh", "imex_prolog.sh", 600)
+    _add("imex_epilog.sh", "imex_epilog.sh", 600)
     _add("AzureCA.pem", "AzureCA.pem")
     _add("suse.sh", "suse.sh", 600)
     _add("start-services.sh", "start-services.sh", 555)
