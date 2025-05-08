@@ -10,6 +10,8 @@ function install_enroot() {
     # Install or update enroot if necessary
     if [ "$(enroot version)" != "$ENROOT_VERSION" ] ; then
         logger -s  Updating enroot to $ENROOT_VERSION
+        # RDH otherwise we are writing to cluster-init dir, which causes strange behaviour on retries
+	pushd /tmp
 	case $os_release in
             almalinux)
                 yum remove -y enroot enroot+caps
@@ -40,6 +42,7 @@ function install_enroot() {
                 exit 0
             ;;
         esac
+	popd
     else
         logger -s  Enroot is already at version $ENROOT_VERSION
     fi
