@@ -54,8 +54,22 @@ from ${SCHEDULER}cc.cli import main
 main()
 EOF
 
+    cat > $VENV/bin/azslurmd <<EOF
+#!$VENV/bin/python
+
+import os
+
+if "SCALELIB_LOG_USER" not in os.environ:
+    os.environ["SCALELIB_LOG_USER"] = "$SCALELIB_LOG_USER"
+if "SCALELIB_LOG_GROUP" not in os.environ:
+    os.environ["SCALELIB_LOG_GROUP"] = "$SCALELIB_LOG_GROUP"
+
+from ${SCHEDULER}cc.azslurmdwrapper import main
+main()
+EOF
 
     chmod +x $VENV/bin/azslurm
+    chmod +x $VENV/bin/azslurmd
     if [ ! -e ~/bin ]; then
         mkdir ~/bin
     fi
@@ -92,6 +106,27 @@ init_azslurm_config() {
         --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId)
 }
 
+
+setup_azslurmd() {
+    cat > /etc/systemd/system/azslurmd.service <<EOF
+[Unit]
+Description=AzSlurm Daemon
+After=network.target
+
+[Service]
+ExecStart=$VENV/bin/azslurmd
+Restart=always
+User=root
+Group=root
+WorkingDirectory=/tmp/
+Environment="PATH=/$VENV/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable azslurmd
+}
 
 no_jetpack() {
     echo "--no-jetpack is set. Please run $INSTALL_DIR/init-config.sh then $INSTALL_DIR/post-install.sh."
@@ -143,6 +178,8 @@ main() {
     setup_venv
     # setup the install dir - logs and logging.conf, some permissions.
     setup_install_dir
+    # setup the azslurmd but do not start it.
+    setup_azslurmd
     # If there is no jetpack, we have to stop here.
     # The user has to run $INSTALL_DIR/init-config.sh with the appropriate arguments, and then $INSTALL_DIR/post-install.sh
     if [ $NO_JETPACK == 1 ]; then
