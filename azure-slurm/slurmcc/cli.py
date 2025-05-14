@@ -46,16 +46,18 @@ def csv_list(x: str) -> List[str]:
     # used in argument parsing
     return [x.strip() for x in x.split(",")]
 
-
+__INITIALIZED_FNAMES = {}
 def init_power_saving_log(function: Callable) -> Callable:
     def wrapped(*args: Any, **kwargs: Any) -> Any:
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
             if hasattr(handler, "baseFilename"):
                 fname = getattr(handler, "baseFilename")
-                if fname and fname.endswith(f"{function.__name__}.log"):
-                    handler.setLevel(logging.INFO)
-                    logging.info(f"initialized {function.__name__}.log")
+                if fname not in __INITIALIZED_FNAMES:
+                    if fname and fname.endswith(f"{function.__name__}.log"):
+                        handler.setLevel(logging.INFO)
+                        logging.info(f"initialized {function.__name__}.log")
+                        __INITIALIZED_FNAMES[fname] = True
         return function(*args, **kwargs)
 
     wrapped.__doc__ = function.__doc__
@@ -253,7 +255,7 @@ class SlurmCLI(CommonCLI):
         parser.add_argument(
             "--node-list", type=hostlist, required=True
         ).completer = self._slurm_node_name_completer  # type: ignore
-        parser.add_argument("--no-wait", action="store_true", default=False)
+        parser.add_argument("--no-wait", action="store_true", default=False, help="DEPRECATED")
 
     @init_power_saving_log
     def resume(self, config: Dict, node_list: List[str], no_wait: bool = False) -> None:
@@ -270,17 +272,6 @@ class SlurmCLI(CommonCLI):
             raise AzureSlurmError(
                 f"Failed to boot {node_list} - {bootup_result.message}"
             )
-        if no_wait:
-            return
-
-        def get_latest_nodes() -> List[Node]:
-            node_mgr = self._get_node_manager(config, force=True)
-            return node_mgr.get_nodes()
-
-        booted_node_list = [n.name for n in (bootup_result.nodes or [])]
-        allocation.wait_for_resume(
-            config, bootup_result.operation_id, booted_node_list, get_latest_nodes
-        )
 
     def wait_for_resume_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
@@ -368,6 +359,7 @@ class SlurmCLI(CommonCLI):
         parser.set_defaults(read_only=False)
         parser.add_argument("--terminate-zombie-nodes", action="store_true", default=False)
 
+    @init_power_saving_log
     def return_to_idle(
         self, config: Dict, terminate_zombie_nodes: bool = False
     ) -> None:
@@ -520,6 +512,7 @@ class SlurmCLI(CommonCLI):
         )
         parser.add_argument("--cost-cache-root", dest="cost__cache_root")
         parser.add_argument("--config-dir", required=True)
+        parser.add_argument("--azslurmd-sleep-time", default=15, dest="azslurmd__sleep_time")
 
     def _initconfig(self, config: Dict) -> None:
         # TODO
@@ -1052,6 +1045,12 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
             raise AzureSlurmError(f"Unknown node - {node_name}")
         nodes.append(by_name[node_name])
     return nodes
+
+
+
+def new_node_manager(config: str = "/opt/azurehpc/slurm/autoscale.json") -> NodeManager:
+    config = hpcutil.load_config("/opt/azurehpc/slurm/autoscale.json")
+    return SlurmCLI()._get_node_manager(config, force=True)
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:

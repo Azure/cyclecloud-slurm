@@ -106,7 +106,6 @@ init_azslurm_config() {
         --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId)
 }
 
-
 setup_azslurmd() {
     cat > /etc/systemd/system/azslurmd.service <<EOF
 [Unit]
@@ -193,7 +192,48 @@ main() {
     $INSTALL_DIR/post-install.sh $SCALELIB_LOG_GROUP $SCALELIB_LOG_USER
 }
 
-# actual script invocation
+require_root() {
+    if [ $(whoami) != root ]; then
+    echo "Please run as root"
+    exit 1
+    fi
+}
+
+
+parse_args_set_variables() {
+    export SCHEDULER=slurm
+    export VENV=/opt/azurehpc/slurm/venv
+    export INSTALL_DIR=$(dirname $VENV)
+    export NO_JETPACK=0
+    # if jetpack doesn't exist or this is not defined, it will silently use slurm as default 
+    export SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
+    export SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
+    # Set this globally before running main.
+    export PYTHON_PATH=$(find_python3)
+    export PATH=$PATH:/root/bin
+
+    while (( "$#" )); do
+        case "$1" in
+            --no-jetpack)
+                NO_JETPACK=1
+                shift
+                ;;
+            --help)
+                echo "Usage: $0 [--no-jetpack]"
+                exit 0
+                ;;
+            -*|--*=)
+                echo "Unknown option $1" >&2
+                exit 1
+                ;;
+            *)
+                echo "Unknown option  $1" >&2
+                exit 1
+                ;;
+        esac
+    done
+}
+
 require_root
 parse_args_set_variables $@
 main
