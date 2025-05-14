@@ -90,6 +90,7 @@ main()
 EOF
 
     chmod +x $VENV/bin/azslurm
+
     if [ ! -e ~/bin ]; then
         mkdir ~/bin
     fi
@@ -115,43 +116,46 @@ setup_install_dir() {
     chmod +x $INSTALL_DIR/*.sh
 }
 
-# TODO implement more functions to replace what comes after.
-PYTHON_PATH=$(find_python3)
-setup_venv
-setup_install_dir
 
-
-if [ $NO_JETPACK == 1 ]; then
-    echo "--no-jetpack is set. Please run azslurm initconfig and azslurm scale manually, as well as chown slurm:slurm $VENV/../logs/*.log."
-    exit 0
-fi
-
-which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
-
-# note: lower case the tag names, and use a sane default 'unknown'
-tag=$(jetpack config azure.metadata.compute.tags | python3 -c "\
+init_azslurm_config() {
+    which jetpack > /dev/null|| (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
+    tag=$(jetpack config azure.metadata.compute.tags | python3 -c "\
 import sys;\
 items = [x.split(':', 1) for x in sys.stdin.read().split(';')];\
 tags = dict([tuple([i[0].lower(), i[-1]]) for i in items]);\
 print(tags.get('clusterid', 'unknown'))")
 
-cluster_name=$(jetpack config cyclecloud.cluster.name)
-escaped_cluster_name=$(python3 -c "import re; print(re.sub('[^a-zA-Z0-9-]', '-', '$cluster_name').lower())")
+    $INSTALL_DIR/init-config.sh \
+        --url "$(jetpack config cyclecloud.config.web_server)" \
+        --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
+        --username $(jetpack config cyclecloud.config.username) \
+        --password $(jetpack config cyclecloud.config.password) \
+        --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+        --accounting-tag-value "$tag"
+}
 
-config_dir=/sched/$escaped_cluster_name
-azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
-                   --password $(jetpack config cyclecloud.config.password) \
-                   --url      $(jetpack config cyclecloud.config.web_server) \
-                   --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
-                   --config-dir $config_dir \
-                   --accounting-tag-name ClusterId \
-                   --accounting-tag-value "$tag" \
-                   --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
-                   --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
-                   --cost-cache-root $INSTALL_DIR/.cache \
-                   > $INSTALL_DIR/autoscale.json
+no_jetpack() {
+    echo "--no-jetpack is set. Please run $INSTALL_DIR/init-config.sh then $INSTALL_DIR/post-install.sh."
+}
 
+main() {
+    # create the venv and make sure azslurm is in the path
+    setup_venv
+    # setup the install dir - logs and logging.conf, some permissions.
+    setup_install_dir
+    # If there is no jetpack, we have to stop here.
+    # The user has to run $INSTALL_DIR/init-config.sh with the appropriate arguments, and then $INSTALL_DIR/post-install.sh
+    if [ $NO_JETPACK == 1 ]; then
+        no_jetpack
+        exit 0
+    fi
 
-azslurm scale --no-restart
-
-chown $SCALELIB_LOG_USER:$SCALELIB_LOG_GROUP $VENV/../logs/*.log
+    # we have jetpack, so let's automate init-config.sh and post-install.sh
+    init_azslurm_config
+    echo Running $INSTALL_DIR/post-install.sh
+    $INSTALL_DIR/post-install.sh
+}
+# Set this globally before running main.
+PYTHON_PATH=$(find_python3)
+main
+echo Installation complete.

@@ -154,6 +154,8 @@ def execute() -> None:
         _add("packages/" + fil, path)
 
     _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
+    _add("sbin/init-config.sh", "sbin/init-config.sh", mode=os.stat("sbin/init-config.sh")[0])
+    _add("sbin/post-install.sh", "sbin/post-install.sh", mode=os.stat("sbin/post-install.sh")[0])
     _add("sbin/resume_fail_program.sh", "sbin/resume_fail_program.sh")
     _add("sbin/prolog.sh", "sbin/prolog.sh")
     _add("sbin/resume_program.sh", "sbin/resume_program.sh")
