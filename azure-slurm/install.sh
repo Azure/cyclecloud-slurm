@@ -4,42 +4,9 @@
 #
 set -e
 
-if [ $(whoami) != root ]; then
-  echo "Please run as root"
-  exit 1
-fi
-
-SCHEDULER=slurm
-VENV=/opt/azurehpc/slurm/venv
-INSTALL_DIR=$(dirname $VENV)
-NO_JETPACK=0
-
-export PATH=$PATH:/root/bin
-
-while (( "$#" )); do
-    case "$1" in
-        --no-jetpack)
-            NO_JETPACK=1
-            shift
-            ;;
-        --help)
-            echo "Usage: $0 [--no-jetpack]"
-            exit 0
-            ;;
-        -*|--*=)
-            echo "Unknown option $1" >&2
-            exit 1
-            ;;
-        *)
-            echo "Unknown option  $1" >&2
-            exit 1
-            ;;
-    esac
-done
-
 find_python3() {
     export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
-    if [ ! -z $AZSLURM_PYTHON_PATH]; then
+    if [ ! -z $AZSLURM_PYTHON_PATH ]; then
         echo $AZSLURM_PYTHON_PATH
         return 0
     fi
@@ -71,10 +38,7 @@ setup_venv() {
     # upgrade venv with packages from intallation
     python3 -m pip install --upgrade --no-deps packages/*
 
-    SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
-    SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
-
-    # Create azslurm and azslurmd executables
+    # Create azslurm executable
     # NOTE: dynamically generated due to the SCALELIB_LOG_USER and SCALELIB_LOG_GROUP
     cat > $VENV/bin/azslurm <<EOF
 #!$VENV/bin/python
@@ -89,6 +53,7 @@ if "SCALELIB_LOG_GROUP" not in os.environ:
 from ${SCHEDULER}cc.cli import main
 main()
 EOF
+
 
     chmod +x $VENV/bin/azslurm
     if [ ! -e ~/bin ]; then
@@ -116,34 +81,83 @@ setup_install_dir() {
     chmod +x $INSTALL_DIR/*.sh
 }
 
-# TODO implement more functions to replace what comes after.
-PYTHON_PATH=$(find_python3)
-setup_venv
-setup_install_dir
+init_azslurm_config() {
+    which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
+
+    $INSTALL_DIR/init-config.sh \
+        --url "$(jetpack config cyclecloud.config.web_server)" \
+        --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
+        --username $(jetpack config cyclecloud.config.username) \
+        --password $(jetpack config cyclecloud.config.password) \
+        --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId)
+}
 
 
-if [ $NO_JETPACK == 1 ]; then
-    echo "--no-jetpack is set. Please run azslurm initconfig and azslurm scale manually, as well as chown slurm:slurm $VENV/../logs/*.log."
-    exit 0
-fi
+no_jetpack() {
+    echo "--no-jetpack is set. Please run $INSTALL_DIR/init-config.sh then $INSTALL_DIR/post-install.sh."
+}
 
-which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
+require_root() {
+    if [ $(whoami) != root ]; then
+    echo "Please run as root"
+    exit 1
+    fi
+}
 
-cluster_name=$(jetpack config cyclecloud.cluster.name)
-escaped_cluster_name=$(python3 -c "import re; print(re.sub('[^a-zA-Z0-9-]', '-', '$cluster_name').lower())")
+parse_args_set_variables() {
+    export SCHEDULER=slurm
+    export VENV=/opt/azurehpc/slurm/venv
+    export INSTALL_DIR=$(dirname $VENV)
+    export NO_JETPACK=0
+    # if jetpack doesn't exist or this is not defined, it will silently use slurm as default 
+    export SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
+    export SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
+    # Set this globally before running main.
+    export PYTHON_PATH=$(find_python3)
+    export PATH=$PATH:/root/bin
 
-config_dir=/sched/$escaped_cluster_name
-azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
-                   --password $(jetpack config cyclecloud.config.password) \
-                   --url      $(jetpack config cyclecloud.config.web_server) \
-                   --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
-                   --config-dir $config_dir \
-                   --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
-                   --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
-                   --cost-cache-root $INSTALL_DIR/.cache \
-                   > $INSTALL_DIR/autoscale.json
+    while (( "$#" )); do
+        case "$1" in
+            --no-jetpack)
+                NO_JETPACK=1
+                shift
+                ;;
+            --help)
+                echo "Usage: $0 [--no-jetpack]"
+                exit 0
+                ;;
+            -*|--*=)
+                echo "Unknown option $1" >&2
+                exit 1
+                ;;
+            *)
+                echo "Unknown option  $1" >&2
+                exit 1
+                ;;
+        esac
+    done
+}
 
+main() {
+    # create the venv and make sure azslurm is in the path
+    setup_venv
+    # setup the install dir - logs and logging.conf, some permissions.
+    setup_install_dir
+    # If there is no jetpack, we have to stop here.
+    # The user has to run $INSTALL_DIR/init-config.sh with the appropriate arguments, and then $INSTALL_DIR/post-install.sh
+    if [ $NO_JETPACK == 1 ]; then
+        no_jetpack
+        exit 0
+    fi
 
-azslurm scale --no-restart
+    # we have jetpack, so let's automate init-config.sh and post-install.sh
+    init_azslurm_config
+    echo Running $INSTALL_DIR/post-install.sh
+    $INSTALL_DIR/post-install.sh $SCALELIB_LOG_GROUP $SCALELIB_LOG_USER
+}
 
-chown $SCALELIB_LOG_USER:$SCALELIB_LOG_GROUP $VENV/../logs/*.log
+# actual script invocation
+require_root
+parse_args_set_variables $@
+main
+echo Installation complete.
