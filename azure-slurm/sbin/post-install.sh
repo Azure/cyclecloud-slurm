@@ -6,3 +6,4 @@ set -e
 cd $(dirname $0)
 azslurm scale
 chown -R slurm:slurm logs/
+systemctl start azslurmd
