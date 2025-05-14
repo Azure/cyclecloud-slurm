@@ -8,3 +8,4 @@ azslurm scale --no-restart
 SLURM_GROUP=${1:-slurm}
 SLURM_USER=${2:-slurm}
 chown -R $SLURM_GROUP:$SLURM_USER logs/
+systemctl restart azslurmd
