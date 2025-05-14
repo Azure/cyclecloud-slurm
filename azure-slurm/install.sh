@@ -10,28 +10,20 @@ if [ $(whoami) != root ]; then
 fi
 
 SCHEDULER=slurm
-INSTALL_PYTHON3=0
 VENV=/opt/azurehpc/slurm/venv
+INSTALL_DIR=$(dirname $VENV)
 NO_JETPACK=0
 
 export PATH=$PATH:/root/bin
 
 while (( "$#" )); do
     case "$1" in
-        --install-python3)
-            INSTALL_PYTHON3=1
-            shift
-            ;;
         --no-jetpack)
             NO_JETPACK=1
             shift
             ;;
-        --venv)
-            VENV=$2
-            shift 2
-            ;;
         --help)
-            echo "Usage: $0 [--install-python3] [--venv <path>] [--no-jetpack]"
+            echo "Usage: $0 [--no-jetpack]"
             exit 0
             ;;
         -*|--*=)
@@ -45,36 +37,45 @@ while (( "$#" )); do
     esac
 done
 
-echo INSTALL_PYTHON3=$INSTALL_PYTHON3
-echo VENV=$VENV
-
-# remove jetpack's python3 from the path
-export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
-set +e
-which python3 > /dev/null;
-if [ $? != 0 ]; then
-    if [ $INSTALL_PYTHON3 == 1 ]; then
-        yum install -y python3 || exit 1
-    else
-        echo Please install python3 >&2;
-        exit 1
+find_python3() {
+    export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
+    if [ ! -z $AZSLURM_PYTHON_PATH]; then
+        echo $AZSLURM_PYTHON_PATH
+        return 0
     fi
-fi
-set -e
+    for version in $( seq 11 20 ); do
+        which python3.$version
+        if [ $? == 0 ]; then
+            return 0
+        fi
+    done
+    echo Could not find python3 version 3.11 >&2
+    return 1
+}
 
-python3 -m venv $VENV
-mkdir -p $VENV/../logs
-source $VENV/bin/activate
-set -e
+setup_venv() {
+    
+    set -e
 
-# ensure wheel is installed
-pip install wheel
-pip install --upgrade --no-deps packages/*
+    $PYTHON_PATH -c "import sys; sys.exit(0)" || (echo "$PYTHON_PATH is not a valid python3 executable. Please install python3.11 or higher." && exit 1)
+    $PYTHON_PATH -m pip --version > /dev/null || $PYTHON_PATH -m ensurepip
+    $PYTHON_PATH -m venv $VENV
 
-SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
-SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
+    set +e
+    source $VENV/bin/activate
+    set -e
 
-cat > $VENV/bin/azslurm <<EOF
+    # ensure wheel is installed
+    python3 -m pip install wheel
+    # upgrade venv with packages from intallation
+    python3 -m pip install --upgrade --no-deps packages/*
+
+    SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
+    SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
+
+    # Create azslurm and azslurmd executables
+    # NOTE: dynamically generated due to the SCALELIB_LOG_USER and SCALELIB_LOG_GROUP
+    cat > $VENV/bin/azslurm <<EOF
 #!$VENV/bin/python
 
 import os
@@ -87,30 +88,38 @@ if "SCALELIB_LOG_GROUP" not in os.environ:
 from ${SCHEDULER}cc.cli import main
 main()
 EOF
-chmod +x $VENV/bin/azslurm
 
-azslurm -h 2>&1 > /dev/null || exit 1
+    chmod +x $VENV/bin/azslurm
+    if [ ! -e ~/bin ]; then
+        mkdir ~/bin
+    fi
 
+    ln -sf $VENV/bin/azslurm ~/bin/
 
-if [ ! -e ~/bin ]; then
-    mkdir ~/bin
-fi
-
-ln -sf $VENV/bin/azslurm ~/bin/
-
-INSTALL_DIR=$(dirname $VENV)
-
-cp logging.conf $INSTALL_DIR/
-cp sbin/*.sh $INSTALL_DIR/
-chown slurm:slurm $INSTALL_DIR/*.sh
-chmod +x $INSTALL_DIR/*.sh
-
-if [ -e /etc/profile.d ]; then
-    cat > /etc/profile.d/azslurm_autocomplete.sh<<EOF
+    # setup autocomplete of azslurm
+    if [ -e /etc/profile.d ]; then
+        cat > /etc/profile.d/azslurm_autocomplete.sh<<EOF
 which azslurm > /dev/null 2>&1 || export PATH=$PATH:/root/bin
 eval "\$(/opt/azurehpc/slurm/venv/bin/register-python-argcomplete azslurm)" || echo "Warning: Autocomplete is disabled" 1>&2
 EOF
-fi
+    fi
+
+    azslurm -h 2>&1 > /dev/null || exit 1
+}
+
+setup_install_dir() {
+    mkdir -p $INSTALL_DIR/logs
+    cp logging.conf $INSTALL_DIR/
+    cp sbin/*.sh $INSTALL_DIR/
+    chown slurm:slurm $INSTALL_DIR/*.sh
+    chmod +x $INSTALL_DIR/*.sh
+}
+
+# TODO implement more functions to replace what comes after.
+PYTHON_PATH=$(find_python3)
+setup_venv
+setup_install_dir
+
 
 if [ $NO_JETPACK == 1 ]; then
     echo "--no-jetpack is set. Please run azslurm initconfig and azslurm scale manually, as well as chown slurm:slurm $VENV/../logs/*.log."

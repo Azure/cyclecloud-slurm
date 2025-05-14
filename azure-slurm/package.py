@@ -17,7 +17,8 @@ CYCLECLOUD_API_VERSION = "8.7.1"
 
 def build_sdist() -> str:
     check_call([sys.executable, "setup.py", "sdist"])
-    sdists = glob.glob("dist/azure-slurm-*.tar.gz")
+    # sometimes this is azure-slurm, sometimes it is azure_slurm, depenends on the build system version.
+    sdists = glob.glob("dist/azure*slurm-*.tar.gz")
     assert len(sdists) == 1, f"Found %d sdist packages, expected 1 - see {os.path.abspath('dist/azure-slurm-*.tar.gz')}" % len(sdists)
     path = sdists[0]
     fname = os.path.basename(path)
