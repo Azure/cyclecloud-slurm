@@ -232,7 +232,7 @@ class SlurmCLI(CommonCLI):
         parser.add_argument(
             "--node-list", type=hostlist, required=True
         ).completer = self._slurm_node_name_completer  # type: ignore
-        parser.add_argument("--no-wait", action="store_true", default=False)
+        parser.add_argument("--no-wait", action="store_true", default=False, help="DEPRECATED")
 
     @init_power_saving_log
     def resume(self, config: Dict, node_list: List[str], no_wait: bool = False) -> None:
@@ -249,17 +249,6 @@ class SlurmCLI(CommonCLI):
             raise AzureSlurmError(
                 f"Failed to boot {node_list} - {bootup_result.message}"
             )
-        if no_wait:
-            return
-
-        def get_latest_nodes() -> List[Node]:
-            node_mgr = self._get_node_manager(config, force=True)
-            return node_mgr.get_nodes()
-
-        booted_node_list = [n.name for n in (bootup_result.nodes or [])]
-        allocation.wait_for_resume(
-            config, bootup_result.operation_id, booted_node_list, get_latest_nodes
-        )
 
     def wait_for_resume_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
@@ -347,6 +336,7 @@ class SlurmCLI(CommonCLI):
         parser.set_defaults(read_only=False)
         parser.add_argument("--terminate-zombie-nodes", action="store_true", default=False)
 
+    @init_power_saving_log
     def return_to_idle(
         self, config: Dict, terminate_zombie_nodes: bool = False
     ) -> None:
@@ -1033,6 +1023,12 @@ def _as_nodes(node_list: List[str], node_mgr: NodeManager) -> List[Node]:
             raise AzureSlurmError(f"Unknown node - {node_name}")
         nodes.append(by_name[node_name])
     return nodes
+
+
+
+def new_node_manager(config: str = "/opt/azurehpc/slurm/autoscale.json") -> NodeManager:
+    config = load_config("/opt/azurehpc/slurm/autoscale.json")
+    return SlurmCLI()._get_node_manager(config, force=True)
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:
