@@ -63,6 +63,8 @@ Autoscale = $Autoscale
         # May be used to identify the ID in cluster-init scripts
         cluster.identities.default = $ManagedIdentity
 
+        cyclecloud.enable_chef = false
+
         [[[cluster-init slurm:default:4.0.0]]]
         Optional = true
 
