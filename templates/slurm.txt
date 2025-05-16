@@ -248,7 +248,7 @@ Autoscale = $Autoscale
         slurm.hpc = true
         slurm.partition = gpu
         #Parameter to enable or disable IMEX service on a per-job basis default is False
-        #slurm.imex.enabled=$SlurmImexEnabled
+        slurm.imex.enabled=$SlurmImexEnabled
 
     [[nodearray dynamic]]
     Extends = nodearraybase
