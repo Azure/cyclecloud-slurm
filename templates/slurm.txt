@@ -247,9 +247,8 @@ Autoscale = $Autoscale
         slurm.default_partition = true
         slurm.hpc = true
         slurm.partition = gpu
-        #Parameter to enable or disable IMEX service on a per-job basis
-        #IMEX Support is enabled by default for GB200 but can be disabled by setting param to False
-        #slurm.imex.enabled=True
+        #Parameter to enable or disable IMEX service on a per-job basis default is False
+        #slurm.imex.enabled=$SlurmImexEnabled
 
     [[nodearray dynamic]]
     Extends = nodearraybase
@@ -400,6 +399,12 @@ Order = 10
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Use Spot VMs for GPU execute hosts
+
+        [[[parameter SlurmImexEnabled]]]
+        Label = Enable IMEX Service
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Enable IMEX Service on a per-job basis
 
         [[[parameter GPUSpotMaxPrice]]]
         Label = Max Price GPU
