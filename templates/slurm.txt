@@ -400,12 +400,6 @@ Order = 10
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Use Spot VMs for GPU execute hosts
 
-        [[[parameter SlurmImexEnabled]]]
-        Label = Enable IMEX Service
-        DefaultValue = false
-        Widget.Plugin = pico.form.BooleanCheckBox
-        Widget.Label = Enable IMEX Service on a per-job basis
-
         [[[parameter GPUSpotMaxPrice]]]
         Label = Max Price GPU
         DefaultValue = -1
@@ -436,6 +430,12 @@ Order = 10
         Config.MinValue = 0
         Config.MaxValue = 10000
         Config.IntegerOnly = true
+
+        [[[parameter SlurmImexEnabled]]]
+        Label = Enable IMEX Service
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Enable IMEX Service on a per-job basis
 
     [[parameters Networking]]
     Order = 40
