@@ -432,10 +432,10 @@ Order = 10
         Config.IntegerOnly = true
 
         [[[parameter SlurmImexEnabled]]]
-        Label = Enable IMEX Service
+        Label = GPU IMEX Service
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
-        Widget.Label = Enable IMEX Service on a per-job basis
+        Widget.Label = Enable IMEX Service on a per-job basis for GPU execute hosts
 
     [[parameters Networking]]
     Order = 40
