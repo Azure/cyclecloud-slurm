@@ -61,8 +61,6 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
                 args.append(f"--time={timeout}")
                 command = f"bash -c '{user_command}'" if shell else user_command
                 args.append(command)
-                # partition_flag = f"-p {partition} " if partition else ""
-                # gpu_flag = f"--gpus={gpus} " if gpus else ""
                 srun_command = " ".join(args)
                 logging.debug(srun_command)
                 #subprocess timeout is in seconds, so we need to convert the timeout to seconds
