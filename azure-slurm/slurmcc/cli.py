@@ -211,7 +211,7 @@ class SlurmCLI(CommonCLI):
             elif block:
                 raise ValueError("--block is not supported with --use_fabric_manager")
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,topo_type,config_dir)
+            topo = topology.Topology(partition,output,"fabric",topo_type,config_dir)
             topo.run()
         elif use_nvlink_domain:
             if not partition:
@@ -223,7 +223,7 @@ class SlurmCLI(CommonCLI):
             elif block:
                 topo_type = "block"
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,topo_type,config_dir)
+            topo = topology.Topology(partition,output,"nvlink",topo_type,config_dir)
             topo.run()
         elif use_vmss:
             if not tree and not block:
