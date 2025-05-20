@@ -188,35 +188,57 @@ class SlurmCLI(CommonCLI):
     
     def topology_parser(self, parser: ArgumentParser) -> None:
         group = parser.add_mutually_exclusive_group(required=False)
+        topology_group = parser.add_mutually_exclusive_group(required=False)
         parser.add_argument('-p,','--partition', type=str, help="Specify the parititon")
         parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
         group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS (default: True)')
         group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager (default: False)')
-        group.add_argument('-b', '--use_block_topology', action='store_true', default=False, help='Use Block Topology (default: False)')
-    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_block_topology) -> None:
+        group.add_argument('-n', '--use_nvlink_domain', action='store_true', default=False, help='Use NVlink domain (default: False)')
+        topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology (default: False)')
+        topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology (default: False)')
+
+    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block) -> None:
         """
         Generates Topology Plugin Configuration
         """
         if use_fabric_manager:
             if not partition:
                 raise ValueError("--partition is required when using --use_fabric_manager")
+            if not tree and not block:
+                topo_type = "tree"
+            elif tree:
+                topo_type = "tree"
+            elif block:
+                raise ValueError("--block is not supported with --use_fabric_manager")
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,config_dir)
+            topo = topology.Topology(partition,output,topo_type,config_dir)
             topo.run()
-        elif use_block_topology:
+        elif use_nvlink_domain:
             if not partition:
-                raise ValueError("--partition is required when using --use_block_topology")
+                raise ValueError("--partition is required when using --use_nvlink_domain")
+            if not tree and not block:
+                topo_type = "block"
+            elif tree:
+                raise ValueError("--tree is not supported with --use_nvlink_domain")
+            elif block:
+                topo_type = "block"
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,config_dir)
-            topo.run_block()
+            topo = topology.Topology(partition,output,topo_type,config_dir)
+            topo.run()
         elif use_vmss:
+            if not tree and not block:
+                topo_type = "tree"
+            elif tree:
+                topo_type = "tree"
+            elif block:
+                topo_type = "block"
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
-                    return _generate_topology(self._get_node_manager(config), file_writer)
+                    return _generate_topology(self._get_node_manager(config),topo_type, file_writer)
             else:
-                return _generate_topology(self._get_node_manager(config), sys.stdout)
+                return _generate_topology(self._get_node_manager(config),topo_type, sys.stdout)
         else:
-            raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_block_topology")
+            raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_nvlink_domain")
     
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
@@ -850,7 +872,7 @@ def _partitions(
         writer.write("\n")
 
 
-def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
+def _generate_topology(node_mgr: NodeManager, topo_type: str, writer: TextIO) -> None:
     partitions = partitionlib.fetch_partitions(node_mgr)
 
     nodes_by_pg = {}
@@ -871,7 +893,10 @@ def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
             continue
         nodes = sorted(nodes, key=slutil.get_sort_key_func(bool(pg)))
         slurm_node_expr = ",".join(nodes)  # slutil.to_hostlist(",".join(nodes))
-        writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
+        if topo_type == "tree":
+            writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
+        elif topo_type == "block":
+            writer.write("BlockName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
 
 
 def _generate_nvidia_devices(gpu_count: int) -> str:

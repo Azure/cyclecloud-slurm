@@ -15,7 +15,7 @@ class Topology:
     Attributes:
     """
 
-    def __init__(self,partition, output,directory):
+    def __init__(self,partition,output,topo_type,directory):
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = f"{directory}/.topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -31,6 +31,7 @@ class Topology:
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= output
+        self.topo_type=topo_type
 
     def get_hostnames(self) -> None:
         """
@@ -450,7 +451,7 @@ class Topology:
                 num_nodes = len(hosts)
                 print(f"# Number of Nodes in block{block_index}: {num_nodes}\n")
                 print(f"BlockName=block{block_index} Nodes={','.join(hosts)}\n")
-    def write_slurm_topology(self)-> None:
+    def write_tree_topology(self)-> None:
         """
         Writes the SLURM topology configuration to a file or prints it to the console.
 
@@ -486,11 +487,25 @@ class Topology:
             if len(self.torsets)>1:
                 switch_name=int(torset_index)+1
                 print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
-    def run(self):
+    def run_tree(self):
         """
-        Executes the sequence of steps to generate and write the SLURM topology.
-        Returns:
-            None
+        Executes the process of generating and writing the Slurm Tree topology.
+        This method performs the following steps:
+        1. Retrieves the hostnames for the specified partition.
+        2. Retrieves the SHARP command directory based on the operating system.
+        3. Checks if the SHARP command is functional.
+        4. Checks if the 'ibstat' command can be run on all hosts.
+        5. Runs 'ibstat' on hosts to collect InfiniBand device GUIDs.
+        6. Writes the collected GUIDs to a file.
+        7. Generates the topology file using the SHARP command.
+        8. Groups device GUIDs per switch.
+        9. Identifies torsets for hosts based on the GUIDs.
+        10. Groups hosts by torsets.
+        11. Writes the Slurm topology based on the torsets.
+        Logs:
+            - Debug: Indicates the progress of each step in the process.
+            - Info: Indicates the completion of writing the Slurm topology, 
+              specifying the file path if applicable.
         """
         log.debug("Retrieving hostnames")
         self.get_hostnames()
@@ -513,12 +528,13 @@ class Topology:
         log.debug("Identified torsets for hosts")
         self.torsets = self.group_hosts_by_torset()
         log.debug("Finished grouping hosts by torsets")
-        self.write_slurm_topology()
+        self.write_tree_topology()
         if self.slurm_top_file:
             log.info("Finished writing slurm topology from torsets to %s",
                           self.slurm_top_file)
         else:
             log.info("Printed slurm topology")
+
 
     def run_block(self):
         """
@@ -548,3 +564,14 @@ class Topology:
                         self.slurm_top_file)
         else:
             log.info("Printed slurm topology")
+
+    def run(self):
+        """
+        Executes the sequence of steps to generate and write the SLURM topology.
+        Returns:
+            None
+        """
+        if self.topo_type == "block":
+            self.run_block()
+        elif self.topo_type == "tree":
+            self.run_tree()
