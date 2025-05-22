@@ -63,6 +63,11 @@ Autoscale = $Autoscale
         # May be used to identify the ID in cluster-init scripts
         cluster.identities.default = $ManagedIdentity
 
+        monitoring.ingestion_endpoint = $MonitoringIngestionEndpoint
+        monitoring.identity_client_id = $MonitoringIdentityClientId
+        monitoring.enabled = $MonitoringEnabled
+        cyclecloud.enable_chef = false
+
         [[[cluster-init slurm:default:4.0.0]]]
         Optional = true
 
@@ -201,6 +206,9 @@ Autoscale = $Autoscale
         AssociatePublicIpAddress = $ExecuteNodesPublic
 
     [[nodearray hpc]]
+    CloudInit="""#!/bin/bash
+    echo DSHELL=/bin/bash >> /etc/adduser.conf
+    """
     Extends = nodearraybase
     MachineType = $HPCMachineType
     ImageName = $HPCImageName
@@ -944,3 +952,22 @@ Order = 20
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Run Node Health Checks on startup
+[parameters Monitoring]
+Order = 100
+    [[parameter MonitoringEnabled]]
+    Label = Enable Monitoring
+    DefaultValue = false
+    Widget.Plugin = pico.form.BooleanCheckBox
+    Widget.Label = Enable Grafana monitoring
+
+    [[parameter MonitoringIngestionEndpoint]]
+    Label = Ingestion Endpoint
+    Description = URL of the ingestion endpoint for Grafana
+    Conditions.Excluded := MonitoringEnabled isnt true
+
+    [[parameter MonitoringIdentityClientId]]
+    Label = Managed Id
+    Description = Optionally assign an Azure user assigned managed identity to all nodes to access Azure resources using assigned roles.
+    # ParameterType = Azure.ManagedIdentity
+    DefaultValue = =undefined
+    Conditions.Excluded := MonitoringEnabled isnt true
