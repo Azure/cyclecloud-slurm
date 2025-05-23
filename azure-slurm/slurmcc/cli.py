@@ -191,11 +191,11 @@ class SlurmCLI(CommonCLI):
         topology_group = parser.add_mutually_exclusive_group(required=False)
         parser.add_argument('-p,','--partition', type=str, help="Specify the parititon")
         parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
-        group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS (default: True)')
-        group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager (default: False)')
-        group.add_argument('-n', '--use_nvlink_domain', action='store_true', default=False, help='Use NVlink domain (default: False)')
-        topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology (default: False)')
-        topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology (default: False)')
+        group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS to map Tree or Block topology along VMSS boundaries without special network consideration (default: True)')
+        group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager to map Tree topology (Block topology not allowed) according to SHARP network topology tool(default: False)')
+        group.add_argument('-n', '--use_nvlink_domain', action='store_true', default=False, help='Use NVlink domain to map Block topology (Tree topology not allowed) according to NVLink Domain and Partition for multi-node NVLink (default: False)')
+        topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology output to use Block topology plugin with NVLink or VMSS aligned blocks (default: False)')
+        topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology output to use Tree topology plugin with VMSS aligned "racks"  (default: False)')
 
     def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block) -> None:
         """
