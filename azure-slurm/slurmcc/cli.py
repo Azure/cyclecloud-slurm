@@ -204,34 +204,25 @@ class SlurmCLI(CommonCLI):
         if use_fabric_manager:
             if not partition:
                 raise ValueError("--partition is required when using --use_fabric_manager")
-            if not tree and not block:
-                topo_type = "tree"
-            elif tree:
-                topo_type = "tree"
-            elif block:
+            if block:
                 raise ValueError("--block is not supported with --use_fabric_manager")
+            else:
+                topo_type = topology.TopologyType.TREE
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,"fabric",topo_type,config_dir)
+            topo = topology.Topology(partition,output,topology.TopologyInput.FABRIC,topo_type,config_dir)
             topo.run()
         elif use_nvlink_domain:
             if not partition:
                 raise ValueError("--partition is required when using --use_nvlink_domain")
-            if not tree and not block:
-                topo_type = "block"
-            elif tree:
+            if tree:
                 raise ValueError("--tree is not supported with --use_nvlink_domain")
-            elif block:
-                topo_type = "block"
+            else:
+                topo_type = topology.TopologyType.BLOCK
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,"nvlink",topo_type,config_dir)
+            topo = topology.Topology(partition,output,topology.TopologyInput.NVLINK,topo_type,config_dir)
             topo.run()
         elif use_vmss:
-            if not tree and not block:
-                topo_type = "tree"
-            elif tree:
-                topo_type = "tree"
-            elif block:
-                topo_type = "block"
+            topo_type = "block" if block else "tree"
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
                     return _generate_topology(self._get_node_manager(config),topo_type, file_writer)
