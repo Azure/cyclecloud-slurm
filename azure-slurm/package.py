@@ -17,7 +17,8 @@ CYCLECLOUD_API_VERSION = "8.7.1"
 
 def build_sdist() -> str:
     check_call([sys.executable, "setup.py", "sdist"])
-    sdists = glob.glob("dist/azure-slurm-*.tar.gz")
+    # sometimes this is azure-slurm, sometimes it is azure_slurm, depenends on the build system version.
+    sdists = glob.glob("dist/azure*slurm-*.tar.gz")
     assert len(sdists) == 1, f"Found %d sdist packages, expected 1 - see {os.path.abspath('dist/azure-slurm-*.tar.gz')}" % len(sdists)
     path = sdists[0]
     fname = os.path.basename(path)
@@ -153,6 +154,8 @@ def execute() -> None:
         _add("packages/" + fil, path)
 
     _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
+    _add("sbin/init-config.sh", "sbin/init-config.sh", mode=os.stat("sbin/init-config.sh")[0])
+    _add("sbin/post-install.sh", "sbin/post-install.sh", mode=os.stat("sbin/post-install.sh")[0])
     _add("sbin/resume_fail_program.sh", "sbin/resume_fail_program.sh")
     _add("sbin/prolog.sh", "sbin/prolog.sh")
     _add("sbin/resume_program.sh", "sbin/resume_program.sh")

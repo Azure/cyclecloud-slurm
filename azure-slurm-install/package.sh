@@ -2,4 +2,4 @@
 set -e
 
 cd $(dirname $0)
-python3 package.py $@
+python3.11 package.py $@
