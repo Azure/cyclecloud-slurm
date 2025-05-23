@@ -6,9 +6,25 @@ from pathlib import Path
 import subprocess as subprocesslib
 import datetime
 from . import util as slutil
+from enum import Enum
 
 log=logging.getLogger('topology')
-
+class TopologyType(Enum):
+    """
+    Enum class representing the type of topology.
+    """
+    BLOCK = "block"
+    TREE = "tree"
+    def __str__(self):
+        return self.value
+class TopologyInput(Enum):
+    """
+    Enum class representing the type of topology input.
+    """
+    NVLINK = "nvlink"
+    FABRIC = "fabric"
+    def __str__(self):
+        return self.value
 class Topology:
     """
     A class to represent and manage the topology of a Slurm cluster.
@@ -16,6 +32,10 @@ class Topology:
     """
 
     def __init__(self,partition,output,topo_input,topo_type,directory):
+        if not isinstance(topo_type, TopologyType):
+            raise ValueError("topo_type must be an instance of TopologyType Enum")
+        if not isinstance(topo_input, TopologyInput):
+            raise ValueError("topo_input must be an instance of TopologyInput Enum")
         self.timestamp= datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.output_dir = f"{directory}/.topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -498,11 +518,8 @@ class Topology:
             2. Obtains rack IDs for each host.
             3. Groups hosts by their respective racks and stores the result.
 
-        Logging is performed at each major step for debugging purposes.
         """
-        log.debug("Retrieving hostnames")
         self.get_hostnames()
-        log.debug("Retrieving rack IDs for hosts")
         self.get_rack_id()
         self.racks = self.group_hosts_per_rack()
         log.debug("Grouped hosts by racks")
@@ -523,100 +540,40 @@ class Topology:
             9. Identifies torsets (groups of hosts connected to the same switch).
             10. Groups hosts by their corresponding torsets.
 
-        Logging is performed at each step to provide progress updates.
         """
-        log.debug("Retrieving hostnames")
         self.get_hostnames()
-        log.debug("Retrieving sharp_cmd directory")
         self.sharp_cmd_path=self.get_sharp_cmd()
-        log.debug("checking that sharp_hello_works")
         self.check_sharp_hello()
-        log.debug("Checking ibstat can be run on all hosts")
         self.check_ibstatus()
-        log.debug("Running ibstat on hosts to collect InfiniBand device GUIDs")
         self.retrieve_guids()
-        log.debug("Finished collecting InfiniBand device GUIDs from hosts")
         self.write_guids_to_file()
-        log.debug("Finished writing guids to %s", self.guids_file)
         self.generate_topo_file()
         log.debug("Topology file generated at %s", self.topo_file)
         self.device_guids_per_switch =  self.group_guids_per_switch()
-        log.debug("Finished grouping device guids per switch")
         self.host_to_torset_map = self.identify_torsets()
-        log.debug("Identified torsets for hosts")
         self.torsets = self.group_hosts_by_torset()
         log.debug("Finished grouping hosts by torsets")
-    
-    def run_tree(self):
-        """
-        Executes the process to generate and output the SLURM tree topology.
-
-        This method performs the following steps:
-        1. Writes the tree topology to the appropriate output.
-        2. Logs the location of the written SLURM topology file if specified, 
-           otherwise logs that the topology was printed.
-
-        Returns:
-            None
-        """
-        self.write_tree_topology()
-        if self.slurm_top_file:
-            log.info("Finished writing slurm topology for tree topology to %s",
-                          self.slurm_top_file)
-        else:
-            log.info("Printed slurm topology")
-
-
-    def run_block(self):
-        """
-        Executes the block topology generation process.
-
-        This method performs the following steps:
-        1. Writes the block topology information.
-        2. Logs the outcome, indicating whether the topology was written to a file or printed.
-
-        Returns:
-            None
-        """
-        self.write_block_topology()
-        if self.slurm_top_file:
-            log.info("Finished writing slurm topology for block topology to %s",
-                        self.slurm_top_file)
-        else:
-            log.info("Printed slurm topology")
 
     def run(self):
         """
-        Executes the topology configuration based on the specified input and type.
+        Executes the topology generation process based on the specified input and topology type.
 
-        Depending on the value of `self.topo_input`, this method selects the appropriate
-        topology setup routine (`run_nvlink` or `run_fabric`). After setting up the base
-        topology, it further refines the configuration based on `self.topo_type`, calling
-        either `run_block` or `run_tree`. If an invalid topology type or input is provided,
-        an error is logged and the program exits.
+        - Runs NVLINK or fabric topology generation depending on the `topo_input`.
+        - Writes the topology in either block or tree format based on `topo_type`.
+        - Logs the completion of topology writing, indicating the output file if specified.
 
         Raises:
-            SystemExit: If an invalid topology input or type is specified.
+            Any exceptions raised by the called methods are propagated.
         """
-        if self.topo_input=="nvlink":
+        if self.topo_input == TopologyInput.NVLINK:
             self.run_nvlink()
-            if self.topo_type == "block":
-                self.run_block()
-            elif self.topo_type == "tree":
-                self.run_tree()
-            else:
-                log.error("Invalid topology type specified. Exiting.")
-                sys.exit(1)
-        elif self.topo_input=="fabric":
-            self.run_fabric()
-            if self.topo_type == "block":
-                self.run_block()
-            elif self.topo_type == "tree":
-                self.run_tree()
-            else:
-                log.error("Invalid topology type specified. Exiting.")
-                sys.exit(1)
         else:
-            log.error("Invalid topology type specified. Exiting.")
-            sys.exit(1)
-        
+            self.run_fabric()
+        if self.topo_type == TopologyType.BLOCK:
+            self.write_block_topology()
+        else:
+            self.write_tree_topology()
+        if self.slurm_top_file:
+            log.info("Finished writing slurm topology to %s", self.slurm_top_file)
+        else:
+            log.info("Printed slurm topology")
