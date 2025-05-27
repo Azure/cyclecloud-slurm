@@ -40,11 +40,9 @@ class Topology:
         self.output_dir = f"{directory}/.topology/topology_ouput_{self.timestamp}"
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         self.guid_to_host_map = {}
-        self.rack_to_host_map = {}
         self.device_guids_per_switch = []
         self.host_to_torset_map = {}
         self.torsets = {}
-        self.racks = {}
         self.partition=partition
         self.hosts=[]
         self.sharp_cmd_path = None
@@ -144,27 +142,40 @@ class Topology:
             os_id = stdout.strip().strip('"')
             log.debug(f"OS ID for host {self.hosts[0]}: {os_id}")
             return os_id
-        
-    def get_rack_id(self):
+
+    def _run_get_rack_id_command(self) -> str:
         """
-        Retrieves the rack ID (ClusterUUID) for each host and maps it to the corresponding hostname.
+        Runs a command to retrieve the rack ID (ClusterUUID) for each host.
+
         This method executes a shell command on the specified hosts to query the NVIDIA GPU ClusterUUID
         using `nvidia-smi`. The output is processed to extract the hostname and ClusterUUID, which are
         then stored in the `rack_to_host_map` attribute.
-        Raises:
-            slutil.SrunExitCodeException: If the `srun` command fails, logs the error and exits with the
-                                          corresponding return code.
-            subprocesslib.TimeoutExpired: If the command execution times out, exits with a status code of 1.
-        Attributes Updated:
-            rack_to_host_map (dict): A mapping of hostnames to their respective ClusterUUIDs.
-        Note:
-            - The `slutil.srun` function is used to execute the command on the specified hosts.
-            - The `partition` attribute is used to specify the Slurm partition for the `srun` command.
-        """
+        
+        Args:
+            cmd (str): The command to execute on the hosts.
 
+        Returns:
+            str: The output of the command execution.
+        """
         cmd = "echo \"$(nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2)$(nvidia-smi -q | grep 'CliqueId' | head -n 1 | cut -d: -f2)\" | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
+        return slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=len(self.hosts))
+    
+    def get_rack_id(self):
+        """
+        Retrieves a mapping of node names to their corresponding rack (cluster UUID + CliqueId) identifiers.
+
+        Executes an external command to obtain rack information for hosts. Handles errors related to command execution,
+        including specific exceptions for command failure and timeouts. Parses the command output, which is expected to be
+        a list of lines in the format "node:cluster_uuid", and constructs a dictionary mapping each node to its rack ID.
+
+        Returns:
+            dict: A dictionary where keys are node names (str) and values are rack (cluster UUID) identifiers (str).
+
+        Raises:
+            SystemExit: If the external command fails or times out, the process exits with the appropriate return code.
+        """
         try:
-            output = slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=len(self.hosts))
+            output = self._run_get_rack_id_command()
         except slutil.SrunExitCodeException as e:
             log.error("Error running get_rack_id command on hosts")
             if e.stderr_content:
@@ -174,23 +185,23 @@ class Topology:
         except subprocesslib.TimeoutExpired:
             sys.exit(1)
         lines=output.stdout.split('\n')[:-1]
+        rack_to_host_map = {}
         for line in lines:
             line = line.strip('"')
             node,cluster_uuid = line.split(':')
-            self.rack_to_host_map[node.strip()]=cluster_uuid.strip()
+            rack_to_host_map[node.strip()]=cluster_uuid.strip()
+        return rack_to_host_map
+    
     def group_hosts_per_rack(self) -> dict:
         """
-        Groups hosts based on their rack IDs.
-
-        This method iterates over the `rack_to_host_map` dictionary and groups
-        hosts based on their associated rack ID. It returns a dictionary where the
-        keys are rack IDs and the values are lists of hosts that belong to each rack.
-
+        Groups hosts by their rack identifiers.
         Returns:
-            dict: A dictionary with rack IDs as keys and lists of hosts as values.
+            dict: A dictionary where each key is a rack identifier and the value is a list of hostnames belonging to that rack.
         """
+
         racks = {}
-        for host, rack in self.rack_to_host_map.items():
+        rack_to_host_map = self.get_rack_id()
+        for host, rack in rack_to_host_map.items():
             if rack not in racks:
                 racks[rack] = [host]
             else:
@@ -447,22 +458,23 @@ class Topology:
                 torsets[torset].append(host)
         return torsets
 
-    def write_block_topology(self) -> str:
+    def write_block_topology(self, host_dict) -> str:
         """
-        Writes the SLURM block topology configuration and returns it as a string.
-
-        This method generates the block topology configuration based on the `racks` attribute
-        and returns it as a string.
-
+        Generates a block topology configuration string from a dictionary of host groups.
+        Args:
+            host_dict (dict): A dictionary where each key is a group identifier (e.g., ClusterUUID and CliqueID)
+                              and each value is a list of hostnames belonging to that group.
         Returns:
-            str: The generated block topology configuration as a string.
+            str: A formatted string representing the block topology, including comments with the number of nodes
+                 and group identifiers, and block definitions listing the nodes in each block.
         """
         lines = []
         block_index = 0
-        for rack, hosts in self.racks.items():
+        for group_id, hosts in host_dict.items():
             block_index += 1
             num_nodes = len(hosts)
             lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
+            lines.append(f"# ClusterUUID and CliqueID: {group_id}")
             lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
         content = "\n".join(lines) + "\n"
         return content
@@ -504,9 +516,9 @@ class Topology:
 
         """
         self.get_hostnames()
-        self.get_rack_id()
-        self.racks = self.group_hosts_per_rack()
+        racks = self.group_hosts_per_rack()
         log.debug("Grouped hosts by racks")
+        return racks
     
     def run_fabric(self):
         """
@@ -549,11 +561,12 @@ class Topology:
         Raises:
             Any exceptions raised by the called methods are propagated.
         """
-        if self.topo_input == TopologyInput.NVLINK:
-            self.run_nvlink()
-        else:
+        if self.topo_input == TopologyInput.FABRIC:
             self.run_fabric()
-        content = self.write_tree_topology() if self.topo_type == TopologyType.TREE else self.write_block_topology()
+            host_dict=None
+        else:
+            host_dict = self.run_nvlink()
+        content = self.write_tree_topology() if self.topo_type == TopologyType.TREE else self.write_block_topology(host_dict)
         if self.slurm_top_file:
             with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
                 file.write(content)
