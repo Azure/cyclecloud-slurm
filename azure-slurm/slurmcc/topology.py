@@ -449,7 +449,7 @@ class Topology:
 
     def write_block_topology(self) -> str:
         """
-        Writes the block topology configuration and returns it as a string.
+        Writes the SLURM block topology configuration and returns it as a string.
 
         This method generates the block topology configuration based on the `racks` attribute
         and returns it as a string.
@@ -469,11 +469,12 @@ class Topology:
 
     def write_tree_topology(self) -> str:
         """
-        Writes the SLURM topology configuration to a file or prints it to the console.
+        Generates the SLURM tree topology configuration as a string.
 
-        This method generates the SLURM topology configuration based on the `torsets` attribute
-        and either writes it to a file specified by `self.slurm_top_file` or prints it to the console,
-        depending on the value of the `output` parameter.
+        This method constructs the SLURM topology configuration based on the `torsets` attribute,
+        where each torset represents a set of hosts connected to a switch. For each torset, it adds
+        a configuration line specifying the switch name and associated nodes. If there are multiple
+        torsets, it also adds a parent switch connecting all the individual switches.
 
         Returns:
             str: The generated SLURM topology configuration as a string.
