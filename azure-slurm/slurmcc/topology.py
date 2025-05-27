@@ -1,4 +1,4 @@
-"""Module providing slurm topology.conf for IB SHARP-enabled Cluster"""
+"""Module providing slurm topology.conf"""
 import os
 import sys
 import logging
@@ -446,16 +446,16 @@ class Topology:
             else:
                 torsets[torset].append(host)
         return torsets
-    def write_block_topology(self)-> None:
+
+    def write_block_topology(self) -> str:
         """
-        Writes the block topology configuration to a file or prints it to the console.
+        Writes the block topology configuration and returns it as a string.
 
         This method generates the block topology configuration based on the `racks` attribute
-        and either writes it to a file specified by `self.slurm_top_file` or prints it to the console,
-        depending on the value of the `output` parameter.
+        and returns it as a string.
 
         Returns:
-            None
+            str: The generated block topology configuration as a string.
         """
         lines = []
         block_index = 0
@@ -465,14 +465,9 @@ class Topology:
             lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
             lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
         content = "\n".join(lines) + "\n"
+        return content
 
-        if self.slurm_top_file:
-            with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
-                file.write(content)
-        else:
-            print(content, end='')
-
-    def write_tree_topology(self) -> None:
+    def write_tree_topology(self) -> str:
         """
         Writes the SLURM topology configuration to a file or prints it to the console.
 
@@ -481,7 +476,7 @@ class Topology:
         depending on the value of the `output` parameter.
 
         Returns:
-            None
+            str: The generated SLURM topology configuration as a string.
         """
         switches = []
         lines = []
@@ -495,12 +490,7 @@ class Topology:
             switch_name = int(torset_index) + 1
             lines.append(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}")
         content = "\n".join(lines) + "\n"
-
-        if self.slurm_top_file:
-            with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
-                file.write(content)
-        else:
-            print(content, end='')
+        return content
 
     def run_nvlink(self):
         """
@@ -562,11 +552,12 @@ class Topology:
             self.run_nvlink()
         else:
             self.run_fabric()
-        if self.topo_type == TopologyType.BLOCK:
-            self.write_block_topology()
-        else:
-            self.write_tree_topology()
+        content = self.write_tree_topology() if self.topo_type == TopologyType.TREE else self.write_block_topology()
         if self.slurm_top_file:
+            with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
+                file.write(content)
             log.info("Finished writing slurm topology to %s", self.slurm_top_file)
         else:
+            print(content, end='')
             log.info("Printed slurm topology")
+            
