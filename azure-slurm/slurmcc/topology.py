@@ -450,29 +450,29 @@ class Topology:
         """
         Writes the block topology configuration to a file or prints it to the console.
 
-        This method generates the block topology configuration based on the `torsets` attribute
-        and either writes it to a file specified by `self.topo_file` or prints it to the console,
+        This method generates the block topology configuration based on the `racks` attribute
+        and either writes it to a file specified by `self.slurm_top_file` or prints it to the console,
         depending on the value of the `output` parameter.
 
         Returns:
             None
         """
+        lines = []
+        block_index = 0
+        for rack, hosts in self.racks.items():
+            block_index += 1
+            num_nodes = len(hosts)
+            lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
+            lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
+        content = "\n".join(lines) + "\n"
+
         if self.slurm_top_file:
             with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
-                block_index=0
-                for rack, hosts in self.racks.items():
-                    block_index+=1
-                    num_nodes = len(hosts)
-                    file.write(f"# Number of Nodes in block{block_index}: {num_nodes}\n")
-                    file.write(f"BlockName=block{block_index} Nodes={','.join(hosts)}\n")
+                file.write(content)
         else:
-            block_index=0
-            for rack, hosts in self.racks.items():
-                block_index+=1
-                num_nodes = len(hosts)
-                print(f"# Number of Nodes in block{block_index}: {num_nodes}\n")
-                print(f"BlockName=block{block_index} Nodes={','.join(hosts)}\n")
-    def write_tree_topology(self)-> None:
+            print(content, end='')
+
+    def write_tree_topology(self) -> None:
         """
         Writes the SLURM topology configuration to a file or prints it to the console.
 
@@ -483,31 +483,24 @@ class Topology:
         Returns:
             None
         """
-        switches=[]
+        switches = []
+        lines = []
+        for torset, hosts in self.torsets.items():
+            torset_index = torset[-2:]
+            num_nodes = len(hosts)
+            lines.append(f"# Number of Nodes in sw{torset_index}: {num_nodes}")
+            lines.append(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}")
+            switches.append(f"sw{torset_index}")
+        if len(self.torsets) > 1:
+            switch_name = int(torset_index) + 1
+            lines.append(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}")
+        content = "\n".join(lines) + "\n"
+
         if self.slurm_top_file:
             with open(self.slurm_top_file, 'w', encoding="utf-8") as file:
-                for torset, hosts in self.torsets.items():
-                    torset_index=torset[-2:]
-                    num_nodes = len(hosts)
-                    file.write(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
-                    print(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
-                    file.write(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
-                    print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
-                    switches.append(f"sw{torset_index}")
-                if len(self.torsets)>1:
-                    switch_name=int(torset_index)+1
-                    file.write(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
-                    print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
+                file.write(content)
         else:
-            for torset, hosts in self.torsets.items():
-                torset_index=torset[-2:]
-                num_nodes = len(hosts)
-                print(f"# Number of Nodes in sw{torset_index}: {num_nodes}\n")
-                print(f"SwitchName=sw{torset_index} Nodes={','.join(hosts)}\n")
-                switches.append(f"sw{torset_index}")
-            if len(self.torsets)>1:
-                switch_name=int(torset_index)+1
-                print(f"SwitchName=sw{switch_name:02} Switches={','.join(switches)}\n")
+            print(content, end='')
 
     def run_nvlink(self):
         """
