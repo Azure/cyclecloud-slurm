@@ -206,8 +206,7 @@ class SlurmCLI(CommonCLI):
                 raise ValueError("--partition is required when using --use_fabric_manager")
             if block:
                 raise ValueError("--block is not supported with --use_fabric_manager")
-            else:
-                topo_type = topology.TopologyType.TREE
+            topo_type = topology.TopologyType.TREE
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition,output,topology.TopologyInput.FABRIC,topo_type,config_dir)
             topo.run()
@@ -216,18 +215,18 @@ class SlurmCLI(CommonCLI):
                 raise ValueError("--partition is required when using --use_nvlink_domain")
             if tree:
                 raise ValueError("--tree is not supported with --use_nvlink_domain")
-            else:
-                topo_type = topology.TopologyType.BLOCK
+            topo_type = topology.TopologyType.BLOCK
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition,output,topology.TopologyInput.NVLINK,topo_type,config_dir)
             topo.run()
         elif use_vmss:
-            topo_type = "block" if block else "tree"
+            if block:
+                raise ValueError("--block is not supported with --use_vmss")
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
-                    return _generate_topology(self._get_node_manager(config),topo_type, file_writer)
+                    return _generate_topology(self._get_node_manager(config), file_writer)
             else:
-                return _generate_topology(self._get_node_manager(config),topo_type, sys.stdout)
+                return _generate_topology(self._get_node_manager(config), sys.stdout)
         else:
             raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_nvlink_domain")
     
@@ -863,7 +862,7 @@ def _partitions(
         writer.write("\n")
 
 
-def _generate_topology(node_mgr: NodeManager, topo_type: str, writer: TextIO) -> None:
+def _generate_topology(node_mgr: NodeManager, writer: TextIO) -> None:
     partitions = partitionlib.fetch_partitions(node_mgr)
 
     nodes_by_pg = {}
@@ -884,10 +883,7 @@ def _generate_topology(node_mgr: NodeManager, topo_type: str, writer: TextIO) ->
             continue
         nodes = sorted(nodes, key=slutil.get_sort_key_func(bool(pg)))
         slurm_node_expr = ",".join(nodes)  # slutil.to_hostlist(",".join(nodes))
-        if topo_type == "tree":
-            writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
-        elif topo_type == "block":
-            writer.write("BlockName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
+        writer.write("SwitchName={} Nodes={}\n".format(pg or "htc", slurm_node_expr))
 
 
 def _generate_nvidia_devices(gpu_count: int) -> str:
