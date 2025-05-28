@@ -1,8 +1,13 @@
 # Number of Nodes in block1: 18
+# ClusterUUID and CliqueID: 5e797fc6-0f46-421a-8724-0e102c0f723c
 BlockName=block1 Nodes=hpcbench-hpc-1,hpcbench-hpc-5,hpcbench-hpc-9,hpcbench-hpc-13,hpcbench-hpc-17,hpcbench-hpc-21,hpcbench-hpc-25,hpcbench-hpc-29,hpcbench-hpc-33,hpcbench-hpc-37,hpcbench-hpc-41,hpcbench-hpc-45,hpcbench-hpc-49,hpcbench-hpc-53,hpcbench-hpc-57,hpcbench-hpc-61,hpcbench-hpc-65,hpcbench-hpc-69
 # Number of Nodes in block2: 18
+# ClusterUUID and CliqueID: 5e797fc6-0f46-421a-8724-0e102c0f721e
 BlockName=block2 Nodes=hpcbench-hpc-2,hpcbench-hpc-6,hpcbench-hpc-10,hpcbench-hpc-14,hpcbench-hpc-18,hpcbench-hpc-22,hpcbench-hpc-26,hpcbench-hpc-30,hpcbench-hpc-34,hpcbench-hpc-38,hpcbench-hpc-42,hpcbench-hpc-46,hpcbench-hpc-50,hpcbench-hpc-54,hpcbench-hpc-58,hpcbench-hpc-62,hpcbench-hpc-66,hpcbench-hpc-70
 # Number of Nodes in block3: 18
+# ClusterUUID and CliqueID: 5e797fc6-0f46-421a-8724-0e102c0f724b
 BlockName=block3 Nodes=hpcbench-hpc-3,hpcbench-hpc-7,hpcbench-hpc-11,hpcbench-hpc-15,hpcbench-hpc-19,hpcbench-hpc-23,hpcbench-hpc-27,hpcbench-hpc-31,hpcbench-hpc-35,hpcbench-hpc-39,hpcbench-hpc-43,hpcbench-hpc-47,hpcbench-hpc-51,hpcbench-hpc-55,hpcbench-hpc-59,hpcbench-hpc-63,hpcbench-hpc-67,hpcbench-hpc-71
 # Number of Nodes in block4: 18
+# ClusterUUID and CliqueID: 5e797fc6-0f46-421a-8724-0e102c0f722a
 BlockName=block4 Nodes=hpcbench-hpc-4,hpcbench-hpc-8,hpcbench-hpc-12,hpcbench-hpc-16,hpcbench-hpc-20,hpcbench-hpc-24,hpcbench-hpc-28,hpcbench-hpc-32,hpcbench-hpc-36,hpcbench-hpc-40,hpcbench-hpc-44,hpcbench-hpc-48,hpcbench-hpc-52,hpcbench-hpc-56,hpcbench-hpc-60,hpcbench-hpc-64,hpcbench-hpc-68,hpcbench-hpc-72
+BlockSizes=1

@@ -31,7 +31,7 @@ class Topology:
     Attributes:
     """
 
-    def __init__(self,partition,output,topo_input,topo_type,directory):
+    def __init__(self,partition,output,topo_input,topo_type,directory,block_size=1):
         if not isinstance(topo_type, TopologyType):
             raise ValueError("topo_type must be an instance of TopologyType Enum")
         if not isinstance(topo_input, TopologyInput):
@@ -51,6 +51,7 @@ class Topology:
         self.slurm_top_file= output
         self.topo_input=topo_input
         self.topo_type=topo_type
+        self.block_size=block_size
 
     def get_hostnames(self) -> None:
         """
@@ -184,11 +185,11 @@ class Topology:
             sys.exit(e.returncode)
         except subprocesslib.TimeoutExpired:
             sys.exit(1)
-        lines=output.stdout.split('\n')[:-1]
+        lines = output.stdout.split('\n')[:-1]
         rack_to_host_map = {}
         for line in lines:
             line = line.strip('"')
-            node,cluster_uuid = line.split(':')
+            node, cluster_uuid = line.split(':')
             rack_to_host_map[node.strip()]=cluster_uuid.strip()
         return rack_to_host_map
     
@@ -475,7 +476,12 @@ class Topology:
             num_nodes = len(hosts)
             lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
             lines.append(f"# ClusterUUID and CliqueID: {group_id}")
-            lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
+            if len(hosts) < self.block_size:
+                lines.append(f"# Warning: Block {block_index} has less than {self.block_size} nodes, commenting out")
+                lines.append(f"#BlockName=block{block_index} Nodes={','.join(hosts)}")
+            else:
+                lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
+        lines.append(f"BlockSizes={self.block_size}")
         content = "\n".join(lines) + "\n"
         return content
 
@@ -505,7 +511,7 @@ class Topology:
         content = "\n".join(lines) + "\n"
         return content
 
-    def run_nvlink(self):
+    def run_nvlink(self) -> dict:
         """
         Executes the NVLink topology discovery process for the cluster.
 
@@ -513,6 +519,8 @@ class Topology:
             1. Retrieves the list of hostnames in the cluster.
             2. Obtains rack IDs for each host.
             3. Groups hosts by their respective racks and stores the result.
+        Returns:
+            dict: A dictionary where keys are rack identifiers and values are lists of hostnames in each rack.
 
         """
         self.get_hostnames()

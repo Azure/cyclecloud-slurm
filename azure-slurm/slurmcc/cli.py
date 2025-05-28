@@ -196,8 +196,9 @@ class SlurmCLI(CommonCLI):
         group.add_argument('-n', '--use_nvlink_domain', action='store_true', default=False, help='Use NVlink domain to map Block topology (Tree topology not allowed) according to NVLink Domain and Partition for multi-node NVLink (default: False)')
         topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology output to use Block topology plugin with NVLink or VMSS aligned blocks (default: False)')
         topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology output to use Tree topology plugin with VMSS aligned "racks"  (default: False)')
+        parser.add_argument("-s", "--block_size", type=int, required=False, default=1, help="Minimum block size required for each block (use with --block or --use_nvlink_domain, default: 1)")
 
-    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block) -> None:
+    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block, block_size) -> None:
         """
         Generates Topology Plugin Configuration
         """
@@ -217,7 +218,7 @@ class SlurmCLI(CommonCLI):
                 raise ValueError("--tree is not supported with --use_nvlink_domain")
             topo_type = topology.TopologyType.BLOCK
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,topology.TopologyInput.NVLINK,topo_type,config_dir)
+            topo = topology.Topology(partition,output,topology.TopologyInput.NVLINK,topo_type,config_dir,block_size)
             topo.run()
         elif use_vmss:
             if block:
