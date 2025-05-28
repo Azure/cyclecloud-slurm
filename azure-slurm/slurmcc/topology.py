@@ -9,6 +9,7 @@ from . import util as slutil
 from enum import Enum
 
 log=logging.getLogger('topology')
+
 class TopologyType(Enum):
     """
     Enum class representing the type of topology.
@@ -17,6 +18,7 @@ class TopologyType(Enum):
     TREE = "tree"
     def __str__(self):
         return self.value
+
 class TopologyInput(Enum):
     """
     Enum class representing the type of topology input.
@@ -25,13 +27,14 @@ class TopologyInput(Enum):
     FABRIC = "fabric"
     def __str__(self):
         return self.value
+
 class Topology:
     """
     A class to represent and manage the topology of a Slurm cluster.
     Attributes:
     """
 
-    def __init__(self,partition,output,topo_input,topo_type,directory,block_size=1):
+    def __init__(self, partition, output, topo_input, topo_type, directory, block_size=1):
         if not isinstance(topo_type, TopologyType):
             raise ValueError("topo_type must be an instance of TopologyType Enum")
         if not isinstance(topo_input, TopologyInput):
@@ -49,9 +52,9 @@ class Topology:
         self.guids_file = f"{self.output_dir}/guids.txt"
         self.topo_file = f"{self.output_dir}/topology.txt"
         self.slurm_top_file= output
-        self.topo_input=topo_input
-        self.topo_type=topo_type
-        self.block_size=block_size
+        self.topo_input = topo_input
+        self.topo_type = topo_type
+        self.block_size = block_size
 
     def get_hostnames(self) -> None:
         """
@@ -190,7 +193,7 @@ class Topology:
         for line in lines:
             line = line.strip('"')
             node, cluster_uuid = line.split(':')
-            rack_to_host_map[node.strip()]=cluster_uuid.strip()
+            rack_to_host_map[node.strip()] = cluster_uuid.strip()
         return rack_to_host_map
     
     def group_hosts_per_rack(self) -> dict:
@@ -571,7 +574,7 @@ class Topology:
         """
         if self.topo_input == TopologyInput.FABRIC:
             self.run_fabric()
-            host_dict=None
+            host_dict = None
         else:
             host_dict = self.run_nvlink()
         content = self.write_tree_topology() if self.topo_type == TopologyType.TREE else self.write_block_topology(host_dict)
