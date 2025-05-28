@@ -472,6 +472,9 @@ class Topology:
             str: A formatted string representing the block topology, including comments with the number of nodes
                  and group identifiers, and block definitions listing the nodes in each block.
         """
+        if not host_dict:
+            log.error("Host dictionary is empty, cannot generate block topology")
+            sys.exit(1)
         lines = []
         block_index = 0
         for group_id, hosts in host_dict.items():
