@@ -209,7 +209,7 @@ class SlurmCLI(CommonCLI):
                 raise ValueError("--block and --block_size are not supported with --use_fabric_manager")
             topo_type = topology.TopologyType.TREE
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,topology.TopologyInput.FABRIC,topo_type,config_dir)
+            topo = topology.Topology(partition, output, topology.TopologyInput.FABRIC, topo_type, config_dir)
             topo.run()
         elif use_nvlink_domain:
             if not partition:
@@ -219,7 +219,7 @@ class SlurmCLI(CommonCLI):
             block_size = block_size or 1
             topo_type = topology.TopologyType.BLOCK
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,topology.TopologyInput.NVLINK,topo_type,config_dir,block_size)
+            topo = topology.Topology(partition, output, topology.TopologyInput.NVLINK, topo_type, config_dir, block_size)
             topo.run()
         elif use_vmss:
             if block or block_size:
