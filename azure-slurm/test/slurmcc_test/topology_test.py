@@ -399,3 +399,27 @@ def test_run_tree():
     with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
     assert result==actual
+
+def test_print_block_topology():
+    """
+    Test the print_block_topology method of the Topology class.
+
+    This test performs the following steps:
+    1. Creates an instance of the Topology class with a specified output file.
+    2. Sets the topology input file for the Topology instance.
+    3. Calls the print_block_topology method to generate the block topology.
+    4. Reads the generated output file.
+    5. Reads the expected output file.
+    6. Asserts that the generated output matches the expected output.
+
+    Raises:
+        AssertionError: If the generated output does not match the expected output.
+    """
+    slutil.srun=run_parallel_cmd
+    slutil.run=run_command
+    test_obj   = Topology("hpc",None,TopologyInput.NVLINK,TopologyType.BLOCK,TESTDIR)
+    result=test_obj.write_block_topology()
+
+    with open('test/slurmcc_test/topology_test_input/block_topology.txt','r', encoding='utf-8') as file:
+        actual= file.read()
+    assert result==actual

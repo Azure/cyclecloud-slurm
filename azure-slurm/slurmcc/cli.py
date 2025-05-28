@@ -194,9 +194,9 @@ class SlurmCLI(CommonCLI):
         group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS to map Tree or Block topology along VMSS boundaries without special network consideration (default: True)')
         group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager to map Tree topology (Block topology not allowed) according to SHARP network topology tool(default: False)')
         group.add_argument('-n', '--use_nvlink_domain', action='store_true', default=False, help='Use NVlink domain to map Block topology (Tree topology not allowed) according to NVLink Domain and Partition for multi-node NVLink (default: False)')
-        topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology output to use Block topology plugin with NVLink or VMSS aligned blocks (default: False)')
-        topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology output to use Tree topology plugin with VMSS aligned "racks"  (default: False)')
-        parser.add_argument("-s", "--block_size", type=int, required=False, default=1, help="Minimum block size required for each block (use with --block or --use_nvlink_domain, default: 1)")
+        topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology output to use Block topology plugin (default: False)')
+        topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology output to use Tree topology plugin(default: False)')
+        parser.add_argument("-s", "--block_size", type=int, required=False, help="Minimum block size required for each block (use with --block or --use_nvlink_domain, default: 1)")
 
     def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block, block_size) -> None:
         """
@@ -205,8 +205,8 @@ class SlurmCLI(CommonCLI):
         if use_fabric_manager:
             if not partition:
                 raise ValueError("--partition is required when using --use_fabric_manager")
-            if block:
-                raise ValueError("--block is not supported with --use_fabric_manager")
+            if block or block_size:
+                raise ValueError("--block and --block_size are not supported with --use_fabric_manager")
             topo_type = topology.TopologyType.TREE
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition,output,topology.TopologyInput.FABRIC,topo_type,config_dir)
@@ -216,13 +216,14 @@ class SlurmCLI(CommonCLI):
                 raise ValueError("--partition is required when using --use_nvlink_domain")
             if tree:
                 raise ValueError("--tree is not supported with --use_nvlink_domain")
+            block_size = block_size or 1
             topo_type = topology.TopologyType.BLOCK
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition,output,topology.TopologyInput.NVLINK,topo_type,config_dir,block_size)
             topo.run()
         elif use_vmss:
-            if block:
-                raise ValueError("--block is not supported with --use_vmss")
+            if block or block_size:
+                raise ValueError("--block and --block_size are not supported with --use_vmss")
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
                     return _generate_topology(self._get_node_manager(config), file_writer)
