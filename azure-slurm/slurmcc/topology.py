@@ -482,6 +482,8 @@ class Topology:
             num_nodes = len(hosts)
             lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
             lines.append(f"# ClusterUUID and CliqueID: {group_id}")
+            if "N/A" in group_id:
+                lines.append(f"# Warning: Block {block_index} has unknown ClusterUUID and CliqueID")
             if len(hosts) < self.block_size:
                 lines.append(f"# Warning: Block {block_index} has less than {self.block_size} nodes, commenting out")
                 lines.append(f"#BlockName=block{block_index} Nodes={','.join(hosts)}")
