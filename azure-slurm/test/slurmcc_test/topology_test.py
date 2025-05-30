@@ -3,9 +3,10 @@ Classes:
     OutputContainer: A container class to hold the standard output.
     ParallelOutputContainer: A container for storing the output of a srun command.
 '''
-from slurmcc.topology import Topology
+from slurmcc.topology import Topology, TopologyInput, TopologyType
 from slurmcc import util as slutil
 from pathlib import Path
+import pytest
 
 TESTDIR="test/slurmcc_test/topology_test_output"
 
@@ -32,7 +33,7 @@ class ParallelOutputContainer:
         self.stdout=stdout
         self.stderr=stderr
         self.returncode=exit_code
-def run_parallel_cmd(hosts,cmd,shell=False, partition=None):
+def run_parallel_cmd(hosts,cmd,shell=False, partition=None,gpus=None):
     """
     Executes a command in parallel on a list of hosts and returns the output.
 
@@ -91,6 +92,7 @@ def run_parallel_cmd(hosts,cmd,shell=False, partition=None):
             stderr = ""
             exit_code = 0
             return ParallelOutputContainer(stdout,stderr,exit_code)
+
 def run_command(cmd,shell=True):
     """
     Executes a given command and returns the output based on predefined conditions.
@@ -157,7 +159,7 @@ def test_get_hostnames():
         AssertionError: If the retrieved hostnames do not match the expected hostnames.
     """
     slutil.run=run_command
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.get_hostnames()
     result=test_obj.hosts
     with open('test/slurmcc_test/topology_test_input/valid_hostnames.txt','r', encoding='utf-8') as file:
@@ -179,7 +181,7 @@ def test_get_os_name():
     5. Assert that the result is 'ubuntu'.
     """
     slutil.srun=run_parallel_cmd
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     result=test_obj.get_os_name()
     assert result=='ubuntu'
@@ -193,7 +195,7 @@ def test_get_sharp_cmd():
     Assertions:
         - The result of get_sharp_cmd() should be "/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
     """
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     result=test_obj.get_sharp_cmd()
     assert result=="/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
@@ -217,7 +219,7 @@ def test_check_sharp_hello():
         None
     """
     slutil.srun=run_parallel_cmd
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     test_obj.sharp_cmd_path="/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
     result=test_obj.check_sharp_hello()
@@ -242,7 +244,7 @@ def test_check_ibstatus():
         None
     """
     slutil.srun=run_parallel_cmd
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     result=test_obj.check_ibstatus()
     assert result==0
@@ -265,7 +267,7 @@ def test_retrieve_guids():
         AssertionError: If the contents of the output GUIDs file do not match the expected GUIDs.
     """
     slutil.srun=run_parallel_cmd
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     with open('test/slurmcc_test/topology_test_input/guid_hostnames.txt','r', encoding='utf-8') as file:
         test_obj.hosts= file.read().splitlines()
     test_obj.retrieve_guids()
@@ -291,7 +293,7 @@ def test_generate_topo_file():
                         expected content.
     """
     slutil.srun=run_parallel_cmd
-    test_obj   = Topology("hpc",None,TESTDIR)
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     test_obj.generate_topo_file()
     with open(test_obj.topo_file,'r', encoding='utf-8') as file:
@@ -299,40 +301,8 @@ def test_generate_topo_file():
     with open('test/slurmcc_test/topology_test_input/topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
     assert result==actual
-
-def test_write_slurm_topology():
-    """
-    Test the write_slurm_topology method of the Topology class.
-
-    This test performs the following steps:
-    1. Creates an instance of the Topology class with a specified output file.
-    2. Sets the topo_file attribute to a predefined input topology file.
-    3. Groups device GUIDs per switch using the group_guids_per_switch method.
-    4. Identifies torsets using the identify_torsets method.
-    5. Groups hosts by torset using the group_hosts_by_torset method.
-    6. Writes the slurm topology to the output file using the write_slurm_topology method.
-    7. Reads the generated output file and compares it with an expected output file.
     
-    The test asserts that the content of the generated output file matches the expected output file.
-    """
-    slutil.srun=run_parallel_cmd
-    slutil.run=run_command
-    output= 'test/slurmcc_test/topology_test_output/slurm_topology_1.txt'
-    test_obj   = Topology("hpc",output,TESTDIR)
-    test_obj.get_hostnames()
-    test_obj.retrieve_guids()
-    test_obj.topo_file = 'test/slurmcc_test/topology_test_input/topology.txt'
-    test_obj.device_guids_per_switch =  test_obj.group_guids_per_switch()
-    test_obj.host_to_torset_map = test_obj.identify_torsets()
-    test_obj.torsets = test_obj.group_hosts_by_torset()
-    test_obj.write_slurm_topology()
-    with open('test/slurmcc_test/topology_test_output/slurm_topology_1.txt','r', encoding='utf-8') as file:
-        result= file.read()
-    with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
-        actual= file.read()
-    assert result==actual
-
-def test_run():
+def test_run_fabric():
     """
     Test the Topology class by running a topology generation and comparing the output to the expected result.
 
@@ -350,10 +320,299 @@ def test_run():
     slutil.srun=run_parallel_cmd
     slutil.run=run_command
     output= 'test/slurmcc_test/topology_test_output/slurm_topology_2.txt'
-    test_obj   = Topology("hpc",output,TESTDIR)
+    test_obj   = Topology("hpc",output,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.run()
     with open('test/slurmcc_test/topology_test_output/slurm_topology_2.txt','r', encoding='utf-8') as file:
         result= file.read()
     with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
     assert result==actual
+
+def test_run_nvlink():
+    """
+    Test the run method of the Topology class.
+
+    This test performs the following steps:
+    1. Creates an instance of the Topology class with a specified output file.
+    2. Sets the topology input file for the Topology instance.
+    3. Runs the topology generation process.
+    4. Reads the generated output file.
+    5. Reads the expected output file.
+    6. Asserts that the generated output matches the expected output.
+
+    Raises:
+        AssertionError: If the generated output does not match the expected output.
+    """
+    slutil.srun=run_parallel_cmd
+    slutil.run=run_command
+    output= 'test/slurmcc_test/topology_test_output/slurm_block_topology.txt'
+    test_obj   = Topology("hpc",output,TopologyInput.NVLINK,TopologyType.BLOCK,TESTDIR)
+    def fake_run_get_rack_id_command_1(*args, **kwargs):
+        with open('test/slurmcc_test/topology_test_input/nodes_clusterUUIDs.txt', 'r', encoding='utf-8') as f:
+            stdout = f.read()
+        return ParallelOutputContainer(stdout, "", 0)
+    test_obj._run_get_rack_id_command = fake_run_get_rack_id_command_1
+    test_obj.run()
+    racks=test_obj.run_nvlink()
+    content = test_obj.write_block_topology(racks)
+    with open('test/slurmcc_test/topology_test_output/slurm_block_topology.txt','r', encoding='utf-8') as file:
+        result= file.read()
+    with open('test/slurmcc_test/topology_test_input/block_topology.txt','r', encoding='utf-8') as file:
+        actual= file.read()
+    assert result==actual
+    assert content==actual
+    assert len(racks)==4
+
+def test_group_hosts_per_rack_single_rack(monkeypatch):
+    """
+    Test group_hosts_per_rack when all hosts belong to the same rack.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj.hosts = ['node1', 'node2', 'node3']
+
+    # Mock get_rack_id to return all hosts mapped to the same rack
+    def fake_get_rack_id():
+        return {'node1': 'rackA', 'node2': 'rackA', 'node3': 'rackA'}
+    test_obj.get_rack_id = fake_get_rack_id
+
+    racks = test_obj.group_hosts_per_rack()
+    assert racks == {'rackA': ['node1', 'node2', 'node3']}
+
+def test_group_hosts_per_rack_multiple_racks(monkeypatch):
+    """
+    Test group_hosts_per_rack when hosts are distributed across multiple racks.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj.hosts = ['node1', 'node2', 'node3', 'node4']
+
+    # Mock get_rack_id to return hosts mapped to different racks
+    def fake_get_rack_id():
+        return {'node1': 'rackA', 'node2': 'rackB', 'node3': 'rackA', 'node4': 'rackC'}
+    test_obj.get_rack_id = fake_get_rack_id
+    racks = test_obj.group_hosts_per_rack()
+    assert racks == {
+        'rackA': ['node1', 'node3'],
+        'rackB': ['node2'],
+        'rackC': ['node4']
+    }
+
+def test_group_hosts_per_rack_empty(monkeypatch):
+    """
+    Test group_hosts_per_rack when there are no hosts.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj.hosts = []
+
+    # Mock get_rack_id to return empty dict
+    def fake_get_rack_id():
+        return {}
+    test_obj.get_rack_id = fake_get_rack_id
+
+    racks = test_obj.group_hosts_per_rack()
+    assert racks == {}
+
+def test_group_hosts_per_rack_duplicate_hosts(monkeypatch):
+    """
+    Test group_hosts_per_rack when the same host appears multiple times in get_rack_id.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj.hosts = ['node1', 'node2']
+
+    # Mock get_rack_id to return duplicate hosts (should not happen, but test for robustness)
+    def fake_get_rack_id():
+        return {'node1': 'rackA', 'node1': 'rackA', 'node2': 'rackB'}
+    test_obj.get_rack_id = fake_get_rack_id
+
+    racks = test_obj.group_hosts_per_rack()
+    assert racks == {'rackA': ['node1'], 'rackB': ['node2']}
+
+def test_get_rack_id_success(monkeypatch):
+    class DummyOutput:
+        stdout = 'node1:uuidA\nnode2:uuidB\nnode3:uuidA\n'
+    def fake_run_get_rack_id_command(*args, **kwargs):
+        return DummyOutput()
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj._run_get_rack_id_command = fake_run_get_rack_id_command
+    result = test_obj.get_rack_id()
+    assert result == {'node1': 'uuidA', 'node2': 'uuidB', 'node3': 'uuidA'}
+
+def test_get_rack_id_empty(monkeypatch):
+    class DummyOutput:
+        stdout = ''
+    def fake_run_get_rack_id_command(*args, **kwargs):
+        return DummyOutput()
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj._run_get_rack_id_command = fake_run_get_rack_id_command
+    result = test_obj.get_rack_id()
+    assert result == {}
+
+def test_get_rack_id_strip_quotes(monkeypatch):
+    class DummyOutput:
+        stdout = '"node1:uuidA"\n"node2:uuidB"\n'
+    def fake_run_get_rack_id_command(*args, **kwargs):
+        return DummyOutput()
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj._run_get_rack_id_command = fake_run_get_rack_id_command
+    result = test_obj.get_rack_id()
+    assert result == {'node1': 'uuidA', 'node2': 'uuidB'}
+
+TESTDIR = "test/slurmcc_test/topology_test_output"
+
+@pytest.mark.parametrize(
+    "block_size,host_dict,expected_lines,should_exit",
+    [
+        # Normal case: all blocks have enough nodes
+        (
+            2,
+            {
+                "rackA": ["node1", "node2"],
+                "rackB": ["node3", "node4"],
+            },
+            [
+                "# Number of Nodes in block1: 2",
+                "# ClusterUUID and CliqueID: rackA",
+                "BlockName=block1 Nodes=node1,node2",
+                "# Number of Nodes in block2: 2",
+                "# ClusterUUID and CliqueID: rackB",
+                "BlockName=block2 Nodes=node3,node4",
+                "BlockSizes=2",
+            ],
+            False,
+        ),
+        # One block too small
+        (
+            3,
+            {
+                "rackA": ["node1", "node2"],
+                "rackB": ["node3", "node4", "node5"],
+            },
+            [
+                "# Warning: Block 1 has less than 3 nodes, commenting out",
+                "#BlockName=block1 Nodes=node1,node2",
+                "BlockName=block2 Nodes=node3,node4,node5",
+                "BlockSizes=3",
+            ],
+            False,
+        ),
+        # All blocks too small
+        (
+            5,
+            {
+                "rackA": ["node1"],
+                "rackB": ["node2", "node3"],
+            },
+            [
+                "# Warning: Block 1 has less than 5 nodes, commenting out",
+                "#BlockName=block1 Nodes=node1",
+                "# Warning: Block 2 has less than 5 nodes, commenting out",
+                "#BlockName=block2 Nodes=node2,node3",
+                "BlockSizes=5",
+            ],
+            False,
+        ),
+        # Empty host_dict triggers sys.exit
+        (
+            2,
+            {},
+            [],
+            True,
+        ),
+    ]
+)
+def test_write_block_topology_cases(monkeypatch, block_size, host_dict, expected_lines, should_exit):
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=block_size)
+    if should_exit:
+        with pytest.raises(SystemExit):
+            test_obj.write_block_topology(host_dict)
+    else:
+        result = test_obj.write_block_topology(host_dict)
+        for line in expected_lines:
+            assert line in result
+        assert result.strip().endswith(f"BlockSizes={block_size}")
+
+def test_write_block_topology_order_and_indexing():
+    # Ensure block indices increment in insertion order
+    host_dict = {"rackA": ["n1"], "rackB": ["n2"], "rackC": ["n3"]}
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=2)
+    result = test_obj.write_block_topology(host_dict)
+    assert "# Number of Nodes in block1: 1" in result
+    assert "# Number of Nodes in block2: 1" in result
+    assert "# Number of Nodes in block3: 1" in result
+    assert result.count("BlockSizes=2") == 1
+
+def test_write_block_topology_single_block_enough_nodes():
+    host_dict = {"rackA": ["node1", "node2"]}
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=2)
+    result = test_obj.write_block_topology(host_dict)
+    assert "BlockName=block1 Nodes=node1,node2" in result
+    assert "# Warning:" not in result
+
+def test_write_block_topology_single_block_too_few_nodes():
+    host_dict = {"rackA": ["node1"]}
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=3)
+    result = test_obj.write_block_topology(host_dict)
+    assert "# Warning: Block 1 has less than 3 nodes, commenting out" in result
+    assert "#BlockName=block1 Nodes=node1" in result
+    # The uncommented version should not appear anywhere in the result
+    assert "\nBlockName=block1 Nodes=node1\n" not in f"\n{result}\n"
+
+def test_write_block_topology_multiple_blocks_mixed_sizes():
+    host_dict = {
+        "rackA": ["node1", "node2", "node3"],
+        "rackB": ["node4"],
+        "rackC": ["node5", "node6", "node7"],
+    }
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=3)
+    result = test_obj.write_block_topology(host_dict)
+    assert "BlockName=block1 Nodes=node1,node2,node3" in result
+    assert "# Warning: Block 2 has less than 3 nodes, commenting out" in result
+    assert "#BlockName=block2 Nodes=node4" in result
+    assert "BlockName=block3 Nodes=node5,node6,node7" in result
+
+def test_run_nvlink_calls_methods(monkeypatch):
+    """
+    Test that run_nvlink calls get_hostnames and group_hosts_per_rack, and returns the correct racks dict.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    called = {"get_hostnames": False, "group_hosts_per_rack": False}
+
+    def fake_get_hostnames():
+        called["get_hostnames"] = True
+
+    expected_racks = {"rackA": ["node1", "node2"], "rackB": ["node3"]}
+    def fake_group_hosts_per_rack():
+        called["group_hosts_per_rack"] = True
+        return expected_racks
+
+    test_obj.get_hostnames = fake_get_hostnames
+    test_obj.group_hosts_per_rack = fake_group_hosts_per_rack
+
+    result = test_obj.run_nvlink()
+    assert called["get_hostnames"]
+    assert called["group_hosts_per_rack"]
+    assert result == expected_racks
+
+def test_run_nvlink_empty_hosts(monkeypatch):
+    """
+    Test run_nvlink returns empty dict when group_hosts_per_rack returns empty.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj.get_hostnames = lambda: None
+    test_obj.group_hosts_per_rack = lambda: {}
+    result = test_obj.run_nvlink()
+    assert result == {}
+
+def test_run_nvlink_multiple_racks(monkeypatch):
+    """
+    Test run_nvlink returns correct mapping for multiple racks.
+    """
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
+    test_obj.get_hostnames = lambda: None
+    racks = {
+        "rack1": ["host1", "host2"],
+        "rack2": ["host3"],
+        "rack3": ["host4", "host5", "host6"]
+    }
+    test_obj.group_hosts_per_rack = lambda: racks
+    result = test_obj.run_nvlink()
+    assert result == racks

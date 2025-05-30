@@ -188,28 +188,49 @@ class SlurmCLI(CommonCLI):
     
     def topology_parser(self, parser: ArgumentParser) -> None:
         group = parser.add_mutually_exclusive_group(required=False)
+        topology_group = parser.add_mutually_exclusive_group(required=False)
         parser.add_argument('-p,','--partition', type=str, help="Specify the parititon")
         parser.add_argument('-o', '--output', type=str, help="Specify slurm topology file output")
-        group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS (default: True)')
-        group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager (default: False)')
-    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager):
+        group.add_argument('-v', '--use_vmss', action='store_true', default=True, help='Use VMSS to map Tree or Block topology along VMSS boundaries without special network consideration (default: True)')
+        group.add_argument('-f', '--use_fabric_manager', action='store_true', default=False, help='Use Fabric Manager to map Tree topology (Block topology not allowed) according to SHARP network topology tool(default: False)')
+        group.add_argument('-n', '--use_nvlink_domain', action='store_true', default=False, help='Use NVlink domain to map Block topology (Tree topology not allowed) according to NVLink Domain and Partition for multi-node NVLink (default: False)')
+        topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology output to use Block topology plugin (default: False)')
+        topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology output to use Tree topology plugin(default: False)')
+        parser.add_argument("-s", "--block_size", type=int, required=False, help="Minimum block size required for each block (use with --block or --use_nvlink_domain, default: 1)")
+
+    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block, block_size) -> None:
         """
         Generates Topology Plugin Configuration
         """
         if use_fabric_manager:
             if not partition:
                 raise ValueError("--partition is required when using --use_fabric_manager")
+            if block or block_size:
+                raise ValueError("--block and --block_size are not supported with --use_fabric_manager")
+            topo_type = topology.TopologyType.TREE
             config_dir = config.get("config_dir")
-            topo = topology.Topology(partition,output,config_dir)
+            topo = topology.Topology(partition, output, topology.TopologyInput.FABRIC, topo_type, config_dir)
+            topo.run()
+        elif use_nvlink_domain:
+            if not partition:
+                raise ValueError("--partition is required when using --use_nvlink_domain")
+            if tree:
+                raise ValueError("--tree is not supported with --use_nvlink_domain")
+            block_size = block_size or 1
+            topo_type = topology.TopologyType.BLOCK
+            config_dir = config.get("config_dir")
+            topo = topology.Topology(partition, output, topology.TopologyInput.NVLINK, topo_type, config_dir, block_size)
             topo.run()
         elif use_vmss:
+            if block or block_size:
+                raise ValueError("--block and --block_size are not supported with --use_vmss")
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
                     return _generate_topology(self._get_node_manager(config), file_writer)
             else:
                 return _generate_topology(self._get_node_manager(config), sys.stdout)
         else:
-            raise ValueError("Please specify either --use_vmss or --use_fabric_manager")
+            raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_nvlink_domain")
     
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
