@@ -788,7 +788,7 @@ Order = 20
         [[[parameter configuration_slurm_launch_parameters]]]
         Label = Launch Parameters
         Description = Deploy Slurm with Launch Parameters (comma delimited)
-        DefaultValue = ''
+        DefaultValue = 'use_interactive_step'
         ParameterType = String
 
 

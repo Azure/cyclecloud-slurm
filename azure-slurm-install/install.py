@@ -104,6 +104,7 @@ class InstallSettings:
         self.additonal_slurm_config = (
             config["slurm"].get("additional", {}).get("config")
         )
+        self.launch_parameters = config["slurm"].get("launch_parameters", "")
 
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
@@ -393,7 +394,8 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "max_node_count": s.max_node_count,
             "state_save_location": state_save_location,
             "prolog": "/etc/slurm/prolog.d/*",
-            "epilog": "/etc/slurm/epilog.d/*"
+            "epilog": "/etc/slurm/epilog.d/*",
+            "launch_parameters" : s.launch_parameters
         },
     )
 

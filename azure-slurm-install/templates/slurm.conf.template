@@ -25,6 +25,7 @@ SlurmctldParameters=idle_on_node_suspend
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurmd/slurmd.log
 DisableRootJobs=No
+LaunchParameters={launch_parameters}
 # TopologyPlugin=topology/tree
 # If you use the TopologyPlugin you likely also want to use our
 # job submit plugin so that your jobs run on a single switch 
