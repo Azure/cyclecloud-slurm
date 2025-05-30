@@ -85,8 +85,7 @@ EOF
     cp -fv /usr/share/enroot/hooks.d/50-slurm-pmi.sh /usr/share/enroot/hooks.d/50-slurm-pytorch.sh /etc/enroot/hooks.d
 }
 
-if is_compute ; then
-    install_enroot
-    configure_enroot
-fi
+
+install_enroot
+configure_enroot
 
