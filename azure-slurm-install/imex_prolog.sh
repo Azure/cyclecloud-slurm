@@ -2,10 +2,12 @@
 # Prolog script for NVIDIA IMEX
 run_prolog() {
 
-  if ! systemctl list-units --full --all | grep -Fq "nvidia-imex.service"; then 
-    exit 0 
-  fi 
-  
+  if ! systemctl list-units --full --all | grep -Fq "nvidia-imex.service"; then
+    exit 0
+  fi
+
+  echo "SLURM_NODELIST: $SLURM_NODELIST"
+
   set -ex
   # Clean the config file in case the service gets started by accident
   > /tmp/nodes_config.cfg
@@ -22,7 +24,8 @@ run_prolog() {
   set -e
 
   # update peer list
-  scontrol -a show node $NODES -o | sed 's/^.* NodeAddr=\([^ ]*\).*/\1/' > /etc/nvidia-imex/nodes_config.cfg
+  scontrol show node $SLURM_NODELIST -o | sed 's/^.* NodeAddr=\([^ ]*\).*/\1/' > /etc/nvidia-imex/nodes_config.cfg
+  #cat /etc/nvidia-imex/nodes_config.cfg
   # rotate server port to prevent race condition
   NEW_SERVER_PORT=$((${SLURM_JOB_ID}% 16384 + 33792))
   sed -i "s/SERVER_PORT.*/SERVER_PORT=${NEW_SERVER_PORT}/" /etc/nvidia-imex/config.cfg
@@ -33,7 +36,6 @@ run_prolog() {
   # set timeouts for start
   sed -i "s/IMEX_CONN_WAIT_TIMEOUT.*/IMEX_CONN_WAIT_TIMEOUT=${IMEX_CONN_WAIT_TIMEOUT}/" /etc/nvidia-imex/config.cfg
   timeout $NVIDIA_IMEX_START_TIMEOUT systemctl start nvidia-imex
-   
 }
 # Get VM size from Jetpack
 mkdir -p /var/log/slurm
@@ -41,7 +43,7 @@ mkdir -p /var/log/slurm
 set -x
 set +e
 VM_SIZE=$(/opt/cycle/jetpack/bin/jetpack config azure.metadata.compute.vmSize)
-IMEX_ENABLED=$(/opt/cycle/jetpack/bin/jetpack config slurm.imex.enabled)
+IMEX_ENABLED=$(/opt/cycle/jetpack/bin/jetpack config slurm.imex.enabled null)
 echo "VM_SIZE: $VM_SIZE"
 echo "IMEX_ENABLED: $IMEX_ENABLED"
 # Main logic
