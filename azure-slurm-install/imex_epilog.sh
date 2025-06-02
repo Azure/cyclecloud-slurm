@@ -19,7 +19,7 @@ mkdir -p /var/log/slurm
   set -x
   set +e
   VM_SIZE=$(/opt/cycle/jetpack/bin/jetpack config azure.metadata.compute.vmSize)
-  IMEX_ENABLED=$(/opt/cycle/jetpack/bin/jetpack config slurm.imex.enabled)
+  IMEX_ENABLED=$(/opt/cycle/jetpack/bin/jetpack config slurm.imex.enabled null)
 
   # Main logic
   set -e
