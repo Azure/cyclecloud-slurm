@@ -9,8 +9,6 @@ run_prolog() {
   echo "SLURM_NODELIST: $SLURM_NODELIST"
 
   set -ex
-  # Clean the config file in case the service gets started by accident
-  > /tmp/nodes_config.cfg
   NODES=$SLURM_NODELIST
   echo $NODES
   NVIDIA_IMEX_START_TIMEOUT=60
