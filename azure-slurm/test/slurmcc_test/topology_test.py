@@ -7,6 +7,7 @@ from slurmcc.topology import Topology, TopologyInput, TopologyType
 from slurmcc import util as slutil
 from pathlib import Path
 import pytest
+import re
 
 TESTDIR="test/slurmcc_test/topology_test_output"
 
@@ -363,6 +364,40 @@ def test_run_nvlink():
     assert content==actual
     assert len(racks)==4
 
+def test_visualize_block_topology():
+    slutil.srun=run_parallel_cmd
+    slutil.run=run_command
+    test_obj   = Topology("hpc",None,TopologyInput.NVLINK,TopologyType.BLOCK,TESTDIR)
+    def fake_run_get_rack_id_command_1(*args, **kwargs):
+        with open('test/slurmcc_test/topology_test_input/nodes_clusterUUIDs.txt', 'r', encoding='utf-8') as f:
+            stdout = f.read()
+        return ParallelOutputContainer(stdout, "", 0)
+    test_obj._run_get_rack_id_command = fake_run_get_rack_id_command_1
+    content=test_obj.run()
+    vis = test_obj.visualize(content,18)
+    print(vis)
+    with open('test/slurmcc_test/topology_test_output/block_topo_vis.txt', 'w', encoding='utf-8') as f:
+        f.write(vis)
+    with open('test/slurmcc_test/topology_test_output/block_topo_vis.txt','r', encoding='utf-8') as file:
+        result= file.read()
+    with open('test/slurmcc_test/topology_test_input/block_topo_vis.txt','r', encoding='utf-8') as file:
+        actual= file.read()
+    assert result==actual
+
+def test_visualize_tree_topology():
+    slutil.srun=run_parallel_cmd
+    slutil.run=run_command
+    test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
+    content=test_obj.run()
+    vis = test_obj.visualize(content,18)
+    with open('test/slurmcc_test/topology_test_output/tree_topo_vis.txt', 'w', encoding='utf-8') as f:
+            f.write(vis)
+    with open('test/slurmcc_test/topology_test_output/tree_topo_vis.txt','r', encoding='utf-8') as file:
+        result= file.read()
+    with open('test/slurmcc_test/topology_test_input/tree_topo_vis.txt','r', encoding='utf-8') as file:
+        actual= file.read()
+    assert result==actual
+
 def test_group_hosts_per_rack_single_rack(monkeypatch):
     """
     Test group_hosts_per_rack when all hosts belong to the same rack.
@@ -616,3 +651,263 @@ def test_run_nvlink_multiple_racks(monkeypatch):
     test_obj.group_hosts_per_rack = lambda: racks
     result = test_obj.run_nvlink()
     assert result == racks
+    
+@pytest.mark.parametrize(
+    "topo_type,topology_str,max_block_size,expected_lines,block_size",
+    [
+        # BLOCK: one block, not enough nodes, commented
+        (
+            TopologyType.BLOCK,
+            "# Number of Nodes in block1: 1\n"
+            "# ClusterUUID and CliqueID: rackA\n"
+            "# Warning: Block 1 has less than 2 nodes, commenting out\n"
+            "#BlockName=block1 Nodes=node1\n"
+            "BlockSizes=2\n",
+            2,
+            [
+                "block 1  : # of Nodes = 1",
+                "ClusterUUID + CliqueID : rackA",
+                "** This block is ineligible for scheduling because # of nodes < min block size 2**",
+                "|-------|",
+                "| node1 |",
+                "|-------|",
+                "|   X   |",
+                "|-------|",
+            ],
+            2
+        ),
+        (
+            TopologyType.BLOCK,
+            "# Number of Nodes in block1: 6\n"
+            "# ClusterUUID and CliqueID: N/A N/A\n"
+            "# Warning: Block 1 has unknown ClusterUUID and CliqueID\n"
+            "# Warning: Block 1 has less than 8 nodes, commenting out\n"
+            "#BlockName=block1 Nodes=vis0603-gpu-4,vis0603-gpu-6,vis0603-gpu-3,vis0603-gpu-5,vis0603-gpu-1,vis0603-gpu-2\n"
+            "BlockSizes=8",
+            18,
+            [
+                "block 1  : # of Nodes = 6",
+                "ClusterUUID + CliqueID : N/A N/A",
+                "** This block is ineligible for scheduling because # of nodes < min block size 8**",
+                "|---------------|---------------|---------------|",
+                "| vis0603-gpu-4 | vis0603-gpu-6 | vis0603-gpu-3 |",
+                "|---------------|---------------|---------------|",
+                "| vis0603-gpu-5 | vis0603-gpu-1 | vis0603-gpu-2 |",
+                "|---------------|---------------|---------------|",
+                "|       X       |       X       |       X       |",
+                "|---------------|---------------|---------------|",
+                "|       X       |       X       |       X       |",
+                "|---------------|---------------|---------------|",
+                "|       X       |       X       |       X       |",
+                "|---------------|---------------|---------------|",
+                "|       X       |       X       |       X       |"
+            ],
+            8
+        ),
+        # BLOCK: no valid blocks
+        (
+            TopologyType.BLOCK,
+            "",
+            2,
+            [
+                "# No valid blocks found in topology string.",
+            ],
+            2
+        ),
+        (
+            TopologyType.BLOCK,
+            (
+                "# Number of Nodes in block1: 4\n"
+                "# ClusterUUID and CliqueID: rackA\n"
+                "BlockName=block1 Nodes=node1,node2,node3,node4\n"
+                "BlockSizes=4\n"
+            ),
+            4,
+            [
+                "block 1  : # of Nodes = 4",
+                "ClusterUUID + CliqueID : rackA",
+                "|-------|-------|",
+                "| node1 | node2 |",
+                "|-------|-------|",
+                "| node3 | node4 |",
+                "|-------|-------|",
+            ],
+            2
+        ),
+        (
+            TopologyType.BLOCK,
+            (
+                "# Number of Nodes in block1: 2\n"
+                "# ClusterUUID and CliqueID: rackB\n"
+                "BlockName=block1 Nodes=nodeA,nodeB\n"
+                "BlockSizes=2\n"
+            ),
+            2,
+            [
+                "block 1  : # of Nodes = 2",
+                "ClusterUUID + CliqueID : rackB",
+                "|-------|",
+                "| nodeA |",
+                "|-------|",
+                "| nodeB |",
+                "|-------|",
+            ],
+            2
+        ),
+        (
+            TopologyType.BLOCK,
+            (
+                "# Number of Nodes in block1: 1\n"
+                "# ClusterUUID and CliqueID: rackC\n"
+                "BlockName=block1 Nodes=host1\n"
+                "BlockSizes=3\n"
+            ),
+            3,
+            [
+                "block 1  : # of Nodes = 1",
+                "ClusterUUID + CliqueID : rackC",
+                "|-------|",
+                "| host1 |",
+                "|-------|",
+                "|   X   |",
+                "|-------|",
+                "|   X   |",
+                "|-------|",
+            ],
+            2
+        ),
+        (
+            TopologyType.BLOCK,
+            (
+                "# Number of Nodes in block1: 0\n"
+                "# ClusterUUID and CliqueID: rackD\n"
+                "BlockName=block1 Nodes=\n"
+                "BlockSizes=2\n"
+            ),
+            2,
+            [
+                "# No valid blocks found in topology string."
+            ],
+            2
+        ),
+        (
+            TopologyType.BLOCK,
+            (
+                "# Number of Nodes in block1: 3\n"
+                "# ClusterUUID and CliqueID: rackE\n"
+                "BlockName=block1 Nodes=node1,node2,node3\n"
+                "BlockSizes=2\n"
+            ),
+            5,
+            [
+                "block 1  : # of Nodes = 3",
+                "ClusterUUID + CliqueID : rackE",
+                "|-------|",
+                "| node1 |",
+                "|-------|",
+                "| node2 |",
+                "|-------|",
+                "| node3 |",
+                "|-------|",
+                "|   X   |",
+                "|-------|",
+                "|   X   |",
+                "|-------|"
+            ],
+            2
+        ),
+        # TREE: two switches, one parent
+        (
+            TopologyType.TREE,
+            "# Number of Nodes in sw01: 2\n"
+            "SwitchName=sw01 Nodes=node1,node2\n"
+            "# Number of Nodes in sw02: 1\n"
+            "SwitchName=sw02 Nodes=node3\n"
+            "SwitchName=sw03 Switches=sw01,sw02\n",
+            2,
+            [
+                "Switch 3 (root)",
+                "├── Switch 1 (2 nodes)",
+                "│   ├── node1",
+                "│   └── node2",
+                "└── Switch 2 (1 nodes)",
+                "    └── node3",
+            ],
+            2
+        ),
+        # TREE: no valid switches
+        (
+            TopologyType.TREE,
+            "",
+            2,
+            [
+                "# No valid switches found in topology string.",
+            ],
+            2
+        ),
+    ]
+)
+def test_visualize_various_cases(topo_type, topology_str, max_block_size, expected_lines,block_size):
+    test_obj = Topology("hpc", None, TopologyInput.FABRIC, topo_type, "testdir", block_size)
+    result = test_obj.visualize(topology_str, max_block_size)
+    print(result)
+    for line in expected_lines:
+        assert line in result
+
+def test_visualize_block_grid_shape():
+    # Test grid shape for block size 6 (should be 3x2 or 2x3)
+    topology_str = (
+        "# Number of Nodes in block1: 6\n"
+        "# ClusterUUID and CliqueID: rackA\n"
+        "BlockName=block1 Nodes=n1,n2,n3,n4,n5,n6\n"
+        "BlockSizes=6\n"
+    )
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir", block_size=6)
+    vis = test_obj.visualize(topology_str, 6)
+    # Should have 3 rows and 2 columns or 2 rows and 3 columns
+    assert vis.count("|") > 0
+    assert "n1" in vis and "n6" in vis
+
+def test_visualize_block_invalid_max_block_size():
+    topology_str = (
+        "# Number of Nodes in block1: 2\n"
+        "# ClusterUUID and CliqueID: rackA\n"
+        "BlockName=block1 Nodes=node1,node2\n"
+        "BlockSizes=2\n"
+    )
+    test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir", block_size=2)
+    with pytest.raises(ValueError):
+        test_obj.visualize(topology_str, 0)
+
+def test_visualize_tree_no_parent_switch():
+    topology_str = (
+        "# Number of Nodes in sw01: 2\n"
+        "SwitchName=sw01 Nodes=node1,node2\n"
+        "# Number of Nodes in sw02: 1\n"
+        "SwitchName=sw02 Nodes=node3\n"
+    )
+    test_obj = Topology("hpc", None, TopologyInput.FABRIC, TopologyType.TREE, "testdir")
+    vis = test_obj.visualize(topology_str, 2)
+    assert "Switch 1 (2 nodes)" in vis
+    assert "Switch 2 (1 nodes)" in vis
+    assert "node1" in vis and "node2" in vis and "node3" in vis
+
+def test_visualize_tree_with_parent_switch():
+    topology_str = (
+        "# Number of Nodes in sw01: 2\n"
+        "SwitchName=sw01 Nodes=node1,node2\n"
+        "# Number of Nodes in sw02: 1\n"
+        "SwitchName=sw02 Nodes=node3\n"
+        "SwitchName=sw03 Switches=sw01,sw02\n"
+    )
+    test_obj = Topology("hpc", None, TopologyInput.FABRIC, TopologyType.TREE, "testdir")
+    vis = test_obj.visualize(topology_str, 2)
+    assert "Switch 3 (root)" in vis
+    assert "Switch 1 (2 nodes)" in vis
+    assert "Switch 2 (1 nodes)" in vis
+    assert "node1" in vis and "node2" in vis and "node3" in vis
+
+
+
+
+

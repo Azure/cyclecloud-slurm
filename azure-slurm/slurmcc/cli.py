@@ -197,8 +197,10 @@ class SlurmCLI(CommonCLI):
         topology_group.add_argument('-b', '--block', action='store_true', default=False, help='Generate Block Topology output to use Block topology plugin (default: False)')
         topology_group.add_argument('-t', '--tree', action='store_true', default=False, help='Generate Tree Topology output to use Tree topology plugin(default: False)')
         parser.add_argument("-s", "--block_size", type=int, required=False, help="Minimum block size required for each block (use with --block or --use_nvlink_domain, default: 1)")
+        parser.add_argument("-g", "--generate_visualization", action='store_true', default=False, help="Generate ASCII visualization for the topology (default: False)")
+        parser.add_argument("--visual_block_size", type=int, default=18, help="Block size for visualization (default: 18)")
 
-    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block, block_size) -> None:
+    def topology(self, config: Dict, partition, output, use_vmss, use_fabric_manager, use_nvlink_domain, tree, block, block_size, generate_visualization, visual_block_size) -> None:
         """
         Generates Topology Plugin Configuration
         """
@@ -210,7 +212,9 @@ class SlurmCLI(CommonCLI):
             topo_type = topology.TopologyType.TREE
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition, output, topology.TopologyInput.FABRIC, topo_type, config_dir)
-            topo.run()
+            content = topo.run()
+            if generate_visualization:
+                print(topo.visualize(content))
         elif use_nvlink_domain:
             if not partition:
                 raise ValueError("--partition is required when using --use_nvlink_domain")
@@ -220,10 +224,12 @@ class SlurmCLI(CommonCLI):
             topo_type = topology.TopologyType.BLOCK
             config_dir = config.get("config_dir")
             topo = topology.Topology(partition, output, topology.TopologyInput.NVLINK, topo_type, config_dir, block_size)
-            topo.run()
+            content = topo.run()
+            if generate_visualization:
+                print(topo.visualize(content, max_block_size=visual_block_size))
         elif use_vmss:
-            if block or block_size:
-                raise ValueError("--block and --block_size are not supported with --use_vmss")
+            if block or block_size or partition or generate_visualization:
+                raise ValueError("--block, --block_size, --partition, and --generate_visualization are not supported with --use_vmss")
             if output:
                 with open(output, 'w', encoding='utf-8') as file_writer:
                     return _generate_topology(self._get_node_manager(config), file_writer)
