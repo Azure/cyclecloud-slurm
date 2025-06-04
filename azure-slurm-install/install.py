@@ -472,6 +472,14 @@ def _complete_install_primary(s: InstallSettings) -> None:
             mode="0644",
             content=f"include /etc/slurm/plugstack.conf.d/*"
         )
+    if not os.path.exists(f"{s.config_dir}/topology.conf"):
+        ilib.file(
+            f"{s.config_dir}/topology.conf",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0644",
+            content=""
+        )
 
 def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
@@ -515,7 +523,14 @@ def _complete_install_all(s: InstallSettings) -> None:
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
-    
+
+    ilib.link(
+        f"{s.config_dir}/topology.conf",
+        "/etc/slurm/topology.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
     ilib.link(
         f"{s.config_dir}/prolog.d",
         "/etc/slurm/prolog.d",
