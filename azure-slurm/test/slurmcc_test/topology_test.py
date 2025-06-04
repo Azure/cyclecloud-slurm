@@ -384,6 +384,69 @@ def test_visualize_block_topology():
         actual= file.read()
     assert result==actual
 
+def test_bfl_visualize_block_topology():
+    test_obj   = Topology("hpc",None,TopologyInput.NVLINK,TopologyType.BLOCK,TESTDIR)
+    content = (
+                "# Number of Nodes in block1: 8\n"
+                "# ClusterUUID and CliqueID: 1db72bdb-8004-4407-a49a-a9a935a80529 32766\n"
+                "BlockName=block1 Nodes=ccw1-gpu-8,ccw1-gpu-22,ccw1-gpu-82,ccw1-gpu-179,ccw1-gpu-97,ccw1-gpu-146,ccw1-gpu-45,ccw1-gpu-112\n"
+                "# Number of Nodes in block2: 15\n"
+                "# ClusterUUID and CliqueID: 18f2ff51-040a-486c-90ce-138067a7379a 32766\n"
+                "BlockName=block2 Nodes=ccw1-gpu-247,ccw1-gpu-134,ccw1-gpu-17,ccw1-gpu-33,ccw1-gpu-110,ccw1-gpu-51,ccw1-gpu-240,ccw1-gpu-154,ccw1-gpu-186,ccw1-gpu-198,ccw1-gpu-95,ccw1-gpu-210,ccw1-gpu-169,ccw1-gpu-225,ccw1-gpu-227\n"
+                "# Number of Nodes in block3: 18\n"
+                "# ClusterUUID and CliqueID: f9eeccb9-69ff-4a55-95e8-c00f14b83c38 32766\n"
+                "BlockName=block3 Nodes=ccw1-gpu-1,ccw1-gpu-9,ccw1-gpu-242,ccw1-gpu-79,ccw1-gpu-209,ccw1-gpu-248,ccw1-gpu-128,ccw1-gpu-172,ccw1-gpu-218,ccw1-gpu-109,ccw1-gpu-76,ccw1-gpu-32,ccw1-gpu-61,ccw1-gpu-203,ccw1-gpu-138,ccw1-gpu-238,ccw1-gpu-163,ccw1-gpu-226\n"
+                "# Number of Nodes in block4: 17\n"
+                "# ClusterUUID and CliqueID: 50c636e0-94d8-4df8-97c5-515a399e7f60 32766\n"
+                "BlockName=block4 Nodes=ccw1-gpu-164,ccw1-gpu-73,ccw1-gpu-195,ccw1-gpu-207,ccw1-gpu-245,ccw1-gpu-129,ccw1-gpu-10,ccw1-gpu-144,ccw1-gpu-125,ccw1-gpu-221,ccw1-gpu-235,ccw1-gpu-3,ccw1-gpu-104,ccw1-gpu-215,ccw1-gpu-229,ccw1-gpu-53,ccw1-gpu-80\n"
+                "# Number of Nodes in block5: 13\n"
+                "# ClusterUUID and CliqueID: 475636da-3c86-4f45-bc03-7623e8ef7085 32766\n"
+                "BlockName=block5 Nodes=ccw1-gpu-31,ccw1-gpu-184,ccw1-gpu-40,ccw1-gpu-166,ccw1-gpu-156,ccw1-gpu-65,ccw1-gpu-5,ccw1-gpu-13,ccw1-gpu-87,ccw1-gpu-78,ccw1-gpu-75,ccw1-gpu-108,ccw1-gpu-136\n"
+                "# Number of Nodes in block6: 16\n"
+                "# ClusterUUID and CliqueID: 87e6be3b-cd1a-46cd-ae93-7ea1629a165f 32766\n"
+                "BlockName=block6 Nodes=ccw1-gpu-91,ccw1-gpu-74,ccw1-gpu-135,ccw1-gpu-34,ccw1-gpu-193,ccw1-gpu-116,ccw1-gpu-63,ccw1-gpu-160,ccw1-gpu-29,ccw1-gpu-202,ccw1-gpu-130,ccw1-gpu-126,ccw1-gpu-48,ccw1-gpu-165,ccw1-gpu-208,ccw1-gpu-211\n"
+                "# Number of Nodes in block7: 16\n"
+                "# ClusterUUID and CliqueID: cc79d754-915f-408b-b1c3-b8c3aa6668ab 32766\n"
+                "BlockName=block7 Nodes=ccw1-gpu-237,ccw1-gpu-182,ccw1-gpu-217,ccw1-gpu-90,ccw1-gpu-223,ccw1-gpu-201,ccw1-gpu-159,ccw1-gpu-243,ccw1-gpu-139,ccw1-gpu-192,ccw1-gpu-64,ccw1-gpu-120,ccw1-gpu-2,ccw1-gpu-231,ccw1-gpu-41,ccw1-gpu-47\n"
+                "# Number of Nodes in block8: 17\n"
+                "# ClusterUUID and CliqueID: 19ce407e-11b7-4236-97f7-0f9a5b62692b 32766\n"
+                "BlockName=block8 Nodes=ccw1-gpu-49,ccw1-gpu-77,ccw1-gpu-157,ccw1-gpu-137,ccw1-gpu-30,ccw1-gpu-102,ccw1-gpu-142,ccw1-gpu-181,ccw1-gpu-4,ccw1-gpu-71,ccw1-gpu-12,ccw1-gpu-88,ccw1-gpu-162,ccw1-gpu-20,ccw1-gpu-117,ccw1-gpu-98,ccw1-gpu-57\n"
+                "# Number of Nodes in block9: 17\n"
+                "# ClusterUUID and CliqueID: 809d6b94-4c14-40b4-8eee-b71539be6baf 32766\n"
+                "BlockName=block9 Nodes=ccw1-gpu-19,ccw1-gpu-212,ccw1-gpu-224,ccw1-gpu-241,ccw1-gpu-197,ccw1-gpu-46,ccw1-gpu-105,ccw1-gpu-23,ccw1-gpu-222,ccw1-gpu-188,ccw1-gpu-249,ccw1-gpu-133,ccw1-gpu-56,ccw1-gpu-89,ccw1-gpu-94,ccw1-gpu-234,ccw1-gpu-153\n"
+                "# Number of Nodes in block10: 14\n"
+                "# ClusterUUID and CliqueID: 5110b53c-8898-4b07-bb98-9c7159894d5a 32766\n"
+                "BlockName=block10 Nodes=ccw1-gpu-15,ccw1-gpu-18,ccw1-gpu-14,ccw1-gpu-7,ccw1-gpu-22,ccw1-gpu-11,ccw1-gpu-16,ccw1-gpu-21,ccw1-gpu-27,ccw1-gpu-28,ccw1-gpu-24,ccw1-gpu-26,ccw1-gpu-25,ccw1-gpu-39\n"
+                "# Number of Nodes in block11: 16\n"
+                "# ClusterUUID and CliqueID: ad2669de-e798-494b-b2fb-ab9445b17e75 32766\n"
+                "BlockName=block11 Nodes=ccw1-gpu-250,ccw1-gpu-244,ccw1-gpu-50,ccw1-gpu-72,ccw1-gpu-143,ccw1-gpu-84,ccw1-gpu-114,ccw1-gpu-194,ccw1-gpu-220,ccw1-gpu-206,ccw1-gpu-158,ccw1-gpu-28,ccw1-gpu-185,ccw1-gpu-232,ccw1-gpu-228,ccw1-gpu-176\n"
+                "# Number of Nodes in block12: 16\n"
+                "# ClusterUUID and CliqueID: 8a2e3316-46f1-4772-882f-a53e2448892b 32766\n"
+                "BlockName=block12 Nodes=ccw1-gpu-36,ccw1-gpu-55,ccw1-gpu-27,ccw1-gpu-151,ccw1-gpu-122,ccw1-gpu-118,ccw1-gpu-18,ccw1-gpu-141,ccw1-gpu-103,ccw1-gpu-70,ccw1-gpu-131,ccw1-gpu-60,ccw1-gpu-175,ccw1-gpu-92,ccw1-gpu-161,ccw1-gpu-171\n"
+                "# Number of Nodes in block13: 16\n"
+                "# ClusterUUID and CliqueID: a3b58aab-21bc-4a89-8eaf-cf7ce06c1609 32766\n"
+                "BlockName=block13 Nodes=ccw1-gpu-85,ccw1-gpu-149,ccw1-gpu-239,ccw1-gpu-38,ccw1-gpu-204,ccw1-gpu-58,ccw1-gpu-213,ccw1-gpu-67,ccw1-gpu-100,ccw1-gpu-173,ccw1-gpu-219,ccw1-gpu-24,ccw1-gpu-177,ccw1-gpu-189,ccw1-gpu-115,ccw1-gpu-233\n"
+                "# Number of Nodes in block14: 18\n"
+                "# ClusterUUID and CliqueID: b78ed242-7b98-426f-b194-b76b8899f4ec 32766\n"
+                "BlockName=block14 Nodes=ccw1-gpu-123,ccw1-gpu-132,ccw1-gpu-69,ccw1-gpu-83,ccw1-gpu-15,ccw1-gpu-26,ccw1-gpu-147,ccw1-gpu-93,ccw1-gpu-52,ccw1-gpu-107,ccw1-gpu-113,ccw1-gpu-152,ccw1-gpu-62,ccw1-gpu-44,ccw1-gpu-7,ccw1-gpu-127,ccw1-gpu-35,ccw1-gpu-167\n"
+                "# Number of Nodes in block15: 16\n"
+                "# ClusterUUID and CliqueID: acd0098d-5416-4fe2-b3b9-edebcd0d9374 32766\n"
+                "BlockName=block15 Nodes=ccw1-gpu-246,ccw1-gpu-14,ccw1-gpu-37,ccw1-gpu-214,ccw1-gpu-236,ccw1-gpu-119,ccw1-gpu-200,ccw1-gpu-66,ccw1-gpu-191,ccw1-gpu-148,ccw1-gpu-124,ccw1-gpu-42,ccw1-gpu-99,ccw1-gpu-216,ccw1-gpu-168,ccw1-gpu-230\n"
+                "# Number of Nodes in block16: 16\n"
+                "# ClusterUUID and CliqueID: ef2f7639-552c-437e-bcee-56af9d562415 32766\n"
+                "BlockName=block16 Nodes=ccw1-gpu-25,ccw1-gpu-205,ccw1-gpu-170,ccw1-gpu-11,ccw1-gpu-39,ccw1-gpu-196,ccw1-gpu-86,ccw1-gpu-6,ccw1-gpu-111,ccw1-gpu-187,ccw1-gpu-155,ccw1-gpu-145,ccw1-gpu-183,ccw1-gpu-121,ccw1-gpu-54,ccw1-gpu-59\n"
+                "BlockSizes=1\n"
+
+            )
+    vis = test_obj.visualize(content,18)
+    with open('test/slurmcc_test/topology_test_output/bfl_block_topo_vis.txt', 'w', encoding='utf-8') as f:
+        f.write(vis)
+    with open('test/slurmcc_test/topology_test_output/bfl_block_topo_vis.txt','r', encoding='utf-8') as file:
+        result= file.read()
+    with open('test/slurmcc_test/topology_test_input/bfl_block_topo_vis.txt','r', encoding='utf-8') as file:
+        actual= file.read()
+    assert result==actual
+
 def test_visualize_tree_topology():
     slutil.srun=run_parallel_cmd
     slutil.run=run_command
@@ -651,7 +714,7 @@ def test_run_nvlink_multiple_racks(monkeypatch):
     test_obj.group_hosts_per_rack = lambda: racks
     result = test_obj.run_nvlink()
     assert result == racks
-    
+
 @pytest.mark.parametrize(
     "topo_type,topology_str,max_block_size,expected_lines,block_size",
     [
@@ -845,6 +908,7 @@ def test_run_nvlink_multiple_racks(monkeypatch):
             ],
             2
         ),
+        
     ]
 )
 def test_visualize_various_cases(topo_type, topology_str, max_block_size, expected_lines,block_size):
