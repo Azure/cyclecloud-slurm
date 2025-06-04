@@ -231,7 +231,8 @@ Note: `azslurm topology` is only useful in manually scaled clusters or clusters 
 
 ```
 usage: azslurm topology [-h] [--config CONFIG] [-p, PARTITION] [-o OUTPUT]
-                        [-v | -f | -n] [-b | -t] [-s BLOCK_SIZE]
+                        [-v | -f | -n] [-b | -t] [-s BLOCK_SIZE] [--viz]
+                        [--visual_block_size VISUAL_BLOCK_SIZE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -258,6 +259,12 @@ optional arguments:
   -s BLOCK_SIZE, --block_size BLOCK_SIZE
                         Minimum block size required for each block (use with
                         --block or --use_nvlink_domain, default: 1)
+                        Use Fabric Manager (default: False)
+  --viz
+                        Generate ASCII visualization for the topology
+                        (default: False)
+  --visual_block_size VISUAL_BLOCK_SIZE
+                        Block size for visualization (default: 18)
 ```
 To generate slurm topology using VMSS you may optionally specify the type of topology which is defaulted as tree:
 ```
@@ -319,6 +326,142 @@ BlockSizes=5
 ```
 This either prints out the topology in slurm topology format or creates an output file with the topology.
 
+To create a visualization of the topology output you may specify `-viz` after the command for `--use_nvlink_domain` and `--use_fabric_manager` that optionally can take `--visual_block_size` to create a grid for the block (Default 18)
+
+Example Block topology visual
+```
+azslurm topology -n -p gpu --viz
+```
+```
+block 1  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f723c
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-1  | hpcbench-hpc-5  | hpcbench-hpc-9  |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-13 | hpcbench-hpc-17 | hpcbench-hpc-21 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-25 | hpcbench-hpc-29 | hpcbench-hpc-33 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-37 | hpcbench-hpc-41 | hpcbench-hpc-45 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-49 | hpcbench-hpc-53 | hpcbench-hpc-57 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-61 | hpcbench-hpc-65 | hpcbench-hpc-69 |
+|-----------------|-----------------|-----------------|
+
+block 2  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f721e
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-2  | hpcbench-hpc-6  | hpcbench-hpc-10 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-14 | hpcbench-hpc-18 | hpcbench-hpc-22 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-26 | hpcbench-hpc-30 | hpcbench-hpc-34 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-38 | hpcbench-hpc-42 | hpcbench-hpc-46 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-50 | hpcbench-hpc-54 | hpcbench-hpc-58 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-62 | hpcbench-hpc-66 | hpcbench-hpc-70 |
+|-----------------|-----------------|-----------------|
+
+block 3  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f724b
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-3  | hpcbench-hpc-7  | hpcbench-hpc-11 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-15 | hpcbench-hpc-19 | hpcbench-hpc-23 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-27 | hpcbench-hpc-31 | hpcbench-hpc-35 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-39 | hpcbench-hpc-43 | hpcbench-hpc-47 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-51 | hpcbench-hpc-55 | hpcbench-hpc-59 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-63 | hpcbench-hpc-67 | hpcbench-hpc-71 |
+|-----------------|-----------------|-----------------|
+
+block 4  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f722a
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-4  | hpcbench-hpc-8  | hpcbench-hpc-12 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-16 | hpcbench-hpc-20 | hpcbench-hpc-24 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-28 | hpcbench-hpc-32 | hpcbench-hpc-36 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-40 | hpcbench-hpc-44 | hpcbench-hpc-48 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-52 | hpcbench-hpc-56 | hpcbench-hpc-60 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-64 | hpcbench-hpc-68 | hpcbench-hpc-72 |
+|-----------------|-----------------|-----------------|
+```
+Example Block topology visual for blocks with nodes less than `visual_block_size`
+```
+block 1  : # of Nodes = 6
+ClusterUUID + CliqueID : N/A N/A
+|---------------|---------------|---------------|
+| vis0603-gpu-2 | vis0603-gpu-5 | vis0603-gpu-1 |
+|---------------|---------------|---------------|
+| vis0603-gpu-3 | vis0603-gpu-4 | vis0603-gpu-6 |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+```
+Example Block Topology visual with block with nodes less than min block size
+```
+block 1  : # of Nodes = 6
+ClusterUUID + CliqueID : N/A N/A
+** This block is ineligible for scheduling because # of nodes < min block size 8**
+|---------------|---------------|---------------|
+| vis0603-gpu-4 | vis0603-gpu-2 | vis0603-gpu-5 |
+|---------------|---------------|---------------|
+| vis0603-gpu-1 | vis0603-gpu-6 | vis0603-gpu-3 |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+```
+Example Tree Topology visual
+```
+azslurm topology -f -p hpc --viz
+```
+```
+Switch 5 (root)
+├── Switch 0 (3 nodes)
+│   ├── hpcbench-hpc-36
+│   ├── hpcbench-hpc-39
+│   └── hpcbench-hpc-42
+├── Switch 1 (6 nodes)
+│   ├── hpcbench-hpc-1
+│   ├── hpcbench-hpc-35
+│   ├── hpcbench-hpc-38
+│   ├── hpcbench-hpc-41
+│   ├── hpcbench-hpc-44
+│   └── hpcbench-hpc-49
+├── Switch 2 (3 nodes)
+│   ├── hpcbench-hpc-37
+│   ├── hpcbench-hpc-45
+│   └── hpcbench-hpc-46
+├── Switch 3 (2 nodes)
+│   ├── hpcbench-hpc-40
+│   └── hpcbench-hpc-43
+└── Switch 4 (2 nodes)
+    ├── hpcbench-hpc-47
+    └── hpcbench-hpc-48
+```
 
 ### GB200 IMEX Support
 Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cleanup IMEX service on a per-job basis. The prolog script will attempt to kill an existing IMEX service before configuring a new instance that will be specific to the new, submitted job. The epilog script terminates the IMEX service. By default, these scripts will run for GB200 nodes and not run for non-GB200 nodes. A configurable parameter `slurm.imex.enabled` has been added to the slurm cluster configuration template to allow non-GB200 nodes to enable IMEX support for their jobs or allow GB200 nodes to disable IMEX support for their jobs.
