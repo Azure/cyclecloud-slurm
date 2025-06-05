@@ -2,7 +2,7 @@
 # Licensed under the MIT License.
 #
 import logging
-from typing import Callable, Dict, List, Set, Tuple
+from typing import Callable, Dict, Iterator, List, Set, Tuple
 
 from hpc.autoscale import util as hpcutil
 from hpc.autoscale import clock
@@ -103,75 +103,184 @@ def wait_for_nodes_to_terminate(
     raise AzureSlurmError(f"Timed out waiting for nodes to terminate: {waiting_for_nodes}")
 
 
+class SlurmNodes:
+    def __init__(self, node_list: List[str]) -> None:
+        self.__nodes = hpcutil.partition_single(
+            slutil.show_nodes(node_list), lambda node: node["NodeName"]
+        )
 
-class WaitForResume:
-    def __init__(self) -> None:
-        self.failed_node_names: Set[str] = set()
-        self.ip_already_set: Set[Tuple[str, str]] = set()
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.__nodes.keys())
+    
+    def states(self, name: str) -> Set[str]:
+        return set(self.__nodes[name]["State"].lower().split("+"))
 
-    def check_nodes(
-        self, node_list: List[str], latest_nodes: List[Node]
+    def is_idle(self, name: str) -> bool:
+        return "idle" in self.states(name)
+    
+    def is_powered_down(self, name: str) -> bool:
+        return "powered_down" in self.states(name)
+    
+    def is_down(self, name: str) -> bool:
+        return "down" in self.states(name)
+    
+    def is_powering_up(self, name: str) -> bool:
+        return bool(self.states(name).intersection(set(["powering_up"])))
+
+    def reason(self, name: str) -> str:
+        return self.__nodes[name].get("Reason", "").strip()
+
+    def unset_reason(self, name: str) -> None:
+        if try_scontrol(["update", f"NodeName={name}", "Reason=(null)"]):
+            # update internally
+            self.__nodes[name]["Reason"] = ""
+
+    def is_down_by_cyclecloud(self, name: str) -> bool:
+        return (
+            self.is_down(name)
+            and self.__nodes[name].get("Reason") in ["cyclecloud_node_failure", "cyclecloud_zombie_node"]
+        )
+    
+    def is_joined(self, name: str) -> bool:
+        return not bool(self.states(name).intersection(set(["powered_down", "powering_down", "powering_up"])))
+
+    def mark_down_as_zombie(self, name: str) -> None:
+        if try_scontrol(
+            [
+                "update",
+                f"NodeName={name}",
+                f"NodeAddr={name}",
+                f"NodeHostName={name}",
+                "State=down",
+                "Reason=cyclecloud_zombie_node",
+            ]
+        ):
+            # update internally
+            self.__nodes[name]["State"] = "down"
+            self.__nodes[name]["Reason"] = "cyclecloud_zombie_node"
+            self.__nodes[name]["NodeAddr"] = name
+            self.__nodes[name]["NodeHostName"] = name
+
+    def mark_down_by_cyclecloud(self, name: str) -> None:
+        if try_scontrol(
+            [
+                "update",
+                f"NodeName={name}",
+                f"NodeAddr={name}",
+                f"NodeHostName={name}",
+                "State=down",
+                "Reason=cyclecloud_node_failure",
+            ]
+        ):
+            # update internally
+            self.__nodes[name]["State"] = "down"
+            self.__nodes[name]["Reason"] = "cyclecloud_node_failure"
+            self.__nodes[name]["NodeAddr"] = name
+            self.__nodes[name]["NodeHostName"] = name
+
+    def recover_node(self, name: str) -> None:
+        assert self.is_down_by_cyclecloud(name)
+        cmd = [
+            "update",
+            f"NodeName={name}",
+            "State=idle",
+            "Reason=(null)",
+        ]
+        if try_scontrol(cmd):
+            # update internally
+            self.__nodes[name]["State"] = "idle"
+            self.__nodes[name]["Reason"] = ""
+
+    def has_ip(self, name: str) -> bool:
+        return (
+            self.__nodes[name]["NodeAddr"] != name
+            and self.__nodes[name]["NodeHostName"] != name
+        )
+
+    def set_ip(self, name: str, ip: str) -> None:
+        if ip == name:
+            return
+        if self.__nodes[name]["NodeAddr"] == ip:
+            if self.__nodes[name]["NodeHostName"] == ip:
+                return
+
+        if try_scontrol(
+            ["update", f"NodeName={name}", f"NodeAddr={ip}", f"NodeHostName={ip}"]
+        ):
+            # update internally
+            self.__nodes[name]["NodeAddr"] = ip
+            self.__nodes[name]["NodeHostName"] = ip
+
+
+def try_scontrol(args: List[str]) -> bool:
+    try:
+        slutil.scontrol(args)
+        return True
+    except Exception as e:
+        logging.error("Failed to run scontrol %s: %s", args, e)
+        return False
+
+
+class SyncNodes:
+
+    def sync_nodes(
+        self, slurm_nodes: SlurmNodes, cyclecloud_nodes: List[Node]
     ) -> Tuple[Dict, List[Node]]:
-        ready_nodes = []
         states = {}
+        cc_nodes = hpcutil.partition_single(cyclecloud_nodes, lambda node: node.name)
 
-        by_name = hpcutil.partition_single(latest_nodes, lambda node: node.name)
+        ready_nodes = []
 
-        relevant_nodes: List[Node] = []
+        logging.info("Converging the following node names %s", list(slurm_nodes))
 
-        recovered_node_names: Set[str] = set()
+        for name in slurm_nodes:
+            if slurm_nodes.reason(name) in ["cyclecloud_node_failure", "cyclecloud_zombie_node"]:
+                if slurm_nodes.is_idle(name) and slurm_nodes.is_powered_down(name):
+                    logging.info("Unsetting old reason", name)
+                    slurm_nodes.unset_reason(name)
+                    continue
+            node = cc_nodes.get(name)
 
-        newly_failed_node_names: List[str] = []
-
-        deleted_nodes = []
-
-        for name in node_list:
-            node = by_name.get(name)
-            
             if not node:
-                deleted_nodes.append(node)
+                if slurm_nodes.is_joined(name):
+                    logging.warning("Node %s not found in CycleCloud, but slurm thinks it does exist.", name)
+                    logging.warning("Marking node %s down in slurm.", name)
+                    slurm_nodes.mark_down_by_cyclecloud(name)
+                    continue
+                else:
+                    # typical case - node is in neither CC or slurm
+                    continue
+
+            if node.state == "Ready" and not slurm_nodes.is_joined(name):
+                if not slurm_nodes.is_powering_up(name) and not slurm_nodes.is_down_by_cyclecloud(name):
+                    logging.warning("Node %s is off in slurm, but cyclecloud does have a node.", name)
+                    logging.warning("Marking node %s down (zombie) in slurm. To fix this, please try one of the following:", name)
+                    logging.warning("    - scontrol update nodename=%s state=power_down - to tell slurm to power this node down again", name)
+                    logging.warning("    - azslurm suspend --node-list %s", name)
+                    logging.warning("    - Or simply terminate the node %s from the CycleCloud UI", name)
+                    slurm_nodes.mark_down_as_zombie(name)
+
                 continue
-            is_dynamic = node.software_configuration.get("slurm", {}).get("dynamic_config")
 
-            relevant_nodes.append(node)
+            state = node.state or "UNKNOWN"
 
-            state = node.state
-
-            if state and state.lower() == "failed":
-                states["Failed"] = states.get("Failed", 0) + 1
-                if name not in self.failed_node_names:
-                    newly_failed_node_names.append(name)
-                    if not is_dynamic:
-                        slutil.scontrol(["update", f"NodeName={name}", f"NodeAddr={name}", f"NodeHostName={name}"])
-                    self.failed_node_names.add(name)
-
+            if state.lower() == "failed":
+                if not slurm_nodes.is_down(name):
+                    slurm_nodes.mark_down_by_cyclecloud(name)
                 continue
 
             use_nodename_as_hostname = node.software_configuration.get("slurm", {}).get(
                 "use_nodename_as_hostname", False
             )
+
             if not use_nodename_as_hostname:
-                ip_already_set_key = (name, node.private_ip)
-                if node.private_ip and ip_already_set_key not in self.ip_already_set:
-                    slutil.scontrol(
-                        [
-                            "update",
-                            "NodeName=%s" % name,
-                            "NodeAddr=%s" % node.private_ip,
-                            "NodeHostName=%s" % node.private_ip,
-                        ]
-                    )
-                    self.ip_already_set.add(ip_already_set_key)
+                if node.private_ip:
+                    slurm_nodes.set_ip(name, node.private_ip)
 
-            if name in self.failed_node_names:
-                recovered_node_names.add(name)
+            if slurm_nodes.is_down_by_cyclecloud(name):
+                slurm_nodes.recover_node(name)
 
-            if node.target_state != "Started":
-                states["UNKNOWN"] = states.get("UNKNOWN", {})
-                states["UNKNOWN"][node.state] = states["UNKNOWN"].get(state, 0) + 1
-                continue
-
-            if node.state == "Ready":
+            if state == "Ready":
                 if not node.private_ip:
                     state = "WaitingOnIPAddress"
                 else:
@@ -179,124 +288,32 @@ class WaitForResume:
 
             states[state] = states.get(state, 0) + 1
 
-        if newly_failed_node_names:
-            failed_node_names_str = ",".join(self.failed_node_names)
-            try:
-                logging.error(
-                    "The following nodes failed to start: %s", failed_node_names_str
-                )
-                for failed_name in self.failed_node_names:
-                    slutil.scontrol(
-                        [
-                            "update",
-                            "NodeName=%s" % failed_name,
-                            "State=down",
-                            "Reason=cyclecloud_node_failure",
-                        ]
-                    )
-            except Exception:
-                logging.exception(
-                    "Failed to mark the following nodes as down: %s. Will re-attempt next iteration.",
-                    failed_node_names_str,
-                )
-
-        if recovered_node_names:
-            recovered_node_names_str = ",".join(recovered_node_names)
-            try:
-                for recovered_name in recovered_node_names:
-                    logging.error(
-                        "The following nodes have recovered from failure: %s",
-                        recovered_node_names_str,
-                    )
-                    if not is_dynamic:
-                        slutil.scontrol(
-                            [
-                                "update",
-                                "NodeName=%s" % recovered_name,
-                                "State=idle",
-                                "Reason=cyclecloud_node_recovery",
-                            ]
-                        )
-                    if recovered_name in self.failed_node_names:
-                        self.failed_node_names.remove(recovered_name)
-            except Exception:
-                logging.exception(
-                    "Failed to mark the following nodes as recovered: %s. Will re-attempt next iteration.",
-                    recovered_node_names_str,
-                )
-
         return (states, ready_nodes)
 
 
-def wait_for_resume(
-    config: Dict,
-    operation_id: str,
-    node_list: List[str],
-    get_latest_nodes: Callable[[], List[Node]],
-    waiter: "WaitForResume" = WaitForResume(),
-) -> None:
-    previous_states = {}
-
-    nodes_str = ",".join(node_list[:5])
-    omega = clock.time() + 3600
-
-    ready_nodes: List[Node] = []
-
-    while clock.time() < omega:
-        states, ready_nodes = waiter.check_nodes(node_list, get_latest_nodes())
-        terminal_states = (
-            states.get("Ready", 0)
-            + sum(states.get("UNKNOWN", {}).values())
-            + states.get("Failed", 0)
-        )
-
-        if states != previous_states:
-            states_messages = []
-            for key in sorted(states.keys()):
-                if key != "UNKNOWN":
-                    states_messages.append("{}={}".format(key, states[key]))
-                else:
-                    for ukey in sorted(states["UNKNOWN"].keys()):
-                        states_messages.append(
-                            "{}={}".format(ukey, states["UNKNOWN"][ukey])
-                        )
-
-            states_message = " , ".join(states_messages)
-            logging.info(
-                "OperationId=%s NodeList=%s: Number of nodes in each state: %s",
-                operation_id,
-                nodes_str,
-                states_message,
-            )
-
-        if terminal_states == len(node_list):
-            break
-
-        previous_states = states
-        clock.sleep(5)
-
-    logging.info(
-        "The following nodes reached Ready state: %s",
-        ",".join([x.name for x in ready_nodes]),
+def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
-    for node in ready_nodes:
-        if not hpcutil.is_valid_hostname(config, node):
-            continue
-        is_dynamic = node.software_configuration.get("slurm", {}).get("dynamic_config")
-        if is_dynamic:
-            continue
-        slutil.scontrol(
-            [
-                "update",
-                "NodeName=%s" % node.name,
-                "NodeAddr=%s" % node.private_ip,
-                "NodeHostName=%s" % node.hostname,
-            ]
-        )
+    logging.info("Starting azslurmd in the foreground")
+    # azslurmd()
+    import sys
 
-    logging.info(
-        "OperationId=%s NodeList=%s: all nodes updated with the proper IP address. Exiting",
-        operation_id,
-        nodes_str,
-    )
-    
+    if "-h" in sys.argv or "--help" in sys.argv:
+        print("Usage: azslurm.py <command> <node>")
+        print("Commands:")
+        print("  is_down <node>+")
+        print("  reason <node>+")
+        print("  is_down_by_cyclecloud <node>+")
+        print("  is_joined <node>+")
+        print("  mark_down_by_cyclecloud <node>+")
+        print("  recover_node <node>+")
+        print("  has_ip <node>+")
+        sys.exit(0)
+
+    nodes = SlurmNodes(sys.argv[2:])
+    for node in nodes:
+        print(node, getattr(nodes, sys.argv[1])(node))
+
+if __name__ == "__main__":
+    main()
