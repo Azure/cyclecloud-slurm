@@ -32,7 +32,7 @@ def make_partition(
     use_pcpu: bool = True,
     slurm_memory: str = "",
     dampen_memory: Optional[float] = None,
-    dynamic_config: str = "",
+    dynamic_feature: str = "",
 ) -> Partition:
     resources = {"slurm_memory": Memory.value_of(slurm_memory)} if slurm_memory else {}
     node_def = NodeDefinition(
@@ -64,7 +64,7 @@ def make_partition(
         [bucket],
         100,
         use_pcpu,
-        dynamic_config,
+        dynamic_feature,
         {},
         ["Standard_f4"],
         dampen_memory,
@@ -76,7 +76,7 @@ def test_partitions() -> None:
     partitions = [
         make_partition("htc", False, False),
         make_partition("hpc", True, True),
-        make_partition("dynamic", False, False, dynamic_config="-Z Feature=dyn"),
+        make_partition("dynamic", False, False, dynamic_feature="dyn"),
     ]
 
     # Define neither slurm_memory nor dampen_memory, autoscale=true
@@ -123,7 +123,7 @@ PartitionName=dynamic Nodes=dynamicns"""
         make_partition("htc", False, False, slurm_memory="15g"),
         make_partition("hpc", True, True, slurm_memory="14g"),
         make_partition(
-            "dynamic", False, False, dynamic_config="-Z Feature=dyn", slurm_memory="13g"
+            "dynamic", False, False, dynamic_feature="dyn", slurm_memory="13g"
         ),
     ]
     # No slurm.dampen_memory or slurm_memory resource, autoscale=FALSE
@@ -151,7 +151,7 @@ PartitionName=dynamic Nodes=dynamicns"""
             "dynamic",
             False,
             False,
-            dynamic_config="-Z Feature=dyn",
+            dynamic_feature="dyn",
             slurm_memory="13g",
             dampen_memory=0.75,
         ),
@@ -181,7 +181,7 @@ PartitionName=dynamic Nodes=dynamicns"""
             "dynamic",
             False,
             False,
-            dynamic_config="-Z Feature=dyn",
+            dynamic_feature="dyn",
             slurm_memory="13g",
             dampen_memory=0.75,
         ),

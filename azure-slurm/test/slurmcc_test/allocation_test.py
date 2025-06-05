@@ -11,6 +11,7 @@ from slurmcc.partition import fetch_partitions
 from . import testutil
 
 import logging
+import pytest
 import sys
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stderr)
 
@@ -93,8 +94,18 @@ def test_mixed_resume_names() -> None:
     assert len(bootup_result.nodes) == 2
     assert node_list == [n.name for n in bootup_result.nodes]
 
- 
+
+@pytest.fixture(autouse=True)
+def mock_is_slurmctld_up() -> None:
+    implementation = slutil.is_slurmctld_up
+    slutil.is_slurmctld_up = lambda: True
+    yield
+    slutil.is_slurmctld_up = implementation
+
+
 def test_resume_dynamic_by_feature() -> None:
+
+    
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
     native_cli = testutil.make_native_cli()
@@ -128,8 +139,6 @@ def test_resume_dynamic_by_feature() -> None:
     assert result
     assert result.nodes
     assert 2 == len(result.nodes)
-
-
 
 
 def test_failure_mode() -> None:
