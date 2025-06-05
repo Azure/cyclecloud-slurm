@@ -346,3 +346,5 @@ azure-slurm-install/docker/
 .DS_Store
 .build.log
 azure-slurm-install/AzureCA.pem
+.build/
+*.tar.gz
