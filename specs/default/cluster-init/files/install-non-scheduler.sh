@@ -16,7 +16,7 @@ if [ $do_install == "True" ]; then
     jetpack download --project $slurm_project_name $install_pkg
     tar xzf $install_pkg
     cd azure-slurm-install
-    python3 install.py --platform $platform --mode $mode --bootstrap-config /opt/cycle/jetpack/config/node.json
+    python3 install.py --config-mode $mode --bootstrap-config /opt/cycle/jetpack/config/node.json
 fi
 
 echo "installation complete. Run start-services scheduler|execute|login to start the slurm services."

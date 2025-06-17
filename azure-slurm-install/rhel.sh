@@ -3,10 +3,8 @@
 # Licensed under the MIT License.
 #
 set -e
-INSTALLED_FILE=/etc/azslurm-bins.installed
-if [ -e $INSTALLED_FILE ]; then
-    exit 0
-fi
+set -x
+
 
 SLURM_ROLE=$1
 SLURM_VERSION=$2
@@ -47,18 +45,16 @@ fi
 for pkg in $slurm_packages; do
     yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
 done
-if [ ${SLURM_ROLE} == "scheduler" ]; then
+if [[ ${SLURM_ROLE} == "scheduler" || ${SLURM_ROLE} == "install-only" ]]; then
     for pkg in $sched_packages; do
         yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
     done
 fi
-
-if [ ${SLURM_ROLE} == "execute" ]; then
+if [[ ${SLURM_ROLE} == "execute" || ${SLURM_ROLE} == "install-only" ]]; then
     for pkg in $execute_packages; do
         yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
     done
 fi
-touch $INSTALLED_FILE
 
 exit
 

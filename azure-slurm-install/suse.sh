@@ -2,11 +2,8 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 #
-
-INSTALLED_FILE=/etc/azslurm-bins.installed
-if [ -e $INSTALLED_FILE ]; then
-    exit 0
-fi
+set -e
+set -x
 
 SLURM_ROLE=$1
 SLURM_VERSION=$(echo $2 | cut -d- -f1)
@@ -40,5 +37,3 @@ for fil in slurm.conf cgroup.conf slurmdbd.conf; do
         fi
     fi
 done
-
-touch $INSTALLED_FILE
