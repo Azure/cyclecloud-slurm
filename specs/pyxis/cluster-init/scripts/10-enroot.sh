@@ -56,10 +56,10 @@ function configure_enroot()
     if [ -d /mnt/nvme ]; then
         # If /mnt/nvme exists, use it as the default scratch dir
         mkdir -pv /mnt/nvme/enroot
-        ln -s /mnt/nvme/enroot $ENROOT_SCRATCH_DIR
+        ln -sfn /mnt/nvme/enroot $ENROOT_SCRATCH_DIR
    else
         mkdir -pv /mnt/scratch/enroot
-        ln -s /mnt/scratch/enroot $ENROOT_SCRATCH_DIR
+        ln -sfn /mnt/scratch/enroot $ENROOT_SCRATCH_DIR
     fi
 
     logger -s "Creating enroot scratch directories in $ENROOT_SCRATCH_DIR"
