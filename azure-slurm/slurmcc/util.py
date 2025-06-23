@@ -173,13 +173,25 @@ def to_hostlist(nodes: Union[str, List[str]], scontrol_func: Callable=scontrol) 
 
 
 def from_hostlist(hostlist_expr: str) -> List[str]:
+    return _from_hostlist(hostlist_expr, MAX_NODES_IN_LIST)
+
+
+def _from_hostlist(hostlist_expr: str, max_nodes_in_list: int) -> List[str]:
     """
     convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
     """
     assert isinstance(hostlist_expr, str)
-    stdout = scontrol(["show", "hostnames", hostlist_expr])
-    return [x.strip() for x in stdout.split()]
 
+    sub_exprs = hostlist_expr.split(",")
+    ret = []
+    for i in range(0, len(sub_exprs), max_nodes_in_list):
+        sub_expr = ",".join(sub_exprs[i: i + max_nodes_in_list])
+        if not sub_expr:
+            continue
+        stdout = scontrol(["show", "hostnames", sub_expr])
+        ret.extend([x.strip() for x in stdout.split()])
+    return ret
+    
 
 def run(args: list, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, timeout=120, shell=False, check=True, universal_newlines=True, **kwargs):
     """
