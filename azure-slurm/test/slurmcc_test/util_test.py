@@ -1,4 +1,5 @@
-from slurmcc.util import to_hostlist, get_sort_key_func, run
+from slurmcc.util import to_hostlist, get_sort_key_func, run, _show_nodes, set_slurm_cli
+from slurmcc_test.testutil import MockNativeSlurmCLI
 from typing import List
 import subprocess
 
@@ -49,3 +50,13 @@ def test_run_function() -> None:
         out=run(['touch', '/root/.test'])
     except subprocess.CalledProcessError as e:
         assert out.returncode != 0
+
+
+def test_show_nodes() -> None:
+    cli = MockNativeSlurmCLI()
+    node_list = ["htc-1", "htc-2", "htc-3", "htc-4"]
+    set_slurm_cli(cli)
+    cli.create_nodes(node_list, ["cloud"], ["htc"])
+    complete = _show_nodes(node_list, 4)
+    split = _show_nodes(node_list, 2)
+    assert split == complete

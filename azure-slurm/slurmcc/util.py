@@ -108,15 +108,30 @@ def is_slurmctld_up() -> bool:
     except Exception:
         return False
 
-
+# Can be adjusted via ENV here, in case even 50 is too large for max args limits.
+MAX_NODES_IN_LIST = int(os.getenv("AZSLURM_MAX_NODES_IN_LIST", 50))
 def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    return _show_nodes(node_list, MAX_NODES_IN_LIST)
+
+
+def _show_nodes(node_list: Optional[List[str]], max_nodes_in_list: int) -> List[Dict[str, Any]]:
     args = ["show", "nodes"]
     if not is_autoscale_enabled():
         args.append("--future")
-    if node_list:
-        args.append(",".join(node_list))
-    stdout = scontrol(args)
-    return parse_show_nodes(stdout)
+
+    if not node_list:
+        stdout = scontrol(args)
+        return parse_show_nodes(stdout)
+    
+    # Break up names, so we don't hit max arg length limits.
+    ret = []
+    for x in range(0, len(node_list), MAX_NODES_IN_LIST):
+        sub_list = node_list[x: x + MAX_NODES_IN_LIST]
+        if sub_list:
+            sub_args = args + [",".join(sub_list)]
+            stdout = scontrol(sub_args)
+            ret.extend(parse_show_nodes(stdout))
+    return ret
 
 
 def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
