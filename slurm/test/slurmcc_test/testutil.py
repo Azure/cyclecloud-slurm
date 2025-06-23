@@ -7,7 +7,7 @@ from hpc.autoscale.node import nodemanager
 from hpc.autoscale.node.nodemanager import NodeManager
 from slurmcc import partition
 from slurmcc.cli import SlurmDriver
-from slurmcc.util import NativeSlurmCLI, set_slurm_cli
+from slurmcc.util import NativeSlurmCLI, set_slurm_cli, SrunOutput
 
 use_mock_clock()
 
@@ -106,6 +106,9 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
                 raise RuntimeError(f"Unknown args {args}")
             return ""
         raise RuntimeError(f"Unexpected command - {args}")
+    
+    def srun(self, hostlist: List[str], user_command: str, timeout: int, shell: bool, partition: str, gpus: int) -> SrunOutput:
+        raise RuntimeError("Not implemented")
 
     def show_nodes(self, node_names: List[str]) -> str:
         ret = []
