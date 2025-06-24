@@ -109,14 +109,30 @@ def is_slurmctld_up() -> bool:
         return False
 
 
+# Can be adjusted via ENV here, in case even 500 is too large for max args limits.
+MAX_NODES_IN_LIST = int(os.getenv("AZSLURM_MAX_NODES_IN_LIST", 500))
 def show_nodes(node_list: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    return _show_nodes(node_list, MAX_NODES_IN_LIST)
+
+
+def _show_nodes(node_list: Optional[List[str]], max_nodes_in_list: int) -> List[Dict[str, Any]]:
     args = ["show", "nodes"]
     if not is_autoscale_enabled():
         args.append("--future")
-    if node_list:
-        args.append(",".join(node_list))
-    stdout = scontrol(args)
-    return parse_show_nodes(stdout)
+
+    if not node_list:
+        stdout = scontrol(args)
+        return parse_show_nodes(stdout)
+    
+    # Break up names, so we don't hit max arg length limits.
+    ret = []
+    for x in range(0, len(node_list), MAX_NODES_IN_LIST):
+        sub_list = node_list[x: x + MAX_NODES_IN_LIST]
+        if sub_list:
+            sub_args = args + [",".join(sub_list)]
+            stdout = scontrol(sub_args)
+            ret.extend(parse_show_nodes(stdout))
+    return ret
 
 
 def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
@@ -141,29 +157,50 @@ def parse_show_nodes(stdout: str) -> List[Dict[str, Any]]:
 
 
 def to_hostlist(nodes: Union[str, List[str]], scontrol_func: Callable=scontrol) -> str:
+    return _to_hostlist(nodes, scontrol_func=scontrol, max_nodes_in_list=MAX_NODES_IN_LIST)
+
+
+def _to_hostlist(nodes: Union[str, List[str]], scontrol_func: Callable=scontrol, max_nodes_in_list: int=MAX_NODES_IN_LIST) -> str:
     """
     convert name-[1-5] into name-1 name-2 name-3 name-4 name-5
     """
     assert nodes
     for n in nodes:
         assert n
+    
     if isinstance(nodes, list):
         nodes_str = ",".join(nodes)
     else:
         nodes_str = nodes
     # prevent poor sorting of nodes and getting node lists like htc-1,htc-10-19, htc-2, htc-20-29 etc
     sorted_nodes = sorted(nodes_str.split(","), key=get_sort_key_func(is_hpc=False))
-    nodes_str = ",".join(sorted_nodes)
-    return scontrol_func(["show", "hostlist", nodes_str])
+    ret = []
+    for i in range(0, len(sorted_nodes), max_nodes_in_list):
+
+        nodes_str = ",".join(sorted_nodes[i: i + max_nodes_in_list])
+        ret.append(scontrol_func(["show", "hostlist", nodes_str]))
+    return ",".join(ret)
 
 
 def from_hostlist(hostlist_expr: str) -> List[str]:
+    return _from_hostlist(hostlist_expr, MAX_NODES_IN_LIST)
+
+
+def _from_hostlist(hostlist_expr: str, max_nodes_in_list: int) -> List[str]:
     """
     convert name-1,name-2,name-3,name-4,name-5 into name-[1-5]
     """
     assert isinstance(hostlist_expr, str)
-    stdout = scontrol(["show", "hostnames", hostlist_expr])
-    return [x.strip() for x in stdout.split()]
+
+    sub_exprs = hostlist_expr.split(",")
+    ret = []
+    for i in range(0, len(sub_exprs), max_nodes_in_list):
+        sub_expr = ",".join(sub_exprs[i: i + max_nodes_in_list])
+        if not sub_expr:
+            continue
+        stdout = scontrol(["show", "hostnames", sub_expr])
+        ret.extend([x.strip() for x in stdout.split()])
+    return ret
 
 
 def run(args: list, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, timeout=120, shell=False, check=True, universal_newlines=True, **kwargs):
