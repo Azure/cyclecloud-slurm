@@ -3,15 +3,8 @@
 # Licensed under the MIT License.
 #
 set -e
-cd $(dirname $0)
+set -x
 
-if [ $(whoami) != root ]; then
-  echo "Please run as root"
-  exit 1
-fi
+SLURM_VERSION=$1
 
-if [ -e /etc/centos-release ]; then
-    python3 install.py --platform rhel $@
-else
-    python3 install.py --platform ubuntu $@
-fi
+python3 install.py --config-mode install-only -s $1

@@ -36,3 +36,8 @@ cd $SOURCE/azure-slurm
 rm -f dist/*
 ./package.sh $LOCAL_SCALELIB
 mv dist/* ../blobs/
+
+cd $SOURCE/pyxis
+rm -rf pyxis*.tar.gz
+./package.sh
+mv pyxis*.tar.gz ../blobs/

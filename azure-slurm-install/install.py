@@ -54,9 +54,9 @@ class InstallSettings:
         self.node_name = config["node_name"]
         self.hostname = config["hostname"]
         self.ipv4 = config["ipaddress"]
-        self.slurmver = config["slurm"]["version"]
         self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
 
+        self.slurmver = config["slurm"].get("version", None)
         self.slurm_user: str = config["slurm"]["user"].get("name") or "slurm"
         self.slurm_grp: str = config["slurm"]["user"].get("group") or "slurm"
         self.slurm_uid: str = config["slurm"]["user"].get("uid") or "11100"
@@ -161,8 +161,43 @@ def setup_users(s: InstallSettings) -> None:
     )
 
 
-def run_installer(s: InstallSettings, path: str, mode: str) -> None:
-    subprocess.check_call([path, mode, s.slurmver])
+def run_installer(slurmver: str, path: str, mode: str) -> None:
+
+    INSTALL_FILE = "/etc/azslurm-bins.installed"
+    attr = {}
+    if os.path.exists(INSTALL_FILE):
+        try:
+            with open(INSTALL_FILE, 'r') as fp:
+                contents=fp.read()
+                for line in contents.splitlines():
+                    key, value = line.split("=")
+                    attr[key] = value
+            if attr.get("SLURM_VERSION") != slurmver:
+                logging.warning(f"Slurm version installed: {attr['SLURM_VERSION']}, slurm version requested: {slurmver}")
+            elif attr["MODE"] != "install-only" and attr["MODE"] != mode:
+                logging.warning(f"Role configured {attr['MODE']} role requested: {mode}")
+            elif int(attr["EXIT_CODE"]) != 0:
+                logging.warning(f"Previous package install did not succeed, re-running it")
+            else:
+                # Everything is already installed
+                logging.info(f"Required slurm version: {attr['SLURM_VERSION']} already installed.")
+                return
+        except Exception as e:
+            logging.exception(e)
+        os.remove(INSTALL_FILE)
+
+
+    logging.info(f"Running script {path}, slurm version: {slurmver}, mode={mode}")
+    out = subprocess.run([path, mode, slurmver], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    logging.debug(out.stdout)
+    if out.returncode != 0:
+        logging.error(out.stderr)
+        raise Exception(f"{path} returned error")
+    else:
+        with open(INSTALL_FILE, 'w') as fp:
+            fp.write(f"SLURM_VERSION={slurmver}\n")
+            fp.write(f"MODE={mode}\n")
+            fp.write(f"EXIT_CODE={out.returncode}\n")
 
 
 def fix_permissions(s: InstallSettings) -> None:
@@ -696,11 +731,15 @@ def _is_at_least_ubuntu22() -> bool:
 
 
 def _load_config(bootstrap_config: str) -> Dict:
-    if bootstrap_config == "jetpack":
-        config = json.loads(subprocess.check_output(["jetpack", "config", "--json"]))
-    else:
-        with open(bootstrap_config) as fr:
-            config = json.load(fr)
+
+    try:
+        if bootstrap_config == "jetpack":
+            config = json.loads(subprocess.check_output(["jetpack", "config", "--json"]))
+        else:
+            with open(bootstrap_config) as fr:
+                config = json.load(fr)
+    except Exception:
+        return {}
 
     if "cluster_name" not in config:
         config["cluster_name"] = config["cyclecloud"]["cluster"]["name"]
@@ -708,28 +747,68 @@ def _load_config(bootstrap_config: str) -> Dict:
 
     return config
 
+def detect_platform() -> str:
+    """
+    Detects Os Platform
+    """
+    id_val = ""
+    id_like_val = ""
+    platform_map = {
+        "ubuntu": "ubuntu",
+        "debian": "ubuntu",
+        "almalinux": "rhel",
+        "centos": "rhel",
+        "fedora": "rhel",
+        "rhel": "rhel",
+        "suse": "suse",
+        "sles": "suse",
+        "sle_hpc": "suse"
+    }
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("ID="):
+                    id_val = line.strip().split("=", 1)[1].strip('"').lower()
+                elif line.startswith("ID_LIKE="):
+                    id_like_val = line.strip().split("=", 1)[1].strip('"').lower()
+    except Exception:
+        return "unknown"
+
+    for key, val in platform_map.items():
+        if key in id_val or key in id_like_val:
+            return val
+    return "unknown"
 
 def main() -> None:
+
     # needed to set slurmctld only
     if os.path.exists("install_logging.conf"):
         logging.config.fileConfig("install_logging.conf")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--platform", default="rhel", choices=["rhel", "ubuntu", "suse", "debian"]
+        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse"], required=False
     )
     parser.add_argument(
-        "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
+        "--config-mode", default="install-only", choices=["scheduler", "execute", "login", "install-only"], required=False
     )
-    parser.add_argument("--bootstrap-config", default="jetpack")
+    parser.add_argument("-s", "--slurm-version", default=None, required=False)
+    parser.add_argument("--bootstrap-config", default="jetpack", required=False)
 
     args = parser.parse_args()
 
-    if args.platform == "debian":
-        args.platform = "ubuntu"
-
     config = _load_config(args.bootstrap_config)
-    settings = InstallSettings(config, args.platform, args.mode)
+    slurm_ver = args.slurm_version
+    settings = InstallSettings(config, args.platform, args.config_mode)
+    if settings.slurmver is not None:
+        slurm_ver = settings.slurmver
+
+    if not slurm_ver:
+        raise ValueError("No Valid slurm version specified")
+
+    run_installer(slurm_ver, os.path.abspath(f"{args.platform}.sh"), args.config_mode)
+    if args.config_mode == "install-only":
+        return
 
     #create config dir
     setup_config_dir(settings)
@@ -739,9 +818,6 @@ def main() -> None:
 
     # create the munge key and/or copy it to /etc/munge/
     munge_key(settings)
-
-    # runs either rhel.sh or ubuntu.sh to install the packages
-    run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
 
     # various permissions fixes
     fix_permissions(settings)
@@ -766,10 +842,10 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except:
+    except Exception as e:
         print(
             "An error occured during installation. See log file /var/log/azure-slurm-install.log for details.",
             file=sys.stderr,
         )
-        logging.exception("An error occured during installation.")
+        logging.exception(e)
         sys.exit(1)
