@@ -2,56 +2,16 @@
 set -e
 set -x
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$script_dir/../files/common.sh" 
-read_os
-
-ENROOT_VERSION=3.5.0
 BLOB_FILE=pyxis-artifacts.tar.gz
 slurm_project_name=$(jetpack config slurm.project_name slurm)
+
 function install_enroot() {
-    # Install or update enroot if necessary
-    if [ "$(enroot version)" != "$ENROOT_VERSION" ] ; then
-        logger -s  Updating enroot to $ENROOT_VERSION
-        # RDH otherwise we are writing to cluster-init dir, which causes strange behaviour on retries
-	pushd /tmp
+	cd /tmp
 
     jetpack download --project $slurm_project_name $BLOB_FILE
     tar -xvf $BLOB_FILE
-    pushd pyxis-artifacts
-	case $os_release in
-            almalinux)
-                yum remove -y enroot enroot+caps
-                # Enroot requires user namespaces to be enabled
-                echo "user.max_user_namespaces=32" > /etc/sysctl.d/userns.conf
-                sysctl -p /etc/sysctl.d/userns.conf
-
-                arch=$(uname -m)
-                run_file=enroot-check_${ENROOT_VERSION}_$(uname -m).run
-                chmod 755 enroot-check_*.run
-                $run_file --verify
-
-                yum install -y enroot-${ENROOT_VERSION}-1.el8.${arch}.rpm
-                yum install -y enroot+caps-${ENROOT_VERSION}-1.el8.${arch}.rpm
-                ;;
-            ubuntu)
-                arch=$(dpkg --print-architecture)
-                run_file=enroot-check_${ENROOT_VERSION}_$(uname -m).run
-                chmod 755 enroot-check_*.run
-                $run_file --verify
-
-                apt install -y enroot_${ENROOT_VERSION}-1_${arch}.deb
-                apt install -y enroot+caps_${ENROOT_VERSION}-1_${arch}.deb
-                ;;
-            *)
-                logger -s "OS $os_release not tested"
-                exit 0
-            ;;
-        esac
-    popd
-	popd
-    else
-        logger -s  Enroot is already at version $ENROOT_VERSION
-    fi
+    cd pyxis-artifacts
+	./install.sh
 }
 
 function configure_enroot() 

@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+set -e
 
 ENROOT_VERSION=3.5.0
 PYXIS_VERSION=0.20.0
@@ -7,7 +8,7 @@ PYXIS_VERSION=0.20.0
 # Remove any previous .build directory and create a new one
 rm -rf .build
 mkdir -p .build/pyxis-artifacts
-
+cp install.sh .build/pyxis-artifacts/install.sh
 # https://github.com/NVIDIA/enroot/releases/download/v3.5.0/enroot-check_3.5.0_arm64.run
 # 
 
