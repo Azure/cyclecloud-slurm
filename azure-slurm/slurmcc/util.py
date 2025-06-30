@@ -9,6 +9,7 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
+import re
 
 from . import AzureSlurmError, custom_chaos_mode
 
@@ -338,3 +339,169 @@ def is_autoscale_enabled() -> bool:
         return _IS_AUTOSCALE_ENABLED
     logging.warning("Could not determine if autoscale is enabled. Assuming yes")
     return True
+
+def visualize_block(topology_str: str, min_block_size: int, max_block_size: int = 1) -> str:
+    """
+    Visualizes a block topology string as ASCII art.
+
+    Args:
+        topology_str (str): The topology string (output from write_block_topology).
+        max_block_size (int, optional): Maximum block size for grid visualization. Defaults to 1.
+    Returns:
+        str: ASCII visualization of the block topology.
+    """
+    block_pattern = re.compile(
+        r"# Number of Nodes in block(?P<block_idx>\d+): (?P<size>\d+)\n"
+        r"# ClusterUUID and CliqueID: (?P<uuid>.*)\n"
+        r"(?:# Warning:.*\n){0,2}"
+        r"(?P<block_line>(#)?BlockName=block\d+ Nodes=(?P<nodes>[^\n]+))"
+    )
+    blocks = []
+    for match in block_pattern.finditer(topology_str):
+        block_idx = int(match.group("block_idx"))
+        size = int(match.group("size"))
+        uuid = match.group("uuid").strip()
+        nodes = match.group("nodes").split(",")
+        block_line = match.group("block_line")
+        commented = block_line.strip().startswith("#BlockName")
+        blocks.append({
+            "block_idx": block_idx,
+            "size": size,
+            "uuid": uuid,
+            "nodes": nodes,
+            "commented": commented,
+        })
+
+    if not blocks:
+        return "# No valid blocks found in topology string.\n"
+
+    visualizations = []
+    if max_block_size <= 0:
+        raise ValueError("max_block_size must be greater than 0")
+    best_rows, best_cols = max_block_size, 1
+    min_diff = max_block_size - 1
+    for cols in range(1, max_block_size + 1):
+        if max_block_size % cols == 0:
+            rows = max_block_size // cols
+            diff = abs(rows - cols)
+            if diff < min_diff or (diff == min_diff and cols > best_cols):
+                best_rows, best_cols = rows, cols
+                min_diff = diff
+    if best_rows < best_cols:
+        best_rows, best_cols = best_cols, best_rows
+    for block in blocks:
+        block_idx = block["block_idx"]
+        size = block["size"]
+        uuid = block["uuid"]
+        nodes = block["nodes"]
+        commented = block["commented"]
+        header = f"block {block_idx}  : # of Nodes = {size}"
+        uuid_line = f"ClusterUUID + CliqueID : {uuid}"
+        ineligible_line = ""
+        if commented:
+            ineligible_line = (
+                f"** This block is ineligible for scheduling because # of nodes < min block size {min_block_size}**"
+            )
+        grid = []
+        for r in range(best_rows):
+            row = []
+            for c in range(best_cols):
+                idx = r * best_cols + c
+                if idx < len(nodes):
+                    row.append(nodes[idx])
+                else:
+                    row.append("X")
+            grid.append(row)
+        col_width = max(7, max((len(n) for n in nodes), default=2) + 2)
+        sep = "|" + "|".join("-" * col_width for _ in range(best_cols)) + "|"
+        grid_lines = [sep]
+        for i, row in enumerate(grid):
+            grid_lines.append(
+                "|" + "|".join(f"{cell:^{col_width}}" for cell in row) + "|"
+            )
+            grid_lines.append(sep)
+        visualizations.append(
+            "\n".join(
+                filter(
+                    None,
+                    [
+                        header,
+                        uuid_line,
+                        ineligible_line,
+                        "\n".join(grid_lines),
+                    ],
+                )
+            )
+        )
+    return "\n\n".join(visualizations) + "\n"
+
+def visualize_tree(topology_str: str) -> str:
+    """
+    Visualizes a tree topology string as ASCII art.
+
+    Args:
+        topology_str (str): The topology string (output from write_tree_topology).
+    Returns:
+        str: ASCII visualization of the tree topology.
+    """
+    switch_pattern = re.compile(
+        r"# Number of Nodes in sw(?P<sw_idx>\d+): (?P<size>\d+)\n"
+        r"SwitchName=sw(?P<sw_idx2>\d+) Nodes=(?P<nodes>[^\n]+)"
+    )
+    parent_switch_pattern = re.compile(
+        r"SwitchName=sw(?P<parent_idx>\d+) Switches=(?P<children>[^\n]+)"
+    )
+
+    switches = []
+    for match in switch_pattern.finditer(topology_str):
+        sw_idx = int(match.group("sw_idx"))
+        size = int(match.group("size"))
+        nodes = match.group("nodes").split(",")
+        switches.append({
+            "sw_idx": sw_idx,
+            "size": size,
+            "nodes": nodes,
+        })
+
+    parent_switch = None
+    parent_match = parent_switch_pattern.search(topology_str)
+    if parent_match:
+        parent_idx = int(parent_match.group("parent_idx"))
+        children = parent_match.group("children").split(",")
+        parent_switch = {
+            "parent_idx": parent_idx,
+            "children": children,
+        }
+
+    if not switches:
+        return "# No valid switches found in topology string.\n"
+
+    lines = []
+    def draw_tree(parent, children, switches_dict, prefix=""):
+        for i, sw in enumerate(children):
+            is_last = (i == len(children) - 1)
+            branch = "└── " if is_last else "├── "
+            sw_idx = int(sw.replace("sw", ""))
+            sw_info = switches_dict.get(sw_idx)
+            if sw_info:
+                lines.append(f"{prefix}{branch}Switch {sw_idx} ({sw_info['size']} nodes)")
+                node_prefix = "    " if is_last else "│   "
+                for j, node in enumerate(sw_info["nodes"]):
+                    node_branch = "└── " if j == len(sw_info["nodes"]) - 1 else "├── "
+                    lines.append(f"{prefix}{node_prefix}{node_branch}{node}")
+            else:
+                lines.append(f"{prefix}{branch}{sw}")
+
+    switches_dict = {sw["sw_idx"]: sw for sw in switches}
+
+    if parent_switch:
+        lines.append(f"Switch {parent_switch['parent_idx']} (root)")
+        draw_tree(parent_switch['parent_idx'], parent_switch['children'], switches_dict)
+    else:
+        for sw in switches:
+            lines.append(f"Switch {sw['sw_idx']} ({sw['size']} nodes)")
+            for j, node in enumerate(sw["nodes"]):
+                node_branch = "└── " if j == len(sw["nodes"]) - 1 else "├── "
+                lines.append(f"    {node_branch}{node}")
+
+    return "\n".join(lines) + "\n"
