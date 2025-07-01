@@ -7,9 +7,9 @@ import jetpack.config
 
 def test_slurm_uid():
     suid = jetpack.config.get('slurm.user.uid')
-    suser = jetpack.config.get('slurm.user.name')
+    suser = jetpack.config.get('slurm.user.name', 'slurm')
     muid = jetpack.config.get('munge.user.uid')
-    muser = jetpack.config.get('munge.user.name')
+    muser = jetpack.config.get('munge.user.name', 'munge')
     # Check that slurm uid and username match what is in data store
     assert subprocess.check_output(["id", "-u", suser]).decode().strip() == str(suid)
 
