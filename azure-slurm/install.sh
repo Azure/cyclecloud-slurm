@@ -71,6 +71,7 @@ set -e
 pip install wheel
 pip install --upgrade --no-deps packages/*
 
+# Without jetpack, slurm should still be able to be installed, so we echo the defaults
 SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
 SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
 
