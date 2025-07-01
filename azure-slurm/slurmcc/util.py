@@ -9,7 +9,8 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
-
+from pssh.clients.ssh import ParallelSSHClient, SSHClient
+import pwd
 from . import AzureSlurmError, custom_chaos_mode
 
 
@@ -223,6 +224,38 @@ def run(args: list, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, timeou
         logging.error(e)
         raise
     return output
+
+def run_parallel_cmd(hosts, cmd, user=None):
+    """
+    Run a command in parallel on a list of hosts using SSH, optionally as a different user.
+
+    Args:
+        hosts (list): List of hostnames.
+        cmd (str): Command to run.
+        private_key (str): Path to private key.
+        user (str, optional): SSH username to use. If None, default SSH user is used.
+
+    Returns:
+        output: Result from ParallelSSHClient.run_command.
+    """
+    try:
+        # If user is not specified, try to get $SUDO_USER from environment
+        if user is None:
+            user = os.environ.get("SUDO_USER")
+        pw_record = pwd.getpwnam(user)
+        home_dir = pw_record.pw_dir
+        client_kwargs = {"pkey": f"{home_dir}/.ssh/id_rsa"}
+        if user:
+            client_kwargs["user"] = user
+        client = ParallelSSHClient(hosts, **client_kwargs)
+        logging.getLogger("pssh").setLevel(logging.WARNING)
+        output = client.run_command(cmd)
+        client.join(output)
+        return output
+    except TimeoutError as te:
+        raise Exception(f"Timeout occurred while running command: {cmd}: {str(te)}")
+    except Exception as e:
+        raise Exception(f"Error running command: {cmd}: {str(e)}")
 
 def retry_rest(func: Callable, attempts: int = 5) -> Any:
     attempts = max(1, attempts)
