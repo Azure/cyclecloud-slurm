@@ -70,18 +70,23 @@ class Topology:
         """
         def validate_partition(partition) -> None:
             try:
-                output=slutil.run("sinfo -o %P | tr -d '*'", shell=True)
+                output = slutil.run("sinfo -o %P | tr -d '*'", shell=True)
             except subprocesslib.CalledProcessError:
                 sys.exit(1)
             except subprocesslib.TimeoutExpired:
                 sys.exit(1)
-            partitions=set(output.stdout.strip('*').split('\n')[1:-1])
+            partitions = set(output.stdout.strip('*').split('\n')[1:-1])
             log.debug("Valid Partitions: %s", partitions)
-            if partition not in partitions:
-                log.error("Partition %s does not exist", partition)
+            # Support comma-separated partition string
+            if isinstance(partition, str) and "," in partition:
+                partition_set = set(p.strip() for p in partition.split(","))
+            else:
+                partition_set = {partition}
+            if not partition_set.issubset(partitions):
+                log.error("Partition(s) %s do not exist", partition_set - partitions)
                 sys.exit(1)
             else:
-                log.debug("Partition %s exists", partition)
+                log.debug("Partition(s) %s exist", partition_set)
         def get_hostlist(cmd) -> list:
             try:
                 output=slutil.run(cmd, shell=True)
@@ -161,8 +166,8 @@ class Topology:
         Returns:
             str: The output of the command execution.
         """
-        cmd = "echo \"$(nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2)$(nvidia-smi -q | grep 'CliqueId' | head -n 1 | cut -d: -f2)\" | while IFS= read -r line; do echo \"$(hostname): $line\"; done"
-        return slutil.srun(self.hosts, cmd, shell=True, partition=self.partition, gpus=len(self.hosts))
+        cmd = "echo \"$(nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2)$(nvidia-smi -q | grep 'CliqueId' | head -n 1 | cut -d: -f2)\""
+        return slutil.run_parallel_cmd(self.hosts, cmd)
     
     def get_rack_id(self):
         """
@@ -180,20 +185,16 @@ class Topology:
         """
         try:
             output = self._run_get_rack_id_command()
-        except slutil.SrunExitCodeException as e:
+        except Exception as e:
             log.error("Error running get_rack_id command on hosts")
-            if e.stderr_content:
-                log.error(e.stderr_content)
-            log.error(e.stderr)
-            sys.exit(e.returncode)
-        except subprocesslib.TimeoutExpired:
+            log.error(e)
             sys.exit(1)
-        lines = output.stdout.split('\n')[:-1]
-        rack_to_host_map = {}
-        for line in lines:
-            line = line.strip('"')
-            node, cluster_uuid = line.split(':')
-            rack_to_host_map[node.strip()] = cluster_uuid.strip()
+        except TimeoutError as t:
+            sys.exit(1)
+        rack_to_host_map={}
+        for host_out in output:
+            for line in host_out.stdout:
+                rack_to_host_map[host_out.host.strip()] = line.strip()
         return rack_to_host_map
     
     def group_hosts_per_rack(self) -> dict:
