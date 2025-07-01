@@ -248,7 +248,7 @@ def run_parallel_cmd(hosts, cmd, user=None):
         if user:
             client_kwargs["user"] = user
         client = ParallelSSHClient(hosts, **client_kwargs)
-        logging.getLogger("pssh").setLevel(logging.WARNING)
+        logging.getLogger("pssh").setLevel(logging.ERROR)
         output = client.run_command(cmd)
         client.join(output)
         return output
