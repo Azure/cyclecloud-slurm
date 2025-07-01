@@ -35,7 +35,7 @@ srun hostname""".format(
             )
         )
 
-    check_output("sudo", "chown", "cyclecloud:cyclecloud", script_path)
+    check_output("chown", "cyclecloud:cyclecloud", script_path)
     check_output("sudo", "-u", "cyclecloud", "sbatch", script_path)
     wait_for_job(job_name)
     wait_for_scale_down()
