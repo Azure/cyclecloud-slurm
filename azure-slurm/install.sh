@@ -69,6 +69,7 @@ set -e
 
 # ensure wheel is installed
 pip install wheel
+pip install parallel-ssh
 pip install --upgrade --no-deps packages/*
 
 SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
