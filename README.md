@@ -225,11 +225,14 @@ Formatting is only available for jobs and not for partition and partition_hourly
 Do note: `azslurm cost` relies on slurm's admincomment feature to associate specific vm_size and meter info for jobs.
 
 ### Topology
-`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the topology plugin configuration for slurm either using VMSS topology or a fabric manager that has SHARP enabled.
+`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the [topology plugin configuration](https://slurm.schedmd.com/topology.html) for slurm either using VMSS topology, a fabric manager that has SHARP enabled, or the NVLink Domain. `azslurm topology` can generate both tree and block topology plugin configurations for Slurm. Users may use `azslurm topology` to generate the topology file but must manually add it to `/etc/slurm/topology.conf` either by giving that as the output file or copying the file over. Additionally, users must specify `topologyType=tree|block` in `slurm.conf` for full functionality.
+
+Note: `azslurm topology` is only useful in manually scaled clusters or clusters of fixed size. Autoscaling does not take topology into account and topology is not updated on autoscale.
 
 ```
 usage: azslurm topology [-h] [--config CONFIG] [-p, PARTITION] [-o OUTPUT]
-                        [-v | -f]
+                        [-v | -f | -n] [-b | -t] [-s BLOCK_SIZE] [--viz]
+                        [--visual_block_size VISUAL_BLOCK_SIZE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -238,13 +241,35 @@ optional arguments:
                         Specify the parititon
   -o OUTPUT, --output OUTPUT
                         Specify slurm topology file output
-  -v, --use_vmss        Use VMSS (default: True)
+  -v, --use_vmss        Use VMSS to map Tree or Block topology along VMSS
+                        boundaries without special network consideration
+                        (default: True)
   -f, --use_fabric_manager
+                        Use Fabric Manager to map Tree topology (Block
+                        topology not allowed) according to SHARP network
+                        topology tool(default: False)
+  -n, --use_nvlink_domain
+                        Use NVlink domain to map Block topology (Tree topology
+                        not allowed) according to NVLink Domain and Partition
+                        for multi-node NVLink (default: False)
+  -b, --block           Generate Block Topology output to use Block topology
+                        plugin (default: False)
+  -t, --tree            Generate Tree Topology output to use Tree topology
+                        plugin(default: False)
+  -s BLOCK_SIZE, --block_size BLOCK_SIZE
+                        Minimum block size required for each block (use with
+                        --block or --use_nvlink_domain, default: 1)
                         Use Fabric Manager (default: False)
+  --viz
+                        Generate ASCII visualization for the topology
+                        (default: False)
+  --visual_block_size VISUAL_BLOCK_SIZE
+                        Block size for visualization (default: 18)
 ```
-To generate slurm topology using VMSS:
+To generate slurm topology using VMSS you may optionally specify the type of topology which is defaulted as tree:
 ```
 azslurm topology
+azslurm topology -v -t
 azslurm topology -o topology.conf
 ```
 This will print out a the topology in the tree plugin format slurm wants for topology.conf or create a file based on the output file given in the cli
@@ -253,9 +278,10 @@ This will print out a the topology in the tree plugin format slurm wants for top
 SwitchName=htc Nodes=cluster-htc-1,cluster-htc-2,cluster-htc-3,cluster-htc-4,cluster-htc-5,cluster-htc-6,cluster-htc-7,cluster-htc-8,cluster-htc-9,cluster-htc-10,cluster-htc-11,cluster-htc-12,cluster-htc-13,cluster-htc-14,cluster-htc-15,cluster-htc-16,cluster-htc-17,cluster-htc-18,cluster-htc-19,cluster-htc-20,cluster-htc-21,cluster-htc-22,cluster-htc-23,cluster-htc-24,cluster-htc-25,cluster-htc-26,cluster-htc-27,cluster-htc-28,cluster-htc-29,cluster-htc-30,cluster-htc-31,cluster-htc-32,cluster-htc-33,cluster-htc-34,cluster-htc-35,cluster-htc-36,cluster-htc-37,cluster-htc-38,cluster-htc-39,cluster-htc-40,cluster-htc-41,cluster-htc-42,cluster-htc-43,cluster-htc-44,cluster-htc-45,cluster-htc-46,cluster-htc-47,cluster-htc-48,cluster-htc-49,cluster-htc-50
 SwitchName=Standard_F2s_v2_pg0 Nodes=cluster-hpc-1,cluster-hpc-10,cluster-hpc-11,cluster-hpc-12,cluster-hpc-13,cluster-hpc-14,cluster-hpc-15,cluster-hpc-16,cluster-hpc-2,cluster-hpc-3,cluster-hpc-4,cluster-hpc-5,cluster-hpc-6,cluster-hpc-7,cluster-hpc-8,cluster-hpc-9
 ```
-To generate slurm topology using Fabric Manager you need a SHARP enabled cluster and it is required you specify a partition:
+To generate slurm topology using Fabric Manager you need a SHARP enabled cluster and it is required you specify a partition and you may optionally specify tree plugin which is the default:
 ```
 azslurm topology -f -p gpu
+azslurm topology -f -p gpu -t
 azslurm topology -f -p gpu -o topology.conf
 ```
 ```
@@ -275,7 +301,167 @@ SwitchName=sw02 Nodes=ccw-gpu-192
 
 SwitchName=sw03 Nodes=ccw-gpu-13,ccw-gpu-142,ccw-gpu-26,ccw-gpu-136,ccw-gpu-163,ccw-gpu-138,ccw-gpu-187,ccw-gpu-88
 ```
-This either prints out the topology in slurm topology format or creates an output file with the topology
+This either prints out the topology in slurm topology format or creates an output file with the topology.
+
+To generate slurm topology using NVLink Domain, you need to specifiy a partition and optionally specify a minimum block size (Default 1) as well as the block option which is the default :
+```
+azslurm topology -n -p gpu
+azslurm topology -n -p gpu -b -s 5
+azslurm topology -n -p gpu -b -s 5 -o topology.conf
+```
+```
+# Number of Nodes in block1: 18
+# ClusterUUID and CliqueID: b78ed242-7b98-426f-b194-b76b8899f4ec 32766
+BlockName=block1 Nodes=ccw-1-3-gpu-21,ccw-1-3-gpu-407,ccw-1-3-gpu-333,ccw-1-3-gpu-60,ccw-1-3-gpu-387,ccw-1-3-gpu-145,ccw-1-3-gpu-190,ccw-1-3-gpu-205,ccw-1-3-gpu-115,ccw-1-3-gpu-236,ccw-1-3-gpu-164,ccw-1-3-gpu-180,ccw-1-3-gpu-195,ccw-1-3-gpu-438,ccw-1-3-gpu-305,ccw-1-3-gpu-255,ccw-1-3-gpu-14,ccw-1-3-gpu-400
+# Number of Nodes in block2: 16
+# ClusterUUID and CliqueID: cc79d754-915f-408b-b1c3-b8c3aa6668ab 32766
+BlockName=block2 Nodes=ccw-1-3-gpu-464,ccw-1-3-gpu-7,ccw-1-3-gpu-454,ccw-1-3-gpu-344,ccw-1-3-gpu-91,ccw-1-3-gpu-217,ccw-1-3-gpu-324,ccw-1-3-gpu-43,ccw-1-3-gpu-188,ccw-1-3-gpu-97,ccw-1-3-gpu-434,ccw-1-3-gpu-172,ccw-1-3-gpu-153,ccw-1-3-gpu-277,ccw-1-3-gpu-147,ccw-1-3-gpu-354
+# Number of Nodes in block3: 8
+# ClusterUUID and CliqueID: 0e568355-d588-4a53-8166-8200c2c1ef55 32766
+BlockName=block3 Nodes=ccw-1-3-gpu-31,ccw-1-3-gpu-52,ccw-1-3-gpu-297,ccw-1-3-gpu-319,ccw-1-3-gpu-349,ccw-1-3-gpu-62,ccw-1-3-gpu-394,ccw-1-3-gpu-122
+# Number of Nodes in block4: 9
+# ClusterUUID and CliqueID: e3656d04-00db-4ad6-9a42-5df790994e41 32766
+BlockName=block4 Nodes=ccw-1-3-gpu-5,ccw-1-3-gpu-17,ccw-1-3-gpu-254,ccw-1-3-gpu-284,ccw-1-3-gpu-249,ccw-1-3-gpu-37,ccw-1-3-gpu-229,ccw-1-3-gpu-109,ccw-1-3-gpu-294
+BlockSizes=5
+```
+This either prints out the topology in slurm topology format or creates an output file with the topology.
+
+To create a visualization of the topology output you may specify `-viz` after the command for `--use_nvlink_domain` and `--use_fabric_manager` that optionally can take `--visual_block_size` to create a grid for the block (Default 18)
+
+Example Block topology visual
+```
+azslurm topology -n -p gpu --viz
+```
+```
+block 1  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f723c
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-1  | hpcbench-hpc-5  | hpcbench-hpc-9  |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-13 | hpcbench-hpc-17 | hpcbench-hpc-21 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-25 | hpcbench-hpc-29 | hpcbench-hpc-33 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-37 | hpcbench-hpc-41 | hpcbench-hpc-45 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-49 | hpcbench-hpc-53 | hpcbench-hpc-57 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-61 | hpcbench-hpc-65 | hpcbench-hpc-69 |
+|-----------------|-----------------|-----------------|
+
+block 2  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f721e
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-2  | hpcbench-hpc-6  | hpcbench-hpc-10 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-14 | hpcbench-hpc-18 | hpcbench-hpc-22 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-26 | hpcbench-hpc-30 | hpcbench-hpc-34 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-38 | hpcbench-hpc-42 | hpcbench-hpc-46 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-50 | hpcbench-hpc-54 | hpcbench-hpc-58 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-62 | hpcbench-hpc-66 | hpcbench-hpc-70 |
+|-----------------|-----------------|-----------------|
+
+block 3  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f724b
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-3  | hpcbench-hpc-7  | hpcbench-hpc-11 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-15 | hpcbench-hpc-19 | hpcbench-hpc-23 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-27 | hpcbench-hpc-31 | hpcbench-hpc-35 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-39 | hpcbench-hpc-43 | hpcbench-hpc-47 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-51 | hpcbench-hpc-55 | hpcbench-hpc-59 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-63 | hpcbench-hpc-67 | hpcbench-hpc-71 |
+|-----------------|-----------------|-----------------|
+
+block 4  : # of Nodes = 18
+ClusterUUID + CliqueID : 5e797fc6-0f46-421a-8724-0e102c0f722a
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-4  | hpcbench-hpc-8  | hpcbench-hpc-12 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-16 | hpcbench-hpc-20 | hpcbench-hpc-24 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-28 | hpcbench-hpc-32 | hpcbench-hpc-36 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-40 | hpcbench-hpc-44 | hpcbench-hpc-48 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-52 | hpcbench-hpc-56 | hpcbench-hpc-60 |
+|-----------------|-----------------|-----------------|
+| hpcbench-hpc-64 | hpcbench-hpc-68 | hpcbench-hpc-72 |
+|-----------------|-----------------|-----------------|
+```
+Example Block topology visual for blocks with nodes less than `visual_block_size`
+```
+block 1  : # of Nodes = 6
+ClusterUUID + CliqueID : N/A N/A
+|---------------|---------------|---------------|
+| vis0603-gpu-2 | vis0603-gpu-5 | vis0603-gpu-1 |
+|---------------|---------------|---------------|
+| vis0603-gpu-3 | vis0603-gpu-4 | vis0603-gpu-6 |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+```
+Example Block Topology visual with block with nodes less than min block size
+```
+block 1  : # of Nodes = 6
+ClusterUUID + CliqueID : N/A N/A
+** This block is ineligible for scheduling because # of nodes < min block size 8**
+|---------------|---------------|---------------|
+| vis0603-gpu-4 | vis0603-gpu-2 | vis0603-gpu-5 |
+|---------------|---------------|---------------|
+| vis0603-gpu-1 | vis0603-gpu-6 | vis0603-gpu-3 |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+|       X       |       X       |       X       |
+|---------------|---------------|---------------|
+```
+Example Tree Topology visual
+```
+azslurm topology -f -p hpc --viz
+```
+```
+Switch 5 (root)
+├── Switch 0 (3 nodes)
+│   ├── hpcbench-hpc-36
+│   ├── hpcbench-hpc-39
+│   └── hpcbench-hpc-42
+├── Switch 1 (6 nodes)
+│   ├── hpcbench-hpc-1
+│   ├── hpcbench-hpc-35
+│   ├── hpcbench-hpc-38
+│   ├── hpcbench-hpc-41
+│   ├── hpcbench-hpc-44
+│   └── hpcbench-hpc-49
+├── Switch 2 (3 nodes)
+│   ├── hpcbench-hpc-37
+│   ├── hpcbench-hpc-45
+│   └── hpcbench-hpc-46
+├── Switch 3 (2 nodes)
+│   ├── hpcbench-hpc-40
+│   └── hpcbench-hpc-43
+└── Switch 4 (2 nodes)
+    ├── hpcbench-hpc-47
+    └── hpcbench-hpc-48
+```
 
 ### GB200 IMEX Support
 Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cleanup IMEX service on a per-job basis. The prolog script will attempt to kill an existing IMEX service before configuring a new instance that will be specific to the new, submitted job. The epilog script terminates the IMEX service. By default, these scripts will run for GB200 nodes and not run for non-GB200 nodes. A configurable parameter `slurm.imex.enabled` has been added to the slurm cluster configuration template to allow non-GB200 nodes to enable IMEX support for their jobs or allow GB200 nodes to disable IMEX support for their jobs.

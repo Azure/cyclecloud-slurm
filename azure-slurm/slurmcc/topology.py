@@ -590,4 +590,21 @@ class Topology:
         else:
             print(content, end='')
             log.info("Printed slurm topology")
-            
+        return content
+
+
+
+    def visualize(self, topology_str: str, max_block_size: int = 1) -> str:
+        """
+        Visualizes a block or tree topology string as ASCII art.
+
+        Args:
+            topology_str (str): The topology string (output from write_block_topology or write_tree_topology).
+            max_block_size (int, optional): Maximum block size for grid visualization. Defaults to 1.
+        Returns:
+            str: ASCII visualization of the topology.
+        """
+        if self.topo_type == TopologyType.BLOCK:
+            return slutil.visualize_block(topology_str, self.block_size, max_block_size)
+        else:
+            return slutil.visualize_tree(topology_str)
