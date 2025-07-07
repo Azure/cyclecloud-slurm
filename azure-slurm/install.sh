@@ -130,7 +130,7 @@ azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --url      $(jetpack config cyclecloud.config.web_server) \
                    --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
                    --config-dir $config_dir \
-                   --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
+                   --accounting-subscription-id $(jetpack props get azure.subscription_id) \
                    --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
                    --cost-cache-root $INSTALL_DIR/.cache \
                    > $INSTALL_DIR/autoscale.json

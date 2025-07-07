@@ -14,7 +14,7 @@ LOCAL_AZURE_CA_PEM = "AzureCA.pem"
 
 
 class InstallSettings:
-    def __init__(self, config: Dict, platform_family: str, mode: str) -> None:
+    def __init__(self, config: Dict, properties: Dict, platform_family: str, mode: str) -> None:
         self.config = config
 
         if "slurm" not in config:
@@ -55,7 +55,7 @@ class InstallSettings:
         self.hostname = config["hostname"]
         self.ipv4 = config["ipaddress"]
         self.slurmver = config["slurm"]["version"]
-        self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
+        self.vm_size = properties["azure"]["vm_size"]
 
         self.slurm_user: str = config["slurm"]["user"].get("name") or "slurm"
         self.slurm_grp: str = config["slurm"]["user"].get("group") or "slurm"
@@ -725,6 +725,15 @@ def _load_config(bootstrap_config: str) -> Dict:
 
     return config
 
+def _load_properties(properties: str) -> Dict:
+    properties_dict = {}
+    if properties == "jetpack":
+        properties_dict = json.loads(subprocess.check_output(["jetpack", "props", "get", "--json"]))
+    else:
+        with open(properties, encoding="utf-8") as fr:
+            properties_dict = json.load(fr)
+            
+    return properties_dict
 
 def main() -> None:
     # needed to set slurmctld only
@@ -740,13 +749,16 @@ def main() -> None:
     )
     parser.add_argument("--bootstrap-config", default="jetpack")
 
+    parser.add_argument("--properties", default="jetpack")
+
     args = parser.parse_args()
 
     if args.platform == "debian":
         args.platform = "ubuntu"
 
     config = _load_config(args.bootstrap_config)
-    settings = InstallSettings(config, args.platform, args.mode)
+    properties = _load_properties(args.properties)
+    settings = InstallSettings(config, properties, args.platform, args.mode)
 
     #create config dir
     setup_config_dir(settings)
