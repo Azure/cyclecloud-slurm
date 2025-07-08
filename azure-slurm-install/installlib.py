@@ -560,12 +560,15 @@ def cluster_status(config: Dict) -> Dict:
     if config.get("mock_provider"):
         return config["mock_provider"]["nodes"]
 
-    cc_config = config["cyclecloud"]["config"]
-    urlbase = cc_config["web_server"].rstrip("/")
-    username = cc_config["username"]
-    password = cc_config["password"]
+    connection_data = {}
+    with open("/opt/cycle/jetpack/connection.json", "r") as f:
+        connection_data = json.load(f)
+
+    urlbase = connection_data["web_server"].rstrip("/")
+    username = connection_data["username"]
+    password = connection_data["password"]
     context = SSLContext(ssl.PROTOCOL_TLSv1_2)
-    cluster_name = urllib.parse.quote(config["cyclecloud"]["cluster"]["name"])
+    cluster_name = urllib.parse.quote(connection_data["cluster"])
     url = f"{urlbase}/clusters/{cluster_name}/nodes"
 
     auth_token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode(

@@ -720,7 +720,10 @@ def _load_config(bootstrap_config: str) -> Dict:
             config = json.load(fr)
 
     if "cluster_name" not in config:
-        config["cluster_name"] = config["cyclecloud"]["cluster"]["name"]
+        connection_data = {}
+        with open("/opt/cycle/jetpack/config/connection.json", "r") as f:
+            connection_data = json.load(f)
+        config["cluster_name"] = connection_data["cluster"]
         config["node_name"] = config["cyclecloud"]["node"]["name"]
 
     return config

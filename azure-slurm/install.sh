@@ -121,14 +121,15 @@ fi
 
 which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
 
-cluster_name=$(jetpack config cyclecloud.cluster.name)
+connection_json_path=/opt/cycle/jetpack/config/connection.json
+cluster_name=$(jq -r '.cluster' $connection_json_path)
 escaped_cluster_name=$(python3 -c "import re; print(re.sub('[^a-zA-Z0-9-]', '-', '$cluster_name').lower())")
 
 config_dir=/sched/$escaped_cluster_name
-azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
-                   --password $(jetpack config cyclecloud.config.password) \
-                   --url      $(jetpack config cyclecloud.config.web_server) \
-                   --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
+azslurm initconfig --username $(jq -r '.username' $connection_json_path) \
+                   --password $(jq -r '.password' $connection_json_path) \
+                   --url      $(jq -r '.url' $connection_json_path) \
+                   --cluster-name "$(jq -r '.cluster' $connection_json_path)" \
                    --config-dir $config_dir \
                    --accounting-subscription-id $(jetpack props get azure.subscription_id) \
                    --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
