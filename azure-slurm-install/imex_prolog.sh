@@ -23,7 +23,7 @@ run_prolog() {
 
   # update peer list
   scontrol show hostnames "$SLURM_NODELIST" | while read host; do
-    getent hosts "$host" | awk '{ print $1 }' | head -n1
+    getent ahosts "$host" | awk '{ print $1 }' | head -n1
   done > /etc/nvidia-imex/nodes_config.cfg
   #cat /etc/nvidia-imex/nodes_config.cfg
   # rotate server port to prevent race condition
