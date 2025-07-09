@@ -22,7 +22,9 @@ run_prolog() {
   set -e
 
   # update peer list
-  scontrol show node $SLURM_NODELIST -o | sed 's/^.* NodeAddr=\([^ ]*\).*/\1/' > /etc/nvidia-imex/nodes_config.cfg
+  scontrol show hostnames "$SLURM_NODELIST" | while read host; do
+    getent ahosts "$host" | awk '{ print $1 }' | head -n1
+  done > /etc/nvidia-imex/nodes_config.cfg
   #cat /etc/nvidia-imex/nodes_config.cfg
   # rotate server port to prevent race condition
   NEW_SERVER_PORT=$((${SLURM_JOB_ID}% 16384 + 33792))
