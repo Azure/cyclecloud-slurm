@@ -433,36 +433,60 @@ def test_group_hosts_per_rack_duplicate_hosts(monkeypatch):
 
     racks = test_obj.group_hosts_per_rack()
     assert racks == {'rackA': ['node1'], 'rackB': ['node2']}
+class DummyHostOut:
+    def __init__(self, host, stdout):
+        self.host = host
+        self.stdout = stdout
 
-# def test_get_rack_id_success(monkeypatch):
-#     class DummyOutput:
-#         stdout = 'node1:uuidA\nnode2:uuidB\nnode3:uuidA\n'
-#     def fake_run_get_rack_id_command(*args, **kwargs):
-#         return DummyOutput()
-#     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
-#     test_obj._run_get_rack_id_command = fake_run_get_rack_id_command
-#     result = test_obj.get_rack_id()
-#     assert result == {'node1': 'uuidA', 'node2': 'uuidB', 'node3': 'uuidA'}
+def make_host_out(host, lines):
+    return DummyHostOut(host, lines)
 
-# def test_get_rack_id_empty(monkeypatch):
-#     class DummyOutput:
-#         stdout = ''
-#     def fake_run_get_rack_id_command(*args, **kwargs):
-#         return DummyOutput()
-#     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
-#     test_obj._run_get_rack_id_command = fake_run_get_rack_id_command
-#     result = test_obj.get_rack_id()
-#     assert result == {}
+def test_get_rack_id_success(monkeypatch):
+    # Simulate _run_get_rack_id_command returning host outputs with rack IDs
+    outputs = [
+        make_host_out("node1", ["uuidA"]),
+        make_host_out("node2", ["uuidB"]),
+        make_host_out("node3", ["uuidA"]),
+    ]
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    monkeypatch.setattr(topo, "_run_get_rack_id_command", lambda: outputs)
+    result = topo.get_rack_id()
+    assert result == {"node1": "uuidA", "node2": "uuidB", "node3": "uuidA"}
 
-# def test_get_rack_id_strip_quotes(monkeypatch):
-#     class DummyOutput:
-#         stdout = '"node1:uuidA"\n"node2:uuidB"\n'
-#     def fake_run_get_rack_id_command(*args, **kwargs):
-#         return DummyOutput()
-#     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
-#     test_obj._run_get_rack_id_command = fake_run_get_rack_id_command
-#     result = test_obj.get_rack_id()
-#     assert result == {'node1': 'uuidA', 'node2': 'uuidB'}
+def test_get_rack_id_strip_and_multiple_lines(monkeypatch):
+    # Simulate multiple lines per host
+    outputs = [
+        make_host_out("node1", ["uuidA", "uuidA2"]),
+        make_host_out("node2", ["uuidB"]),
+    ]
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    monkeypatch.setattr(topo, "_run_get_rack_id_command", lambda: outputs)
+    result = topo.get_rack_id()
+    # Only the last line for each host will be kept due to overwrite
+    assert result == {"node1": "uuidA2", "node2": "uuidB"}
+
+def test_get_rack_id_empty(monkeypatch):
+    outputs = []
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    monkeypatch.setattr(topo, "_run_get_rack_id_command", lambda: outputs)
+    result = topo.get_rack_id()
+    assert result == {}
+
+def test_get_rack_id_exception(monkeypatch):
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    def raise_exc():
+        raise Exception("fail")
+    monkeypatch.setattr(topo, "_run_get_rack_id_command", raise_exc)
+    with pytest.raises(SystemExit):
+        topo.get_rack_id()
+
+def test_get_rack_id_timeout(monkeypatch):
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    def raise_timeout():
+        raise TimeoutError("timeout")
+    monkeypatch.setattr(topo, "_run_get_rack_id_command", raise_timeout)
+    with pytest.raises(SystemExit):
+        topo.get_rack_id()
 
 TESTDIR = "test/slurmcc_test/topology_test_output"
 
@@ -624,3 +648,4 @@ def test_run_nvlink_multiple_racks(monkeypatch):
     test_obj.group_hosts_per_rack = lambda: racks
     result = test_obj.run_nvlink()
     assert result == racks
+
