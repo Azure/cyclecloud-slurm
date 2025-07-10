@@ -274,7 +274,7 @@ def run_parallel_cmd(hosts, cmd):
         client.join(output)
         return output
     except TimeoutError as te:
-        raise Exception(f"Timeout occurred while running command: {cmd}: {str(te)}")
+        raise TimeoutError(f"Command timed out: {cmd}. Error: {str(te)}")
     except Exception as e:
         raise Exception(f"Error running command: {cmd}: {str(e)}")
 
