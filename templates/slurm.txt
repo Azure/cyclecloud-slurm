@@ -18,9 +18,6 @@ Autoscale = $Autoscale
     KeyPairLocation = ~/.ssh/cyclecloud.pem
     Azure.Identities = $ManagedIdentity
     Tags = $NodeTags
-    
-    # Slurm autoscaling supports both Terminate and Deallocate shutdown policies
-    ShutdownPolicy = $configuration_slurm_shutdown_policy
 
     # Lustre mounts require termination notifications to unmount
     EnableTerminateNotification = ${NFSType == "lustre" || NFSSchedType == "lustre" || AdditionalNFSType == "lustre" || EnableTerminateNotification}
@@ -767,18 +764,6 @@ Order = 20
         Config.FreeForm = true
         Config.Entries := {[Value=""], [Value="AzureCA.pem"]}
         DefaultValue = ""
-
-        [[[parameter configuration_slurm_shutdown_policy]]]
-	    Label = Shutdown Policy
-        description = By default, autostop will Delete stopped VMS for lowest cost.  Optionally, Stop/Deallocate the VMs for faster restart instead.
-        DefaultValue = Terminate
-        config.plugin = pico.control.AutoCompleteDropdown
-            [[[[list Config.Entries]]]]
-            Name = Terminate
-            Label = Terminate
-            [[[[list Config.Entries]]]]
-            Name = Deallocate
-            Label = Deallocate
 
         [[[parameter EnableTerminateNotification]]]
         Label = Enable Termination notifications
