@@ -187,6 +187,8 @@ class Topology:
         try:
             output = self._run_get_rack_id_command()
         except Timeout as t:
+            log.error("Timeout occurred while running get_rack_id command on hosts")
+            log.error(t)
             sys.exit(1)
         except Exception as e:
             log.error("Error running get_rack_id command on hosts")
