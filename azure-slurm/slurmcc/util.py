@@ -9,7 +9,10 @@ import time
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
-
+from pssh.clients.ssh import ParallelSSHClient, SSHClient
+from pssh.exceptions import Timeout
+import pwd
+import grp
 from . import AzureSlurmError, custom_chaos_mode
 
 
@@ -223,6 +226,60 @@ def run(args: list, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, timeou
         logging.error(e)
         raise
     return output
+
+def run_parallel_cmd(hosts, cmd):
+    """
+    Run a command in parallel on a list of hosts using SSH as an interactive user from the 'cyclecloud' group.
+    This function determines the first interactive user (i.e., a user with a valid login shell) in the 'cyclecloud' group,
+    then uses their SSH private key to connect to the specified hosts and execute the given command in parallel.
+        hosts (list): List of hostnames to connect to.
+        cmd (str): Command to execute on each host.
+    Returns:
+        output: Result from ParallelSSHClient.run_command.
+    Raises:
+        ValueError: If the 'cyclecloud' group does not exist or no interactive user is found in the group.
+        TimeoutError: If the command execution times out.
+        Exception: For other errors encountered during execution.
+    """
+    def get_group_users(group_name):
+        try:
+            group_info = grp.getgrnam(group_name)
+        except KeyError:
+            raise ValueError(f"Group '{group_name}' not found.")
+
+        return group_info.gr_mem
+
+    def user_has_login_shell(username):
+        try:
+            pw_entry = pwd.getpwnam(username)
+            shell = pw_entry.pw_shell
+            if shell.endswith('nologin') or shell.endswith('false'):
+                return False
+            return True
+        except KeyError:
+            # user entry not found in /etc/passwd
+            return False
+    try:
+        group_name = "cyclecloud"
+        users_in_group = get_group_users(group_name)
+        interactive_users = [user for user in users_in_group if user_has_login_shell(user)]
+        user = interactive_users[0] if interactive_users else None
+        if not user:
+            raise ValueError(f"No interactive user found in group '{group_name}'.")
+        pw_record = pwd.getpwnam(user)
+        home_dir = pw_record.pw_dir
+        client_kwargs = {"pkey": f"{home_dir}/.ssh/id_rsa"}
+        client_kwargs["user"] = user
+        client_kwargs["timeout"] = 300
+        client = ParallelSSHClient(hosts, **client_kwargs)
+        logging.getLogger("pssh").setLevel(logging.ERROR)
+        output = client.run_command(cmd)
+        client.join(output, timeout=300)
+        return output
+    except Timeout as te:
+        raise Timeout(f"Command timed out: {cmd}. Error: {str(te)}")
+    except Exception as e:
+        raise Exception(f"Error running command: {cmd}: {str(e)}")
 
 def retry_rest(func: Callable, attempts: int = 5) -> Any:
     attempts = max(1, attempts)

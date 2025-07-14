@@ -69,6 +69,7 @@ set -e
 
 # ensure wheel is installed
 pip install wheel
+pip install parallel-ssh
 pip install --upgrade --no-deps packages/*
 
 # Without jetpack, slurm should still be able to be installed, so we echo the defaults
