@@ -7,6 +7,7 @@ import subprocess as subprocesslib
 import datetime
 from . import util as slutil
 from enum import Enum
+from pssh.exceptions import Timeout
 
 log=logging.getLogger('topology')
 
@@ -185,12 +186,13 @@ class Topology:
         """
         try:
             output = self._run_get_rack_id_command()
+        except Timeout as t:
+            sys.exit(1)
         except Exception as e:
             log.error("Error running get_rack_id command on hosts")
             log.error(e)
             sys.exit(1)
-        except TimeoutError as t:
-            sys.exit(1)
+
         rack_to_host_map={}
         for host_out in output:
             for line in host_out.stdout:

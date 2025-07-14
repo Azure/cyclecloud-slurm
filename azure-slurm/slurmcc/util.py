@@ -10,6 +10,7 @@ import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 from pssh.clients.ssh import ParallelSSHClient, SSHClient
+from pssh.exceptions import Timeout
 import pwd
 import grp
 from . import AzureSlurmError, custom_chaos_mode
@@ -228,16 +229,17 @@ def run(args: list, stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, timeou
 
 def run_parallel_cmd(hosts, cmd):
     """
-    Run a command in parallel on a list of hosts using SSH, optionally as a different user.
-
-    Args:
-        hosts (list): List of hostnames.
-        cmd (str): Command to run.
-        private_key (str): Path to private key.
-        user (str, optional): SSH username to use. If None, default SSH user is used.
-
+    Run a command in parallel on a list of hosts using SSH as an interactive user from the 'cyclecloud' group.
+    This function determines the first interactive user (i.e., a user with a valid login shell) in the 'cyclecloud' group,
+    then uses their SSH private key to connect to the specified hosts and execute the given command in parallel.
+        hosts (list): List of hostnames to connect to.
+        cmd (str): Command to execute on each host.
     Returns:
         output: Result from ParallelSSHClient.run_command.
+    Raises:
+        ValueError: If the 'cyclecloud' group does not exist or no interactive user is found in the group.
+        TimeoutError: If the command execution times out.
+        Exception: For other errors encountered during execution.
     """
     def get_group_users(group_name):
         try:
@@ -268,13 +270,14 @@ def run_parallel_cmd(hosts, cmd):
         home_dir = pw_record.pw_dir
         client_kwargs = {"pkey": f"{home_dir}/.ssh/id_rsa"}
         client_kwargs["user"] = user
+        client_kwargs["timeout"] = 120
         client = ParallelSSHClient(hosts, **client_kwargs)
         logging.getLogger("pssh").setLevel(logging.ERROR)
         output = client.run_command(cmd)
-        client.join(output)
+        client.join(output, timeout=120)
         return output
-    except TimeoutError as te:
-        raise TimeoutError(f"Command timed out: {cmd}. Error: {str(te)}")
+    except Timeout as te:
+        raise Timeout(f"Command timed out: {cmd}. Error: {str(te)}")
     except Exception as e:
         raise Exception(f"Error running command: {cmd}: {str(e)}")
 
