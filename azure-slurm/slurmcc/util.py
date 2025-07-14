@@ -270,11 +270,11 @@ def run_parallel_cmd(hosts, cmd):
         home_dir = pw_record.pw_dir
         client_kwargs = {"pkey": f"{home_dir}/.ssh/id_rsa"}
         client_kwargs["user"] = user
-        client_kwargs["timeout"] = 120
+        client_kwargs["timeout"] = 300
         client = ParallelSSHClient(hosts, **client_kwargs)
         logging.getLogger("pssh").setLevel(logging.ERROR)
         output = client.run_command(cmd)
-        client.join(output, timeout=120)
+        client.join(output, timeout=300)
         return output
     except Timeout as te:
         raise Timeout(f"Command timed out: {cmd}. Error: {str(te)}")
