@@ -50,6 +50,17 @@ SuspendProgram=/opt/azurehpc/slurm/suspend_program.sh
 SchedulerParameters=max_switch_wait=24:00:00
 # Only used with dynamic node partitions. 
 MaxNodeCount={max_node_count}
+
+## Node HealthChecks related  configurations
+
+## The interval in seconds between executions of HealthCheckProgram. Setting the value to zero disables execution.
+HealthCheckInterval={health_interval}
+## Identify what node states should execute the HealthCheckProgram. Multiple state values may be specified with a comma separator. The default value is ANY to execute on nodes in any state
+HealthCheckNodeState=ANY
+## Fully qualified pathname of a script to execute as user root periodically on all compute nodes that are not in the NOT_RESPONDING state.
+HealthCheckProgram={health_program}
+
+
 # This as the partition definitions managed by azslurm partitions > /sched/azure.conf
 Include azure.conf
 # If slurm.accounting.enabled=true this will setup slurmdbd

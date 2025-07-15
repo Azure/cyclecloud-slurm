@@ -111,6 +111,7 @@ class InstallSettings:
         self.config_dir = f"/sched/{self.slurm_cluster_name}"
         # Leave the ability to disable this.
         self.ubuntu22_waagent_fix = config["slurm"].get("ubuntu22_waagent_fix", True)
+        self.enable_healthchecks = config["slurm"].get("enable_healthchecks", True)
 
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
@@ -382,6 +383,18 @@ def _complete_install_primary(s: InstallSettings) -> None:
     if not os.path.exists(f"{s.config_dir}/epilog.d"):
         ilib.directory(f"{s.config_dir}/epilog.d", owner=s.slurm_user, group=s.slurm_grp)
 
+
+    # Setting health_interval to 0 disables healthchecks
+    health_interval = 0
+    health_program = '""'
+    if s.enable_healthchecks:
+        # Run background checks every 2 minutes
+        health_interval = 120
+        health_program = f"{s.config_dir}/health.sh"
+        epilog_program = f"{s.config_dir}/epilog.d/99-health_epilog.sh"
+        ilib.copy_file("/etc/healthagent/health.sh.example", health_program, owner="root", group="root", mode=755)
+        ilib.copy_file("/etc/healthagent/epilog.sh.example", epilog_program, owner="root", group="root", mode=755)
+
     ilib.template(
         f"{s.config_dir}/slurm.conf",
         owner=s.slurm_user,
@@ -395,7 +408,9 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "state_save_location": state_save_location,
             "prolog": "/etc/slurm/prolog.d/*",
             "epilog": "/etc/slurm/epilog.d/*",
-            "launch_parameters" : s.launch_parameters
+            "launch_parameters" : s.launch_parameters,
+            "health_interval": health_interval,
+            "health_program": health_program
         },
     )
 
@@ -481,6 +496,8 @@ def _complete_install_primary(s: InstallSettings) -> None:
             content=""
         )
 
+    
+
 def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
         f"{s.config_dir}/gres.conf",
@@ -537,7 +554,7 @@ def _complete_install_all(s: InstallSettings) -> None:
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
-    
+
     ilib.link(
         f"{s.config_dir}/epilog.d",
         "/etc/slurm/epilog.d",
