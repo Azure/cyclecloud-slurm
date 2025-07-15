@@ -22,8 +22,8 @@ Autoscale = $Autoscale
 
         [[[configuration]]]
 
-        slurm.install_pkg = azure-slurm-install-pkg-4.0.0.tar.gz
-        slurm.autoscale_pkg = azure-slurm-pkg-4.0.0.tar.gz
+        slurm.install_pkg = azure-slurm-install-pkg-4.0.1.tar.gz
+        slurm.autoscale_pkg = azure-slurm-pkg-4.0.1.tar.gz
 
         slurm.version = $configuration_slurm_version
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
@@ -40,7 +40,7 @@ Autoscale = $Autoscale
         # For fast spin-up after Deallocate, force an immediate re-converge on boot
         cyclecloud.converge_on_boot = false
 
-        [[[cluster-init cyclecloud/slurm:default:4.0.0]]]
+        [[[cluster-init cyclecloud/slurm:default:4.0.1]]]
         Optional = true
 
         

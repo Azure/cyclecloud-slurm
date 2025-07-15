@@ -5,7 +5,7 @@ Cyclecloud Slurm
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Managing Slurm Clusters in 4.0.0](#managing-slurm-clusters)
+1. [Managing Slurm Clusters in 4.0.1](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
@@ -31,7 +31,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
 5. [Contributing](#contributing)
 ---
-## Managing Slurm Clusters in 4.0.0
+## Managing Slurm Clusters in 4.0.1
 
 ### Making Cluster Changes
 The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
@@ -66,7 +66,7 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
       # (The example here shows the default for an NVidia sku with 8 GPUs)
       # slurm.gpu_device_config = /dev/nvidia[0-7]
 
-      [[[cluster-init cyclecloud/slurm:execute:4.0.0]]]
+      [[[cluster-init cyclecloud/slurm:execute:4.0.1]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
