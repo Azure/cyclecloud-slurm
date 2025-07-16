@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -e
+source ../../default/files/util.sh
 
 do_install=$(jetpack config slurm.do_install True)
 install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.2.tar.gz)
 autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.2.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
-platform=$(jetpack props get os.id_like rhel)
+platform=$(get_platform)
 
 cd $CYCLECLOUD_HOME/system/bootstrap
 if [ $do_install == "True" ]; then
