@@ -5,7 +5,7 @@ mode=$1
 echo $mode | grep -Eqw "login|execute" || (echo "Usage: $0 [login|execute]" && exit 1)
 
 do_install=$(jetpack config slurm.do_install True)
-install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.1.tar.gz)
+install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.2.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
 platform=$(jetpack config platform_family rhel)
 
