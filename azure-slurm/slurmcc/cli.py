@@ -515,8 +515,6 @@ class SlurmCLI(CommonCLI):
 
     def _initconfig_parser(self, parser: ArgumentParser) -> None:
         # TODO
-        parser.add_argument("--accounting-tag-name", dest="accounting__tag_name")
-        parser.add_argument("--accounting-tag-value", dest="accounting__tag_value")
         parser.add_argument(
             "--accounting-subscription-id", dest="accounting__subscription_id"
         )
