@@ -1,5 +1,5 @@
 #!/bin/bash
-
+echo see .build.log for more information
 log_file=".build.log"
 check_dirty_changes() {
   if [ -n "$(git status --porcelain)" ]; then
@@ -24,7 +24,7 @@ delete_existing_blobs() {
   while IFS= read -r file; do
     if [ -f "blobs/$file" ]; then
       printf "%-20s: %s\n" "" "$file"
-      rm -f "blobs/$file"
+      rm -f "blobs/$file" || exit 1
     fi
   done < <(awk -F' *= *' '/^\[blobs\]/ {found=1} found && /^Files/ {gsub(/, */, "\n", $2); print $2; exit}' project.ini)
 }
