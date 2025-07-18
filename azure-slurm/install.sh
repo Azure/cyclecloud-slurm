@@ -121,13 +121,6 @@ fi
 
 which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
 
-# note: lower case the tag names, and use a sane default 'unknown'
-tag=$(jetpack config azure.metadata.compute.tags | python3 -c "\
-import sys;\
-items = [x.split(':', 1) for x in sys.stdin.read().split(';')];\
-tags = dict([tuple([i[0].lower(), i[-1]]) for i in items]);\
-print(tags.get('clusterid', 'unknown'))")
-
 cluster_name=$(jetpack config cyclecloud.cluster.name)
 escaped_cluster_name=$(python3 -c "import re; print(re.sub('[^a-zA-Z0-9-]', '-', '$cluster_name').lower())")
 
@@ -137,8 +130,6 @@ azslurm initconfig --username $(jetpack config cyclecloud.config.username) \
                    --url      $(jetpack config cyclecloud.config.web_server) \
                    --cluster-name "$(jetpack config cyclecloud.cluster.name)" \
                    --config-dir $config_dir \
-                   --accounting-tag-name ClusterId \
-                   --accounting-tag-value "$tag" \
                    --accounting-subscription-id $(jetpack config azure.metadata.compute.subscriptionId) \
                    --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
                    --cost-cache-root $INSTALL_DIR/.cache \
