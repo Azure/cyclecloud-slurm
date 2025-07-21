@@ -1,5 +1,4 @@
-FROM almalinux:8.7
-
-RUN rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux
-RUN yum install -y python36 wget git unzip
-
+FROM python:3.11
+RUN pip3.11 install --upgrade setuptools
+RUN pip3.11 install --upgrade wheel
+RUN /source/util/build.sh
