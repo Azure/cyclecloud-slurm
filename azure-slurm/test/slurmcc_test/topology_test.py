@@ -501,12 +501,12 @@ TESTDIR = "test/slurmcc_test/topology_test_output"
                 "rackB": ["node3", "node4"],
             },
             [
-                "# Number of Nodes in block1: 2",
+                "# Number of Nodes in Block 1: 2",
                 "# ClusterUUID and CliqueID: rackA",
-                "BlockName=block1 Nodes=node1,node2",
-                "# Number of Nodes in block2: 2",
+                "BlockName=block_rackA Nodes=node1,node2",
+                "# Number of Nodes in Block 2: 2",
                 "# ClusterUUID and CliqueID: rackB",
-                "BlockName=block2 Nodes=node3,node4",
+                "BlockName=block_rackB Nodes=node3,node4",
                 "BlockSizes=2",
             ],
             False,
@@ -520,8 +520,8 @@ TESTDIR = "test/slurmcc_test/topology_test_output"
             },
             [
                 "# Warning: Block 1 has less than 3 nodes, commenting out",
-                "#BlockName=block1 Nodes=node1,node2",
-                "BlockName=block2 Nodes=node3,node4,node5",
+                "#BlockName=block_rackA Nodes=node1,node2",
+                "BlockName=block_rackB Nodes=node3,node4,node5",
                 "BlockSizes=3",
             ],
             False,
@@ -535,9 +535,9 @@ TESTDIR = "test/slurmcc_test/topology_test_output"
             },
             [
                 "# Warning: Block 1 has less than 5 nodes, commenting out",
-                "#BlockName=block1 Nodes=node1",
+                "#BlockName=block_rackA Nodes=node1",
                 "# Warning: Block 2 has less than 5 nodes, commenting out",
-                "#BlockName=block2 Nodes=node2,node3",
+                "#BlockName=block_rackB Nodes=node2,node3",
                 "BlockSizes=5",
             ],
             False,
@@ -567,16 +567,16 @@ def test_write_block_topology_order_and_indexing():
     host_dict = {"rackA": ["n1"], "rackB": ["n2"], "rackC": ["n3"]}
     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=2)
     result = test_obj.write_block_topology(host_dict)
-    assert "# Number of Nodes in block1: 1" in result
-    assert "# Number of Nodes in block2: 1" in result
-    assert "# Number of Nodes in block3: 1" in result
+    assert "# Number of Nodes in Block 1: 1" in result
+    assert "# Number of Nodes in Block 2: 1" in result
+    assert "# Number of Nodes in Block 3: 1" in result
     assert result.count("BlockSizes=2") == 1
 
 def test_write_block_topology_single_block_enough_nodes():
     host_dict = {"rackA": ["node1", "node2"]}
     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=2)
     result = test_obj.write_block_topology(host_dict)
-    assert "BlockName=block1 Nodes=node1,node2" in result
+    assert "BlockName=block_rackA Nodes=node1,node2" in result
     assert "# Warning:" not in result
 
 def test_write_block_topology_single_block_too_few_nodes():
@@ -584,9 +584,9 @@ def test_write_block_topology_single_block_too_few_nodes():
     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=3)
     result = test_obj.write_block_topology(host_dict)
     assert "# Warning: Block 1 has less than 3 nodes, commenting out" in result
-    assert "#BlockName=block1 Nodes=node1" in result
+    assert "#BlockName=block_rackA Nodes=node1" in result
     # The uncommented version should not appear anywhere in the result
-    assert "\nBlockName=block1 Nodes=node1\n" not in f"\n{result}\n"
+    assert "\nBlockName=block_rackA Nodes=node1\n" not in f"\n{result}\n"
 
 def test_write_block_topology_multiple_blocks_mixed_sizes():
     host_dict = {
@@ -596,10 +596,10 @@ def test_write_block_topology_multiple_blocks_mixed_sizes():
     }
     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=3)
     result = test_obj.write_block_topology(host_dict)
-    assert "BlockName=block1 Nodes=node1,node2,node3" in result
+    assert "BlockName=block_rackA Nodes=node1,node2,node3" in result
     assert "# Warning: Block 2 has less than 3 nodes, commenting out" in result
-    assert "#BlockName=block2 Nodes=node4" in result
-    assert "BlockName=block3 Nodes=node5,node6,node7" in result
+    assert "#BlockName=block_rackB Nodes=node4" in result
+    assert "BlockName=block_rackC Nodes=node5,node6,node7" in result
 
 def test_run_nvlink_calls_methods(monkeypatch):
     """
@@ -648,4 +648,3 @@ def test_run_nvlink_multiple_racks(monkeypatch):
     test_obj.group_hosts_per_rack = lambda: racks
     result = test_obj.run_nvlink()
     assert result == racks
-

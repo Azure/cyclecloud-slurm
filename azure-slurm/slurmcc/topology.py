@@ -198,6 +198,7 @@ class Topology:
         rack_to_host_map={}
         for host_out in output:
             for line in host_out.stdout:
+                line = line.replace(' ', '_')
                 rack_to_host_map[host_out.host.strip()] = line.strip()
         return rack_to_host_map
     
@@ -485,15 +486,17 @@ class Topology:
         for group_id, hosts in host_dict.items():
             block_index += 1
             num_nodes = len(hosts)
-            lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
+            lines.append(f"# Number of Nodes in Block {block_index}: {num_nodes}")
             lines.append(f"# ClusterUUID and CliqueID: {group_id}")
+            name=group_id
             if "N/A" in group_id:
                 lines.append(f"# Warning: Block {block_index} has unknown ClusterUUID and CliqueID")
+                name="unknown"
             if len(hosts) < self.block_size:
                 lines.append(f"# Warning: Block {block_index} has less than {self.block_size} nodes, commenting out")
-                lines.append(f"#BlockName=block{block_index} Nodes={','.join(hosts)}")
+                lines.append(f"#BlockName=block_{name} Nodes={','.join(hosts)}")
             else:
-                lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
+                lines.append(f"BlockName=block_{name} Nodes={','.join(hosts)}")
         lines.append(f"BlockSizes={self.block_size}")
         content = "\n".join(lines) + "\n"
         return content
