@@ -9,6 +9,8 @@ from slurmcc import partition
 from slurmcc.cli import SlurmDriver
 from slurmcc.util import NativeSlurmCLI, set_slurm_cli, SrunOutput
 
+import logging
+
 use_mock_clock()
 
 
@@ -76,6 +78,7 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
         self.slurm_nodes: Dict[str, Dict] = {}
 
     def scontrol(self, args: List[str], retry: bool = True) -> str:
+        logging.info("MOCK scontrol %s", args)
         clear_caches()
         if args[0:2] == ["show", "hostnames"]:
             assert len(args) == 3
@@ -101,6 +104,9 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
                 slurm_node = self.slurm_nodes[value]
                 for expr in args[2:]:
                     key, value = expr.split("=")
+                    if key not in slurm_node:
+                        raise KeyError(f"Unknown key {key} in {args}")
+                    logging.info("MOCK update %s: %s=%s", slurm_node, key, value)
                     slurm_node[key] = value
             else:
                 raise RuntimeError(f"Unknown args {args}")
@@ -116,14 +122,9 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
         for node_name in node_names:
             assert (
                 node_name in self.slurm_nodes
-            ), f"Unknown slurm node_name {node_name}. Try calling .create_nodes first"
+            ), f"Unknown slurm node_name {node_name}. Try calling .create_nodes first. Existing nodes are {self.slurm_nodes.keys()}"
             snode = self.slurm_nodes[node_name]
-            ret.append(
-                """
-NodeName=%(NodeName)s
-    NodeAddr=%(NodeAddr)s NodeHostName=%(NodeHostName)s AvailableFeatures=%(AvailableFeatures)s Partitions=%(Partitions)s"""
-                % snode
-            )
+            ret.append(" ".join(f"{key}={value}" for key, value in snode.items()))
 
         return "\n".join(ret)
 
@@ -133,10 +134,15 @@ NodeName=%(NodeName)s
                 "NodeName": node_name,
                 "NodeAddr": node_name,
                 "NodeHostName": node_name,
+                "State": "idle",
                 "AvailableFeatures": ",".join(features),
+                "Reason": "",
                 "Partitions": "dynamic" if "dyn" in features else node_name.split("-")[0]
             }
         clear_caches()
+
+    def srun(self, args: List[str], retry: bool = True) -> str:
+        raise RuntimeError("srun not implemented")
 
 
 set_slurm_cli(MockNativeSlurmCLI())
@@ -162,6 +168,18 @@ def refresh_test_node_manager(old_node_mgr: NodeManager) -> NodeManager:
     node_mgr = nodemanager.new_node_manager(config)
     driver.preprocess_node_mgr(config, node_mgr)
     assert config["nodearrays"]["hpc"]
+    return node_mgr
+
+
+def make_test_node_manager_with_bindings(bindings: MockClusterBinding) -> NodeManager:
+    config = dict(CONFIG)
+    config["_mock_bindings"] = bindings
+
+    driver = SlurmDriver()
+    config = driver.preprocess_config(config)
+
+    node_mgr = nodemanager.new_node_manager(config)
+    driver.preprocess_node_mgr(config, node_mgr)
     return node_mgr
 
 
