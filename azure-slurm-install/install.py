@@ -638,6 +638,81 @@ def get_gres_count(hostname):
 
     return count
 
+def set_gpu_features(s: InstallSettings) -> None:
+    # Only proceed if "GB200" in vm_size and node not in "dynamic" partition
+    if "GB200" not in s.vm_size:
+        return
+    partition = s.config["slurm"].get("partition", "")
+    if "dynamic" in partition:
+        return
+
+    # Get current features from scontrol show node --json
+    try:
+        result = subprocess.run(
+            ["scontrol", "show", "node", s.node_name, "--json"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            universal_newlines=True,
+        )
+        node_info = json.loads(result.stdout)
+        features = node_info["nodes"][0].get("features", "")
+        features_list = [
+            f for f in features
+            if f and not (f.startswith("ClusterUUID_") or f.startswith("CliqueId_"))
+        ]
+    except Exception as e:
+        logging.error(f"Failed to get node features: {e}")
+        features_list = []
+
+    # Get clusterUUID and cliqueID from nvidia-smi
+    try:
+        # Get ClusterUUID
+        result = subprocess.run(
+            "nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+            universal_newlines=True,
+            check=True
+        )
+        clusterUUID = result.stdout.strip()
+
+        # Get CliqueID
+        result = subprocess.run(
+            "nvidia-smi -q | grep 'CliqueId' | head -n 1 | cut -d: -f2",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+            universal_newlines=True,
+            check=True
+        )
+        cliqueID = result.stdout.strip()
+    except Exception as e:
+        logging.error(f"Failed to get GPU info: {e}")
+        return
+
+    # Append new features
+    if clusterUUID:
+        features_list.append(f"ClusterUUID_{clusterUUID}")
+    if cliqueID:
+        features_list.append(f"CliqueId_{cliqueID}")
+
+    features_str = ",".join(sorted(set(features_list)))
+    try:
+        subprocess.check_call(
+            [
+            "scontrol",
+            "update",
+            f"nodename={s.node_name}",
+            f"features={features_str}",
+            "state=drain",
+            "reason=cyclecloud_waiting_for_topology",
+            ]
+        )
+        logging.info(f"Updated node features for {s.node_name}: {features_str}")
+    except Exception as e:
+        logging.error(f"Failed to update node features: {e}")
 
 def setup_slurmd(s: InstallSettings) -> None:
     slurmd_config = f"SLURMD_OPTIONS=-b -N {s.node_name}"
@@ -777,6 +852,7 @@ def main() -> None:
     set_hostname(settings)
 
     if settings.mode == "execute":
+        set_gpu_features(settings)
         setup_slurmd(settings)
 
 
