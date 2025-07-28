@@ -8,6 +8,7 @@ import datetime
 from . import util as slutil
 from enum import Enum
 from pssh.exceptions import Timeout
+import json
 
 log=logging.getLogger('topology')
 
@@ -167,8 +168,35 @@ class Topology:
         Returns:
             str: The output of the command execution.
         """
-        cmd = "echo \"$(nvidia-smi -q | grep 'ClusterUUID' | head -n 1 | cut -d: -f2)$(nvidia-smi -q | grep 'CliqueId' | head -n 1 | cut -d: -f2)\""
-        return slutil.run_parallel_cmd(self.hosts, cmd)
+          # Use scontrol show node to get features (ClusterUUID and CliqueID) for each host in JSON format
+
+        cmd = f"scontrol show node {','.join(self.hosts)} --json"
+        try:
+            output = slutil.run(cmd, shell=True)
+            nodes_info = json.loads(output.stdout)
+        except Exception as e:
+            log.error("Failed to get node info via scontrol: %s", e)
+            raise
+
+        # Prepare a result object similar to what run_parallel_cmd would return
+        class HostOutput:
+            def __init__(self, host, stdout):
+                self.host = host
+                self.stdout = stdout
+
+        host_outputs = []
+        for node in nodes_info.get("nodes", []):
+            host = node.get("name")
+            features = node.get("features", "")
+            cluster_uuid = "unknown"
+            clique_id = "unknown"
+            for feature in features:
+                if feature.startswith("ClusterUUID_"):
+                    cluster_uuid = feature.split("_", 1)[1]
+                if feature.startswith("CliqueId_"):
+                    clique_id = feature.split("_", 1)[1]
+            host_outputs.append(HostOutput(host, [f"{cluster_uuid}_{clique_id}"]))
+        return host_outputs
     
     def get_rack_id(self):
         """
