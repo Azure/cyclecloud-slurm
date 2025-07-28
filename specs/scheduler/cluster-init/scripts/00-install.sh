@@ -25,7 +25,7 @@ find_python3() {
 
 install_python3() {
     PYTHON_BIN=find_python3
-    if [ -z "$PYTHON_BIN"]; then
+    if [ -z "$PYTHON_BIN" ]; then
         return 0
     fi
     # NOTE: based off of healthagent 00-install.sh, but we have different needs - we don't need the devel/systemd paths.
