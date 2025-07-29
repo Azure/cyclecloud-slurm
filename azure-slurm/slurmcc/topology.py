@@ -491,6 +491,8 @@ class Topology:
             log.error("Host dictionary is empty, cannot generate block topology")
             sys.exit(1)
         lines = []
+        total_blocks = len(host_dict)
+        lines.append(f"# Total number of blocks = {total_blocks}")
         block_index = 0
         for group_id, hosts in host_dict.items():
             block_index += 1
