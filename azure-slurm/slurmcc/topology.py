@@ -8,6 +8,7 @@ import datetime
 from . import util as slutil
 from enum import Enum
 from pssh.exceptions import Timeout
+import re
 
 log=logging.getLogger('topology')
 
@@ -487,6 +488,9 @@ class Topology:
             str: A formatted string representing the block topology, including comments with the number of nodes
                  and group identifiers, and block definitions listing the nodes in each block.
         """
+        def host_sort_key(host):
+        # Split into alpha and numeric parts for natural sort
+            return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', host)]
         if not host_dict:
             log.error("Host dictionary is empty, cannot generate block topology")
             sys.exit(1)
@@ -497,6 +501,7 @@ class Topology:
         for group_id, hosts in host_dict.items():
             block_index += 1
             num_nodes = len(hosts)
+            hosts = sorted(hosts, key=host_sort_key)
             lines.append(f"# Number of Nodes in Block {block_index}: {num_nodes}")
             lines.append(f"# ClusterUUID and CliqueID: {group_id}")
             name=group_id
