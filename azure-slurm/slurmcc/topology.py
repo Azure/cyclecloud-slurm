@@ -199,6 +199,15 @@ class Topology:
         for host_out in output:
             for line in host_out.stdout:
                 line = line.replace(' ', '_')
+                if '_' not in line:
+                    log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
+                    log.warning(f"Error: {host_out.stderr}")
+                    break
+                cluster_uuid, clique_id = line.split('_')
+                if not cluster_uuid or not clique_id:
+                    log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
+                    log.warning(f"Error: {host_out.stderr}")
+                    break
                 rack_to_host_map[host_out.host.strip()] = line.strip()
         return rack_to_host_map
     
