@@ -7,6 +7,12 @@ from slurmcc.topology import Topology, TopologyInput, TopologyType
 from slurmcc import util as slutil
 from pathlib import Path
 import pytest
+import io
+import sys
+import json
+import tempfile
+import os
+from slurmcc.topology import output_block_nodelist
 
 TESTDIR="test/slurmcc_test/topology_test_output"
 
@@ -648,3 +654,91 @@ def test_run_nvlink_multiple_racks(monkeypatch):
     test_obj.group_hosts_per_rack = lambda: racks
     result = test_obj.run_nvlink()
     assert result == racks
+@pytest.fixture
+def block_topology_str():
+    return (
+        "# Comment line\n"
+        "BlockName=block1 Nodes=node1,node2,node3\n"
+        "BlockName=block2 Nodes=node4,node5\n"
+        "# Another comment\n"
+        "BlockName=block3 Nodes=node6\n"
+    )
+
+@pytest.fixture
+def block_topology_file(block_topology_str):
+    with tempfile.NamedTemporaryFile("w+", delete=False, encoding="utf-8") as f:
+        f.write(block_topology_str)
+        f.flush()
+        yield f.name
+    os.remove(f.name)
+
+def test_output_block_nodelist_json_string(block_topology_str):
+    result = output_block_nodelist(block_topology_str, table=False)
+    blocks = json.loads(result)
+    assert isinstance(blocks, list)
+    assert len(blocks) == 3
+    # Sorted by size (smallest to largest)
+    assert blocks[0]['blockname'] == 'block3'
+    assert blocks[0]['size'] == 1
+    assert blocks[1]['blockname'] == 'block2'
+    assert blocks[1]['size'] == 2
+    assert blocks[2]['blockname'] == 'block1'
+    assert blocks[2]['size'] == 3
+    assert blocks[2]['nodelist'] == ['node1', 'node2', 'node3']
+
+def test_output_block_nodelist_json_file(block_topology_file):
+    result = output_block_nodelist(block_topology_file, table=False)
+    blocks = json.loads(result)
+    assert isinstance(blocks, list)
+    assert len(blocks) == 3
+    assert any(b['blockname'] == 'block1' for b in blocks)
+
+def test_output_block_nodelist_table_output(block_topology_str, capsys):
+    """
+    Test that output_block_nodelist prints the correct table output to stdout.
+    """
+    output_block_nodelist(block_topology_str, table=True)
+    captured = capsys.readouterr()
+    out = captured[0] if isinstance(captured, tuple) else captured.out
+    assert "Block Name" in out
+    assert "block1" in out
+    assert "node1" in out
+    assert "Total blocks: 3" in out
+    assert "Total nodes: 6" in out
+
+def test_output_block_nodelist_table_output_file(block_topology_file, capsys):
+    output_block_nodelist(block_topology_file, table=True)
+    captured = capsys.readouterr()
+    out = captured[0] if isinstance(captured, tuple) else captured.out
+    assert "Block Name" in out
+    assert "block2" in out
+    assert "node4" in out
+    assert "Total blocks: 3" in out
+
+def test_output_block_nodelist_empty_blocks(capsys):
+    content = "# Only comments\n#BlockName=block1 Nodes=node1"
+    output_block_nodelist(content, table=True)
+    captured = capsys.readouterr()
+    out = captured[0] if isinstance(captured, tuple) else captured.out
+    assert "No blocks found in topology" in out
+
+def test_output_block_nodelist_invalid_format():
+    with pytest.raises(ValueError):
+        output_block_nodelist("This is not a block topology", table=False)
+
+def test_output_block_nodelist_long_nodes_truncation(capsys):
+    long_nodes = ",".join([f"node{i}" for i in range(20)])
+    content = f"BlockName=blockX Nodes={long_nodes}"
+    output_block_nodelist(content, table=True)
+    captured = capsys.readouterr()
+    out = captured[0] if isinstance(captured, tuple) else captured.out
+    # Should be truncated with "..."
+    assert "..." in out
+
+def test_output_block_nodelist_handles_spaces():
+    content = "  BlockName=blockA   Nodes= n1 , n2 , n3  "
+    result = output_block_nodelist(content, table=False)
+    blocks = json.loads(result)
+    assert blocks[0]['nodelist'] == ['n1', 'n2', 'n3']
+
+
