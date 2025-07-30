@@ -619,6 +619,13 @@ def _complete_install_all(s: InstallSettings) -> None:
         group="root",
         mode=644,
     )
+    ilib.copy_file(
+        source="capture_logs.sh",
+        dest="/opt/cycle/capture_logs.sh",
+        owner="root",
+        group="root",
+        mode=755
+    )
 
 def get_gres_count(hostname):
     count = 0

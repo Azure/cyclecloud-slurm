@@ -29,6 +29,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
+    8. [Capturing logs and configuration for troubleshooting] ()
 5. [Contributing](#contributing)
 ---
 ## Managing Slurm Clusters in 4.0.2
@@ -482,6 +483,17 @@ Due to an issue with the underlying DNS registration scheme that is used across 
       slurm.ubuntu22_waagent_fix = false
 ```
 In future releases, this mitigation will be disabled by default when the issue is resolved in `waagent`.
+
+### Capturing logs and configuration data for troubleshooting
+
+When diagnosing/troubleshooting issues in Slurm clusters orchestrated by CycleCloud, Please use the following convenience script provided for capturing logs and configuration data from any node that needs to be examined by Microsoft engineers.
+This script can be run on any scheduler/login/execute node. But it must be run on all the nodes whose logs/data needs to be captured.
+
+```bash
+/opt/cycle/capture_logs.sh
+```
+
+This should produce a tarball file which should be sent over in support cases.
 
 # Contributing
 
