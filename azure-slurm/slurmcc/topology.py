@@ -480,7 +480,8 @@ class Topology:
 
     def write_block_topology(self, host_dict) -> str:
         """
-        Generates a block topology configuration string from a dictionary of host groups.
+        Generates a block topology configuration string from a dictionary of host groups,
+        sorting blocks by the number of nodes (descending).
         Args:
             host_dict (dict): A dictionary where each key is a group identifier (e.g., ClusterUUID and CliqueID)
                               and each value is a list of hostnames belonging to that group.
@@ -494,20 +495,25 @@ class Topology:
         if not host_dict:
             log.error("Host dictionary is empty, cannot generate block topology")
             sys.exit(1)
+        # Sort blocks by number of nodes (descending), then by group_id for stability
+        sorted_blocks = sorted(
+            host_dict.items(),
+            key=lambda item: (-len(item[1]), item[0])
+        )
         lines = []
-        total_blocks = len(host_dict)
+        total_blocks = len(sorted_blocks)
         lines.append(f"# Total number of blocks = {total_blocks}")
         block_index = 0
-        for group_id, hosts in host_dict.items():
+        for group_id, hosts in sorted_blocks:
             block_index += 1
             num_nodes = len(hosts)
             hosts = sorted(hosts, key=host_sort_key)
             lines.append(f"# Number of Nodes in Block {block_index}: {num_nodes}")
             lines.append(f"# ClusterUUID and CliqueID: {group_id}")
-            name=group_id
+            name = group_id
             if "N/A" in group_id:
                 lines.append(f"# Warning: Block {block_index} has unknown ClusterUUID and CliqueID")
-                name="unknown"
+                name = "unknown"
             if len(hosts) < self.block_size:
                 lines.append(f"# Warning: Block {block_index} has less than {self.block_size} nodes, commenting out")
                 lines.append(f"#BlockName=block_{name} Nodes={','.join(hosts)}")
