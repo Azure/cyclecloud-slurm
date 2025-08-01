@@ -634,18 +634,18 @@ def output_block_nodelist(topology_input, table=False):
         If table=False: JSON string of blocks sorted by size
         If table=True: string in tabular format with block names, sizes, and node lists
     """
-    
+
     # Read content from file or use string directly
     if Path(topology_input).exists():
         with open(topology_input, 'r', encoding='utf-8') as f:
             content = f.read()
     else:
         content = topology_input
-    
+
     # Check if it's a block topology
     if 'BlockName=' not in content:
         raise ValueError("Input is not a block topology format")
-    
+
     # Parse blocks
     blocks = []
     lines = content.strip().split('\n')
@@ -655,7 +655,7 @@ def output_block_nodelist(topology_input, table=False):
         line = line.strip()
         if not line or line.startswith('#'):
             continue
-            
+
         # Parse BlockName lines
         if line.startswith('BlockName='):
             # Extract block name and nodes
@@ -664,16 +664,16 @@ def output_block_nodelist(topology_input, table=False):
                 block_name = match.group(1)
                 nodes_str = match.group(2)
                 nodelist = [node.strip() for node in nodes_str.split(',')]
-                
+
                 blocks.append({
                     'blockname': block_name,
                     'size': len(nodelist),
                     'nodelist': nodelist
                 })
-    
+
     # Sort blocks by size (smallest to largest)
     blocks.sort(key=lambda x: x['size'])
-    
+
     if not table:
         # Return JSON format
         return json.dumps(blocks, indent=2)
@@ -682,7 +682,7 @@ def output_block_nodelist(topology_input, table=False):
         if not blocks:
             print("No blocks found in topology")
             return
-            
+
         # Calculate column widths
         max_blockname = max(len(b['blockname']) for b in blocks)
         max_blockname = max(max_blockname, len("Block Name"))
@@ -698,9 +698,10 @@ def output_block_nodelist(topology_input, table=False):
             if len(nodes_str) > 50:
                 nodes_str = nodes_str[:47] + '...'
             lines.append(f"{block['blockname']:<{max_blockname}} | {block['size']:>6} | {nodes_str}")
-        
+
         # Summary
         lines.append(f"\nTotal blocks: {len(blocks)}")
         lines.append(f"Total nodes: {sum(b['size'] for b in blocks)}")
 
         return "\n".join(lines) + "\n"
+    
