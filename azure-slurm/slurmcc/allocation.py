@@ -106,10 +106,12 @@ def wait_for_nodes_to_terminate(
 
 
 class SlurmNodes:
-    def __init__(self, node_list: List[str]) -> None:
+    def __init__(self, node_list: List[str], suspend_exc_nodes: List[str]) -> None:
         self.__nodes = hpcutil.partition_single(
             slutil.show_nodes(node_list), lambda node: node["NodeName"]
         )
+        self.__suspend_exc_nodes = suspend_exc_nodes
+        self.__active_suspend_exc_nodes: List[str] = []
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.__nodes.keys())
@@ -192,6 +194,24 @@ class SlurmNodes:
             # update internally
             self.__nodes[name]["State"] = "idle"
             self.__nodes[name]["Reason"] = ""
+    
+    def is_suspend_exc(self, name: str) -> bool:
+        return name in self.__suspend_exc_nodes
+    
+    def suspend_exc_node(self, name: str) -> None:
+        if not self.is_suspend_exc(name):
+            slutil.update_suspend_exc_nodes("add", name)
+            self.__suspend_exc_nodes.append(name)
+        self.__active_suspend_exc_nodes.append(name)
+
+    def unsuspend_exc_node(self, name: str) -> None:
+        if self.is_suspend_exc(name):
+            if name in self.__active_suspend_exc_nodes:
+                slutil.update_suspend_exc_nodes("remove", name)
+                self.__suspend_exc_nodes.remove(name)
+                self.__active_suspend_exc_nodes.remove(name)
+            else:
+                logging.info("Node %s will remain in SuspendExcNodes, as no history of KeepAlive in CycleCloud found.", name)
 
 
 def try_scontrol(args: List[str]) -> bool:
@@ -244,6 +264,15 @@ class SyncNodes:
                 else:
                     # typical case - node is in neither CC or slurm
                     continue
+            
+            # slurm node has an internal cache of this information, so this is only called once.
+            if node.keep_alive:
+                slurm_nodes.suspend_exc_node(name)
+            else:
+                # logging.warning("Node %s is no longer marked as KeepAlive=true, please run scontrol update SuspendExcNodes-=%s to remove this.", name, name)
+                # TODO - we can't really do the unsuspend unless we know that we are the ones that
+                # suspended the nodes in the first place...
+                slurm_nodes.unsuspend_exc_node(name)
 
             if node.state == "Ready" and not slurm_nodes.is_joined(name):
                 if not slurm_nodes.is_powering_up(name) and not slurm_nodes.is_down_by_cyclecloud(name):
@@ -297,7 +326,7 @@ def main() -> None:
         print("  recover_node <node>+")
         sys.exit(0)
 
-    nodes = SlurmNodes(sys.argv[2:])
+    nodes = SlurmNodes(sys.argv[2:], [])
     for node in nodes:
         print(node, getattr(nodes, sys.argv[1])(node))
 

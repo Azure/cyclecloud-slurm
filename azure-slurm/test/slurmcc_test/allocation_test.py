@@ -176,3 +176,22 @@ def test_failure_mode() -> None:
     bindings.update_state("Failed", ["htc-1"])
     states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "htc-1", states
+
+
+def test_keep_alive() -> None:
+    native_cli = testutil.make_native_cli()
+    # add the node outside of azslurmd
+    native_cli.scontrol(["update", "suspendexcnodes+=htc-1"])
+    sn = allocation.SlurmNodes([], slutil.get_current_suspend_exc_nodes())
+    
+    # node is in suspend_exc and remains there, even if we try to remove it
+    assert sn.is_suspend_exc("htc-1")
+    sn.unsuspend_exc_node("htc-1")
+    assert sn.is_suspend_exc("htc-1")
+
+    # now _we_ have suspended this node (i.e. KeepAlive=true was seen)
+    sn.suspend_exc_node("htc-1")
+    assert sn.is_suspend_exc("htc-1")
+    # so now we can remove it - and it is NOT suspended
+    sn.unsuspend_exc_node("htc-1")
+    assert not sn.is_suspend_exc("htc-1")

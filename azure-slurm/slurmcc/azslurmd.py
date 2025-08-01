@@ -1,4 +1,4 @@
-from slurmcc import allocation, cli
+from slurmcc import allocation, cli, util
 import abc
 import os
 import time
@@ -23,6 +23,7 @@ class AzslurmDaemon:
     def __init__(self, node_source: NodeSource) -> None:
         self.node_source = node_source
         self.sync_nodes = allocation.SyncNodes()
+        self.suspend_exc_nodes: list[str] = util.get_current_suspend_exc_nodes()
 
     def run_once(self) -> None:
         start = time.time()
@@ -34,7 +35,7 @@ class AzslurmDaemon:
     
     def converge_nodes(self) -> None:
         cc_nodes = self.node_source.get_nodes()
-        slurm_nodes = allocation.SlurmNodes([])  # empty list means all nodes
+        slurm_nodes = allocation.SlurmNodes([], self.suspend_exc_nodes)  # empty list means all nodes
         self.sync_nodes.sync_nodes(slurm_nodes, cc_nodes)
 
 

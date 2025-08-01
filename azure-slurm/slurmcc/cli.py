@@ -659,56 +659,14 @@ class SlurmCLI(CommonCLI):
     ) -> None:
         """
         Add, remove or set which nodes should be prevented from being shutdown.
-
         """
+        action = "add"
+        if remove:
+            action = "remove"
+        elif set_nodes:
+            action = "set"
+        slutil.update_suspend_exc_nodes(action, ",".join(node_list))
 
-        config_dir = config.get("config_dir")
-        if remove and set_nodes:
-            raise AzureSlurmError("Please define only --set or --remove, not both.")
-
-        lines = slutil.check_output(["scontrol", "show", "config"]).splitlines()
-        filtered = [
-            line for line in lines if line.lower().startswith("suspendexcnodes")
-        ]
-        current_susp_nodes = []
-        if filtered:
-            current_susp_nodes_expr = filtered[0].split("=")[-1].strip()
-            if current_susp_nodes_expr != "(null)":
-                current_susp_nodes = slutil.from_hostlist(current_susp_nodes_expr)
-
-        if set_nodes:
-            hostnames = list(set(node_list))
-        elif remove:
-            hostnames = list(set(current_susp_nodes) - set(node_list))
-        else:
-            hostnames = current_susp_nodes + node_list
-
-        all_susp_hostnames = (
-            slutil.check_output(
-                [
-                    "scontrol",
-                    "show",
-                    "hostnames",
-                    ",".join(hostnames),
-                ]
-            )
-            .strip()
-            .split()
-        )
-        all_susp_hostnames = sorted(
-            list(set(all_susp_hostnames)), key=slutil.get_sort_key_func(False)
-        )
-        all_susp_hostlist = slutil.check_output(
-            ["scontrol", "show", "hostlist", ",".join(all_susp_hostnames)]
-        ).strip()
-
-        with open(f"{config_dir}/keep_alive.conf.tmp", "w") as fw:
-            if all_susp_hostlist:
-                fw.write(f"SuspendExcNodes = {all_susp_hostlist}")
-            else:
-                fw.write("# SuspendExcNodes = ")
-        shutil.move(f"{config_dir}/keep_alive.conf.tmp", f"{config_dir}/keep_alive.conf")
-        slutil.check_output(["scontrol", "reconfig"])
 
     def accounting_info_parser(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--node-name", required=True)
