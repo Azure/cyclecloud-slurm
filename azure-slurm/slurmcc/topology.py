@@ -8,6 +8,7 @@ import datetime
 from . import util as slutil
 from enum import Enum
 from pssh.exceptions import Timeout
+import re
 
 log=logging.getLogger('topology')
 
@@ -198,6 +199,16 @@ class Topology:
         rack_to_host_map={}
         for host_out in output:
             for line in host_out.stdout:
+                line = line.replace(' ', '_')
+                if '_' not in line:
+                    log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
+                    log.warning(f"Error: {host_out.stderr}")
+                    break
+                cluster_uuid, clique_id = line.split('_', 1)
+                if not cluster_uuid or not clique_id:
+                    log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
+                    log.warning(f"Error: {host_out.stderr}")
+                    break
                 rack_to_host_map[host_out.host.strip()] = line.strip()
         return rack_to_host_map
     
@@ -469,7 +480,8 @@ class Topology:
 
     def write_block_topology(self, host_dict) -> str:
         """
-        Generates a block topology configuration string from a dictionary of host groups.
+        Generates a block topology configuration string from a dictionary of host groups,
+        sorting blocks by the number of nodes (descending).
         Args:
             host_dict (dict): A dictionary where each key is a group identifier (e.g., ClusterUUID and CliqueID)
                               and each value is a list of hostnames belonging to that group.
@@ -477,23 +489,36 @@ class Topology:
             str: A formatted string representing the block topology, including comments with the number of nodes
                  and group identifiers, and block definitions listing the nodes in each block.
         """
+        def host_sort_key(host):
+        # Split into alpha and numeric parts for natural sort
+            return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', host)]
         if not host_dict:
             log.error("Host dictionary is empty, cannot generate block topology")
             sys.exit(1)
+        # Sort blocks by number of nodes (descending), then by group_id for stability
+        sorted_blocks = sorted(
+            host_dict.items(),
+            key=lambda item: (-len(item[1]), item[0])
+        )
         lines = []
+        total_blocks = len(sorted_blocks)
+        lines.append(f"# Total number of blocks = {total_blocks}")
         block_index = 0
-        for group_id, hosts in host_dict.items():
+        for group_id, hosts in sorted_blocks:
             block_index += 1
             num_nodes = len(hosts)
-            lines.append(f"# Number of Nodes in block{block_index}: {num_nodes}")
+            hosts = sorted(hosts, key=host_sort_key)
+            lines.append(f"# Number of Nodes in Block {block_index}: {num_nodes}")
             lines.append(f"# ClusterUUID and CliqueID: {group_id}")
+            name = group_id
             if "N/A" in group_id:
                 lines.append(f"# Warning: Block {block_index} has unknown ClusterUUID and CliqueID")
+                name = "unknown"
             if len(hosts) < self.block_size:
                 lines.append(f"# Warning: Block {block_index} has less than {self.block_size} nodes, commenting out")
-                lines.append(f"#BlockName=block{block_index} Nodes={','.join(hosts)}")
+                lines.append(f"#BlockName=block_{name} Nodes={','.join(hosts)}")
             else:
-                lines.append(f"BlockName=block{block_index} Nodes={','.join(hosts)}")
+                lines.append(f"BlockName=block_{name} Nodes={','.join(hosts)}")
         lines.append(f"BlockSizes={self.block_size}")
         content = "\n".join(lines) + "\n"
         return content
