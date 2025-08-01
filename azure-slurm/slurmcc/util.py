@@ -15,6 +15,8 @@ import pwd
 import grp
 from . import AzureSlurmError, custom_chaos_mode
 
+from typing import Literal
+
 
 class SrunExitCodeException(Exception):
     def __init__(self, returncode: int, stdout: str, stderr: str, stderr_content: str):
@@ -111,6 +113,27 @@ def is_slurmctld_up() -> bool:
     except Exception:
         return False
 
+
+UpdateT = Literal['add', 'remove', 'set']
+def update_suspend_exc_nodes(action: UpdateT, nodes: str) -> None:
+    assignment = "="
+    if action == "set":
+        assignment = "="
+    elif action == "remove":
+        assignment = "-="
+    else:
+        assignment = "+="
+    scontrol(["update", f"suspendexcnodes{assignment}{nodes}"])
+
+
+def get_current_suspend_exc_nodes() -> List[str]:
+    lines = scontrol(["show", "config"]).splitlines()
+    for line in lines:
+        line = line.lower()
+        if line.startswith("suspendexcnodes"):
+            _, node_list = line.split("=", 1)
+            return from_hostlist(node_list)
+    return []
 
 # Can be adjusted via ENV here, in case even 500 is too large for max args limits.
 MAX_NODES_IN_LIST = int(os.getenv("AZSLURM_MAX_NODES_IN_LIST", 500))

@@ -76,6 +76,7 @@ def _show_hostlist(node_list: List[str]) -> str:
 class MockNativeSlurmCLI(NativeSlurmCLI):
     def __init__(self) -> None:
         self.slurm_nodes: Dict[str, Dict] = {}
+        self.suspend_exc_nodes: List[str] = []
 
     def scontrol(self, args: List[str], retry: bool = True) -> str:
         logging.info("MOCK scontrol %s", args)
@@ -97,6 +98,9 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
             if len(args) == 3:
                 return self.show_nodes(args[2].split(","))
             return self.show_nodes([])
+        
+        if args[0:2] == ["show", "config"]:
+            return "\n".join(["", f"SuspendExcNodes={','.join(self.suspend_exc_nodes)}", "Ignore=me"])
 
         if args[0] == "update":
             entity, value = args[1].split("=")
@@ -108,6 +112,14 @@ class MockNativeSlurmCLI(NativeSlurmCLI):
                         raise KeyError(f"Unknown key {key} in {args}")
                     logging.info("MOCK update %s: %s=%s", slurm_node, key, value)
                     slurm_node[key] = value
+            elif entity.lower().startswith("suspendexcnodes"):
+                if "+" in entity:
+                    self.suspend_exc_nodes.append(value)
+                elif "-" in entity:
+                    self.suspend_exc_nodes.remove(value)
+                else:
+                    self.suspend_exc_nodes.clear()
+                    self.suspend_exc_nodes.extend(value.split(","))
             else:
                 raise RuntimeError(f"Unknown args {args}")
             return ""

@@ -1,4 +1,4 @@
-from slurmcc import allocation, cli
+from slurmcc import allocation, cli, util
 import abc
 import os
 import time
@@ -23,10 +23,13 @@ class AzslurmDaemon:
     def __init__(self, node_source: NodeSource) -> None:
         self.node_source = node_source
         self.sync_nodes = allocation.SyncNodes()
+        keep_alive_conf = os.path.realpath("/etc/slurm/keep_alive.conf")
+        self.slurm_nodes = allocation.SlurmNodes(allocation.SuspendExcNodesSerializer(keep_alive_conf))
 
     def run_once(self) -> None:
         start = time.time()
         logging.debug("begin azslurmd")
+        self.slurm_nodes.refresh()
         self.converge_nodes()
         end = time.time()
         duration = end - start
@@ -34,17 +37,18 @@ class AzslurmDaemon:
     
     def converge_nodes(self) -> None:
         cc_nodes = self.node_source.get_nodes()
-        slurm_nodes = allocation.SlurmNodes([])  # empty list means all nodes
-        self.sync_nodes.sync_nodes(slurm_nodes, cc_nodes)
+        # follow the symlink
+        self.sync_nodes.sync_nodes(self.slurm_nodes, cc_nodes)
 
 
 @cli.init_power_saving_log
 def azslurmd(sleep_time: int = 15) -> None:
     """Run the main loop of the azslurm daemon. Writes log to azslurmd.log under /opt/azurehpc/slurm/logs"""
     logging.info("azslurmd is running with PID=%s", os.getpid())
+    azslurm_daemon = AzslurmDaemon(NodeManagerSource())
     while True:
         try:
-            AzslurmDaemon(NodeManagerSource()).run_once()
+            azslurm_daemon.run_once()
             time.sleep(sleep_time)
         except InterruptedError:
             logging.warning("azslurmd recieved sigkill")

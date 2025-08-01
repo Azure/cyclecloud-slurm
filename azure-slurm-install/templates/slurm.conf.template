@@ -41,6 +41,7 @@ Epilog={epilog}
 # Recommended to keep this on.
 PrologFlags=alloc
 TreeWidth=65533
+ReconfigFlags=KeepPowerSaveSettings
 ResumeTimeout=1800
 SuspendTimeout=600
 SuspendTime=300
@@ -66,9 +67,9 @@ Include azure.conf
 # If slurm.accounting.enabled=true this will setup slurmdbd
 # otherwise it will just define accounting_storage/none as the plugin
 Include accounting.conf
-# SuspendExcNodes is managed in /etc/slurm/keep_alive.conf
-# see azslurm keep_alive for more information.
-# you can also remove this import to remove support for azslurm keep_alive
+# SuspendExcNodes is persisted to /etc/slurm/keep_alive.conf
+# via azlurmd. There can be up to a 15 second delay.
+# Note this is a work around until ReconfigFlags=KeepPowerSaveSettings is fixed in slurm.
 Include keep_alive.conf
 
 SlurmCtldHost={slurmctldhost}

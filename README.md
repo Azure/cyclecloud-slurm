@@ -18,6 +18,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     9. [Cost Reporting](#cost-reporting)
     10. [Topology](#topology)
     11. [GB200 IMEX Support](#gb200-imex-support) 
+    12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
@@ -25,7 +26,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
     2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
     3. [Dampening Memory](#dampening-memory)
-    4. [KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
+    4. [Pre:4.0.2: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
@@ -329,6 +330,12 @@ Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cl
                 or
         slurm.imex.enabled=False
 ``` 
+
+
+### Setting KeepAlive
+Added in 4.0.2: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.2. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
+
+If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
 ## Supported Slurm and PMIX versions
 The current slurm versions supported are `24.11.3` and `24.05.6`. Both are compiled with PMIX version `4.2.9`.

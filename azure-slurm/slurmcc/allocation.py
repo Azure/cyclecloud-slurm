@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 #
 import logging
+import shutil
 from typing import Callable, Dict, Iterator, List, Set, Tuple
 
 from hpc.autoscale import util as hpcutil
@@ -105,11 +106,44 @@ def wait_for_nodes_to_terminate(
     raise AzureSlurmError(f"Timed out waiting for nodes to terminate: {waiting_for_nodes}")
 
 
+class SuspendExcNodesSerializer:
+    def __init__(self, keep_alive_conf_path: str) -> None:
+        self.keep_alive_conf_path = keep_alive_conf_path
+        self.last_suspend_exc_nodes: Tuple[str, Set[str]] = ("", set())
+
+    def serialize_keep_alive(self) -> Set[str]:
+        # parse existing SuspendExcNodes and serialize it out to keep_alive.conf
+        # note: this should not be required, but slurm's ReconfigFlags are not respecting
+        # this.
+        # Only write this out if we are out of date. For simplicity, we will always write this out 
+        # on first startup of azslurmd.
+        for raw_line in slutil.scontrol(["show", "config"]).splitlines():
+            if raw_line.startswith("SuspendExcNodes"):
+                if "(null)" in raw_line:
+                    raw_line = "# SuspendExcNodes ="
+                if raw_line != self.last_suspend_exc_nodes[0]:
+                    logging.info("KeepAlive: Updating %s:", self.keep_alive_conf_path)
+                    logging.info("KeepAlive: Old: %s", self.last_suspend_exc_nodes[0])
+                    logging.info("KeepAlive: New: %s", raw_line)
+                    # safe write then move, to avoid partial writes
+                    with open(self.keep_alive_conf_path + ".tmp", "w") as fw:
+                        fw.write("# Managed by azslurmd\n")
+                        fw.write(raw_line)
+                    shutil.move(self.keep_alive_conf_path + ".tmp", self.keep_alive_conf_path)
+                    _, value = raw_line.split("=")
+                    node_list = set(slutil.from_hostlist(value))
+                    # save the last raw_line and the parsed node_list
+                    self.last_suspend_exc_nodes = (raw_line, node_list)
+        return self.last_suspend_exc_nodes[1]
+
+
 class SlurmNodes:
-    def __init__(self, node_list: List[str]) -> None:
-        self.__nodes = hpcutil.partition_single(
-            slutil.show_nodes(node_list), lambda node: node["NodeName"]
-        )
+    def __init__(self, suspend_exc_nodes_slzr: SuspendExcNodesSerializer) -> None:
+        self.__nodes: Dict[str, Dict] = []
+        self.suspend_exc_nodes_slzr = suspend_exc_nodes_slzr
+        self.__suspend_exc_nodes: Set[str] = set()
+        self.__active_suspend_exc_nodes: Set[str] = set()
+        self.refresh()
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.__nodes.keys())
@@ -140,7 +174,7 @@ class SlurmNodes:
     def is_down_by_cyclecloud(self, name: str) -> bool:
         return (
             self.is_down(name)
-            and self.__nodes[name].get("Reason") in ["cyclecloud_node_failure", "cyclecloud_zombie_node"]
+            and self.__nodes[name].get("Reason") in ["cyclecloud_no_node", "cyclecloud_zombie_node"]
         )
     
     def is_joined(self, name: str) -> bool:
@@ -163,7 +197,7 @@ class SlurmNodes:
             self.__nodes[name]["NodeAddr"] = name
             self.__nodes[name]["NodeHostName"] = name
 
-    def mark_down_by_cyclecloud(self, name: str) -> None:
+    def mark_missing_in_cyclecloud(self, name: str) -> None:
         if try_scontrol(
             [
                 "update",
@@ -171,12 +205,12 @@ class SlurmNodes:
                 f"NodeAddr={name}",
                 f"NodeHostName={name}",
                 "State=down",
-                "Reason=cyclecloud_node_failure",
+                "Reason=cyclecloud_no_node",
             ]
         ):
             # update internally
             self.__nodes[name]["State"] = "down"
-            self.__nodes[name]["Reason"] = "cyclecloud_node_failure"
+            self.__nodes[name]["Reason"] = "cyclecloud_no_node"
             self.__nodes[name]["NodeAddr"] = name
             self.__nodes[name]["NodeHostName"] = name
 
@@ -192,6 +226,46 @@ class SlurmNodes:
             # update internally
             self.__nodes[name]["State"] = "idle"
             self.__nodes[name]["Reason"] = ""
+
+    def _mark_active_suspend(self, name: str) -> None:
+        if name not in self.__active_suspend_exc_nodes:
+            logging.info("Node %s has KeepAlive", name)
+            self.__active_suspend_exc_nodes.add(name)
+        
+    def _unmark_active_suspend(self, name: str) -> None:
+        if name in self.__active_suspend_exc_nodes:
+            logging.info("Node %s no longer has KeepAlive", name)
+            self.__active_suspend_exc_nodes.remove(name)
+
+    def _is_active_suspend(self, name: str) -> bool:
+        """ Returns true if we have seen KeepAlive=true on this node"""
+        return name in self.__active_suspend_exc_nodes
+    
+    def is_suspend_exc(self, name: str) -> bool:
+        return name in self.__suspend_exc_nodes
+    
+    def suspend_exc_node(self, name: str) -> None:
+        if not self.is_suspend_exc(name):
+            logging.info("Adding %s to SuspendExcNodes", name)
+            slutil.update_suspend_exc_nodes("add", name)
+            self.__suspend_exc_nodes.add(name)
+        self._mark_active_suspend(name)
+
+    def unsuspend_exc_node(self, name: str) -> None:
+        if self.is_suspend_exc(name):
+            if self._is_active_suspend(name):
+                logging.info("Removing %s from SuspendExcNodes", name)
+                slutil.update_suspend_exc_nodes("remove", name)
+                self.__suspend_exc_nodes.remove(name)
+                self._unmark_active_suspend(name)
+            else:
+                logging.info("Node %s will remain in SuspendExcNodes, as no history of KeepAlive in CycleCloud found.", name)
+
+    def refresh(self) -> None:
+        self.__nodes = hpcutil.partition_single(
+            slutil.show_nodes([]), lambda node: node["NodeName"]
+        )
+        self.__suspend_exc_nodes = self.suspend_exc_nodes_slzr.serialize_keep_alive()
 
 
 def try_scontrol(args: List[str]) -> bool:
@@ -228,7 +302,7 @@ class SyncNodes:
         logging.info("Converging nodes with the following states: %s", ", ".join(states_message))
 
         for name in slurm_nodes:
-            if slurm_nodes.reason(name) in ["cyclecloud_node_failure", "cyclecloud_zombie_node"]:
+            if slurm_nodes.reason(name) in ["cyclecloud_no_node", "cyclecloud_zombie_node"]:
                 if slurm_nodes.is_idle(name) and slurm_nodes.is_powered_down(name):
                     logging.info("Unsetting old reason for node=%s", name)
                     slurm_nodes.unset_reason(name)
@@ -239,11 +313,17 @@ class SyncNodes:
                 if slurm_nodes.is_joined(name):
                     logging.warning("Node %s not found in CycleCloud, but slurm thinks it does exist.", name)
                     logging.warning("Marking node %s down in slurm.", name)
-                    slurm_nodes.mark_down_by_cyclecloud(name)
+                    slurm_nodes.mark_missing_in_cyclecloud(name)
                     continue
                 else:
                     # typical case - node is in neither CC or slurm
                     continue
+            
+            # slurm node has an internal cache of this information, so this is only called once.
+            if node.keep_alive:
+                slurm_nodes.suspend_exc_node(name)
+            else:
+                slurm_nodes.unsuspend_exc_node(name)
 
             if node.state == "Ready" and not slurm_nodes.is_joined(name):
                 if not slurm_nodes.is_powering_up(name) and not slurm_nodes.is_down_by_cyclecloud(name):
@@ -259,8 +339,11 @@ class SyncNodes:
             state = node.state or "UNKNOWN"
 
             if state.lower() == "failed":
-                if not slurm_nodes.is_down(name):
-                    slurm_nodes.mark_down_by_cyclecloud(name)
+                # don't mark nodes down that have already joined, as health events will cause nodes to 
+                # be in a failed state, but should handle putting them in drain.
+                # if not slurm_nodes.is_joined(name) and not slurm_nodes.is_down(name):
+                #     slurm_nodes.mark_down_by_cyclecloud(name)
+                logging.warning("Node %s is in a failed state. Ignoring", name)
                 continue
 
             use_nodename_as_hostname = node.software_configuration.get("slurm", {}).get(
@@ -274,7 +357,7 @@ class SyncNodes:
                 ready_nodes.append(node)
 
             states[state] = states.get(state, 0) + 1
-
+        
         return (states, ready_nodes)
 
 
@@ -297,7 +380,7 @@ def main() -> None:
         print("  recover_node <node>+")
         sys.exit(0)
 
-    nodes = SlurmNodes(sys.argv[2:])
+    nodes = SlurmNodes(sys.argv[2:], [])
     for node in nodes:
         print(node, getattr(nodes, sys.argv[1])(node))
 
