@@ -26,6 +26,10 @@ function install_enroot() {
 
                 yum install -y https://github.com/NVIDIA/enroot/releases/download/v${ENROOT_VERSION}/enroot-${ENROOT_VERSION}-1.el8.${arch}.rpm
                 yum install -y https://github.com/NVIDIA/enroot/releases/download/v${ENROOT_VERSION}/enroot+caps-${ENROOT_VERSION}-1.el8.${arch}.rpm
+                ## Needed for enroot runtime https://github.com/NVIDIA/enroot/blob/master/doc/installation.md
+                dnf install -y epel-release
+                dnf install -y jq squashfs-tools parallel
+                dnf install -y fuse-overlayfs pigz squashfuse
                 ;;
             ubuntu)
                 arch=$(dpkg --print-architecture)
@@ -36,6 +40,9 @@ function install_enroot() {
                 curl -fSsL -O https://github.com/NVIDIA/enroot/releases/download/v${ENROOT_VERSION}/enroot_${ENROOT_VERSION}-1_${arch}.deb
                 curl -fSsL -O https://github.com/NVIDIA/enroot/releases/download/v${ENROOT_VERSION}/enroot+caps_${ENROOT_VERSION}-1_${arch}.deb
                 apt install -y ./*.deb
+                apt install -y curl gawk jq squashfs-tools parallel
+                apt install -y fuse-overlayfs pigz squashfuse
+
                 ;;
             *)
                 logger -s "OS $os_release not tested"
