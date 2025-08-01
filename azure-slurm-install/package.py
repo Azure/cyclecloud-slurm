@@ -55,6 +55,7 @@ def execute() -> None:
     _add("AzureCA.pem", "AzureCA.pem")
     _add("suse.sh", "suse.sh", 600)
     _add("start-services.sh", "start-services.sh", 555)
+    _add("capture_logs.sh", "capture_logs.sh", 755)
 
     for fil in os.listdir("templates"):
         if os.path.isfile(f"templates/{fil}"):
