@@ -204,7 +204,7 @@ class Topology:
                     log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
                     log.warning(f"Error: {host_out.stderr}")
                     break
-                cluster_uuid, clique_id = line.split('_')
+                cluster_uuid, clique_id = line.split('_', 1)
                 if not cluster_uuid or not clique_id:
                     log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
                     log.warning(f"Error: {host_out.stderr}")
