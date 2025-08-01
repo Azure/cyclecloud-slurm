@@ -11,18 +11,19 @@ from slurmcc.partition import fetch_partitions
 from . import testutil
 
 import logging
+import pytest
 import sys
 logging.basicConfig(level=logging.DEBUG, format="%(message)s", stream=sys.stderr)
 
 
-class MockWaiter(allocation.WaitForResume):
-    def __init__(self) -> None:
+class MockSyncNodes(allocation.SyncNodes):
+    def __init__(self, ) -> None:
         super().__init__()
 
-    def check_nodes(
-        self, node_list: List[str], latest_nodes: List[Node]
+    def sync_nodes(
+        self, slurm_nodes: allocation.SlurmNodes, cyclecloud_nodes: List[Node]
     ) -> Tuple[Dict, List[Node]]:
-        return super().check_nodes(node_list, latest_nodes)
+        return super().sync_nodes(slurm_nodes, cyclecloud_nodes)
 
 
 def setup():
@@ -36,15 +37,15 @@ def teardown():
 def test_basic_resume() -> None:
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
-    node_list = ["hpc-1", "hpc-2", "htc-1"]
     partitions = fetch_partitions(node_mgr)
     native_cli = testutil.make_native_cli()
+    node_list = allocation.SlurmNodes(["hpc-1", "hpc-2", "htc-1"])
 
     bootup_result = allocation.resume(testutil.CONFIG, node_mgr, node_list, partitions)
     assert bootup_result
     assert bootup_result.nodes
     assert len(bootup_result.nodes) == 3
-    assert node_list == [n.name for n in bootup_result.nodes]
+    assert list(node_list) == [n.name for n in bootup_result.nodes]
     assert 3 == len(bindings.get_nodes().nodes)
     by_name = hpcutil.partition_single(bindings.get_nodes().nodes, lambda n: n["Name"])
     assert by_name["hpc-1"]["PlacementGroupId"]
@@ -57,44 +58,54 @@ def test_basic_resume() -> None:
     
     assert 3 == len(get_latest_nodes())
 
-    waiter = MockWaiter()
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    sync_nodes = MockSyncNodes()
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert len(ready) == 0
 
     bindings.assign_ip(["hpc-2", "htc-1"])
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert len(ready) == 0
     assert native_cli.slurm_nodes["hpc-2"]["NodeAddr"] == "hpc-2"
     assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "10.1.0.3"
 
     bindings.update_state("Ready", ["hpc-2"])
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert ["hpc-2"] == [n.name for n in ready]
 
     bindings.update_state("Ready", ["hpc-1", "htc-1"])
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     # hpc-1 should not be ready - it still has no ip address
     assert ["hpc-2", "htc-1"] == [n.name for n in ready]
 
     bindings.assign_ip(["hpc-1"])
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     # hpc-1 should not be ready - it still has no ip address
-    assert node_list == [n.name for n in ready]
+    assert list(node_list) == [n.name for n in ready]
 
 
 def test_mixed_resume_names() -> None:
     node_mgr = testutil.make_test_node_manager()
-    node_list = ["hpc-4", "hpc-20"]
+    node_list = allocation.SlurmNodes(["hpc-4", "hpc-20"])
     partitions = fetch_partitions(node_mgr)
 
     bootup_result = allocation.resume(testutil.CONFIG, node_mgr, node_list, partitions)
     assert bootup_result
     assert bootup_result.nodes
     assert len(bootup_result.nodes) == 2
-    assert node_list == [n.name for n in bootup_result.nodes]
+    assert list(node_list) == [n.name for n in bootup_result.nodes]
 
- 
+
+@pytest.fixture(autouse=True)
+def mock_is_slurmctld_up() -> None:
+    implementation = slutil.is_slurmctld_up
+    slutil.is_slurmctld_up = lambda: True
+    yield
+    slutil.is_slurmctld_up = implementation
+
+
 def test_resume_dynamic_by_feature() -> None:
+
+    
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
     native_cli = testutil.make_native_cli()
@@ -130,12 +141,10 @@ def test_resume_dynamic_by_feature() -> None:
     assert 2 == len(result.nodes)
 
 
-
-
 def test_failure_mode() -> None:
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
-    node_list = ["hpc-1", "hpc-2", "htc-1"]
+    node_list = allocation.SlurmNodes(["hpc-1", "hpc-2", "htc-1"])
     partitions = fetch_partitions(node_mgr)
     native_cli = testutil.make_native_cli()
 
@@ -143,27 +152,46 @@ def test_failure_mode() -> None:
     assert bootup_result
     assert bootup_result.nodes
     assert len(bootup_result.nodes) == 3
-    assert node_list == [n.name for n in bootup_result.nodes]
+    assert list(node_list) == [n.name for n in bootup_result.nodes]
 
     def get_latest_nodes() -> List[Node]:
         new_node_mgr = testutil.refresh_test_node_manager(node_mgr)
         return new_node_mgr.get_nodes()
 
-    waiter = MockWaiter()
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    sync_nodes = MockSyncNodes()
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert len(ready) == 0
 
     bindings.assign_ip(node_list)
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
 
     assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "10.1.0.4"
 
     # make sure new IPs are assigned - cyclecloud often does this
     bindings.assign_ip(["htc-1"])
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "10.1.0.5"
 
     # make sure we unassign the IP for a failed node
     bindings.update_state("Failed", ["htc-1"])
-    states, ready = waiter.check_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
     assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "htc-1", states
+
+
+def test_keep_alive() -> None:
+    native_cli = testutil.make_native_cli()
+    # add the node outside of azslurmd
+    native_cli.scontrol(["update", "suspendexcnodes+=htc-1"])
+    sn = allocation.SlurmNodes([], slutil.get_current_suspend_exc_nodes())
+    
+    # node is in suspend_exc and remains there, even if we try to remove it
+    assert sn.is_suspend_exc("htc-1")
+    sn.unsuspend_exc_node("htc-1")
+    assert sn.is_suspend_exc("htc-1")
+
+    # now _we_ have suspended this node (i.e. KeepAlive=true was seen)
+    sn.suspend_exc_node("htc-1")
+    assert sn.is_suspend_exc("htc-1")
+    # so now we can remove it - and it is NOT suspended
+    sn.unsuspend_exc_node("htc-1")
+    assert not sn.is_suspend_exc("htc-1")
