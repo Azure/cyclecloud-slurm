@@ -632,7 +632,7 @@ def output_block_nodelist(topology_input, table=False):
     
     Returns:
         If table=False: JSON string of blocks sorted by size
-        If table=True: None (prints tabular output)
+        If table=True: string in tabular format with block names, sizes, and node lists
     """
     
     # Read content from file or use string directly
@@ -686,20 +686,21 @@ def output_block_nodelist(topology_input, table=False):
         # Calculate column widths
         max_blockname = max(len(b['blockname']) for b in blocks)
         max_blockname = max(max_blockname, len("Block Name"))
-        
+        lines = []
         # Header
-        print(f"{'Block Name':<{max_blockname}} | {'Size':>6} | {'Nodes'}")
-        print(f"{'-' * max_blockname}-+-{'-' * 8}-+-{'-' * 50}")
-        
+        lines.append(f"{'Block Name':<{max_blockname}} | {'Size':>6} | {'Nodes'}")
+        lines.append(f"{'-' * max_blockname}-+-{'-' * 8}-+-{'-' * 50}")
+
         # Data rows
         for block in blocks:
             nodes_str = ', '.join(block['nodelist'])
             # Truncate long node lists for display
             if len(nodes_str) > 50:
                 nodes_str = nodes_str[:47] + '...'
-            print(f"{block['blockname']:<{max_blockname}} | {block['size']:>6} | {nodes_str}")
+            lines.append(f"{block['blockname']:<{max_blockname}} | {block['size']:>6} | {nodes_str}")
         
         # Summary
-        print(f"\nTotal blocks: {len(blocks)}")
-        print(f"Total nodes: {sum(b['size'] for b in blocks)}")
-            
+        lines.append(f"\nTotal blocks: {len(blocks)}")
+        lines.append(f"Total nodes: {sum(b['size'] for b in blocks)}")
+
+        return "\n".join(lines) + "\n"
