@@ -57,15 +57,15 @@ if [ ! -e /etc/apt/sources.list.d/microsoft-prod.list ]; then
     rm packages-microsoft-prod.deb
 fi
 apt update
-slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-slurmrestd slurm-smd-sview"
+slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-sview"
 for pkg in $slurm_packages; do
     apt install -y $pkg=$SLURM_VERSION
     apt-mark hold $pkg
 done
 
 if [ ${SLURM_ROLE} == "scheduler" ]; then
-    apt install -y slurm-smd-slurmctld=$SLURM_VERSION slurm-smd-slurmdbd=$SLURM_VERSION
-    apt-mark hold slurm-smd-slurmctld slurm-smd-slurmdbd
+    apt install -y slurm-smd-slurmctld=$SLURM_VERSION slurm-smd-slurmdbd=$SLURM_VERSION slurm-smd-slurmrestd=$SLURM_VERSION
+    apt-mark hold slurm-smd-slurmctld slurm-smd-slurmdbd slurm-smd-slurmrestd
 fi
 if [ ${SLURM_ROLE} == "execute" ]; then
     apt install -y slurm-smd-slurmd=$SLURM_VERSION
