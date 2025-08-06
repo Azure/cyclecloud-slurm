@@ -4,9 +4,10 @@ import logging
 import time
 import os
 
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
+
+
 def parse_command(x: str) -> dict:
     ret = {}
     toks = x.split()
@@ -14,23 +15,25 @@ def parse_command(x: str) -> dict:
     while i < len(toks):
         tok = toks[i]
         if "=" in tok:
-            key, value = tok.split("=")
+            key, value = tok.split("=", 1)
         elif tok.startswith("-") and i + 1 < len(toks):
             key = tok
-            value = toks[i+1]
+            value = toks[i + 1]
             i = i + 1
         else:
             key = value = tok
         ret[key] = value
         i = i + 1
     return ret
+
+
 class MockSlurmCommands(SlurmCommands):
     def __init__(self, topology_file: str = "/etc/slurm/topology.conf"):
-        
         self.topology_file = topology_file
         self.last_topology = self.read_topology()
         log.info("Running in TEST MODE - all commands will be mocked")
         self.nodes_dict = {}
+
     def read_topology(self) -> str:
         """Read the current SLURM topology file."""
         try:
@@ -41,15 +44,21 @@ class MockSlurmCommands(SlurmCommands):
         except Exception as e:
             log.warning(f"[TEST MODE] Could not read mock topology file: {e}")
             return ""
+
     def create_nodes(self, partition: str, count: int):
         """Create mock nodes for testing."""
         log.info(f"[TEST MODE] Creating {count} mock nodes in partition '{partition}'")
         assert count >= 18, "Count must be greater than 18 for mock nodes"
         for i in range(count):
             node_name = f"{partition}-{i + 1}"
-            self.nodes_dict[node_name] = {'partition': partition, 'state': 'IDLE', 'power_state': 'POWERED_DOWN', 'reservation_name':''}
+            self.nodes_dict[node_name] = {
+                'partition': partition,
+                'state': 'IDLE',
+                'power_state': 'POWERED_DOWN',
+                'reservation_name': ''
+            }
         log.info(f"[TEST MODE] Created {len(self.nodes_dict)} total mock nodes")
-    
+
     def simulate_failed_converge(self, failed_nodes: list):
         """Simulate some nodes as unhealthy for testing."""
         log.info(f"[TEST MODE] Simulating failed converge for nodes: {failed_nodes}")
@@ -57,7 +66,7 @@ class MockSlurmCommands(SlurmCommands):
             if node in self.nodes_dict:
                 self.nodes_dict[node]['simulate_failure'] = True
         log.info(f"[TEST MODE] Updated states for failed nodes: {failed_nodes}")
-    
+
     def update_states(self):
         """Update mock node states based on simulated failures."""
         log.info("[TEST MODE] Updating mock node states")
@@ -69,16 +78,16 @@ class MockSlurmCommands(SlurmCommands):
                 else:
                     node_data['state'] = 'IDLE'
                     node_data['power_state'] = 'POWERED_UP'
-            if node_data['power_state'] == 'POWERING_DOWN':
+            elif node_data['power_state'] == 'POWERING_DOWN':
                 node_data['state'] = 'IDLE'
                 node_data['power_state'] = 'POWERED_DOWN'
-
         log.info("[TEST MODE] Mock node states updated")
 
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
         """Mock SLURM and system commands for test mode."""
         log.info(f"[TEST MODE] Would run: {cmd}")
-        cmd_parsed= parse_command(cmd)
+        cmd_parsed = parse_command(cmd)
+        
         if "scontrol" in cmd_parsed:
             if "create" in cmd_parsed:
                 if "reservation" in cmd_parsed:
@@ -96,7 +105,12 @@ class MockSlurmCommands(SlurmCommands):
                     node_list = cmd_parsed.get("NodeName", "").split(',')
                     for node_name in node_list:
                         if node_name not in self.nodes_dict:
-                            self.nodes_dict[node_name] = {'partition': 'mock', 'state': 'IDLE', 'power_state': 'POWERED_DOWN', 'reservation_name':''}
+                            self.nodes_dict[node_name] = {
+                                'partition': 'mock',
+                                'state': 'IDLE',
+                                'power_state': 'POWERED_DOWN',
+                                'reservation_name': ''
+                            }
                     log.info(f"[TEST MODE] Mock nodes updated: {node_list}")
                     return subprocess.CompletedProcess(cmd, 0, "Mock nodes updated", "")
             elif "update" in cmd_parsed:
@@ -119,7 +133,7 @@ class MockSlurmCommands(SlurmCommands):
                 self.reservation_name = ""
                 return subprocess.CompletedProcess(cmd, 0, "Mock reservation deleted", "")
             elif "reconfigure" in cmd:
-                self.last_topoology = self.read_topology()
+                self.last_topology = self.read_topology()
                 return subprocess.CompletedProcess(cmd, 0, "Mock reconfigure executed", "")
             elif "show" in cmd_parsed:
                 if "reservation" in cmd_parsed:
@@ -135,44 +149,49 @@ class MockSlurmCommands(SlurmCommands):
                     nodes = cmd.split()[-1].split(',')
                     return subprocess.CompletedProcess(cmd, 0, "\n".join(nodes) + "\n", "")
                 elif "topology" in cmd_parsed:
-                    return subprocess.CompletedProcess(cmd, 0, self.last_topoology, "")
+                    return subprocess.CompletedProcess(cmd, 0, self.last_topology, "")
+        
         elif "sinfo" in cmd_parsed:
             if '-t' in cmd_parsed:
-                states=cmd_parsed['-t'].upper().split(',')
+                states = cmd_parsed['-t'].upper().split(',')
                 ret = []
-                for node_name,node_dict in self.nodes_dict.items():
-                    if node_dict['power_state'].upper() in states or node_dict['state'].upper() in states:
+                for node_name, node_dict in self.nodes_dict.items():
+                    if (node_dict['power_state'].upper() in states or 
+                        node_dict['state'].upper() in states):
                         ret.append(node_name)
                 nodes = "\n".join(ret) + "\n"
             else:
                 nodes = "\n".join(self.nodes_dict.keys()) + "\n"
             return subprocess.CompletedProcess(cmd, 0, nodes, "")
         # Default mock response
-        else:
-            return subprocess.CompletedProcess(cmd, 0, "Mock command executed", "")
+        return subprocess.CompletedProcess(cmd, 0, "Mock command executed", "")
+
+        
 class MockAzslurmTopology(AzslurmTopology):
     def __init__(self, slurm_commands: SlurmCommands):
         super().__init__()
         self.slurm_commands = slurm_commands
+
     def generate_topology(self, partition: str, topology_file: str) -> str:
         """Create a mock topology file for testing."""
-
-        # Generate mock topology with blocks of 18 nodes each, comma-separated
-
         mock_topology_lines = []
         nodes = get_healthy_idle_nodes(partition, self.slurm_commands)
-        total_nodes = len(nodes)  # Use mock nodes length for test mode
+        total_nodes = len(nodes)
         log.info(f"[TEST MODE] Creating mock topology with {total_nodes} nodes")
+        
         for i in range(0, total_nodes, 18):
             block_end = min(i + 18, total_nodes)
             block_nodes = nodes[i:block_end]
             node_list = ",".join(block_nodes)
             block_name = f"block_{i//18 + 1:03d}"
             mock_topology_lines.append(f"BlockName={block_name} Nodes={node_list}")
+        
         mock_topology_lines.append("BlockSizes=1")
         mock_topology = "# Mock topology for testing\n" + "\n".join(mock_topology_lines) + "\n"
+        
         with open(topology_file, 'w', encoding='utf-8') as f:
             f.write(mock_topology)
         log.info(f"[TEST MODE] Created mock topology file: {topology_file}")
+        return mock_topology
 
 
