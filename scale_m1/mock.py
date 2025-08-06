@@ -1,4 +1,4 @@
-from scale_to_n_nodes import SlurmCommands, AzslurmTopology, get_healthy_idle_nodes
+from scale_to_n_nodes import SlurmCommands, AzslurmTopology, get_healthy_idle_nodes, Clock
 import subprocess
 import logging
 import time
@@ -9,8 +9,9 @@ log = logging.getLogger(__name__)
 
 
 def parse_command(x: str) -> dict:
+    import shlex
     ret = {}
-    toks = x.split()
+    toks = shlex.split(x)
     i = 0
     while i < len(toks):
         tok = toks[i]
@@ -26,6 +27,18 @@ def parse_command(x: str) -> dict:
         i = i + 1
     return ret
 
+
+class MockClock(Clock):
+    def __init__(self, start_time: float = None):
+        super().__init__()
+        self.current_time = start_time if start_time else time.time()
+
+    def sleep(self, seconds: float):
+        log.info(f"[TEST MODE] Mock sleep for {seconds} seconds")
+        self.current_time += seconds
+
+    def time(self) -> float:
+        return self.current_time
 
 class MockSlurmCommands(SlurmCommands):
     def __init__(self, topology_file: str = "/etc/slurm/topology.conf"):
@@ -67,7 +80,7 @@ class MockSlurmCommands(SlurmCommands):
                 self.nodes_dict[node]['simulate_failure'] = True
         log.info(f"[TEST MODE] Updated states for failed nodes: {failed_nodes}")
 
-    def update_states(self):
+    def update_states(self, count=9):
         """Update mock node states based on simulated failures."""
         log.info("[TEST MODE] Updating mock node states")
         for node_name, node_data in self.nodes_dict.items():
@@ -78,9 +91,21 @@ class MockSlurmCommands(SlurmCommands):
                 else:
                     node_data['state'] = 'IDLE'
                     node_data['power_state'] = 'POWERED_UP'
+                count -= 1
             elif node_data['power_state'] == 'POWERING_DOWN':
                 node_data['state'] = 'IDLE'
                 node_data['power_state'] = 'POWERED_DOWN'
+                count -= 1
+            # Update one node and return
+            elif node_data['power_state'] == 'PRE_POWERING_UP':
+                node_data['power_state'] = 'POWERING_UP'
+                count -= 1
+            elif node_data['power_state'] == 'PRE_POWERING_DOWN':
+                node_data['power_state'] = 'POWERING_DOWN'
+                count -= 1
+            # Update one node and return
+            if count <= 0:
+                return
         log.info("[TEST MODE] Mock node states updated")
 
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
@@ -115,7 +140,7 @@ class MockSlurmCommands(SlurmCommands):
                     return subprocess.CompletedProcess(cmd, 0, "Mock nodes updated", "")
             elif "update" in cmd_parsed:
                 if "NodeName" in cmd_parsed and "State" in cmd_parsed:
-                    states = {'power_up':'POWERING_UP', 'power_down':'POWERING_DOWN'}
+                    states = {'power_up':'PRE_POWERING_UP', 'power_down':'PRE_POWERING_DOWN'}
                     node_list = cmd_parsed.get("NodeName", "").split(',')
                     new_state = cmd_parsed.get("State", "").lower()
                     for node_name in node_list:
@@ -160,8 +185,31 @@ class MockSlurmCommands(SlurmCommands):
                         node_dict['state'].upper() in states):
                         ret.append(node_name)
                 nodes = "\n".join(ret) + "\n"
-            else:
+            elif cmd_parsed['-o'] == '%N':
                 nodes = "\n".join(self.nodes_dict.keys()) + "\n"
+            elif cmd_parsed['-o'] == '%N %T':
+                ret = []
+                target_nodes = cmd_parsed['-n'].split(',')
+                for node_name, node_dict in self.nodes_dict.items():
+                    if node_name not in target_nodes:
+                        continue
+                    state = node_dict['state'].upper()
+                    assert state in ['IDLE', 'DOWN', 'DRAINING', 'DRAINED', 'RESERVED'], f"Unknown state: {state}"
+                    if node_dict['power_state']=="POWERED_UP":
+                        pass
+                    elif node_dict['power_state']=="POWERED_DOWN":
+                        state += '~'
+                    elif node_dict['power_state']=="POWERING_UP":
+                        state += '#'
+                    elif node_dict['power_state']=="POWERING_DOWN":
+                        state += '%'
+                    elif node_dict['power_state'].startswith("PRE_"):
+                        state += '!'
+                    ret.append(f"{node_name} {state}")
+                nodes = "\n".join(ret) + "\n"
+            else:
+                raise ValueError(f"Unsupported sinfo output format: {cmd_parsed['-o']}")
+                
             return subprocess.CompletedProcess(cmd, 0, nodes, "")
         # Default mock response
         return subprocess.CompletedProcess(cmd, 0, "Mock command executed", "")
@@ -178,16 +226,22 @@ class MockAzslurmTopology(AzslurmTopology):
         nodes = get_healthy_idle_nodes(partition, self.slurm_commands)
         total_nodes = len(nodes)
         log.info(f"[TEST MODE] Creating mock topology with {total_nodes} nodes")
+        blocks = {}
+        mock_topology_lines.append(f"# Mock topology for testing")
+        for node in nodes:
+            node_index = int(node.split("-")[-1])
+            block_index = (node_index - 1) // 18
+            if block_index not in blocks:
+                blocks[block_index] = []
+            blocks[block_index].append(node)
+        for block, node_list in blocks.items():
+            block_name = f"block_{block + 1:03d}"
+            node_list_str = ",".join(node_list)
         
-        for i in range(0, total_nodes, 18):
-            block_end = min(i + 18, total_nodes)
-            block_nodes = nodes[i:block_end]
-            node_list = ",".join(block_nodes)
-            block_name = f"block_{i//18 + 1:03d}"
-            mock_topology_lines.append(f"BlockName={block_name} Nodes={node_list}")
-        
+            mock_topology_lines.append(f"BlockName={block_name} Nodes={node_list_str}")
         mock_topology_lines.append("BlockSizes=1")
-        mock_topology = "# Mock topology for testing\n" + "\n".join(mock_topology_lines) + "\n"
+
+        mock_topology = "\n".join(mock_topology_lines) + "\n"
         
         with open(topology_file, 'w', encoding='utf-8') as f:
             f.write(mock_topology)
