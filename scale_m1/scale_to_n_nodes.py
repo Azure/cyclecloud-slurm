@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from slurmcc.topology import output_block_nodelist
 from slurmcc import util as slutil
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class NodeInvalidStateError(SlurmM1Error):
 
     def __str__(self):
         return f"NodeInvalidStateError: {self.message}"
-    
+
 
 class SlurmCommandError(SlurmM1Error):
     """Raised when a SLURM command fails."""
@@ -51,7 +52,7 @@ class SlurmCommandError(SlurmM1Error):
 
     def __str__(self):
         return f"SlurmCommandError: Command '{self.command}' failed with return code {self.returncode}. Output: {self.output}"
-    
+
 
 class AzslurmTopology(ABC):
     @abstractmethod
@@ -61,7 +62,6 @@ class AzslurmTopology(ABC):
 
 
 class AzslurmTopologyImpl(AzslurmTopology):
-
     def generate_topology(self, partition: str, topology_file: str) -> str:
         """Generate the SLURM topology configuration."""
         cmd = f"azslurm topology -n -p {partition} -o {topology_file}"
@@ -75,16 +75,15 @@ class AzslurmTopologyImpl(AzslurmTopology):
 
 
 class SlurmCommands(ABC):
-
     @abstractmethod
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
         ...
+
     def update_states(self):
-        pass #overridden for testing
+        pass  # overridden for testing
 
 
 class SlurmCommandsImpl(SlurmCommands):
-
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
         """Run a SLURM command and return the result."""
         try:
@@ -98,7 +97,9 @@ class SlurmCommandsImpl(SlurmCommands):
 
 
 class NodeScaler:
-    def __init__(self, partition: str, target_count: int, overprovision: int, slurm_commands: SlurmCommands, azslurm_topology: AzslurmTopology, topology_file: str = "/etc/slurm/topology.conf"):
+    def __init__(self, partition: str, target_count: int, overprovision: int, 
+                 slurm_commands: SlurmCommands, azslurm_topology: AzslurmTopology,
+                 topology_file: str = "/etc/slurm/topology.conf"):
         self.partition = partition
         self.target_count = target_count
         self.overprovision = overprovision
@@ -106,12 +107,11 @@ class NodeScaler:
         self.topology_file = topology_file
         self.slurm_commands = slurm_commands
         self.azslurm_topology = azslurm_topology
-        # Test mode data
 
     def round_up_to_multiple_of_18(self, number: int) -> int:
         """Round up to nearest multiple of 18."""
         return math.ceil(number / 18) * 18
-    
+
     def validate_nodes(self):
         cmd = f"sinfo -p {self.partition} -t powering_down -h -o '%N'"
         result = self.run_command(cmd)
@@ -145,8 +145,9 @@ class NodeScaler:
         Power up the specified number of nodes in the partition.
         In test mode, simulate powering up nodes.
         """
-        node_count=self.round_up_to_multiple_of_18(node_count)
+        node_count = self.round_up_to_multiple_of_18(node_count)
         log.info(f"Powering up {node_count} nodes in partition {self.partition}")
+        
         # Build the node range string, e.g., ccw-gpu-[1-612]
         # Assume node naming convention: <clustername>-<partition>-<index>
         # Get clustername from the first node in the partition (if available)
@@ -156,7 +157,7 @@ class NodeScaler:
             result = self.run_command(cmd_nodes)
             log.info(f"Reservation nodes: {result.stdout.strip()}")
             # Parse something like: "Nodes=ccw-gpu-[1-612]"
-            nodebase=None
+            nodebase = None
             for line in result.stdout.split():
                 if line.startswith("Nodes="):
                     nodebase = line.split("=", 1)[1]
@@ -179,7 +180,6 @@ class NodeScaler:
 
     def wait_for_nodes_to_start(self, timeout: int = 1800) -> bool:
         """Wait for reserved nodes to start. In test mode, simulate the wait."""
-        # Original implementation
         log.info("Waiting for nodes to start...")
         start_time = time.time()
 
@@ -353,43 +353,31 @@ class NodeScaler:
 
         # Step 8: Reconfigure SLURM
         self.reconfigure_slurm()
-        
 
         # Step 9: Release reservation
         self.release_reservation()
-        
+
         log.info(f"Successfully scaled cluster to {self.target_count} nodes!")
 
 
 def get_healthy_idle_nodes(partition, slurm_commands) -> List[str]:
     """Get list of healthy and idle nodes in the partition."""
-    def get_hostlist(cmd) -> set:
-        try:
-            output=slurm_commands.run_command(cmd)
-        except subprocess.CalledProcessError:
-            sys.exit(1)
-        except subprocess.TimeoutExpired:
-            sys.exit(1)
-        return set(output.stdout.split('\n')[:-1])
     try:
-        # TODO: NEED TO FIX THIS
-        #TODO: rip it out and make modu
         partition_cmd = f'-p {partition} '
         sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N'
         hosts = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
-        #host_cmd = f'scontrol show hostnames {hosts}'
+        
         partition_states = "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
         sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h -N'
         down_hosts = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
-        #down_cmd = f'scontrol show hostnames {down_hosts}'
-        #hosts=get_hostlist(host_cmd)
-        #down_hosts=get_hostlist(down_cmd)
-        nodes=sorted(list(hosts-down_hosts), key=lambda x: int(x.split('-')[-1]))
+        
+        nodes = sorted(list(hosts - down_hosts), key=lambda x: int(x.split('-')[-1]))
         log.info(f"Found {len(nodes)} healthy and idle nodes")
         return nodes
     except subprocess.CalledProcessError:
         log.error("Failed to get healthy idle nodes")
         return []
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -429,7 +417,7 @@ Examples:
         log.error("Overprovision must be non-negative")
         sys.exit(1)
 
-    mode_str =""
+    mode_str = ""
     log.info(f"Starting cluster scaling{mode_str}:")
     log.info(f"  Partition: {args.partition}")
     log.info(f"  Target nodes: {args.target_count}")
@@ -442,7 +430,9 @@ Examples:
         azslurm_topology = MockAzslurmTopology(slurm_commands)
     else:
         azslurm_topology = AzslurmTopologyImpl()
-    scaler = NodeScaler(args.partition, args.target_count, args.overprovision, slurm_commands, azslurm_topology)
+    
+    scaler = NodeScaler(args.partition, args.target_count, args.overprovision, 
+                       slurm_commands, azslurm_topology)
 
     try:
         scaler.run()
@@ -458,6 +448,7 @@ Examples:
         log.exception(f"Unexpected error during scaling: {e}")
         scaler.cleanup()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
