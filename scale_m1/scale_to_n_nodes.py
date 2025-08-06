@@ -6,7 +6,7 @@ Usage: ./scale_to_n_nodes.py -p gpu -n/--target_count 504 -b/--overprovision 108
 
 import argparse
 import sys
-import time
+import time as timelib
 import json
 import subprocess
 import logging
@@ -15,7 +15,7 @@ from typing import List, Dict, Tuple
 import math
 from abc import ABC, abstractmethod
 
-SLEEP_LEN = 30
+
 # Add the parent directory to Python path to import slurmcc modules
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -26,6 +26,30 @@ from slurmcc import util as slutil
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
 
+class Clock(ABC):
+    @abstractmethod
+    def sleep(self, seconds: int):
+        """Sleep for a given number of seconds."""
+        ...
+
+    @abstractmethod
+    def time(self) -> float:
+        """Get the current time in seconds since the epoch."""
+        ...
+
+
+class RealClock(Clock):
+    def sleep(self, seconds: int):
+        """Sleep for a given number of seconds."""
+        timelib.sleep(seconds)
+
+    def time(self) -> float:
+
+        """Get the current time in seconds since the epoch."""
+        return timelib.time()
+    
+
+CLOCK = RealClock()
 
 class SlurmM1Error(Exception):
     """Base class for SLURM M1 errors."""
@@ -79,7 +103,7 @@ class SlurmCommands(ABC):
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
         ...
 
-    def update_states(self):
+    def update_states(self, count: int = 9):
         pass  # overridden for testing
 
 
@@ -103,7 +127,7 @@ class NodeScaler:
         self.partition = partition
         self.target_count = target_count
         self.overprovision = overprovision
-        self.reservation_name = f"scale_reservation_{int(time.time())}"
+        self.reservation_name = f"scale_reservation_{int(CLOCK.time())}"
         self.topology_file = topology_file
         self.slurm_commands = slurm_commands
         self.azslurm_topology = azslurm_topology
@@ -140,7 +164,7 @@ class NodeScaler:
             log.error(f"Failed to create reservation: {e}")
             raise SlurmCommandError(cmd, e.returncode, e.output)
 
-    def power_up_nodes(self, node_count: int) -> bool:
+    def power_up_nodes(self, node_count: int) -> str:
         """
         Power up the specified number of nodes in the partition.
         In test mode, simulate powering up nodes.
@@ -174,34 +198,14 @@ class NodeScaler:
         try:
             self.run_command(cmd)
             log.info("Nodes powering up initiated successfully")
+            return nodebase
         except subprocess.CalledProcessError as e:
             log.error("Failed to power up nodes")
             raise SlurmCommandError(cmd, e.returncode, e.output)
 
-    def wait_for_nodes_to_start(self, timeout: int = 1800) -> bool:
+    def wait_for_nodes_to_start(self, node_str: str, timeout: int = 7200) -> bool:
         """Wait for reserved nodes to start. In test mode, simulate the wait."""
-        log.info("Waiting for nodes to start...")
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            try:
-                cmd = f"sinfo -p {self.partition} -t powering_up -h -o '%N'"
-                result = self.run_command(cmd)
-                powering_nodes = result.stdout.strip()
-                if not powering_nodes:
-                    log.info("All nodes have finished powering up")
-                    return
-                else:
-                    log.info(f"Still waiting for nodes to power up: {powering_nodes}")
-
-            except subprocess.CalledProcessError:
-                log.warning("Error checking node status, retrying...")
-
-            time.sleep(2)
-            self.slurm_commands.update_states()  # Update states in test mode
-
-        log.error(f"Timeout waiting for nodes to start after {timeout} seconds")
-        raise SlurmM1Error("Timeout waiting for nodes to start")
+        self.wait_for_nodes(timeout, "start", node_str)
 
     def generate_topology(self) -> None:
         """Generate topology configuration file using azslurm CLI."""
@@ -213,7 +217,7 @@ class NodeScaler:
         try:
             json_output = output_block_nodelist(self.topology_file, table=False)
             blocks = json.loads(json_output)
-            log.info(f"Found {len(blocks)} blocks in topology")
+            log.info(f"Found {len(blocks)} blocks in topology in {self.topology_file}")
             return blocks
         except Exception as e:
             log.error(f"Failed to parse topology blocks: {e}")
@@ -270,10 +274,82 @@ class NodeScaler:
             log.info("Successfully initiated node termination")
 
             # Wait a bit for nodes to start powering down
-            time.sleep(10)
+            CLOCK.sleep(10)
         except subprocess.CalledProcessError as e:
             raise SlurmCommandError(cmd, e.returncode, e.output)
 
+    def wait_for_nodes_to_terminate(self, node_str: str, timeout: int = 1200) -> bool:
+        """Wait for reserved nodes to terminate. In test mode, simulate the wait."""
+        self.wait_for_nodes(timeout, "terminate", node_str)
+
+    def wait_for_nodes(self, timeout: int, action: str, nodes: str) -> None:
+        """Wait for reserved nodes to start. In test mode, simulate the wait."""
+        log.info(f"Waiting for nodes to {action}...")
+        start_time = CLOCK.time()
+        filter_state = 'powering_up' if action == 'start' else 'powering_down'
+        terminal_states = ['POWERED_UP'] if action == 'start' else ['POWERED_DOWN', 'POWERING_DOWN']
+        secondary_terminal_states = ['POWERED_DOWN', 'POWERING_DOWN'] if action == 'start' else []
+        not_responsive_nodes = set()
+        terminal_state_nodes_for_logging = set()
+        secondary_state_nodes_for_logging = set()
+        powering_up_nodes = set()
+        while CLOCK.time() - start_time < timeout:
+            nodes_not_in_terminal_state = set()
+            state_counts = {}
+            try:
+                cmd = f"sinfo -n {nodes} -h -N -o '%N %T'"
+                result = self.run_command(cmd)
+                log.info(f"Result: {result.stdout.strip()}")
+            except subprocess.CalledProcessError as e:
+                log.warning(f"Error checking node status: {e}")
+
+            lines = [x for x in result.stdout.splitlines() if x.strip()]
+            assert len(lines) > 1
+            for line in lines:
+                if not line.strip():
+                    continue
+                node, state = line.split()
+                power_state = "POWERED_UP"
+                if not state[-1].isalpha():
+                    if state[-1] == "~":
+                        power_state = "POWERED_DOWN"
+                    elif state[-1] == "%":
+                        power_state = "POWERING_DOWN"
+                    elif state[-1] == "#":
+                        power_state = "POWERING_UP"
+                        if action == "start":
+                            powering_up_nodes.add(node)
+                    elif state[-1] == "*":
+                        if node not in not_responsive_nodes:
+                            not_responsive_nodes.add(node)
+                            log.warning(f"Node {node} is not responsive")
+                    else:
+                        log.warning(f"Unknown power state symbol '{state[-1]}' for node {node}")
+                        power_state = "UNKNOWN"
+                state_counts[power_state] = state_counts.get(power_state, 0) + 1
+                log.info(f"Line: {line}, Node: {node}, State: {state}, Power State: {power_state}")
+                if power_state in terminal_states:
+                    terminal_state_nodes_for_logging.add(node)
+                elif power_state in secondary_terminal_states and node in powering_up_nodes:
+                    if node not in secondary_state_nodes_for_logging:
+                        secondary_state_nodes_for_logging.add(node)
+                        log.warning(f"Node {node} has  moved from state {terminal_states} to state {power_state}")
+                        # This is considered a successful state
+                        # Specifically a node that had powered up is now powering down/powered down
+                else:
+                    nodes_not_in_terminal_state.add(node)
+            if not nodes_not_in_terminal_state:
+                log.info(f"All nodes have finished {filter_state}")
+                return
+            unexpected_states = terminal_state_nodes_for_logging.intersection(nodes_not_in_terminal_state)
+            if unexpected_states:
+                log.error(f"The following nodes {unexpected_states} previously reached their terminal state {terminal_states} but are no longer in that/those state(s).")
+            log.info(f"Current Power states: {state_counts}")
+            CLOCK.sleep(5)
+            self.slurm_commands.update_states()  # Update states in test mode
+
+        log.error(f"Timeout waiting for nodes to {action} after {timeout} seconds")
+        raise SlurmM1Error(f"Timeout waiting for nodes to {action}")
     def reconfigure_slurm(self) -> None:
         """Reconfigure SLURM to apply topology changes."""
         try:
@@ -311,10 +387,10 @@ class NodeScaler:
         self.create_reservation(reservation_count)
 
         # Step 2: Wait for nodes to start
-        self.power_up_nodes(reservation_count)
+        node_list=self.power_up_nodes(reservation_count)
         # Add a delay to allow nodes to start powering up
-        time.sleep(5)
-        self.wait_for_nodes_to_start()
+        CLOCK.sleep(60)
+        self.wait_for_nodes_to_start(node_list)
 
         # Step 3: Check healthy nodes
         healthy_nodes = get_healthy_idle_nodes(self.partition, self.slurm_commands)
@@ -344,7 +420,9 @@ class NodeScaler:
 
             # Wait for nodes to power down
             log.info("Waiting for nodes to power down...")
-            time.sleep(10)
+            CLOCK.sleep(60)
+            #TODO: Fix List to str method
+            self.wait_for_nodes_to_terminate(','.join(nodes_to_terminate))
 
             # Step 7: Re-generate topology
             self.generate_topology()
@@ -370,6 +448,7 @@ def get_healthy_idle_nodes(partition, slurm_commands) -> List[str]:
         partition_states = "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
         sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h -N'
         down_hosts = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
+        log.info(f"Excluding {down_hosts} down/unhealthy nodes")
         
         nodes = sorted(list(hosts - down_hosts), key=lambda x: int(x.split('-')[-1]))
         log.info(f"Found {len(nodes)} healthy and idle nodes")
