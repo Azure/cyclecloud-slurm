@@ -2,7 +2,9 @@ from scale_to_n_nodes import NodeScaler, NodeInvalidStateError
 from mock import MockSlurmCommands, MockAzslurmTopology, MockClock
 import scale_to_n_nodes
 
+
 scale_to_n_nodes.CLOCK = MockClock()
+
 
 def test_exit_early_if_powering_down():
     mock_slurm_commands = MockSlurmCommands()
@@ -12,10 +14,10 @@ def test_exit_early_if_powering_down():
     nodescaler = NodeScaler(partition="gpu", target_count=10, overprovision=0, slurm_commands=mock_slurm_commands,azslurm_topology=None)
     try:
         nodescaler.run()
-        #nodescaler.validate_nodes()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Some nodes are in POWERING_DOWN state, cannot proceed with scaling."
+
 
 def test_basic_scaling():
     mock_slurm_commands = MockSlurmCommands()
@@ -33,6 +35,7 @@ def test_basic_scaling():
         topology = f.read()
     assert "BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18" in topology
 
+
 def test_scale_not_enough_healthy_nodes():
     mock_slurm_commands = MockSlurmCommands()
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
@@ -41,10 +44,10 @@ def test_scale_not_enough_healthy_nodes():
 
     try:
         nodescaler.run()
-        #nodescaler.validate_nodes()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Insufficient healthy nodes: 15 < 17"
+
 
 def test_scale_not_enough_healthy_nodes_fail_all():
     mock_slurm_commands = MockSlurmCommands()
@@ -55,10 +58,10 @@ def test_scale_not_enough_healthy_nodes_fail_all():
 
     try:
         nodescaler.run()
-        #nodescaler.validate_nodes()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Insufficient healthy nodes: 0 < 17"
+
 
 def test_successful_over_alloc():
     mock_slurm_commands = MockSlurmCommands()
@@ -69,10 +72,29 @@ def test_successful_over_alloc():
     nodescaler = NodeScaler(partition="gpu", target_count=17, overprovision=18, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     nodescaler.run()
-        #nodescaler.validate_nodes()
+
     with open("/tmp/topology.conf", "r") as f:
         topology = f.read()
     assert """# Mock topology for testing
 BlockName=block_001 Nodes=gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
 BlockName=block_002 Nodes=gpu-33,gpu-34,gpu-35,gpu-36
+BlockSizes=1""" in topology
+
+
+def test_basic_scaling_large_delete():
+    mock_slurm_commands = MockSlurmCommands()
+    mock_slurm_commands.create_nodes(partition="gpu", count=54)
+    mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
+    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    # Run the scaling process
+    nodescaler.run()
+    
+    # Validate that the scaling was successful
+    assert all(node['state'] == 'IDLE' for node in mock_slurm_commands.nodes_dict.values())
+    # assert all(node['power_state'] == 'POWERED_UP' for node in mock_slurm_commands.nodes_dict.values())
+    with open("/tmp/topology.conf", "r") as f:
+        topology = f.read()
+    assert """# Mock topology for testing
+BlockName=block_003 Nodes=gpu-37,gpu-38,gpu-39,gpu-40,gpu-41,gpu-42,gpu-43,gpu-44,gpu-45,gpu-46,gpu-47,gpu-48,gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
 BlockSizes=1""" in topology
