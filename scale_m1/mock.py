@@ -69,6 +69,7 @@ class MockSlurmCommands(SlurmCommands):
         log.info("Running in TEST MODE - all commands will be mocked")
         self.nodes_dict: dict[str, dict] = {}
         self.reservation_name: str = ""
+        self.reservation_nodes: list[str] = []
 
     def read_topology(self) -> str:
         """Read the current SLURM topology file."""
@@ -94,6 +95,13 @@ class MockSlurmCommands(SlurmCommands):
                 'reservation_name': ''
             }
         log.info(f"[TEST MODE] Created {len(self.nodes_dict)} total mock nodes")
+    
+    def show_hostlist(self, nodes: list[str]) -> str:
+        return ",".join(nodes)
+    
+    def show_hostnames(self, node_str: str) -> list[str]:
+        return node_str.split(",")
+
 
     def alloc_nodes(self, nodes: list[str]) -> None:
         for node in nodes:
@@ -179,22 +187,20 @@ class MockSlurmCommands(SlurmCommands):
     
     def scontrol_create_reservation(self, cmd: str, cmd_parsed: dict) ->subprocess.CompletedProcess:
         self.reservation_name = cmd_parsed["ReservationName"]
-        self.node_count = int(cmd_parsed["NodeCnt"])
-        assert self.node_count > 0, "Node count must be greater than 0"
+        if "NodeCnt" in cmd_parsed:
+            # handle empty reservation
+            assert cmd_parsed["NodeCnt"] == "0", cmd_parsed
+            self.reservation_nodes = []
+            return subprocess.CompletedProcess(cmd, 0, "Mock reservation created", "")
+        
+        self.reservation_nodes = cmd_parsed["Nodes"].split(",")
 
-        to_allocate = self.node_count
-
-        for node_name, node_dict in list(self.nodes_dict.items()):
+        for node_name in self.reservation_nodes:
+            node_dict = self.nodes_dict[node_name]
             assert node_dict['partition'] == cmd_parsed["PartitionName"]
-            if node_dict["state"].upper() == "IDLE":
-                node_dict['reservation_name'] = self.reservation_name
-                to_allocate -= 1
-                if to_allocate == 0:
-                    break
-        if to_allocate:
-            for node_name, node_dict in list(self.nodes_dict.items()):
-                node_dict["reservation_name"] = ""
-            raise subprocess.CalledProcessError(1, cmd, "Not enough nodes to allocate")
+            assert node_dict["state"].upper() == "IDLE"
+            node_dict['reservation_name'] = self.reservation_name
+
         log.info(f"[TEST MODE] Mock reservation created: {self.reservation_name}")
         return subprocess.CompletedProcess(cmd, 0, "Mock reservation created", "")
     
@@ -206,6 +212,7 @@ class MockSlurmCommands(SlurmCommands):
             if node_data['reservation_name'] == self.reservation_name:
                 node_data['reservation_name'] = ""
         self.reservation_name = ""
+        self.reservation_nodes = []
         return subprocess.CompletedProcess(cmd, 0, "Mock reservation deleted", "")
     
     def scontrol_update_nodename(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
@@ -213,16 +220,26 @@ class MockSlurmCommands(SlurmCommands):
         node_list = cmd_parsed.get("NodeName", "").split(',')
         new_state = cmd_parsed.get("State", "").lower()
         for node_name in node_list:
-            if node_name in self.nodes_dict:
-                self.nodes_dict[node_name]['power_state'] = states[new_state]
-                log.info(f"[TEST MODE] Mock node {node_name} power state updated to {new_state}")
+            self.nodes_dict[node_name]['power_state'] = states[new_state]
+            log.info(f"[TEST MODE] Mock node {node_name} power state updated to {new_state}")
+
+        # mimic M1 assertion that all VMSS requests end up having a multiple of 18 
+        if new_state == "power_up":
+            has_a_vm = 0
+            for node_name, node_dict in self.nodes_dict.items():
+                if node_dict["power_state"] in ["PRE_POWERING_UP", "POWERING_UP", "POWERED_UP"]:
+                    has_a_vm += 1
+            assert has_a_vm % 18 == 0, f"This would result in an improper m1 allocation - {has_a_vm} total vms"
         return subprocess.CompletedProcess(cmd, 0, "Mock nodes updated", "")
+    
+    def _power_up(self, node_names: list[str]) -> None:
+        for node_name in node_names:
+            self.nodes_dict[node_name]['power_state'] = "PRE_POWERING_UP"
     
     def scontrol_show_reservation(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
         if self.reservation_name == cmd.split()[-1]:
-            res_nodes = [node for node, data in self.nodes_dict.items() if data['reservation_name'] == self.reservation_name]
-            res_count = len(res_nodes)
-            output = f"ReservationName={self.reservation_name}\nNodes={','.join(res_nodes)}\nNodeCnt={res_count}"
+            res_count = len(self.reservation_nodes)
+            output = f"ReservationName={self.reservation_name}\nNodes={','.join(self.reservation_nodes)}\nNodeCnt={res_count}"
             return subprocess.CompletedProcess(cmd, 0, output, "")
         else:
             raise subprocess.CalledProcessError(cmd, 1, "Reservation not found", "")

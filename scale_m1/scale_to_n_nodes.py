@@ -118,6 +118,14 @@ class SlurmCommands(ABC):
     def update_states(self, count: int = 9):
         pass  # overridden for testing
 
+    @abstractmethod
+    def show_hostlist(self, nodes: list[str]) -> str:
+        ...
+    
+    @abstractmethod
+    def show_hostnames(self, node_str: str) -> list[str]:
+        ...
+
 
 class SlurmCommandsImpl(SlurmCommands):
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
@@ -130,6 +138,12 @@ class SlurmCommandsImpl(SlurmCommands):
         except subprocess.TimeoutExpired as e:
             log.error(f"Command timed out: {cmd}\nError: {e}")
             raise
+    
+    def show_hostlist(self, nodes: list[str]) -> str:
+        return slutil.to_hostlist(nodes)
+    
+    def show_hostnames(self, node_str: str) -> list[str]:
+        return slutil.from_hostlist(node_str)
 
 
 class NodeScaler:
@@ -164,15 +178,36 @@ class NodeScaler:
 
     def create_reservation(self, node_count: int) -> None:
         """Create a SLURM reservation for the specified number of nodes."""
-        # Round up to nearest multiple of 18
-        powered_up_and_not_idle_nodes = get_powered_up_and_not_idle_nodes(self.partition, self.slurm_commands)
-        unhealthy_alive_nodes = get_unhealthy_nodes(self.partition, self.slurm_commands)
+        total_powered_up_nodes = len(get_powered_up_nodes(self.partition, self.slurm_commands))
+        # current_healthy = len()
+        # not_reservable = len(get_healthy_but_not_idle_nodes(self.partition, self.slurm_commands))
+        # reservable_nodes = current_healthy - not_reservable
+        current_healthy_set = set(get_healthy_nodes(self.partition, self.slurm_commands))
+        not_reservable_set = set(get_healthy_but_not_idle_nodes(self.partition, self.slurm_commands))
+        reservable_nodes_set = current_healthy_set - set(not_reservable_set)
+
+        new_healthy_minimum = node_count - len(current_healthy_set)
+        new_powered_up_state = self.round_up_to_multiple_of_18(total_powered_up_nodes + new_healthy_minimum)
+        to_power_up = new_powered_up_state - total_powered_up_nodes
+
+        powered_down_nodes = get_powered_down_nodes(self.partition, self.slurm_commands)
+        if len(powered_down_nodes) < to_power_up:
+            raise SlurmM1Error(f"There are not enough nodes in a powered down state to fulfill this request - required {to_power_up} < {len(powered_down_nodes)}")
+        to_power_up_set = set(powered_down_nodes[:to_power_up])
+
+        reservation_nodes = list(to_power_up_set) + list(reservable_nodes_set)
         
-        reservation_count = self.round_up_to_multiple_of_18(node_count + len(unhealthy_alive_nodes)) - len(powered_up_and_not_idle_nodes)
-        log.info(f"Creating reservation for {reservation_count} nodes (rounded up from {node_count})")
+        if reservation_nodes:
+            reservation_nodes_short = self.slurm_commands.show_hostlist(reservation_nodes)
+            nodes_sub_cmd = f"Nodes={reservation_nodes_short}"
+        else:
+            # we want to just create an empty reservation for downstream simplicity
+            nodes_sub_cmd = "NodeCnt=0"
+
+        log.info(f"Creating reservation for {len(reservation_nodes)} nodes (rounded up from {node_count})")
 
         cmd = (f"scontrol create reservation ReservationName={self.reservation_name} "
-               f"PartitionName={self.partition} NodeCnt={reservation_count} "
+               f"PartitionName={self.partition}  {nodes_sub_cmd} "
                f"StartTime=now Duration=infinite User=root")
 
         try:
@@ -203,10 +238,13 @@ class NodeScaler:
                 if line.startswith("Nodes="):
                     nodebase = line.split("=", 1)[1]
                     break
-            if not nodebase:
+            if nodebase is None:
                 log.error("failed to get nodes from reservation")
                 raise SlurmCommandError(cmd_nodes, 1, "No nodes found in reservation")
-
+            elif not nodebase:
+                assert "NodeCnt=0" in result.stdout
+                log.info("There are no nodes in the reservation to power up. Returning.")
+                return nodebase
         except subprocess.CalledProcessError as e:
             log.exception("Failed to get nodes from reservation")
             raise SlurmCommandError(cmd_nodes, e.returncode, e.output)
@@ -241,8 +279,9 @@ class NodeScaler:
             log.error(f"Failed to parse topology blocks: {e}")
             return []
 
-    def calculate_nodes_to_terminate(self, blocks: List[Dict]) -> Tuple[List[str], int]:
+    def calculate_nodes_to_terminate(self, blocks: List[Dict], reserved_node_list: str) -> Tuple[List[str], int]:
         """Calculate which nodes need to be terminated to reach target count."""
+        reserved_node_names = self.slurm_commands.show_hostnames(reserved_node_list)
         # Count total healthy nodes
         total_nodes = sum(block['size'] for block in blocks)
         nodes_to_remove = total_nodes - self.target_count
@@ -262,17 +301,17 @@ class NodeScaler:
                 break
 
             block_size = block['size']
+            reserved_within_block = [x for x in block['nodelist'] if x in reserved_node_names][ :remaining_to_remove]
 
-            if remaining_to_remove >= block_size:
-                # Terminate entire block
-                nodes_to_terminate.extend(block['nodelist'])
-                remaining_to_remove -= block_size
+            # Terminate entire block, as long as it is in the reservation
+            nodes_to_terminate.extend(reserved_within_block)
+            remaining_to_remove -= len(reserved_within_block)
+            assert remaining_to_remove >= 0
+            if len(reserved_within_block) == block_size:
                 log.info(f"Terminating entire block {block['blockname']} ({block_size} nodes)")
             else:
-                # Terminate partial block
-                nodes_to_terminate.extend(block['nodelist'][:remaining_to_remove])
-                log.info(f"Terminating {remaining_to_remove} nodes from block {block['blockname']}")
-                remaining_to_remove = 0
+                log.info(f"Terminating partial block {block['blockname']} ({len(reserved_within_block)} nodes)")
+
 
         final_count = total_nodes - len(nodes_to_terminate)
         log.info(f"Will terminate {len(nodes_to_terminate)} nodes, resulting in {final_count} nodes")
@@ -399,7 +438,8 @@ class NodeScaler:
         """Execute the complete scaling workflow."""
         # Step 0: Validate nodes
         self.validate_nodes()
-
+        # TODO RDH always update the reservation - never delete it.
+        
         try:
             self.run_command(f"scontrol show reservation {self.reservation_name}")
             raise SlurmM1Error(f"The reservation {self.reservation_name} already exists, please run `scontrol delete reservation {self.reservation_name}` before running this script.")
@@ -411,8 +451,10 @@ class NodeScaler:
 
         # Step 2: Wait for nodes to start
         node_list = self.power_up_nodes()
-
-        self.wait_for_nodes_to_start(node_list)
+        if node_list:
+            self.wait_for_nodes_to_start(node_list)
+        else:
+            log.warning("There are no new nodes to power up.")
 
         # Step 3: Check healthy nodes
         healthy_nodes = get_healthy_nodes(self.partition, self.slurm_commands)
@@ -436,7 +478,7 @@ class NodeScaler:
             raise SlurmM1Error("No blocks found in topology")
 
         # Step 6: Calculate and terminate excess nodes
-        nodes_to_terminate, final_count = self.calculate_nodes_to_terminate(blocks)
+        nodes_to_terminate, final_count = self.calculate_nodes_to_terminate(blocks, node_list)
 
         if not self.automatic_termination:
             if nodes_to_terminate:
@@ -479,11 +521,24 @@ class NodeScaler:
         log.info(f"Successfully scaled cluster to {self.target_count} nodes!")
 
 
-def get_powered_up_and_not_idle_nodes(partition, slurm_commands) -> List[str]:
+def get_healthy_but_not_idle_nodes(partition, slurm_commands) -> List[str]:
     """Get list of healthy and idle nodes in the partition."""
     return get_nodes_excluding_states(partition, slurm_commands, 
-                                      "idle,powered_down,powering_up,powering_down,power_down")
-    
+                                      "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot,idle")
+
+
+def get_powered_up_nodes(partition, slurm_commands) -> List[str]:
+    """Get list of healthy and idle nodes in the partition."""
+    return get_nodes_excluding_states(partition, slurm_commands, 
+                                      "powered_down,powering_up,powering_down,power_down")
+
+
+def get_powered_down_nodes(partition, slurm_commands) -> List[str]:
+    """Get list of healthy and idle nodes in the partition."""
+    sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N -t powered_down'
+    hosts = slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n')
+    return hosts
+
 
 def get_unhealthy_nodes(partition: str, slurm_commands: SlurmCommands) -> List[str]:
     """Get list of healthy and idle nodes in the partition."""

@@ -15,7 +15,7 @@ def test_scontrol_power_down():
 def test_reservation():
     mock_slurm_commands = MockSlurmCommands(topology_file="/tmp/topology.txt")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
-    mock_slurm_commands.run_command("scontrol create reservation PartitionName=gpu ReservationName=test_resv NodeCnt=2 Duration=60")
+    mock_slurm_commands.run_command("scontrol create reservation PartitionName=gpu ReservationName=test_resv Nodes=gpu-1,gpu-2 Duration=60")
     result = mock_slurm_commands.run_command("scontrol show reservation test_resv")
     assert "ReservationName=test_resv" in result.stdout
     assert "Nodes=gpu-1,gpu-2" in result.stdout
