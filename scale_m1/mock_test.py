@@ -1,5 +1,6 @@
 from mock import MockAzslurmTopology, MockSlurmCommands
 
+
 def test_scontrol_power_down():
     mock_slurm_commands = MockSlurmCommands(topology_file="/tmp/topology.txt")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
@@ -9,6 +10,8 @@ def test_scontrol_power_down():
     mock_slurm_commands.update_states(50)
     result = mock_slurm_commands.run_command("sinfo -p gpu -t powering_down -o '%N'")
     assert result.stdout.strip() == "gpu-6"
+
+
 def test_reservation():
     mock_slurm_commands = MockSlurmCommands(topology_file="/tmp/topology.txt")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
@@ -16,6 +19,7 @@ def test_reservation():
     result = mock_slurm_commands.run_command("scontrol show reservation test_resv")
     assert "ReservationName=test_resv" in result.stdout
     assert "Nodes=gpu-1,gpu-2" in result.stdout
+
 
 def test_generate_single_block():
     mock_slurm_commands = MockSlurmCommands(topology_file="/tmp/topology.txt")

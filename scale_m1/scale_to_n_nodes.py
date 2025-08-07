@@ -165,7 +165,10 @@ class NodeScaler:
     def create_reservation(self, node_count: int) -> None:
         """Create a SLURM reservation for the specified number of nodes."""
         # Round up to nearest multiple of 18
-        reservation_count = self.round_up_to_multiple_of_18(node_count)
+        powered_up_and_not_idle_nodes = get_powered_up_and_not_idle_nodes(self.partition, self.slurm_commands)
+        unhealthy_alive_nodes = get_unhealthy_nodes(self.partition, self.slurm_commands)
+        
+        reservation_count = self.round_up_to_multiple_of_18(node_count + len(unhealthy_alive_nodes)) - len(powered_up_and_not_idle_nodes)
         log.info(f"Creating reservation for {reservation_count} nodes (rounded up from {node_count})")
 
         cmd = (f"scontrol create reservation ReservationName={self.reservation_name} "
@@ -179,13 +182,11 @@ class NodeScaler:
             log.error(f"Failed to create reservation: {e}")
             raise SlurmCommandError(cmd, e.returncode, e.output)
 
-    def power_up_nodes(self, node_count: int) -> str:
+    def power_up_nodes(self) -> str:
         """
         Power up the specified number of nodes in the partition.
         In test mode, simulate powering up nodes.
         """
-        node_count = self.round_up_to_multiple_of_18(node_count)
-        log.info(f"Powering up {node_count} nodes in partition {self.partition}")
         
         # Build the node range string, e.g., ccw-gpu-[1-612]
         # Assume node naming convention: <clustername>-<partition>-<index>
@@ -195,6 +196,7 @@ class NodeScaler:
         try:
             result = self.run_command(cmd_nodes)
             log.info(f"Reservation nodes: {result.stdout.strip()}")
+            
             # Parse something like: "Nodes=ccw-gpu-[1-612]"
             nodebase = None
             for line in result.stdout.split():
@@ -211,6 +213,7 @@ class NodeScaler:
 
         cmd = f"scontrol update NodeName={nodebase} State=power_up"
         try:
+            log.info(cmd)
             self.run_command(cmd)
             log.info("Nodes powering up initiated successfully")
             return nodebase
@@ -310,7 +313,7 @@ class NodeScaler:
         powering_up_nodes = set()
         while CLOCK.time() - start_time < timeout:
             nodes_not_in_terminal_state = set()
-            state_counts = {}
+            state_counts: dict[str, int] = {}
             try:
                 cmd = f"sinfo -n {nodes} -h -N -o '%N %T'"
                 result = self.run_command(cmd)
@@ -397,19 +400,23 @@ class NodeScaler:
         # Step 0: Validate nodes
         self.validate_nodes()
 
+        try:
+            self.run_command(f"scontrol show reservation {self.reservation_name}")
+            raise SlurmM1Error(f"The reservation {self.reservation_name} already exists, please run `scontrol delete reservation {self.reservation_name}` before running this script.")
+        except subprocess.CalledProcessError:
+            pass
         # Step 1: Create reservation
         reservation_count = self.target_count + self.overprovision
         self.create_reservation(reservation_count)
 
         # Step 2: Wait for nodes to start
-        node_list=self.power_up_nodes(reservation_count)
-        # Add a delay to allow nodes to start powering up
-        # TODO RDH this may break things
-        # CLOCK.sleep(60)
+        node_list = self.power_up_nodes()
+
         self.wait_for_nodes_to_start(node_list)
 
         # Step 3: Check healthy nodes
-        healthy_nodes = get_healthy_idle_nodes(self.partition, self.slurm_commands)
+        healthy_nodes = get_healthy_nodes(self.partition, self.slurm_commands)
+
         if len(healthy_nodes) < self.target_count:
             deficit = self.target_count - len(healthy_nodes)
             new_overprovision = self.overprovision + deficit
@@ -472,24 +479,35 @@ class NodeScaler:
         log.info(f"Successfully scaled cluster to {self.target_count} nodes!")
 
 
-def get_healthy_idle_nodes(partition, slurm_commands) -> List[str]:
+def get_powered_up_and_not_idle_nodes(partition, slurm_commands) -> List[str]:
     """Get list of healthy and idle nodes in the partition."""
-    try:
-        partition_cmd = f'-p {partition} '
-        sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N'
-        hosts = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
-        
-        partition_states = "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot"
-        sinfo_cmd = f'sinfo {partition_cmd}-t {partition_states} -o "%N" -h -N'
-        down_hosts = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
-        log.info(f"Excluding {down_hosts} down/unhealthy nodes")
-        
-        nodes = sorted(list(hosts - down_hosts), key=lambda x: int(x.split('-')[-1]))
-        log.info(f"Found {len(nodes)} healthy and idle nodes")
-        return nodes
-    except subprocess.CalledProcessError:
-        log.error("Failed to get healthy idle nodes")
-        return []
+    return get_nodes_excluding_states(partition, slurm_commands, 
+                                      "idle,powered_down,powering_up,powering_down,power_down")
+    
+
+def get_unhealthy_nodes(partition: str, slurm_commands: SlurmCommands) -> List[str]:
+    """Get list of healthy and idle nodes in the partition."""
+    return get_nodes_excluding_states(partition, slurm_commands, "powered_down,powering_up,powering_down,power_down,idle,mixed,allocated")
+
+
+def get_healthy_nodes(partition: str, slurm_commands: SlurmCommands) -> List[str]:
+    return get_nodes_excluding_states(partition, slurm_commands,
+                                       "powered_down,powering_up,powering_down,power_down,drain,drained,draining,unknown,down,no_respond,fail,reboot")
+
+
+def get_nodes_excluding_states(partition: str, slurm_commands: SlurmCommands, exclude_states: str) -> List[str]:
+    """Get list of healthy and idle nodes in the partition."""
+    partition_cmd = f'-p {partition} '
+    sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N'
+    hosts = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
+    
+    sinfo_cmd = f'sinfo {partition_cmd}-t {exclude_states} -o "%N" -h -N'
+    excluded_host = set(slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n'))
+    log.info(f"Excluding {len(excluded_host)} nodes with states {exclude_states}")
+    
+    nodes = sorted(list(hosts - excluded_host), key=lambda x: int(x.split('-')[-1]))
+    log.info(f"Found {len(nodes)} nodes after excluding states {exclude_states}")
+    return nodes
 
 
 def main() -> None:
