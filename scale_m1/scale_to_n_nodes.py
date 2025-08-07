@@ -5,15 +5,17 @@ Usage: ./scale_to_n_nodes.py -p gpu -n/--target_count 504 -b/--overprovision 108
 """
 
 import argparse
+import json
+import logging
+import math
+import os
+import subprocess
 import sys
 import time as timelib
-import json
-import subprocess
-import logging
+
+from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Dict, Tuple
-import math
-from abc import ABC, abstractmethod
 
 
 # Add the parent directory to Python path to import slurmcc modules
@@ -22,9 +24,19 @@ sys.path.insert(0, str(Path(__file__).parent))
 from slurmcc.topology import output_block_nodelist
 from slurmcc import util as slutil
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
+
+__LAST_MSG = ""
+def cache_log(msg: str) -> None:
+    "Don't repeat the last message"
+    global __LAST_MSG
+    if __LAST_MSG != msg:
+        log.info(msg)
+        __LAST_MSG = msg
+
 
 class Clock(ABC):
     @abstractmethod
@@ -49,7 +61,7 @@ class RealClock(Clock):
         return timelib.time()
     
 
-CLOCK = RealClock()
+CLOCK: Clock = RealClock()
 
 class SlurmM1Error(Exception):
     """Base class for SLURM M1 errors."""
@@ -123,20 +135,23 @@ class SlurmCommandsImpl(SlurmCommands):
 class NodeScaler:
     def __init__(self, partition: str, target_count: int, overprovision: int, 
                  slurm_commands: SlurmCommands, azslurm_topology: AzslurmTopology,
-                 topology_file: str = "/etc/slurm/topology.conf"):
+                 topology_file: str = "/etc/slurm/topology.conf",
+                 automatic_termination: bool = True,
+                 reservation_name: str = f"scale_m1_reservation"):
         self.partition = partition
         self.target_count = target_count
         self.overprovision = overprovision
-        self.reservation_name = f"scale_reservation_{int(CLOCK.time())}"
+        self.reservation_name = reservation_name
         self.topology_file = topology_file
         self.slurm_commands = slurm_commands
         self.azslurm_topology = azslurm_topology
+        self.automatic_termination = automatic_termination
 
     def round_up_to_multiple_of_18(self, number: int) -> int:
         """Round up to nearest multiple of 18."""
         return math.ceil(number / 18) * 18
 
-    def validate_nodes(self):
+    def validate_nodes(self) -> None:
         cmd = f"sinfo -p {self.partition} -t powering_down -h -o '%N'"
         result = self.run_command(cmd)
         powering_nodes = result.stdout.strip()
@@ -147,7 +162,7 @@ class NodeScaler:
         """Run a command and return the result. In test mode, return mocked responses."""
         return self.slurm_commands.run_command(cmd)
 
-    def create_reservation(self, node_count: int) -> bool:
+    def create_reservation(self, node_count: int) -> None:
         """Create a SLURM reservation for the specified number of nodes."""
         # Round up to nearest multiple of 18
         reservation_count = self.round_up_to_multiple_of_18(node_count)
@@ -203,7 +218,7 @@ class NodeScaler:
             log.error("Failed to power up nodes")
             raise SlurmCommandError(cmd, e.returncode, e.output)
 
-    def wait_for_nodes_to_start(self, node_str: str, timeout: int = 7200) -> bool:
+    def wait_for_nodes_to_start(self, node_str: str, timeout: int = 7200) -> None:
         """Wait for reserved nodes to start. In test mode, simulate the wait."""
         self.wait_for_nodes(timeout, "start", node_str)
 
@@ -261,7 +276,7 @@ class NodeScaler:
 
         return nodes_to_terminate, final_count
 
-    def terminate_nodes(self, nodes: List[str]) -> bool:
+    def terminate_nodes(self, nodes: List[str]) -> None:
         """Terminate specified nodes using scontrol."""
         log.info(f"Terminating {len(nodes)} nodes...")
 
@@ -278,7 +293,7 @@ class NodeScaler:
         except subprocess.CalledProcessError as e:
             raise SlurmCommandError(cmd, e.returncode, e.output)
 
-    def wait_for_nodes_to_terminate(self, node_str: str, timeout: int = 1200) -> bool:
+    def wait_for_nodes_to_terminate(self, node_str: str, timeout: int = 1200) -> None:
         """Wait for reserved nodes to terminate. In test mode, simulate the wait."""
         self.wait_for_nodes(timeout, "terminate", node_str)
 
@@ -299,7 +314,6 @@ class NodeScaler:
             try:
                 cmd = f"sinfo -n {nodes} -h -N -o '%N %T'"
                 result = self.run_command(cmd)
-                log.info(f"Result: {result.stdout.strip()}")
             except subprocess.CalledProcessError as e:
                 log.warning(f"Error checking node status: {e}")
 
@@ -327,7 +341,6 @@ class NodeScaler:
                         log.warning(f"Unknown power state symbol '{state[-1]}' for node {node}")
                         power_state = "UNKNOWN"
                 state_counts[power_state] = state_counts.get(power_state, 0) + 1
-                log.info(f"Line: {line}, Node: {node}, State: {state}, Power State: {power_state}")
                 if power_state in terminal_states:
                     terminal_state_nodes_for_logging.add(node)
                 elif power_state in secondary_terminal_states and node in powering_up_nodes:
@@ -344,12 +357,13 @@ class NodeScaler:
             unexpected_states = terminal_state_nodes_for_logging.intersection(nodes_not_in_terminal_state)
             if unexpected_states:
                 log.error(f"The following nodes {unexpected_states} previously reached their terminal state {terminal_states} but are no longer in that/those state(s).")
-            log.info(f"Current Power states: {state_counts}")
+            cache_log(f"Current power states: {state_counts}")
             CLOCK.sleep(5)
             self.slurm_commands.update_states()  # Update states in test mode
 
         log.error(f"Timeout waiting for nodes to {action} after {timeout} seconds")
         raise SlurmM1Error(f"Timeout waiting for nodes to {action}")
+    
     def reconfigure_slurm(self) -> None:
         """Reconfigure SLURM to apply topology changes."""
         try:
@@ -373,11 +387,12 @@ class NodeScaler:
         """Clean up temporary files and reservations."""
         # Try to release reservation if it still exists
         try:
-            self.release_reservation()
+            if self.automatic_termination:
+                self.release_reservation()
         except:
             pass
 
-    def run(self) -> bool:
+    def run(self) -> None:
         """Execute the complete scaling workflow."""
         # Step 0: Validate nodes
         self.validate_nodes()
@@ -389,7 +404,8 @@ class NodeScaler:
         # Step 2: Wait for nodes to start
         node_list=self.power_up_nodes(reservation_count)
         # Add a delay to allow nodes to start powering up
-        CLOCK.sleep(60)
+        # TODO RDH this may break things
+        # CLOCK.sleep(60)
         self.wait_for_nodes_to_start(node_list)
 
         # Step 3: Check healthy nodes
@@ -415,14 +431,32 @@ class NodeScaler:
         # Step 6: Calculate and terminate excess nodes
         nodes_to_terminate, final_count = self.calculate_nodes_to_terminate(blocks)
 
+        if not self.automatic_termination:
+            if nodes_to_terminate:
+                log.info(" --- We recommend that you terminate the following nodes:")
+                short_list = slutil.to_hostlist(nodes_to_terminate)
+                log.info(" ---  $> scontrol update nodename=%s state=power_down", short_list)
+                log.info(" --- After all of the nodes have reached a powering_down state, run the following:")
+            else:
+                log.info(" --- There are no nodes to terminate. Run the following:")
+            log.info(" ---  $> azslurm topology > %s", os.path.realpath("/etc/slurm/topology.conf"))
+            log.info(" --- and then run")
+            log.info(" ---  $> scontrol reconfigure")
+            log.info(" --- Then delete the reservation when you are content:")
+            log.info(" ---  $> scontrol delete reservation %s", self.reservation_name)
+            log.info(" --- To automate this in the future, run --automate-termination")
+            return
+
         if nodes_to_terminate:
             self.terminate_nodes(nodes_to_terminate)
 
             # Wait for nodes to power down
             log.info("Waiting for nodes to power down...")
-            CLOCK.sleep(60)
-            #TODO: Fix List to str method
-            self.wait_for_nodes_to_terminate(','.join(nodes_to_terminate))
+            # since we are using comma separated list here, just
+            # ask for 25 at a time
+            for i in range(0, len(nodes_to_terminate), 25):
+                sub_list = nodes_to_terminate[i: i + 25]
+                self.wait_for_nodes_to_terminate(','.join(sub_list))
 
             # Step 7: Re-generate topology
             self.generate_topology()
@@ -458,7 +492,7 @@ def get_healthy_idle_nodes(partition, slurm_commands) -> List[str]:
         return []
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description='Scale SLURM cluster to exactly N nodes with topology optimization.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -481,6 +515,9 @@ Examples:
                         help='Enable verbose logging')
     parser.add_argument('--mock-topology', '-m', action='store_true',
                         help='Enable mock topology for testing')
+    parser.add_argument('--automatic-termination', action='store_true',
+                        help='Enable automatic termination of nodes and reconfiguring of topology')
+    parser.add_argument('--reservation', required=False, help="Optional: use an existing reservation")
 
     args = parser.parse_args()
 
@@ -496,14 +533,15 @@ Examples:
         log.error("Overprovision must be non-negative")
         sys.exit(1)
 
-    mode_str = ""
-    log.info(f"Starting cluster scaling{mode_str}:")
+
+    log.info(f"Starting cluster scaling:")
     log.info(f"  Partition: {args.partition}")
     log.info(f"  Target nodes: {args.target_count}")
     log.info(f"  Overprovision: {args.overprovision}")
 
     # Create and run scaler
     slurm_commands = SlurmCommandsImpl()
+    azslurm_topology: AzslurmTopology
     if args.mock_topology:
         from mock import MockAzslurmTopology
         azslurm_topology = MockAzslurmTopology(slurm_commands)
@@ -511,7 +549,7 @@ Examples:
         azslurm_topology = AzslurmTopologyImpl()
     
     scaler = NodeScaler(args.partition, args.target_count, args.overprovision, 
-                       slurm_commands, azslurm_topology)
+                       slurm_commands, azslurm_topology, automatic_termination=args.automatic_termination)
 
     try:
         scaler.run()
