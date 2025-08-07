@@ -3,7 +3,7 @@ import shlex
 import subprocess
 import time
 
-from scale_to_n_nodes import SlurmCommands, AzslurmTopology, get_healthy_idle_nodes, Clock
+from scale_to_n_nodes import SlurmCommands, AzslurmTopology, get_healthy_nodes, Clock
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -95,6 +95,16 @@ class MockSlurmCommands(SlurmCommands):
             }
         log.info(f"[TEST MODE] Created {len(self.nodes_dict)} total mock nodes")
 
+    def alloc_nodes(self, nodes: list[str]) -> None:
+        for node in nodes:
+            assert self.nodes_dict[node]["power_state"] == "POWERED_UP", f"invalid state {self.nodes_dict[node]}"
+            self.nodes_dict[node]["state"] = "allocated"
+
+    def drain_nodes(self, nodes: list[str]) -> None:
+        for node in nodes:
+            assert self.nodes_dict[node]["power_state"] == "POWERED_UP", f"invalid state {self.nodes_dict[node]}"
+            self.nodes_dict[node]["state"] = "draining"
+
     def simulate_failed_converge(self, failed_nodes: list):
         """Simulate some nodes as unhealthy for testing."""
         log.info(f"[TEST MODE] Simulating failed converge for nodes: {failed_nodes}")
@@ -149,7 +159,7 @@ class MockSlurmCommands(SlurmCommands):
                 if node_name not in target_nodes:
                     continue
                 state = node_dict['state'].upper()
-                assert state in ['IDLE', 'DOWN', 'DRAINING', 'DRAINED', 'RESERVED'], f"Unknown state: {state}"
+                assert state in ['IDLE', 'DOWN', 'DRAINING', 'DRAINED', 'RESERVED', 'ALLOCATED'], f"Unknown state: {state}"
                 if node_dict['power_state']=="POWERED_UP":
                     pass
                 elif node_dict['power_state']=="POWERED_DOWN":
@@ -171,11 +181,20 @@ class MockSlurmCommands(SlurmCommands):
         self.reservation_name = cmd_parsed["ReservationName"]
         self.node_count = int(cmd_parsed["NodeCnt"])
         assert self.node_count > 0, "Node count must be greater than 0"
-        assert self.node_count <= len(self.nodes_dict), "Not enough mock nodes available"
 
-        for node_name, node_dict in list(self.nodes_dict.items())[:self.node_count]:
+        to_allocate = self.node_count
+
+        for node_name, node_dict in list(self.nodes_dict.items()):
             assert node_dict['partition'] == cmd_parsed["PartitionName"]
-            node_dict['reservation_name'] = self.reservation_name
+            if node_dict["state"].upper() == "IDLE":
+                node_dict['reservation_name'] = self.reservation_name
+                to_allocate -= 1
+                if to_allocate == 0:
+                    break
+        if to_allocate:
+            for node_name, node_dict in list(self.nodes_dict.items()):
+                node_dict["reservation_name"] = ""
+            raise subprocess.CalledProcessError(1, cmd, "Not enough nodes to allocate")
         log.info(f"[TEST MODE] Mock reservation created: {self.reservation_name}")
         return subprocess.CompletedProcess(cmd, 0, "Mock reservation created", "")
     
@@ -200,13 +219,13 @@ class MockSlurmCommands(SlurmCommands):
         return subprocess.CompletedProcess(cmd, 0, "Mock nodes updated", "")
     
     def scontrol_show_reservation(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
-        if self.reservation_name in cmd.split()[-1]:
+        if self.reservation_name == cmd.split()[-1]:
             res_nodes = [node for node, data in self.nodes_dict.items() if data['reservation_name'] == self.reservation_name]
             res_count = len(res_nodes)
             output = f"ReservationName={self.reservation_name}\nNodes={','.join(res_nodes)}\nNodeCnt={res_count}"
             return subprocess.CompletedProcess(cmd, 0, output, "")
         else:
-            return subprocess.CompletedProcess(cmd, 1, "Reservation not found", "")
+            raise subprocess.CalledProcessError(cmd, 1, "Reservation not found", "")
 
     def run_command(self, cmd: str) -> subprocess.CompletedProcess:
         """Mock SLURM and system commands for test mode."""
@@ -248,7 +267,7 @@ class MockAzslurmTopology(AzslurmTopology):
     def generate_topology(self, partition: str, topology_file: str) -> str:
         """Create a mock topology file for testing."""
         mock_topology_lines = []
-        nodes = get_healthy_idle_nodes(partition, self.slurm_commands)
+        nodes = get_healthy_nodes(partition, self.slurm_commands)
         total_nodes = len(nodes)
         log.info(f"[TEST MODE] Creating mock topology with {total_nodes} nodes")
         blocks = {}
