@@ -25,10 +25,15 @@ run_prolog() {
   scontrol show hostnames "$SLURM_NODELIST" | while read host; do
     getent ahosts "$host" | awk '{ print $1 }' | head -n1
   done > /etc/nvidia-imex/nodes_config.cfg
-  #cat /etc/nvidia-imex/nodes_config.cfg
+
+  # 08/08: undo the rotate server port change. This means the server ports will be static and by default that should be
+  # port 50000. This contradicts nvidia's documentation but BFL reportedly were hitting conflicts, and nvdia suggests to use static ports to avoid
+  # conflicts.We could comment out the file but this will ensure running nodes always use the same port.
   # rotate server port to prevent race condition
-  NEW_SERVER_PORT=$((${SLURM_JOB_ID}% 16384 + 33792))
+  #NEW_SERVER_PORT=$((${SLURM_JOB_ID}% 16384 + 33792))
+  NEW_SERVER_PORT=50000
   sed -i "s/SERVER_PORT.*/SERVER_PORT=${NEW_SERVER_PORT}/" /etc/nvidia-imex/config.cfg
+
   # enable imex-ctl on all nodes so you can query imex status with: nvidia-imex-ctl -a -q
   sed -i "s/IMEX_CMD_PORT.*/IMEX_CMD_PORT=50005/" /etc/nvidia-imex/config.cfg
   sed -i "s/IMEX_CMD_ENABLED.*/IMEX_CMD_ENABLED=1/" /etc/nvidia-imex/config.cfg
