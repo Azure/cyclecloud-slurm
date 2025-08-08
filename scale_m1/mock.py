@@ -238,10 +238,16 @@ class MockSlurmCommands(SlurmCommands):
             output = f"ReservationName={self.reservation_name}\nNodes={','.join(self.reservation_nodes)}\nNodeCnt={res_count}"
             return subprocess.CompletedProcess(cmd, 0, output, "")
         else:
-            raise subprocess.CalledProcessError(cmd, 1, "Reservation not found", "")
+            return subprocess.CompletedProcess(cmd, 1, "Reservation not found", "")
 
-    def run_command(self, cmd: str) -> subprocess.CompletedProcess:
+    def run_command(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         """Mock SLURM and system commands for test mode."""
+        ret = self._run_command(cmd)
+        if ret.returncode != 0 and check:
+            raise subprocess.CalledProcessError(ret.returncode, cmd, ret.output, ret.stderr)
+        return ret
+    
+    def _run_command(self, cmd: str) -> subprocess.CompletedProcess:
         log.info(f"[TEST MODE] Would run: {cmd}")
         cmd_parsed = parse_command(cmd)
         

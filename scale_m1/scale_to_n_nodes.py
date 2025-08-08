@@ -116,7 +116,7 @@ class AzslurmTopologyImpl(AzslurmTopology):
 
 class SlurmCommands(ABC):
     @abstractmethod
-    def run_command(self, cmd: str) -> subprocess.CompletedProcess:
+    def run_command(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         ...
 
     def update_states(self, count: int = 9):
@@ -132,10 +132,10 @@ class SlurmCommands(ABC):
 
 
 class SlurmCommandsImpl(SlurmCommands):
-    def run_command(self, cmd: str) -> subprocess.CompletedProcess:
+    def run_command(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         """Run a SLURM command and return the result."""
         try:
-            return slutil.run(cmd, shell=True, timeout=300)
+            return slutil.run(cmd, shell=True, timeout=300, check=check)
         except subprocess.CalledProcessError as e:
             log.error(f"Command failed: {cmd}\nError: {e}")
             raise
@@ -177,9 +177,9 @@ class NodeScaler:
         if powering_nodes:
             raise NodeInvalidStateError("Some nodes are in POWERING_DOWN state, cannot proceed with scaling.")
         
-    def run_command(self, cmd: str) -> subprocess.CompletedProcess:
+    def run_command(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         """Run a command and return the result. In test mode, return mocked responses."""
-        return self.slurm_commands.run_command(cmd)
+        return self.slurm_commands.run_command(cmd, check=check)
 
     def create_reservation(self, node_count: int) -> bool:
         """Create a SLURM reservation for the specified number of nodes."""
@@ -237,23 +237,23 @@ class NodeScaler:
         
     def show_reservation(self) -> str:
         cmd_nodes = f"scontrol show reservation {self.reservation_name}"
-        try:
-            result = self.run_command(cmd_nodes)
-            log.info(f"Reservation nodes: {result.stdout.strip()}")
-            
-            # Parse something like: "Nodes=ccw-gpu-[1-612]"
-            nodebase = None
-            for line in result.stdout.split():
-                if line.startswith("Nodes="):
-                    nodebase = line.split("=", 1)[1]
-                    break
-            if not nodebase:
-                log.error("failed to get nodes from reservation")
-                raise SlurmCommandError(cmd_nodes, 1, "No nodes found in reservation")
-            return nodebase
-        except subprocess.CalledProcessError:
-            log.exception("Failed to get nodes from reservation")
+        
+        result = self.run_command(cmd_nodes, check=False)
+        if result.returncode != 0:
             raise NoReservationError(self.reservation_name)
+        log.info(f"Reservation nodes: {result.stdout.strip()}")
+        
+        # Parse something like: "Nodes=ccw-gpu-[1-612]"
+        nodebase = None
+        for line in result.stdout.split():
+            if line.startswith("Nodes="):
+                nodebase = line.split("=", 1)[1]
+                break
+        if not nodebase:
+            log.error("failed to get nodes from reservation")
+            raise SlurmCommandError(cmd_nodes, 1, "No nodes found in reservation")
+        return nodebase
+
 
     def power_up_nodes(self) -> str:
         """
