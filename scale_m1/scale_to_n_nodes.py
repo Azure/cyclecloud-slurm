@@ -151,11 +151,12 @@ class NodeScaler:
                  slurm_commands: SlurmCommands, azslurm_topology: AzslurmTopology,
                  topology_file: str = "/etc/slurm/topology.conf",
                  automatic_termination: bool = True,
-                 reservation_name: str = f"scale_m1_reservation"):
+                 reservation_name: str = f"scale_m1"):
         self.partition = partition
         self.target_count = target_count
         self.overprovision = overprovision
-        self.reservation_name = reservation_name
+        assert reservation_name
+        self.reservation_name: str  = reservation_name
         self.topology_file = topology_file
         self.slurm_commands = slurm_commands
         self.azslurm_topology = azslurm_topology
@@ -176,7 +177,7 @@ class NodeScaler:
         """Run a command and return the result. In test mode, return mocked responses."""
         return self.slurm_commands.run_command(cmd)
 
-    def create_reservation(self, node_count: int) -> None:
+    def create_reservation(self, node_count: int) -> bool:
         """Create a SLURM reservation for the specified number of nodes."""
         total_powered_up_nodes = len(get_powered_up_nodes(self.partition, self.slurm_commands))
         # current_healthy = len()
@@ -184,16 +185,19 @@ class NodeScaler:
         # reservable_nodes = current_healthy - not_reservable
         current_healthy_set = set(get_healthy_nodes(self.partition, self.slurm_commands))
         not_reservable_set = set(get_healthy_but_not_idle_nodes(self.partition, self.slurm_commands))
-        reservable_nodes_set = current_healthy_set - set(not_reservable_set)
+        already_reserved = set(get_reserved(self.partition, self.slurm_commands))
+        reservable_nodes_set = current_healthy_set - set(not_reservable_set) - set(already_reserved)
 
         new_healthy_minimum = node_count - len(current_healthy_set)
         new_powered_up_state = self.round_up_to_multiple_of_18(total_powered_up_nodes + new_healthy_minimum)
         to_power_up = new_powered_up_state - total_powered_up_nodes
 
-        powered_down_nodes = get_powered_down_nodes(self.partition, self.slurm_commands)
+        powered_down_nodes = get_powered_down_not_reserved(self.partition, self.slurm_commands)
         if len(powered_down_nodes) < to_power_up:
             raise SlurmM1Error(f"There are not enough nodes in a powered down state to fulfill this request - required {to_power_up} < {len(powered_down_nodes)}")
-        to_power_up_set = set(powered_down_nodes[:to_power_up])
+        
+        sorted_powered_down_nodes = sorted(powered_down_nodes, key=lambda x: int(x.split("-")[-1]))
+        to_power_up_set = set(sorted_powered_down_nodes[:to_power_up])
 
         reservation_nodes = list(to_power_up_set) + list(reservable_nodes_set)
         
@@ -204,6 +208,10 @@ class NodeScaler:
             # we want to just create an empty reservation for downstream simplicity
             nodes_sub_cmd = "NodeCnt=0"
 
+        if not reservation_nodes:
+            log.info("There is no reason to create a reservation, as we are not starting any new nodes")
+            return False
+
         log.info(f"Creating reservation for {len(reservation_nodes)} nodes (rounded up from {node_count})")
 
         cmd = (f"scontrol create reservation ReservationName={self.reservation_name} "
@@ -213,20 +221,12 @@ class NodeScaler:
         try:
             self.run_command(cmd)
             log.info(f"Successfully created reservation: {self.reservation_name}")
+            return True
         except subprocess.CalledProcessError as e:
             log.error(f"Failed to create reservation: {e}")
             raise SlurmCommandError(cmd, e.returncode, e.output)
-
-    def power_up_nodes(self) -> str:
-        """
-        Power up the specified number of nodes in the partition.
-        In test mode, simulate powering up nodes.
-        """
         
-        # Build the node range string, e.g., ccw-gpu-[1-612]
-        # Assume node naming convention: <clustername>-<partition>-<index>
-        # Get clustername from the first node in the partition (if available)
-        # We'll use scontrol show partition to get the node list
+    def show_reservation(self) -> str:
         cmd_nodes = f"scontrol show reservation {self.reservation_name}"
         try:
             result = self.run_command(cmd_nodes)
@@ -238,23 +238,33 @@ class NodeScaler:
                 if line.startswith("Nodes="):
                     nodebase = line.split("=", 1)[1]
                     break
-            if nodebase is None:
+            if not nodebase:
                 log.error("failed to get nodes from reservation")
                 raise SlurmCommandError(cmd_nodes, 1, "No nodes found in reservation")
-            elif not nodebase:
-                assert "NodeCnt=0" in result.stdout
-                log.info("There are no nodes in the reservation to power up. Returning.")
-                return nodebase
+            return nodebase
         except subprocess.CalledProcessError as e:
             log.exception("Failed to get nodes from reservation")
             raise SlurmCommandError(cmd_nodes, e.returncode, e.output)
 
-        cmd = f"scontrol update NodeName={nodebase} State=power_up"
+    def power_up_nodes(self) -> str:
+        """
+        Power up the specified number of nodes in the partition.
+        In test mode, simulate powering up nodes.
+        """
+        
+        # Build the node range string, e.g., ccw-gpu-[1-612]
+        # Assume node naming convention: <clustername>-<partition>-<index>
+        # Get clustername from the first node in the partition (if available)
+        # We'll use scontrol show partition to get the node list
+
+        node_str = self.show_reservation()
+
+        cmd = f"scontrol update NodeName={node_str} State=power_up"
         try:
             log.info(cmd)
             self.run_command(cmd)
             log.info("Nodes powering up initiated successfully")
-            return nodebase
+            return node_str
         except subprocess.CalledProcessError as e:
             log.error("Failed to power up nodes")
             raise SlurmCommandError(cmd, e.returncode, e.output)
@@ -438,23 +448,25 @@ class NodeScaler:
         """Execute the complete scaling workflow."""
         # Step 0: Validate nodes
         self.validate_nodes()
-        # TODO RDH always update the reservation - never delete it.
-        
+
         try:
             self.run_command(f"scontrol show reservation {self.reservation_name}")
-            raise SlurmM1Error(f"The reservation {self.reservation_name} already exists, please run `scontrol delete reservation {self.reservation_name}` before running this script.")
+            raise SlurmM1Error(f"The reservation {self.reservation_name} already exists, please run `scontrol delete reservation {self.reservation_name}` before running this script" +
+                               f" or override the reservation name with --reservation")
         except subprocess.CalledProcessError:
             pass
         # Step 1: Create reservation
         reservation_count = self.target_count + self.overprovision
-        self.create_reservation(reservation_count)
+        if not self.create_reservation(reservation_count):
+            healthy = len(get_healthy_nodes(self.partition, self.slurm_commands))
+            log.warning("Exiting early - there was no need to create a reservation, so there are no nodes to take action on.")
+            log.warning(f"Healthy={healthy} Target count={self.target_count}")
+            return
 
         # Step 2: Wait for nodes to start
         node_list = self.power_up_nodes()
-        if node_list:
-            self.wait_for_nodes_to_start(node_list)
-        else:
-            log.warning("There are no new nodes to power up.")
+        
+        self.wait_for_nodes_to_start(node_list)
 
         # Step 3: Check healthy nodes
         healthy_nodes = get_healthy_nodes(self.partition, self.slurm_commands)
@@ -533,11 +545,19 @@ def get_powered_up_nodes(partition, slurm_commands) -> List[str]:
                                       "powered_down,powering_up,powering_down,power_down")
 
 
-def get_powered_down_nodes(partition, slurm_commands) -> List[str]:
+def get_powered_down_not_reserved(partition, slurm_commands) -> List[str]:
     """Get list of healthy and idle nodes in the partition."""
     sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N -t powered_down'
-    hosts = slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n')
-    return hosts
+    powered_down = slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n')
+
+    sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N -t reserved'
+    reserved = slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n')
+    return list(set(powered_down) - set(reserved))
+
+def get_reserved(partition, slurm_commands) -> List[str]:
+    """Get list of healthy and idle nodes in the partition."""
+    sinfo_cmd = f'sinfo -p {partition} -o "%N" -h -N -t reserved'
+    return slurm_commands.run_command(sinfo_cmd).stdout.strip().split('\n')
 
 
 def get_unhealthy_nodes(partition: str, slurm_commands: SlurmCommands) -> List[str]:
@@ -590,7 +610,8 @@ Examples:
                         help='Enable mock topology for testing')
     parser.add_argument('--automatic-termination', action='store_true',
                         help='Enable automatic termination of nodes and reconfiguring of topology')
-    parser.add_argument('--reservation', required=False, help="Optional: use an existing reservation")
+    parser.add_argument('--reservation', required=False, help="Optional: use an existing reservation",
+                        default="scale_m1")
 
     args = parser.parse_args()
 
@@ -622,7 +643,8 @@ Examples:
         azslurm_topology = AzslurmTopologyImpl()
     
     scaler = NodeScaler(args.partition, args.target_count, args.overprovision, 
-                       slurm_commands, azslurm_topology, automatic_termination=args.automatic_termination)
+                       slurm_commands, azslurm_topology, reservation_name=args.reservation,
+                       automatic_termination=args.automatic_termination)
 
     try:
         scaler.run()

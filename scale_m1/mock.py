@@ -97,7 +97,7 @@ class MockSlurmCommands(SlurmCommands):
         log.info(f"[TEST MODE] Created {len(self.nodes_dict)} total mock nodes")
     
     def show_hostlist(self, nodes: list[str]) -> str:
-        return ",".join(nodes)
+        return ",".join(sorted(nodes, key=lambda x: int(x.split("-")[-1])))
     
     def show_hostnames(self, node_str: str) -> list[str]:
         return node_str.split(",")
@@ -112,6 +112,11 @@ class MockSlurmCommands(SlurmCommands):
         for node in nodes:
             assert self.nodes_dict[node]["power_state"] == "POWERED_UP", f"invalid state {self.nodes_dict[node]}"
             self.nodes_dict[node]["state"] = "draining"
+
+    def reserve_nodes(self, nodes: list[str]) -> None:
+        for node in nodes:
+            assert self.nodes_dict[node]["power_state"] == "POWERED_UP", f"invalid state {self.nodes_dict[node]}"
+            self.nodes_dict[node]["state"] = "reserved"
 
     def simulate_failed_converge(self, failed_nodes: list):
         """Simulate some nodes as unhealthy for testing."""
@@ -187,11 +192,6 @@ class MockSlurmCommands(SlurmCommands):
     
     def scontrol_create_reservation(self, cmd: str, cmd_parsed: dict) ->subprocess.CompletedProcess:
         self.reservation_name = cmd_parsed["ReservationName"]
-        if "NodeCnt" in cmd_parsed:
-            # handle empty reservation
-            assert cmd_parsed["NodeCnt"] == "0", cmd_parsed
-            self.reservation_nodes = []
-            return subprocess.CompletedProcess(cmd, 0, "Mock reservation created", "")
         
         self.reservation_nodes = cmd_parsed["Nodes"].split(",")
 
@@ -199,6 +199,7 @@ class MockSlurmCommands(SlurmCommands):
             node_dict = self.nodes_dict[node_name]
             assert node_dict['partition'] == cmd_parsed["PartitionName"]
             assert node_dict["state"].upper() == "IDLE"
+            node_dict["state"] = "RESERVED"
             node_dict['reservation_name'] = self.reservation_name
 
         log.info(f"[TEST MODE] Mock reservation created: {self.reservation_name}")
