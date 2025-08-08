@@ -192,6 +192,9 @@ class NodeScaler:
         already_reserved = set(get_reserved(self.partition, self.slurm_commands))
         reservable_nodes_set = current_healthy_set - set(not_reservable_set) - set(already_reserved)
 
+        if node_count < len(current_healthy_set):
+            return False
+        
         new_healthy_minimum = node_count - len(current_healthy_set)
         new_powered_up_state = self.round_up_to_multiple_of_18(total_powered_up_nodes + new_healthy_minimum)
         to_power_up = new_powered_up_state - total_powered_up_nodes
