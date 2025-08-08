@@ -250,6 +250,9 @@ class MockSlurmCommands(SlurmCommands):
     def _run_command(self, cmd: str) -> subprocess.CompletedProcess:
         log.info(f"[TEST MODE] Would run: {cmd}")
         cmd_parsed = parse_command(cmd)
+
+        if "azslurm" in cmd_parsed:
+            return subprocess.CompletedProcess(cmd, 0, "", "")
         
         if "scontrol" in cmd_parsed:
             if "create" in cmd_parsed:

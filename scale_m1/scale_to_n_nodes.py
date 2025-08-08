@@ -276,6 +276,7 @@ class NodeScaler:
             log.info(cmd)
             self.run_command(cmd)
             log.info("Nodes powering up initiated successfully")
+            self.run_command(f"azslurm resume --node-list {node_str}")
             return node_str
         except subprocess.CalledProcessError as e:
             log.error("Failed to power up nodes")
