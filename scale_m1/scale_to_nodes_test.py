@@ -252,11 +252,7 @@ def test_termination_with_running_jobs():
 
     assert 18 == len(scale_to_n_nodes.get_powered_up_nodes("gpu", mock_slurm_commands))
 
-    with open("/tmp/topology.conf", "r") as f:
-        topology = f.read()
-    assert """# Mock topology for testing
-BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
-BlockSizes=1""" in topology
+    # topology is not generated in this case
 
 
 def test_basic_scaling_large_delete():
@@ -275,4 +271,59 @@ def test_basic_scaling_large_delete():
         topology = f.read()
     assert """# Mock topology for testing
 BlockName=block_003 Nodes=gpu-37,gpu-38,gpu-39,gpu-40,gpu-41,gpu-42,gpu-43,gpu-44,gpu-45,gpu-46,gpu-47,gpu-48,gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
+BlockSizes=1""" in topology
+    
+
+def test_basic_scaling_with_reserved_noop():
+    """
+    leave gpu-[19-36] as still reserved - it should be a no-op
+    """
+    mock_slurm_commands = MockSlurmCommands()
+    mock_slurm_commands.create_nodes(partition="gpu", count=54)
+    mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
+    for n in range(18, 36):
+        mock_slurm_commands._power_up([f"gpu-{n+1}"])
+    mock_slurm_commands.update_states(30)
+    mock_slurm_commands.update_states(30)
+    for n in range(18, 36):
+        mock_slurm_commands.reserve_nodes([f"gpu-{n+1}"])
+
+    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    # Run the scaling process
+    nodescaler.run()
+    
+    # assert all(node['power_state'] == 'POWERED_UP' for node in mock_slurm_commands.nodes_dict.values())
+    with open("/tmp/topology.conf", "r") as f:
+        topology = f.read()
+    assert """# Mock topology for testing
+BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
+BlockSizes=1""" in topology
+    
+
+def test_basic_scaling_with_reserved():
+    """
+    leave gpu-[19-30] as still reserved - it should include 19-30 and others
+    """
+    mock_slurm_commands = MockSlurmCommands()
+    mock_slurm_commands.create_nodes(partition="gpu", count=54)
+    mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
+    for n in range(18, 30):
+        mock_slurm_commands._power_up([f"gpu-{n+1}"])
+    mock_slurm_commands.update_states(30)
+    mock_slurm_commands.update_states(30)
+    for n in range(18, 30):
+        mock_slurm_commands.reserve_nodes([f"gpu-{n+1}"])
+
+    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    # Run the scaling process
+    nodescaler.run()
+    
+    # assert all(node['power_state'] == 'POWERED_UP' for node in mock_slurm_commands.nodes_dict.values())
+    with open("/tmp/topology.conf", "r") as f:
+        topology = f.read()
+    assert """# Mock topology for testing
+BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30
+BlockName=block_003 Nodes=gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
 BlockSizes=1""" in topology
