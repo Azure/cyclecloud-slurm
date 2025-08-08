@@ -90,6 +90,10 @@ class SlurmCommandError(SlurmM1Error):
         return f"SlurmCommandError: Command '{self.command}' failed with return code {self.returncode}. Output: {self.output}"
 
 
+class NoReservationError(SlurmM1Error):
+    pass
+
+
 class AzslurmTopology(ABC):
     @abstractmethod
     def generate_topology(self, partition: str, topology_file: str) -> str:
@@ -199,32 +203,37 @@ class NodeScaler:
         sorted_powered_down_nodes = sorted(powered_down_nodes, key=lambda x: int(x.split("-")[-1]))
         to_power_up_set = set(sorted_powered_down_nodes[:to_power_up])
 
-        reservation_nodes = list(to_power_up_set) + list(reservable_nodes_set)
-        
-        if reservation_nodes:
-            reservation_nodes_short = self.slurm_commands.show_hostlist(reservation_nodes)
-            nodes_sub_cmd = f"Nodes={reservation_nodes_short}"
-        else:
-            # we want to just create an empty reservation for downstream simplicity
-            nodes_sub_cmd = "NodeCnt=0"
+        newly_reserved_nodes = list(to_power_up_set) + list(reservable_nodes_set)
 
-        if not reservation_nodes:
+        if not newly_reserved_nodes:
             log.info("There is no reason to create a reservation, as we are not starting any new nodes")
             return False
-
-        log.info(f"Creating reservation for {len(reservation_nodes)} nodes (rounded up from {node_count})")
-
-        cmd = (f"scontrol create reservation ReservationName={self.reservation_name} "
-               f"PartitionName={self.partition}  {nodes_sub_cmd} "
-               f"StartTime=now Duration=infinite User=root")
+        already_reserved_nodes = []
+        try:
+            reserved_nodes_str = self.show_reservation()
+            if reserved_nodes_str:
+                already_reserved_nodes = self.slurm_commands.show_hostnames(reserved_nodes_str)
+        except NoReservationError:
+            pass
+        
+        reservation_nodes = already_reserved_nodes + newly_reserved_nodes
+        reservation_nodes_short = self.slurm_commands.show_hostlist(reservation_nodes)
+        if not already_reserved_nodes:
+            cmd = (f"scontrol create reservation ReservationName={self.reservation_name} "
+                f"PartitionName={self.partition}  Nodes={reservation_nodes_short} "
+                f"StartTime=now Duration=infinite User=root")
+        else:
+            cmd = (f"scontrol update ReservationName={self.reservation_name} "
+                   f"Nodes={reservation_nodes_short}")
 
         try:
             self.run_command(cmd)
-            log.info(f"Successfully created reservation: {self.reservation_name}")
+            log.info(f"Successfully updated reservation: {self.reservation_name}")
             return True
         except subprocess.CalledProcessError as e:
-            log.error(f"Failed to create reservation: {e}")
+            log.error(f"Failed to update reservation: {e}")
             raise SlurmCommandError(cmd, e.returncode, e.output)
+
         
     def show_reservation(self) -> str:
         cmd_nodes = f"scontrol show reservation {self.reservation_name}"
@@ -242,9 +251,9 @@ class NodeScaler:
                 log.error("failed to get nodes from reservation")
                 raise SlurmCommandError(cmd_nodes, 1, "No nodes found in reservation")
             return nodebase
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             log.exception("Failed to get nodes from reservation")
-            raise SlurmCommandError(cmd_nodes, e.returncode, e.output)
+            raise NoReservationError(self.reservation_name)
 
     def power_up_nodes(self) -> str:
         """
@@ -425,36 +434,11 @@ class NodeScaler:
         except subprocess.CalledProcessError as e:
             raise SlurmCommandError("scontrol reconfigure", e.returncode, e.output)
 
-    def release_reservation(self) -> None:
-        """Release the SLURM reservation."""
-        try:
-            log.info(f"Releasing reservation: {self.reservation_name}")
-            cmd = f"scontrol delete reservation {self.reservation_name}"
-            self.run_command(cmd)
-            log.info("Reservation released successfully")
-        except subprocess.CalledProcessError as e:
-            raise SlurmCommandError(cmd, e.returncode, e.output)
-
-    def cleanup(self):
-        """Clean up temporary files and reservations."""
-        # Try to release reservation if it still exists
-        try:
-            if self.automatic_termination:
-                self.release_reservation()
-        except:
-            pass
-
     def run(self) -> None:
         """Execute the complete scaling workflow."""
         # Step 0: Validate nodes
         self.validate_nodes()
 
-        try:
-            self.run_command(f"scontrol show reservation {self.reservation_name}")
-            raise SlurmM1Error(f"The reservation {self.reservation_name} already exists, please run `scontrol delete reservation {self.reservation_name}` before running this script" +
-                               f" or override the reservation name with --reservation")
-        except subprocess.CalledProcessError:
-            pass
         # Step 1: Create reservation
         reservation_count = self.target_count + self.overprovision
         if not self.create_reservation(reservation_count):
@@ -527,10 +511,8 @@ class NodeScaler:
         # Step 8: Reconfigure SLURM
         self.reconfigure_slurm()
 
-        # Step 9: Release reservation
-        self.release_reservation()
-
         log.info(f"Successfully scaled cluster to {self.target_count} nodes!")
+        log.info(f"Run 'scontrol delete reservation {self.reservation_name}' to release the nodes to the cluster.")
 
 
 def get_healthy_but_not_idle_nodes(partition, slurm_commands) -> List[str]:
@@ -650,15 +632,12 @@ Examples:
         scaler.run()
     except SlurmM1Error as e:
         log.error(f"Scaling failed: {e}")
-        scaler.cleanup()
         sys.exit(1)
     except KeyboardInterrupt:
         log.info("Scaling interrupted by user")
-        scaler.cleanup()
         sys.exit(130)
     except Exception as e:
         log.exception(f"Unexpected error during scaling: {e}")
-        scaler.cleanup()
         sys.exit(1)
 
 

@@ -205,16 +205,11 @@ class MockSlurmCommands(SlurmCommands):
         log.info(f"[TEST MODE] Mock reservation created: {self.reservation_name}")
         return subprocess.CompletedProcess(cmd, 0, "Mock reservation created", "")
     
-    def scontrol_delete_reservation(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
-        assert "reservation" in cmd_parsed
-        assert self.reservation_name in cmd.split()[-1], "Reservation name must be specified"
-        log.info(f"[TEST MODE] Mock reservation deleted: {self.reservation_name}")
-        for node_name, node_data in self.nodes_dict.items():
-            if node_data['reservation_name'] == self.reservation_name:
-                node_data['reservation_name'] = ""
-        self.reservation_name = ""
-        self.reservation_nodes = []
-        return subprocess.CompletedProcess(cmd, 0, "Mock reservation deleted", "")
+
+    def scontrol_update_reservation(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
+        assert cmd_parsed["ReservationName"] == self.reservation_name, f"{cmd_parsed} res_name={self.reservation_name}"
+        self.reservation_nodes = cmd_parsed["Nodes"].split(",")
+        return subprocess.CompletedProcess(cmd, 0, "Mock reservation updated", "")
     
     def scontrol_update_nodename(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
         states = {'power_up':'PRE_POWERING_UP', 'power_down':'PRE_POWERING_DOWN'}
@@ -257,8 +252,8 @@ class MockSlurmCommands(SlurmCommands):
             elif "update" in cmd_parsed:
                 if "NodeName" in cmd_parsed and "State" in cmd_parsed:
                     return self.scontrol_update_nodename(cmd, cmd_parsed)
-            elif "delete" in cmd_parsed:
-                return self.scontrol_delete_reservation(cmd, cmd_parsed)
+                elif "ReservationName" in cmd_parsed:
+                    return self.scontrol_update_reservation(cmd, cmd_parsed)
             elif "reconfigure" in cmd:
                 self.last_topology = self.read_topology()
                 return subprocess.CompletedProcess(cmd, 0, "Mock reconfigure executed", "")
