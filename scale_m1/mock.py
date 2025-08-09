@@ -65,7 +65,7 @@ class MockSlurmCommands(SlurmCommands):
     """
     def __init__(self, topology_file: str = "/etc/slurm/topology.conf"):
         self.topology_file = topology_file
-        self.last_topology = self.read_topology()
+        self.last_topology = ""
         log.info("Running in TEST MODE - all commands will be mocked")
         self.nodes_dict: dict[str, dict] = {}
         self.reservation_name: str = ""
@@ -73,14 +73,11 @@ class MockSlurmCommands(SlurmCommands):
 
     def read_topology(self) -> str:
         """Read the current SLURM topology file."""
-        try:
-            with open(self.topology_file, 'r', encoding='utf-8') as f:
-                topology = f.read()
-            log.info(f"[TEST MODE] Read mock topology file: {self.topology_file}")
-            return topology
-        except Exception as e:
-            log.warning(f"[TEST MODE] Could not read mock topology file: {e}")
-            return ""
+        with open(self.topology_file, 'r', encoding='utf-8') as f:
+            topology = f.read()
+        log.info(f"[TEST MODE] Read mock topology file: {self.topology_file}")
+        return topology
+
 
     def create_nodes(self, partition: str, count: int):
         """Create mock nodes for testing."""
@@ -97,7 +94,8 @@ class MockSlurmCommands(SlurmCommands):
         log.info(f"[TEST MODE] Created {len(self.nodes_dict)} total mock nodes")
     
     def show_hostlist(self, nodes: list[str]) -> str:
-        return ",".join(sorted(nodes, key=lambda x: int(x.split("-")[-1])))
+        assert sorted(nodes, key=lambda x: int(x.split("-")[-1])) == nodes
+        return ",".join(nodes)
     
     def show_hostnames(self, node_str: str) -> list[str]:
         return node_str.split(",")
@@ -113,10 +111,14 @@ class MockSlurmCommands(SlurmCommands):
             assert self.nodes_dict[node]["power_state"] == "POWERED_UP", f"invalid state {self.nodes_dict[node]}"
             self.nodes_dict[node]["state"] = "draining"
 
-    def reserve_nodes(self, nodes: list[str]) -> None:
+    def down_nodes(self, nodes: list[str]) -> None:
         for node in nodes:
             assert self.nodes_dict[node]["power_state"] == "POWERED_UP", f"invalid state {self.nodes_dict[node]}"
-            self.nodes_dict[node]["state"] = "reserved"
+            self.nodes_dict[node]["state"] = "down"
+
+    def reserve_nodes(self, nodes: list[str], reservation_name: str = "scale_m1") -> None:
+        for node in nodes:
+            self.nodes_dict[node]["reservation_name"] = reservation_name
 
     def simulate_failed_converge(self, failed_nodes: list):
         """Simulate some nodes as unhealthy for testing."""
@@ -128,18 +130,18 @@ class MockSlurmCommands(SlurmCommands):
 
     def update_states(self, count=9):
         """Update mock node states based on simulated failures."""
-        log.info("[TEST MODE] Updating mock node states")
+        log.info(f"[TEST MODE] Updating {count} mock node states")
         for node_name, node_data in self.nodes_dict.items():
             if node_data['power_state'] == 'POWERING_UP':
                 if node_data.get('simulate_failure'):
-                    node_data['state'] = 'DOWN'
+                    # # TODO will mess with reservation
+                    # and yes it did.
+                    # node_data['state'] = 'DOWN'
                     node_data['power_state'] = 'POWERING_DOWN'
                 else:
-                    node_data['state'] = 'IDLE'
                     node_data['power_state'] = 'POWERED_UP'
                 count -= 1
             elif node_data['power_state'] == 'POWERING_DOWN':
-                node_data['state'] = 'IDLE'
                 node_data['power_state'] = 'POWERED_DOWN'
                 count -= 1
             # Update one node and return
@@ -151,8 +153,9 @@ class MockSlurmCommands(SlurmCommands):
                 count -= 1
             # Update one node and return
             if count <= 0:
+                log.info("[TEST MODE] Mock node states updated")
                 return
-        log.info("[TEST MODE] Mock node states updated")
+        log.info(f"[TEST MODE] Mock {count} node states remaining")
 
     def sinfo(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
         if '-t' in cmd_parsed:
@@ -161,6 +164,9 @@ class MockSlurmCommands(SlurmCommands):
             for node_name, node_dict in self.nodes_dict.items():
                 if (node_dict['power_state'].upper() in states or 
                     node_dict['state'].upper() in states):
+                    ret.append(node_name)
+                elif "RESERVED" in states and node_dict.get("reservation_name"):
+                    # handle reserved by looking at res name NOT state - drained etc can be reserved.
                     ret.append(node_name)
             nodes_str = "\n".join(ret) + "\n"
         elif cmd_parsed['-o'] == '%N':
@@ -191,6 +197,7 @@ class MockSlurmCommands(SlurmCommands):
         return subprocess.CompletedProcess(cmd, 0, nodes_str, "")
     
     def scontrol_create_reservation(self, cmd: str, cmd_parsed: dict) ->subprocess.CompletedProcess:
+        assert not self.reservation_nodes
         self.reservation_name = cmd_parsed["ReservationName"]
         
         self.reservation_nodes = cmd_parsed["Nodes"].split(",")
@@ -198,17 +205,21 @@ class MockSlurmCommands(SlurmCommands):
         for node_name in self.reservation_nodes:
             node_dict = self.nodes_dict[node_name]
             assert node_dict['partition'] == cmd_parsed["PartitionName"]
-            assert node_dict["state"].upper() == "IDLE"
-            node_dict["state"] = "RESERVED"
+            assert node_dict["state"].upper() not in ["MIXED", "ALLOCATED"]
             node_dict['reservation_name'] = self.reservation_name
 
         log.info(f"[TEST MODE] Mock reservation created: {self.reservation_name}")
         return subprocess.CompletedProcess(cmd, 0, "Mock reservation created", "")
     
-
     def scontrol_update_reservation(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
         assert cmd_parsed["ReservationName"] == self.reservation_name, f"{cmd_parsed} res_name={self.reservation_name}"
         self.reservation_nodes = cmd_parsed["Nodes"].split(",")
+        for node in self.reservation_nodes:
+            node_dict = self.nodes_dict[node]
+            if node in self.reservation_nodes:
+                node_dict["state"] = "RESERVED"
+            elif node_dict["state"] == "RESERVED":
+                node_dict["state"] = "IDLE"
         return subprocess.CompletedProcess(cmd, 0, "Mock reservation updated", "")
     
     def scontrol_update_nodename(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
@@ -216,16 +227,22 @@ class MockSlurmCommands(SlurmCommands):
         node_list = cmd_parsed.get("NodeName", "").split(',')
         new_state = cmd_parsed.get("State", "").lower()
         for node_name in node_list:
+            if new_state == "power_up" and self.nodes_dict[node_name]['power_state'] == "POWERED_UP":
+                continue
+            if new_state == "power_up":
+                self.nodes_dict[node_name]["created_a_vm"] = True
             self.nodes_dict[node_name]['power_state'] = states[new_state]
+
             log.info(f"[TEST MODE] Mock node {node_name} power state updated to {new_state}")
 
         # mimic M1 assertion that all VMSS requests end up having a multiple of 18 
-        if new_state == "power_up":
+        if new_state == "power_up" and any([n.get("created_a_vm") for n in self.nodes_dict.values()]):
             has_a_vm = 0
             for node_name, node_dict in self.nodes_dict.items():
                 if node_dict["power_state"] in ["PRE_POWERING_UP", "POWERING_UP", "POWERED_UP"]:
                     has_a_vm += 1
             assert has_a_vm % 18 == 0, f"This would result in an improper m1 allocation - {has_a_vm} total vms"
+        
         return subprocess.CompletedProcess(cmd, 0, "Mock nodes updated", "")
     
     def _power_up(self, node_names: list[str]) -> None:
@@ -263,6 +280,8 @@ class MockSlurmCommands(SlurmCommands):
                     return self.scontrol_update_nodename(cmd, cmd_parsed)
                 elif "ReservationName" in cmd_parsed:
                     return self.scontrol_update_reservation(cmd, cmd_parsed)
+                elif "partitionname" in cmd_parsed:
+                    return subprocess.CompletedProcess(cmd, 0, "", "")
             elif "reconfigure" in cmd:
                 self.last_topology = self.read_topology()
                 return subprocess.CompletedProcess(cmd, 0, "Mock reconfigure executed", "")
@@ -279,6 +298,25 @@ class MockSlurmCommands(SlurmCommands):
             return self.sinfo(cmd, cmd_parsed)
         
         raise RuntimeError(f"Unknown cmd {cmd}")
+
+    def node_state_counts(self) -> dict[str, int]:
+        counts = {"idle": 0, "reserved": 0, "powered_up": 0, "powered_down": 0, "draining": 0,
+                  "down": 0, "allocated": 0, "created_a_vm": 0, "total": len(self.nodes_dict)}
+        for node_dict in self.nodes_dict.values():
+            power_state = node_dict["power_state"].lower()
+            if power_state not in counts:
+                counts[power_state] = 0
+            counts[power_state] = counts[power_state] + 1
+
+            state = node_dict["state"].lower()
+            if state not in counts:
+                counts[state] = 0
+            counts[state] = counts[state] + 1
+            if node_dict.get("reservation_name"):
+                counts["reserved"] += 1
+            if node_dict.get("created_a_vm"):
+                counts["created_a_vm"] += 1
+        return counts
 
         
 class MockAzslurmTopology(AzslurmTopology):
