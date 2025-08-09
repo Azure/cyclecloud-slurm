@@ -388,8 +388,8 @@ def _complete_install_primary(s: InstallSettings) -> None:
     health_interval = 0
     health_program = '""'
     if s.enable_healthchecks:
-        # Run background checks every 2 minutes
-        health_interval = 120
+        # Run background checks every 1 minute
+        health_interval = 60
         health_program = f"{s.config_dir}/health.sh"
         epilog_program = f"{s.config_dir}/epilog.d/99-health_epilog.sh"
         ilib.copy_file("/etc/healthagent/health.sh.example", health_program, owner="root", group="root", mode=755)
