@@ -200,7 +200,7 @@ class Topology:
         rack_to_host_map={}
         for host_out in output:
             for line in host_out.stdout:
-                line = line.replace(' ', '_')
+                line = line.strip().replace(' ', '_')
                 if '_' not in line:
                     log.warning("Invalid rack id format: %s, expected format 'ClusterUUID_CliqueID', Skipping host", line)
                     log.warning(f"Error: {host_out.stderr}")
