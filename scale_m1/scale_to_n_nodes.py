@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import shutil
 import subprocess
 import sys
 import time as timelib
@@ -458,6 +459,8 @@ class NodeScaler:
             # Step 7: Re-generate topology
             self.generate_topology()
         else:
+            log.info(f"Copying {self.topology_file + '.pre-pruning'} to {self.topology_file}")
+            shutil.copyfile(self.topology_file + ".pre-pruning", self.topology_file)
             log.info("No nodes need to be terminated")
 
         # Step 8: Reconfigure SLURM
