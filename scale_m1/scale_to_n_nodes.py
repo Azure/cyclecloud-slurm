@@ -211,6 +211,13 @@ class NodeScaler:
 
         power_up_delta_nodes_str = self.slurm_commands.show_hostlist(power_up_delta_nodes)
         cmd = f"scontrol update NodeName={power_up_delta_nodes_str} State=power_up"
+
+        if os.getenv("DRYRUN"):
+            d = dict(locals())
+            for k, v in d.items():
+                print(f" {k} = {v if not isinstance(v, (set, list)) else len(v)}")
+            print(f"Would start {len(power_up_delta_nodes)} nodes via {cmd}")
+            sys.exit(0)
         try:
             log.info(cmd)
             self.run_command(cmd)
@@ -313,7 +320,8 @@ class NodeScaler:
                 cmd = f"sinfo -n {nodes} -h -N -o '%N %T'"
                 result = self.run_command(cmd)
             except subprocess.CalledProcessError as e:
-                log.warning(f"Error checking node status: {e}")
+                log.warning(f"Error checking node status: {e}. Will retry")
+                continue
 
             lines = [x for x in result.stdout.splitlines() if x.strip()]
             assert len(lines) > 1
@@ -614,6 +622,10 @@ Examples:
         logging.getLogger().setLevel(logging.DEBUG)
 
     slurm_commands = SlurmCommandsImpl()
+
+    # ensure any down~ nodes are back to idle~
+    slurm_commands.run_command("azslurm return_to_idle")
+    
     if args.cmd == "create_reservation":
         create_reservation(args.reservation, args.partition, slurm_commands)
         return
