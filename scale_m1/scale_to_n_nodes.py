@@ -168,11 +168,11 @@ class NodeScaler:
         return math.ceil(number / 18) * 18
 
     def validate_nodes(self) -> None:
-        cmd = f"sinfo -p {self.partition} -t powering_down -h -o '%N'"
+        cmd = f"sinfo -p {self.partition} -t powering_down,powering_up -h -o '%N'"
         result = self.run_command(cmd)
         powering_nodes = result.stdout.strip()
         if powering_nodes:
-            raise NodeInvalidStateError("Some nodes are in POWERING_DOWN state, cannot proceed with scaling.")
+            raise NodeInvalidStateError("Some nodes are in POWERING_DOWN or POWERING_UP state, cannot proceed with scaling.")
         
     def run_command(self, cmd: str, check: bool = True) -> subprocess.CompletedProcess:
         """Run a command and return the result. In test mode, return mocked responses."""
@@ -189,6 +189,10 @@ class NodeScaler:
         powered_down = get_powered_down(self.partition, self.slurm_commands)
         currently_powered_up_nodes = len(get_powered_up_nodes(self.partition, self.slurm_commands))
         current_healthy_set = set(get_healthy_nodes(self.partition, self.slurm_commands))
+
+        if len(current_healthy_set) >= self.target_count:
+            log.info(f"Target count already reached. {len(current_healthy_set)} >= {self.target_count}")
+            return ""
 
         new_healthy_delta = node_count - len(current_healthy_set)
         if new_healthy_delta <= 0:
@@ -393,7 +397,7 @@ class NodeScaler:
 
     def power_up(self) -> None:
         """Execute the complete scaling workflow."""
-        log.error(f"Starting cluster scaling:")
+        log.info(f"Starting cluster scaling:")
         log.info(f"  Partition: {self.partition}")
         log.info(f"  Target nodes: {self.target_count}")
         log.info(f"  Overprovision: {self.overprovision}")

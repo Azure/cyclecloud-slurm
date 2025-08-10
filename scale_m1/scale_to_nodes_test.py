@@ -28,7 +28,24 @@ def test_exit_early_if_powering_down():
         nodescaler.prune_now()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
-        assert e.message == "Some nodes are in POWERING_DOWN state, cannot proceed with scaling."
+        assert e.message == "Some nodes are in POWERING_DOWN or POWERING_UP state, cannot proceed with scaling."
+    assert not os.path.exists("/tmp/topology.conf")
+
+
+def test_exit_early_if_powering_up():
+    mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
+    mock_slurm_commands.create_nodes(partition="gpu", count=30)
+    mock_slurm_commands._power_up(["gpu-6"])
+    mock_slurm_commands.update_states()
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=10, overprovision=0, slurm_commands=mock_slurm_commands,azslurm_topology=None)
+    try:
+        nodescaler.power_up()
+        nodescaler.prune_now()
+        assert False, "Expected NodeInvalidStateError"
+    except NodeInvalidStateError as e:
+        assert e.message == "Some nodes are in POWERING_DOWN or POWERING_UP state, cannot proceed with scaling."
     assert not os.path.exists("/tmp/topology.conf")
 
 
@@ -397,7 +414,7 @@ def test_basic_scaling_with_reserved_noop():
     
     _post_test(mock_slurm_commands,
             powered_up=18,
-            created_a_vm=36,  # 18 were already started
+            created_a_vm=0,  # 18 were already started, it is a noop
             topology="""# Mock topology for testing
 BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockSizes=1""")
