@@ -7,6 +7,7 @@ Usage: ./scale_m1 -p gpu -n/--target-count 504 -b/--overprovision 108
 import argparse
 import json
 import logging
+import logging.handlers
 import math
 import os
 import shutil
@@ -26,9 +27,43 @@ from slurmcc.topology import output_block_nodelist
 from slurmcc import util as slutil
 
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def setup_logging(verbose: bool = False) -> None:
+    """Configure logging with both console and rotating file handlers."""
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.handlers.clear()
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Rotating file handler
+    if os.getenv('SCALE_M1_LOG_FILE'):
+        log_file = os.getenv('SCALE_M1_LOG_FILE')
+    else:
+        log_file = "/opt/azurehpc/slurm/logs/scale_m1.log"
+    # Rotating file handler
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=1024 * 1024 * 5,  # 5MB
+        backupCount=5,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    logger.info(f"Logging initialized. Console level: {'DEBUG' if verbose else 'INFO'}, File: {log_file}")
+
+
 log = logging.getLogger(__name__)
+
 
 __LAST_MSG = ""
 def cache_log(msg: str) -> None:
@@ -625,8 +660,7 @@ Examples:
 
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    setup_logging(args.verbose)
 
     slurm_commands = SlurmCommandsImpl()
 

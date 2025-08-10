@@ -3,10 +3,10 @@ import shlex
 import subprocess
 import time
 
-from scale_to_n_nodes import SlurmCommands, AzslurmTopology, get_healthy_nodes, Clock
+from scale_to_n_nodes import SlurmCommands, AzslurmTopology, get_healthy_nodes, Clock, setup_logging
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+setup_logging()
 log = logging.getLogger(__name__)
 
 
