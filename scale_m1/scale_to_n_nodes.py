@@ -153,7 +153,7 @@ class SlurmCommandsImpl(SlurmCommands):
 class NodeScaler:
     def __init__(self, target_count: int, overprovision: int, 
                  slurm_commands: SlurmCommands, azslurm_topology: AzslurmTopology,
-                 topology_file: str = "/etc/slurm/topology.conf",
+                 topology_file: str = os.path.realpath("/etc/slurm/topology.conf"),
                  reservation_name: str = f"scale_m1"):
         self.target_count = target_count
         self.overprovision = overprovision
@@ -236,17 +236,17 @@ class NodeScaler:
         """Wait for reserved nodes to start. In test mode, simulate the wait."""
         self.wait_for_nodes(timeout, "start", node_str)
 
-    def generate_topology(self) -> None:
+    def generate_topology(self, suffix: str = "") -> None:
         """Generate topology configuration file using azslurm CLI."""
         log.info("Generating topology configuration using azslurm CLI...")
-        self.azslurm_topology.generate_topology(self.partition, self.topology_file)
+        self.azslurm_topology.generate_topology(self.partition, self.topology_file + suffix)
 
-    def get_ordered_blocks(self) -> List[Dict]:
+    def get_ordered_blocks(self, suffix: str = "") -> List[Dict]:
         """Get blocks ordered by number of healthy nodes. In test mode, return mock data."""
         try:
-            json_output = output_block_nodelist(self.topology_file, table=False)
+            json_output = output_block_nodelist(self.topology_file + suffix, table=False)
             blocks = json.loads(json_output)
-            log.info(f"Found {len(blocks)} blocks in topology in {self.topology_file}")
+            log.info(f"Found {len(blocks)} blocks in topology in {self.topology_file + suffix}")
             return blocks
         except Exception as e:
             log.error(f"Failed to parse topology blocks: {e}")
@@ -428,10 +428,10 @@ class NodeScaler:
     def prune(self) -> str:
         """Returns a suggested hostlist of nodes to terminate"""
         # Step 4: Generate initial topology
-        self.generate_topology()
+        self.generate_topology(".pre-pruning")
 
         # Step 5: Get ordered blocks
-        blocks = self.get_ordered_blocks()
+        blocks = self.get_ordered_blocks(".pre-pruning")
         if not blocks:
             log.error("No blocks found in topology")
             raise SlurmM1Error("No blocks found in topology")

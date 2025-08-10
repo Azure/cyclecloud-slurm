@@ -10,8 +10,12 @@ scale_to_n_nodes.CLOCK = MockClock()
 
 @pytest.fixture(autouse=True)
 def run_around_tests():
-    if os.path.exists("/tmp/topology.conf"):
-        os.remove("/tmp/topology.conf")
+    # just create a topology that already existed
+
+    with open("/tmp/topology.conf", "w") as fw:
+        fw.write("preexisting")
+    with open("/tmp/topology.conf.pre-pruning", "w") as fw:
+        fw.write("preexisting")
     yield
 
 
@@ -29,7 +33,10 @@ def test_exit_early_if_powering_down():
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Some nodes are in POWERING_DOWN or POWERING_UP state, cannot proceed with scaling."
-    assert not os.path.exists("/tmp/topology.conf")
+    _post_test(mock_slurm_commands,
+               powered_up=0,
+               created_a_vm=0,
+               topology="preexisting")
 
 
 def test_exit_early_if_powering_up():
@@ -46,19 +53,23 @@ def test_exit_early_if_powering_up():
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Some nodes are in POWERING_DOWN or POWERING_UP state, cannot proceed with scaling."
-    assert not os.path.exists("/tmp/topology.conf")
+    _post_test(mock_slurm_commands,
+               powered_up=1,
+               created_a_vm=0,
+               topology="preexisting")
 
 
 def _post_test(mock_slurm_commands: MockSlurmCommands,
                powered_up: int,
                created_a_vm: int,
-               topology: str, 
+               topology: str,
+               topology_pre_pruning: str = "",
                reserved: int = -1,
                draining: int = 0,
                allocated: int = 0,
                down: int = 0) -> None:
     mock_slurm_commands.update_states(1000)
-
+    topology_pre_pruning = topology_pre_pruning or topology
     state_counts = mock_slurm_commands.node_state_counts()
     total = state_counts.pop("total")
     powered_down = total - powered_up
@@ -76,16 +87,28 @@ def _post_test(mock_slurm_commands: MockSlurmCommands,
     assert state_counts.pop("created_a_vm") == created_a_vm, orig_state_counts
 
     assert not state_counts, f"unchecked states! {state_counts}"
-    if topology:
-        with open("/tmp/topology.conf", "r") as f:
-            actual_topology = f.read()
+    with open("/tmp/topology.conf", "r") as f:
+        actual_topology = f.read()
+
+    if topology == "preexisting":
+        assert topology == actual_topology
+    else:
         if not topology.startswith("# Mock topology for testing"):
             topology = "# Mock topology for testing\n" + topology
         if not topology.endswith("BlockSizes=1"):
             topology += "\nBlockSizes=1"
         assert actual_topology.strip() == topology.strip()
-    else:
-        assert not os.path.exists("/tmp/topology.conf")
+    
+    if topology_pre_pruning:
+        with open("/tmp/topology.conf.pre-pruning", "r") as f:
+            actual_topology = f.read()
+        if topology_pre_pruning != "preexisting":
+            if not topology_pre_pruning.startswith("# Mock topology for testing"):
+                topology_pre_pruning = "# Mock topology for testing\n" + topology_pre_pruning
+            if not topology_pre_pruning.endswith("BlockSizes=1"):
+                topology_pre_pruning += "\nBlockSizes=1"
+        assert actual_topology.strip() == topology_pre_pruning.strip()
+
 
 def test_basic_scaling_og():
     mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
@@ -102,7 +125,8 @@ def test_basic_scaling_og():
     _post_test(mock_slurm_commands,
                powered_up=18,
                created_a_vm=18,
-               topology="""BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18""")
+               topology="preexisting",
+               topology_pre_pruning="""BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18""")
 
 
 def test_nothing_to_do_og():
@@ -125,7 +149,8 @@ def test_nothing_to_do_og():
     _post_test(mock_slurm_commands,
                powered_up=18,
                created_a_vm=0,
-               topology="""# Mock topology for testing
+               topology="preexisting",
+               topology_pre_pruning="""# Mock topology for testing
 BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
 BlockSizes=1""")
 
@@ -148,7 +173,8 @@ def test_basic_scaling_some_existing():
     _post_test(mock_slurm_commands,
             powered_up=18,
             created_a_vm=17,
-            topology="BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18")
+            topology="preexisting",
+            topology_pre_pruning="BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18")
 
 
 def test_basic_scaling_running_jobs():
@@ -170,7 +196,8 @@ def test_basic_scaling_running_jobs():
         powered_up=18,
         created_a_vm=17,
         allocated=1,
-        topology="BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18")
+        topology="preexisting",
+        topology_pre_pruning="BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18")
 
 
 def test_basic_scaling_drained_fail():
@@ -203,7 +230,7 @@ def test_basic_scaling_drained_fail():
             powered_up=1,
             draining=1,
             created_a_vm=0,
-            topology=None)
+            topology="preexisting")
 
 
 def test_basic_scaling_drained_success():
@@ -231,6 +258,10 @@ def test_basic_scaling_drained_success():
                created_a_vm=35, # need 19, which means we need 36 - but less 1 drained
                draining=1,
                topology="""BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
+BlockSizes=1""",
+               topology_pre_pruning="""# Mock topology for testing
+BlockName=block_001 Nodes=gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
+BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockSizes=1""")
 
 
@@ -276,6 +307,10 @@ def test_reproduce_scale_to_19():
             topology="""# Mock topology for testing
 BlockName=block_001 Nodes=gpu-11,gpu-12,gpu-13,gpu-14
 BlockName=block_002 Nodes=gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
+BlockSizes=1""",
+            topology_pre_pruning="""# Mock topology for testing
+BlockName=block_001 Nodes=gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
+BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockSizes=1""")
 
 
@@ -285,7 +320,7 @@ def test_scale_not_enough_healthy_nodes():
     mock_slurm_commands.simulate_failed_converge(["gpu-1", "gpu-2", "gpu-3"])  # Simulate some nodes as unhealthy
 
     scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
-    nodescaler = NodeScaler(target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology=None)
+    nodescaler = NodeScaler(target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology="preexisting")
 
     try:
         nodescaler.power_up()
@@ -296,7 +331,7 @@ def test_scale_not_enough_healthy_nodes():
     _post_test(mock_slurm_commands,
             powered_up=15,
             created_a_vm=18,
-            topology=None)
+            topology="preexisting")
 
 
 def test_scale_not_enough_healthy_nodes_fail_all():
@@ -306,7 +341,7 @@ def test_scale_not_enough_healthy_nodes_fail_all():
     mock_slurm_commands.simulate_failed_converge(node_list)  # Simulate some nodes as unhealthy
 
     scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
-    nodescaler = NodeScaler(target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology=None)
+    nodescaler = NodeScaler(target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology="preexisting")
 
     try:
         nodescaler.power_up()
@@ -318,7 +353,7 @@ def test_scale_not_enough_healthy_nodes_fail_all():
     _post_test(mock_slurm_commands,
                powered_up=0,
                created_a_vm=18,
-               topology=None)
+               topology="preexisting")
 
 
 def test_successful_over_alloc():
@@ -340,6 +375,10 @@ def test_successful_over_alloc():
                 topology="""# Mock topology for testing
 BlockName=block_001 Nodes=gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
 BlockName=block_002 Nodes=gpu-33,gpu-34,gpu-35,gpu-36
+BlockSizes=1""",
+                topology_pre_pruning="""# Mock topology for testing
+BlockName=block_001 Nodes=gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
+BlockName=block_002 Nodes=gpu-19,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockSizes=1""")
     
 
@@ -366,7 +405,8 @@ def test_termination_with_running_jobs():
                created_a_vm=0,
                allocated=18,
                reserved=1,
-               topology="""# Mock topology for testing
+               topology="preexisting",
+                topology_pre_pruning="""# Mock topology for testing
 BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
 BlockSizes=1""")
 
@@ -387,6 +427,11 @@ def test_basic_scaling_large_delete():
             powered_up=18,
             created_a_vm=54,
             topology="""# Mock topology for testing
+BlockName=block_003 Nodes=gpu-37,gpu-38,gpu-39,gpu-40,gpu-41,gpu-42,gpu-43,gpu-44,gpu-45,gpu-46,gpu-47,gpu-48,gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
+BlockSizes=1""",
+            topology_pre_pruning="""# Mock topology for testing
+BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
+BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockName=block_003 Nodes=gpu-37,gpu-38,gpu-39,gpu-40,gpu-41,gpu-42,gpu-43,gpu-44,gpu-45,gpu-46,gpu-47,gpu-48,gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
 BlockSizes=1""")
     
@@ -415,12 +460,13 @@ def test_basic_scaling_with_reserved_noop():
     _post_test(mock_slurm_commands,
             powered_up=18,
             created_a_vm=0,  # 18 were already started, it is a noop
-            topology="""# Mock topology for testing
+            topology="preexisting",
+            topology_pre_pruning="""# Mock topology for testing
 BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockSizes=1""")
     
 
-def test_basic_scaling_with_reserved():
+def test_basic_scaling_with_reserved_og():
     """
     leave gpu-[19-30] as still reserved - it should include 19-30 and others
     """
@@ -446,4 +492,9 @@ def test_basic_scaling_with_reserved():
                topology="""# Mock topology for testing
 BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30
 BlockName=block_003 Nodes=gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
+BlockSizes=1""",
+                topology_pre_pruning="""# Mock topology for testing
+BlockName=block_001 Nodes=gpu-1,gpu-2,gpu-3,gpu-4,gpu-5,gpu-6,gpu-7,gpu-8,gpu-9,gpu-10,gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
+BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
+BlockName=block_003 Nodes=gpu-37,gpu-38,gpu-39,gpu-40,gpu-41,gpu-42,gpu-43,gpu-44,gpu-45,gpu-46,gpu-47,gpu-48,gpu-49,gpu-50,gpu-51,gpu-52,gpu-53,gpu-54
 BlockSizes=1""")
