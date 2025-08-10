@@ -20,9 +20,12 @@ def test_exit_early_if_powering_down():
     mock_slurm_commands.create_nodes(partition="gpu", count=30)
     mock_slurm_commands.run_command("scontrol update NodeName=gpu-6 State=power_down")
     mock_slurm_commands.update_states(50)
-    nodescaler = NodeScaler(partition="gpu", target_count=10, overprovision=0, slurm_commands=mock_slurm_commands,azslurm_topology=None)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=10, overprovision=0, slurm_commands=mock_slurm_commands,azslurm_topology=None)
     try:
-        nodescaler.run()
+        nodescaler.power_up()
+        nodescaler.prune_now()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Some nodes are in POWERING_DOWN state, cannot proceed with scaling."
@@ -71,10 +74,13 @@ def test_basic_scaling_og():
     mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
     mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
 
     _post_test(mock_slurm_commands,
                powered_up=18,
@@ -86,14 +92,17 @@ def test_nothing_to_do_og():
     mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
     mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
     for n in range(18):
         mock_slurm_commands._power_up([f"gpu-{n+1}"])
     mock_slurm_commands.update_states(100)
     mock_slurm_commands.update_states(100)
     assert mock_slurm_commands.node_state_counts()["powered_up"] == 18
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
     
     # there is no need to even create a reservation: all idle
     _post_test(mock_slurm_commands,
@@ -108,14 +117,17 @@ def test_basic_scaling_some_existing():
     mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
     mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
     mock_slurm_commands._power_up(["gpu-1"])
     mock_slurm_commands.update_states()
     mock_slurm_commands.update_states()
     assert mock_slurm_commands.nodes_dict["gpu-1"]["power_state"] == "POWERED_UP"
     assert scale_to_n_nodes.get_healthy_nodes("gpu", mock_slurm_commands) == ["gpu-1"]
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
     _post_test(mock_slurm_commands,
             powered_up=18,
             created_a_vm=17,
@@ -130,10 +142,13 @@ def test_basic_scaling_running_jobs():
     mock_slurm_commands.update_states()
     mock_slurm_commands.update_states()
     mock_slurm_commands.alloc_nodes(["gpu-1"])
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
     _post_test(mock_slurm_commands,
         powered_up=18,
         created_a_vm=17,
@@ -155,12 +170,15 @@ def test_basic_scaling_drained_fail():
     mock_slurm_commands.update_states()
     mock_slurm_commands.update_states()
     mock_slurm_commands.drain_nodes(["gpu-1"])
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # mock_slurm_commands.run_command("")
     # Run the scaling process
     try:
-        nodescaler.run()
+        nodescaler.power_up()
+        nodescaler.prune_now()
         assert False
     except scale_to_n_nodes.SlurmM1Error as e:
         assert "There are not enough nodes in a powered down state" in str(e)
@@ -182,11 +200,14 @@ def test_basic_scaling_drained_success():
     mock_slurm_commands.update_states()
     mock_slurm_commands.update_states()
     mock_slurm_commands.drain_nodes(["gpu-1"])
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
     
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
 
     _post_test(mock_slurm_commands,
                powered_up=19,
@@ -222,11 +243,13 @@ def test_reproduce_scale_to_19():
     assert mock_slurm_commands.nodes_dict["gpu-20"]["state"] == "IDLE"
     assert mock_slurm_commands.nodes_dict["gpu-20"]["power_state"] == "POWERED_UP"
 
-    nodescaler = NodeScaler(partition="gpu", target_count=19, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=19, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
     
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
 
     _post_test(mock_slurm_commands,
             powered_up=19 + 10,  # targe=19 + 10 draining
@@ -234,8 +257,8 @@ def test_reproduce_scale_to_19():
             draining=10,
             allocated=4,
             topology="""# Mock topology for testing
-BlockName=block_001 Nodes=gpu-11,gpu-12,gpu-13,gpu-14,gpu-15,gpu-16,gpu-17,gpu-18
-BlockName=block_002 Nodes=gpu-19,gpu-20,gpu-21,gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-36
+BlockName=block_001 Nodes=gpu-11,gpu-12,gpu-13,gpu-14
+BlockName=block_002 Nodes=gpu-22,gpu-23,gpu-24,gpu-25,gpu-26,gpu-27,gpu-28,gpu-29,gpu-30,gpu-31,gpu-32,gpu-33,gpu-34,gpu-35,gpu-36
 BlockSizes=1""")
 
 
@@ -243,10 +266,13 @@ def test_scale_not_enough_healthy_nodes():
     mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
     mock_slurm_commands.simulate_failed_converge(["gpu-1", "gpu-2", "gpu-3"])  # Simulate some nodes as unhealthy
-    nodescaler = NodeScaler(partition="gpu", target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology=None)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology=None)
 
     try:
-        nodescaler.run()
+        nodescaler.power_up()
+        nodescaler.prune_now()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Insufficient healthy nodes: 15 < 17"
@@ -261,10 +287,13 @@ def test_scale_not_enough_healthy_nodes_fail_all():
     mock_slurm_commands.create_nodes(partition="gpu", count=18)
     node_list = [f"gpu-{i}" for i in range(1, 19)]
     mock_slurm_commands.simulate_failed_converge(node_list)  # Simulate some nodes as unhealthy
-    nodescaler = NodeScaler(partition="gpu", target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology=None)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=17, overprovision=0, slurm_commands=mock_slurm_commands, azslurm_topology=None)
 
     try:
-        nodescaler.run()
+        nodescaler.power_up()
+        nodescaler.prune_now()
         assert False, "Expected NodeInvalidStateError"
     except NodeInvalidStateError as e:
         assert e.message == "Insufficient healthy nodes: 0 < 17"
@@ -281,9 +310,12 @@ def test_successful_over_alloc():
     node_list = [f"gpu-{i}" for i in range(1, 6)] + [f"gpu-{i}" for i in range(20, 26)] 
     mock_slurm_commands.simulate_failed_converge(node_list)  # Simulate some nodes as unhealthy
     mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
-    nodescaler = NodeScaler(partition="gpu", target_count=17, overprovision=18, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
-    nodescaler.run()
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=17, overprovision=18, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    nodescaler.power_up()
+    nodescaler.prune_now()
 
     _post_test(mock_slurm_commands,
                 powered_up=17,
@@ -306,9 +338,11 @@ def test_termination_with_running_jobs():
         mock_slurm_commands.alloc_nodes([f"gpu-{n + 1}"])
 
     mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
-    nodescaler = NodeScaler(partition="gpu", target_count=1, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
-    
-    nodescaler.run()
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=1, overprovision=0, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+    nodescaler.power_up()
+    nodescaler.prune_now()
 
     _post_test(mock_slurm_commands,
                powered_up=18,
@@ -324,10 +358,13 @@ def test_basic_scaling_large_delete():
     mock_slurm_commands = MockSlurmCommands("/tmp/topology.conf")
     mock_slurm_commands.create_nodes(partition="gpu", count=54)
     mock_azslurm_topology = MockAzslurmTopology(mock_slurm_commands)
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
     
     _post_test(mock_slurm_commands,
             powered_up=18,
@@ -351,10 +388,12 @@ def test_basic_scaling_with_reserved_noop():
     for n in range(18, 36):
         mock_slurm_commands.reserve_nodes([f"gpu-{n+1}"])
 
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
     
     _post_test(mock_slurm_commands,
             powered_up=18,
@@ -378,10 +417,12 @@ def test_basic_scaling_with_reserved():
     for n in range(18, 30):
         mock_slurm_commands.reserve_nodes([f"gpu-{n+1}"])
 
-    nodescaler = NodeScaler(partition="gpu", target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
+    scale_to_n_nodes.create_reservation("scale_m1", "gpu", mock_slurm_commands)
+    nodescaler = NodeScaler(target_count=18, overprovision=36, topology_file="/tmp/topology.conf", slurm_commands=mock_slurm_commands, azslurm_topology=mock_azslurm_topology)
 
     # Run the scaling process
-    nodescaler.run()
+    nodescaler.power_up()
+    nodescaler.prune_now()
     _post_test(mock_slurm_commands,
                powered_up=18,
                created_a_vm=42,  # 12 were already started

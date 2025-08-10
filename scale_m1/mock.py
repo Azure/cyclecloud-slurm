@@ -70,6 +70,7 @@ class MockSlurmCommands(SlurmCommands):
         self.nodes_dict: dict[str, dict] = {}
         self.reservation_name: str = ""
         self.reservation_nodes: list[str] = []
+        self.reservation_partition: str = ""
 
     def read_topology(self) -> str:
         """Read the current SLURM topology file."""
@@ -201,6 +202,7 @@ class MockSlurmCommands(SlurmCommands):
         self.reservation_name = cmd_parsed["ReservationName"]
         
         self.reservation_nodes = cmd_parsed["Nodes"].split(",")
+        self.reservation_partition = cmd_parsed["PartitionName"]
 
         for node_name in self.reservation_nodes:
             node_dict = self.nodes_dict[node_name]
@@ -252,7 +254,10 @@ class MockSlurmCommands(SlurmCommands):
     def scontrol_show_reservation(self, cmd: str, cmd_parsed: dict) -> subprocess.CompletedProcess:
         if self.reservation_name == cmd.split()[-1]:
             res_count = len(self.reservation_nodes)
-            output = f"ReservationName={self.reservation_name}\nNodes={','.join(self.reservation_nodes)}\nNodeCnt={res_count}"
+            output = f"""ReservationName={self.reservation_name}
+            Nodes={','.join(self.reservation_nodes)}
+            NodeCnt={res_count}
+            PartitionName={self.reservation_partition}"""
             return subprocess.CompletedProcess(cmd, 0, output, "")
         else:
             return subprocess.CompletedProcess(cmd, 1, "Reservation not found", "")
