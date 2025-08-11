@@ -65,13 +65,13 @@ upgrade_azslurm_install() {
     echo "Running azslurm install upgrade"
     cd $WORKDIR
     PACKAGE="azure-slurm-install-pkg-4.0.2.tar.gz"
-    curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O  https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
+    curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O  https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
     tar -xf $PACKAGE
     cd azure-slurm-install
-    cp -p start-services.sh /opt/azurehpc/slurm/
-    cp -p capture_logs.sh /opt/cycle/
-    cp -p imex_epilog.sh /sched/$CLUSTERNAME/epilog.d/
-    cp -p imex_prolog.sh /sched/$CLUSTERNAME/prolog.d/
+    install -o root -g root -m 0755 start-services.sh /opt/azurehpc/slurm/
+    install -o root -g root -m 0755 capture_logs.sh /opt/cycle/
+    install -o root -g root -m 0755 imex_epilog.sh /sched/$CLUSTERNAME/epilog.d/
+    install -o root -g root -m 0755 imex_prolog.sh /sched/$CLUSTERNAME/prolog.d/
 }
 
 upgrade_azslurmd() {
@@ -79,7 +79,7 @@ upgrade_azslurmd() {
     echo "Running azslurmd upgrade"
     cd $WORKDIR
     PACKAGE="azure-slurm-pkg-4.0.2.tar.gz"
-    curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
+    curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
     tar -xf $PACKAGE
     cd azure-slurm
     AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
@@ -90,15 +90,15 @@ upgrade_healthagent() {
     cd $WORKDIR
     systemctl stop healthagent || true
     PACKAGE="healthagent-1.0.3.tar.gz"
-    curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-healthagent/releases/download/1.0.3/$PACKAGE
+    curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-healthagent/releases/download/1.0.3/$PACKAGE
     source /opt/healthagent/.venv/bin/activate
     pip install --force-reinstall $PACKAGE
     sed -i '/^\[Service\]/a WatchdogSec=600s' /etc/systemd/system/healthagent.service
     systemctl daemon-reload
     systemctl restart healthagent || true
     cp $PACKAGE /opt/healthagent/
-    cp -p /etc/healthagent/health.sh.example /sched/$CLUSTERNAME/health.sh
-    cp -p /etc/healthagent/epilog.sh.example /sched/$CLUSTERNAME/epilog.d/99-health_epilog.sh
+    install -o root -g root -m 0755 /etc/healthagent/health.sh.example /sched/$CLUSTERNAME/health.sh
+    install -o root -g root -m 0755 /etc/healthagent/epilog.sh.example /sched/$CLUSTERNAME/epilog.d/99-health_epilog.sh
     echo "Healthagent upgrade complete"
 
 }
