@@ -65,7 +65,7 @@ upgrade_azslurm_install() {
     echo "Running azslurm install upgrade"
     cd $WORKDIR
     PACKAGE="azure-slurm-install-pkg-4.0.2.tar.gz"
-    curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O  https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
+    curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O  https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
     tar -xf $PACKAGE
     cd azure-slurm-install
     cp -p start-services.sh /opt/azurehpc/slurm/
@@ -79,7 +79,7 @@ upgrade_azslurmd() {
     echo "Running azslurmd upgrade"
     cd $WORKDIR
     PACKAGE="azure-slurm-pkg-4.0.2.tar.gz"
-    curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
+    curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
     tar -xf $PACKAGE
     cd azure-slurm
     AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
@@ -90,7 +90,7 @@ upgrade_healthagent() {
     cd $WORKDIR
     systemctl stop healthagent || true
     PACKAGE="healthagent-1.0.3.tar.gz"
-    curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-healthagent/releases/download/1.0.3/$PACKAGE
+    curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-healthagent/releases/download/1.0.3/$PACKAGE
     source /opt/healthagent/.venv/bin/activate
     pip install --force-reinstall $PACKAGE
     sed -i '/^\[Service\]/a WatchdogSec=600s' /etc/systemd/system/healthagent.service
