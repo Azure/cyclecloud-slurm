@@ -537,8 +537,8 @@ def get_nodes_excluding_states(partition: str, slurm_commands: SlurmCommands, ex
     return nodes
 
 
-def get_reservable_nodes(partition: str, slurm_commands: SlurmCommands):
-    return get_nodes_excluding_states(partition, slurm_commands, "reserved,maint,allocated,mixed")
+def get_reservable_nodes(partition: str, slurm_commands: SlurmCommands, filter_states: str):
+    return get_nodes_excluding_states(partition, slurm_commands, filter_states)
 
 
 def sorted_nodes(nodes: Union[list[str], set[str]]) -> list[str]:
@@ -548,12 +548,12 @@ def sorted_nodes(nodes: Union[list[str], set[str]]) -> list[str]:
     return sorted(nodes, key=lambda x: int(x.split("-")[-1]))
 
 
-def create_reservation(reservation_name: str, partition: str,  slurm_commands: SlurmCommands) -> bool:
+def create_reservation(reservation_name: str, partition: str,  slurm_commands: SlurmCommands, filter_states: str = "reserved,maint,allocated,mixed") -> bool:
     """Create a SLURM reservation for the specified number of nodes."""
     slurm_commands.run_command(f"scontrol update partitionname={partition} state=DOWN")
     log.info("Set partition %s DOWN and sleeping 15 seconds to ensure valid sinfo information for proper reservation creation", partition)
     CLOCK.sleep(15)
-    reservable_nodes = get_reservable_nodes(partition, slurm_commands)
+    reservable_nodes = get_reservable_nodes(partition, slurm_commands, filter_states)
     if not reservable_nodes:
         raise SlurmM1Error("There are no reservable any nodes.")
     reservation_nodes_short = slurm_commands.show_hostlist(reservable_nodes)
@@ -618,6 +618,9 @@ Examples:
                         help='SLURM partition name')
     create_res.add_argument('--reservation', required=False, help="Optional: use an existing reservation",
                         default="scale_m1")
+    create_res.add_argument('--filter-states', required=False, 
+                        help="Comma-separated list of node states to exclude when finding reservable nodes (default: 'reserved,maint,allocated,mixed')",
+                        default="reserved,maint,allocated,mixed")
     create_res.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
     create_res.set_defaults(cmd="create_reservation")
@@ -668,7 +671,7 @@ Examples:
     slurm_commands.run_command("azslurm return_to_idle")
     
     if args.cmd == "create_reservation":
-        create_reservation(args.reservation, args.partition, slurm_commands)
+        create_reservation(args.reservation, args.partition, slurm_commands, args.filter_states)
         return
     
     # Validate arguments
