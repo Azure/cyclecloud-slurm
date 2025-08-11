@@ -7,6 +7,7 @@ Usage: ./scale_m1 -p gpu -n/--target-count 504 -b/--overprovision 108
 import argparse
 import json
 import logging
+import logging.handlers
 import math
 import os
 import shutil
@@ -26,9 +27,43 @@ from slurmcc.topology import output_block_nodelist
 from slurmcc import util as slutil
 
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+def setup_logging(verbose: bool = False) -> None:
+    """Configure logging with both console and rotating file handlers."""
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    logger.handlers.clear()
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # Rotating file handler
+    if os.getenv('SCALE_M1_LOG_FILE'):
+        log_file = os.getenv('SCALE_M1_LOG_FILE')
+    else:
+        log_file = "/opt/azurehpc/slurm/logs/scale_m1.log"
+    # Rotating file handler
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=1024 * 1024 * 5,  # 5MB
+        backupCount=5,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    
+    logger.info(f"Logging initialized. Console level: {'DEBUG' if verbose else 'INFO'}, File: {log_file}")
+
+
 log = logging.getLogger(__name__)
+
 
 __LAST_MSG = ""
 def cache_log(msg: str) -> None:
@@ -329,7 +364,7 @@ class NodeScaler:
                 continue
 
             lines = [x for x in result.stdout.splitlines() if x.strip()]
-            assert len(lines) > 1
+            assert len(lines) >= 1
             for line in lines:
                 if not line.strip():
                     continue
@@ -502,8 +537,8 @@ def get_nodes_excluding_states(partition: str, slurm_commands: SlurmCommands, ex
     return nodes
 
 
-def get_reservable_nodes(partition: str, slurm_commands: SlurmCommands):
-    return get_nodes_excluding_states(partition, slurm_commands, "reserved,maint,allocated,mixed")
+def get_reservable_nodes(partition: str, slurm_commands: SlurmCommands, filter_states: str = "reserved,maint,allocated,mixed"):
+    return get_nodes_excluding_states(partition, slurm_commands, filter_states)
 
 
 def sorted_nodes(nodes: Union[list[str], set[str]]) -> list[str]:
@@ -513,12 +548,12 @@ def sorted_nodes(nodes: Union[list[str], set[str]]) -> list[str]:
     return sorted(nodes, key=lambda x: int(x.split("-")[-1]))
 
 
-def create_reservation(reservation_name: str, partition: str,  slurm_commands: SlurmCommands) -> bool:
+def create_reservation(reservation_name: str, partition: str,  slurm_commands: SlurmCommands, filter_states: str = "reserved,maint,allocated,mixed") -> bool:
     """Create a SLURM reservation for the specified number of nodes."""
     slurm_commands.run_command(f"scontrol update partitionname={partition} state=DOWN")
     log.info("Set partition %s DOWN and sleeping 15 seconds to ensure valid sinfo information for proper reservation creation", partition)
     CLOCK.sleep(15)
-    reservable_nodes = get_reservable_nodes(partition, slurm_commands)
+    reservable_nodes = get_reservable_nodes(partition, slurm_commands, filter_states)
     if not reservable_nodes:
         raise SlurmM1Error("There are no reservable any nodes.")
     reservation_nodes_short = slurm_commands.show_hostlist(reservable_nodes)
@@ -583,6 +618,9 @@ Examples:
                         help='SLURM partition name')
     create_res.add_argument('--reservation', required=False, help="Optional: use an existing reservation",
                         default="scale_m1")
+    create_res.add_argument('--filter-states', required=False, 
+                        help="Comma-separated list of node states to exclude when finding reservable nodes (default: 'reserved,maint,allocated,mixed')",
+                        default="reserved,maint,allocated,mixed")
     create_res.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
     create_res.set_defaults(cmd="create_reservation")
@@ -625,8 +663,7 @@ Examples:
 
     args = parser.parse_args()
 
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    setup_logging(args.verbose)
 
     slurm_commands = SlurmCommandsImpl()
 
@@ -634,7 +671,7 @@ Examples:
     slurm_commands.run_command("azslurm return_to_idle")
     
     if args.cmd == "create_reservation":
-        create_reservation(args.reservation, args.partition, slurm_commands)
+        create_reservation(args.reservation, args.partition, slurm_commands, args.filter_states)
         return
     
     # Validate arguments
