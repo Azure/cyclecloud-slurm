@@ -5,41 +5,6 @@ set -eo pipefail
 TIMESTAMP=$(date +%Y_%m_%d_%H_%M)
 WORKDIR=/tmp/upgrade-$TIMESTAMP
 
-# Cleanup function for error handling
-cleanup() {
-    local exit_code=$?
-    if [ $exit_code -ne 0 ]; then
-        echo "ERROR: Upgrade failed! Attempting rollback..." >&2
-        rollback_on_failure
-    fi
-
-}
-trap cleanup EXIT
-
-
-rollback_on_failure() {
-    echo "Rolling back changes..." >&2
-    systemctl stop slurmctld slurmdbd || true
-
-    if [ -d "/etc/slurm-bak-$TIMESTAMP" ]; then
-        rm -rf /etc/slurm
-        mv /etc/slurm-bak-$TIMESTAMP /etc/slurm
-    fi
-
-    if [ -d "/sched/$CLUSTERNAME-bak-$TIMESTAMP" ]; then
-        rm -rf "/sched/$CLUSTERNAME"
-        mv "/sched/$CLUSTERNAME-bak-$TIMESTAMP" "/sched/$CLUSTERNAME"
-    fi
-
-    systemctl restart munge slurmdbd slurmctld || true
-
-    # Restore partitions
-    for part in $(sinfo -o "%R" --noheader 2>/dev/null || true); do 
-        scontrol update partition="$part" state=up || true
-    done
-}
-
-
 find_python3() {
     export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
     if [ ! -z "$AZSLURM_PYTHON_PATH" ]; then
@@ -103,8 +68,10 @@ upgrade_azslurm_install() {
     curl --retry 3 --retry-delay 2 --retry-all-errors -fsSL -O  https://github.com/Azure/cyclecloud-slurm/releases/download/4.0.2/$PACKAGE
     tar -xf $PACKAGE
     cd azure-slurm-install
-    $PYTHON_BIN install.py --mode=scheduler --platform=$OS
-    echo "Success"
+    cp -p start-services.sh /opt/azurehpc/slurm/
+    cp -p capture_logs.sh /opt/cycle/
+    cp -p imex_epilog.sh /sched/$CLUSTERNAME/epilog.d/
+    cp -p imex_prolog.sh /sched/$CLUSTERNAME/prolog.d/
 }
 
 upgrade_azslurmd() {
@@ -130,17 +97,10 @@ upgrade_healthagent() {
     systemctl daemon-reload
     systemctl restart healthagent || true
     cp $PACKAGE /opt/healthagent/
+    cp -p /etc/healthagent/health.sh.example /sched/$CLUSTERNAME/health.sh
+    cp -p /etc/healthagent/epilog.sh.example /sched/$CLUSTERNAME/epilog.d/99-health_epilog.sh
     echo "Healthagent upgrade complete"
 
-}
-
-start_services() {
-    if [ -x "$WORKDIR/azure-slurm-install/start-services.sh" ]; then
-        $WORKDIR/azure-slurm-install/start-services.sh scheduler
-    else
-        echo "ERROR: $WORKDIR/azure-slurm-install/start-services.sh not found or not executable" >&2
-        exit 1
-    fi
 }
 
 
@@ -157,32 +117,6 @@ main(){
     fi
 
     echo "Cluster: $CLUSTERNAME"
-    echo "Preparing scheduler node for upgrade, marking partitions down..."
-
-    # Mark partitions down
-    for part in $(sinfo -o "%R" --noheader); do 
-        echo "Marking partition $part down"
-        scontrol update partition="$part" state=down
-    done
-
-    # Stop services
-    echo "Stopping Slurm services..."
-    systemctl stop slurmdbd
-    systemctl stop slurmctld
-
-    # Backup existing configuration
-    echo "Backing up existing configuration..."
-    if [ -d "/etc/slurm" ]; then
-        mv "/etc/slurm" "/etc/slurm-bak-$TIMESTAMP"
-        mkdir /etc/slurm
-    fi
-    if [ -d "/sched/$CLUSTERNAME" ]; then
-        mv "/sched/$CLUSTERNAME" "/sched/$CLUSTERNAME-bak-$TIMESTAMP"
-    fi
-
-    if [ -f /etc/azslurm-bins.installed ]; then
-        rm /etc/azslurm-bins.installed
-    fi
 
     # Perform upgrade
     install_python3
@@ -190,13 +124,6 @@ main(){
     upgrade_healthagent
     upgrade_azslurm_install
     upgrade_azslurmd
-    start_services
-
-    echo "Upgrade complete, marking partitions back up..."
-    for part in $(sinfo -o "%R" --noheader); do 
-        echo "Marking partition $part up"
-        scontrol update partition="$part" state=up
-    done
 
     echo "Scheduler upgrade completed successfully!"
 }
