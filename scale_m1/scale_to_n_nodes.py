@@ -364,7 +364,7 @@ class NodeScaler:
                 continue
 
             lines = [x for x in result.stdout.splitlines() if x.strip()]
-            assert len(lines) > 1
+            assert len(lines) >= 1
             for line in lines:
                 if not line.strip():
                     continue
