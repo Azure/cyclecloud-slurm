@@ -537,7 +537,7 @@ def get_nodes_excluding_states(partition: str, slurm_commands: SlurmCommands, ex
     return nodes
 
 
-def get_reservable_nodes(partition: str, slurm_commands: SlurmCommands, filter_states: str):
+def get_reservable_nodes(partition: str, slurm_commands: SlurmCommands, filter_states: str = "reserved,maint,allocated,mixed"):
     return get_nodes_excluding_states(partition, slurm_commands, filter_states)
 
 
