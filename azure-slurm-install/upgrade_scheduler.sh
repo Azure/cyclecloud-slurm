@@ -93,6 +93,7 @@ upgrade_healthagent() {
     curl --retry 10 --retry-delay 5 --retry-all-errors -fsSL -O https://github.com/Azure/cyclecloud-healthagent/releases/download/1.0.3/$PACKAGE
     source /opt/healthagent/.venv/bin/activate
     pip install --force-reinstall $PACKAGE
+    healthagent-install
     sed -i '/^\[Service\]/a WatchdogSec=600s' /etc/systemd/system/healthagent.service
     systemctl daemon-reload
     systemctl restart healthagent || true
