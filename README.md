@@ -338,7 +338,7 @@ Added in 4.0.3: If the KeepAlive attribute is set in the CycleCloud UI, then the
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
 ## Supported Slurm and PMIX versions
-The current slurm versions supported are `24.11.3` and `24.05.6`. Both are compiled with PMIX version `4.2.9`.
+The current slurm version supported is `25.05.2` which is compiled with PMIX version `4.2.9`.
 ## Packaging
 Slurm and PMIX packages are fetched and downloaded exclusively from packages.microsoft.com.
 ### Supported OS and PMC Repos
