@@ -30,7 +30,7 @@ slurm_packages="slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slu
 sched_packages="slurm-slurmctld slurm-slurmdbd slurm-slurmrestd"
 execute_packages="slurm-slurmd"
 
-INSIDERS=$(/opt/cycle/jetpack/bin/jetpack config slurm.insiders null)
+INSIDERS=$(/opt/cycle/jetpack/bin/jetpack config slurm.insiders False)
 
 if [[ "$INSIDERS" == "True" ]]; then
     if [ "$OS_VERSION" -gt "8" ]; then
