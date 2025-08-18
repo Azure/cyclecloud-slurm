@@ -46,7 +46,6 @@ def execute() -> None:
     _add("install_logging.conf", "conf/install_logging.conf")
     _add("installlib.py", "installlib.py")
     _add("install.py", "install.py")
-    #TODO: only add insiders repo if insiders
     _add("slurmel8insiders.repo", "slurmel8insiders.repo")
     _add("slurmel9insiders.repo", "slurmel9insiders.repo")
     _add("slurmel8.repo", "slurmel8.repo")
