@@ -29,16 +29,21 @@ else
     REPO=slurm-ubuntu-focal
 fi
 
+REPO_GROUP="stable"
+INSIDERS=$(/opt/cycle/jetpack/bin/jetpack config slurm.insiders False)
+if [[ "$INSIDERS" == "True" ]]; then
+    REPO_GROUP="insiders"
+
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
     # microsoft-prod no longer installs GPG key in /etc/apt/trusted.gpg.d
     # so we need to use signed-by instead to specify the key for Ubuntu 24.04 onwards
-    echo "deb [arch=$arch signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+    echo "deb [arch=$arch signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/repos/$REPO/ $REPO_GROUP main" > /etc/apt/sources.list.d/slurm.list
 else
     if [ "$arch" == "arm64" ]; then
         echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
         exit 1
     fi
-    echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ insiders main" > /etc/apt/sources.list.d/slurm.list
+    echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ $REPO_GROUP main" > /etc/apt/sources.list.d/slurm.list
 fi
 echo "\
 Package: slurm, slurm-*
