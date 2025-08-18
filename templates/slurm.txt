@@ -26,7 +26,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
 
         slurm.version = $configuration_slurm_version
-        slurm.insiders = true
+        slurm.insiders = false
         slurm.user.uid = 11100
         slurm.user.gid = 11100
         munge.user.uid = 11101
