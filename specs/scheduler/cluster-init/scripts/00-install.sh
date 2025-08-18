@@ -2,8 +2,8 @@
 set -e
 
 do_install=$(jetpack config slurm.do_install True)
-install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.2.tar.gz)
-autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.2.tar.gz)
+install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.3.tar.gz)
+autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.3.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
 platform=$(jetpack config platform_family rhel)
 

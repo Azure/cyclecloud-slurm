@@ -4,7 +4,7 @@ maintainer_email 'support@cyclecomputing.com'
 license 'All Rights Reserved'
 description 'Installs/Configures slurm'
 long_description 'Installs/Configures slurm'
-version '4.0.2'
+version '4.0.3'
 chef_version '>= 12.1' if respond_to?(:chef_version)
 
 %w{ cuser cshared }.each {|c| depends c}
