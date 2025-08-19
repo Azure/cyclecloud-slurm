@@ -33,6 +33,7 @@ REPO_GROUP="stable"
 INSIDERS=$(/opt/cycle/jetpack/bin/jetpack config slurm.insiders False)
 if [[ "$INSIDERS" == "True" ]]; then
     REPO_GROUP="insiders"
+fi
 
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
     # microsoft-prod no longer installs GPG key in /etc/apt/trusted.gpg.d
