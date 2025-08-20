@@ -26,6 +26,7 @@ Autoscale = $Autoscale
         [[[configuration]]]
 
         slurm.version = $configuration_slurm_version
+        slurm.insiders = false
         slurm.user.uid = 11100
         slurm.user.gid = 11100
         munge.user.uid = 11101
@@ -720,8 +721,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="24.05.6-1"], [Value="24.11.3-1"]}
-        DefaultValue = 24.11.3-1
+        Config.Entries := {[Value="25.05.2-1"]}
+        DefaultValue = 25.05.2-1
 
         [[[parameter configuration_slurm_accounting_enabled]]]
         Label = Job Accounting
