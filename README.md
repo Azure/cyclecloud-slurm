@@ -5,7 +5,7 @@ Cyclecloud Slurm
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Managing Slurm Clusters in 4.0.2](#managing-slurm-clusters)
+1. [Managing Slurm Clusters in 4.0.3](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
@@ -26,14 +26,14 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
     2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
     3. [Dampening Memory](#dampening-memory)
-    4. [Pre:4.0.2: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
+    4. [Pre:4.0.3: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
     8. [Capturing logs and configuration for troubleshooting] ()
 5. [Contributing](#contributing)
 ---
-## Managing Slurm Clusters in 4.0.2
+## Managing Slurm Clusters in 4.0.3
 
 ### Making Cluster Changes
 The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
@@ -68,7 +68,7 @@ The default template that ships with Azure CycleCloud has three partitions (`hpc
       # (The example here shows the default for an NVidia sku with 8 GPUs)
       # slurm.gpu_device_config = /dev/nvidia[0-7]
 
-      [[[cluster-init cyclecloud/slurm:execute:4.0.2]]]
+      [[[cluster-init cyclecloud/slurm:execute:4.0.3]]]
       [[[network-interface eth0]]]
       AssociatePublicIpAddress = $ExecuteNodesPublic
 ```
@@ -333,7 +333,7 @@ Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cl
 
 
 ### Setting KeepAlive
-Added in 4.0.2: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.2. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
+Added in 4.0.3: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.3. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
 
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
