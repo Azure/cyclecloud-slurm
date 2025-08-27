@@ -57,17 +57,17 @@ if [ ! -e /etc/yum.repos.d/microsoft-prod.repo ];then
     rm packages-microsoft-prod.rpm
 fi
 for pkg in $slurm_packages; do
-    yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
+    yum -y install "${pkg}-${SLURM_VERSION}*" --disableexcludes slurm
 done
 if [ ${SLURM_ROLE} == "scheduler" ]; then
     for pkg in $sched_packages; do
-        yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
+        yum -y install "${pkg}-${SLURM_VERSION}*" --disableexcludes slurm
     done
 fi
 
 if [ ${SLURM_ROLE} == "execute" ]; then
     for pkg in $execute_packages; do
-        yum -y install $pkg-${SLURM_VERSION}.el${OS_VERSION} --disableexcludes slurm
+        yum -y install "${pkg}-${SLURM_VERSION}*" --disableexcludes slurm
     done
 fi
 touch $INSTALLED_FILE
