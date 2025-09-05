@@ -32,18 +32,21 @@ execute_packages="slurm-slurmd"
 
 INSIDERS=$(/opt/cycle/jetpack/bin/jetpack config slurm.insiders False)
 
-if [[ "$INSIDERS" == "True" ]]; then
-    if [ "$OS_VERSION" -gt "8" ]; then
+if [[ "$OS_VERSION" == "9" ]]; then
+    if [[ "$INSIDERS" == "True" ]]; then
         cp slurmel9insiders.repo /etc/yum.repos.d/slurm.repo
     else
-        cp slurmel8insiders.repo /etc/yum.repos.d/slurm.repo
-    fi
-else
-    if [ "$OS_VERSION" -gt "8" ]; then
         cp slurmel9.repo /etc/yum.repos.d/slurm.repo
+    fi
+elif [[ "$OS_VERSION" == "8" ]]; then
+    if [[ "$INSIDERS" == "True" ]]; then
+        cp slurmel8insiders.repo /etc/yum.repos.d/slurm.repo
     else
         cp slurmel8.repo /etc/yum.repos.d/slurm.repo
     fi
+else
+    echo "Unsupported OS version: $OS_VERSION"
+    exit 1
 fi
 
 ## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to
