@@ -3,23 +3,47 @@
 # Licensed under the MIT License.
 #
 set -e
-INSALLED_FILE=/etc/azslurm-bins.installed
-if [ -e $INSALLED_FILE ]; then
-    exit 0
-fi
-
+INSTALLED_FILE=/etc/azslurm-bins.installed
 SLURM_ROLE=$1
 SLURM_VERSION=$2
 
-apt update
+# Function to check if a package is installed (for any version)
+is_package_installed() {
+    local pkg_name=$1
+    dpkg -l | grep -q "^[hi]i  ${pkg_name}"
+}
+
+# Function to check if a package is installed with specific version prefix
+is_package_installed_with_version() {
+    local pkg_name=$1
+    local version_prefix=$2
+    dpkg -l | grep "^[hi]i  ${pkg_name}" | grep -q "${version_prefix}"
+}
+
 UBUNTU_VERSION=$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2)
+
+system_packages=""
+
+# Handle python3-venv for Ubuntu > 19
 if [[ $UBUNTU_VERSION > "19" ]]; then
-    apt -y install python3-venv
+    if ! is_package_installed "python3-venv"; then
+        echo "python3-venv needs to be installed"
+        system_packages="$system_packages python3-venv"
+    else
+        echo "python3-venv is already installed"
+    fi
 fi
 
-apt -y install munge
- 
-apt -y install libmysqlclient-dev libssl-dev jq
+# Handle system packages
+for pkg in munge libmysqlclient-dev libssl-dev jq; do
+    if ! is_package_installed "$pkg"; then
+        echo "$pkg needs to be installed"
+        system_packages="$system_packages $pkg"
+    else
+        echo "$pkg is already installed"
+    fi
+done
+
 arch=$(dpkg --print-architecture)
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
     REPO=slurm-ubuntu-noble
@@ -46,6 +70,7 @@ else
     fi
     echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ $REPO_GROUP main" > /etc/apt/sources.list.d/slurm.list
 fi
+
 echo "\
 Package: slurm, slurm-*
 Pin:  origin \"packages.microsoft.com\"
@@ -62,23 +87,53 @@ if [ ! -e /etc/apt/sources.list.d/microsoft-prod.list ]; then
     dpkg -i packages-microsoft-prod.deb
     rm packages-microsoft-prod.deb
 fi
-apt update
+
 slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-sview"
-for pkg in $slurm_packages; do
-    apt install -y "${pkg}=${SLURM_VERSION}*"
-    apt-mark hold $pkg
+sched_packages="slurm-smd-slurmctld slurm-smd-slurmdbd slurm-smd-slurmrestd"
+execute_packages="slurm-smd-slurmd"
+
+# Collect all SLURM packages based on role
+all_packages="$slurm_packages"
+
+if [ "${SLURM_ROLE}" == "scheduler" ]; then
+    all_packages="$all_packages $sched_packages"
+fi
+
+if [ "${SLURM_ROLE}" == "execute" ]; then
+    all_packages="$all_packages $execute_packages"
+fi
+
+packages_to_install="$system_packages"
+packages_to_hold=""
+
+# Add SLURM packages that aren't installed
+for pkg in $all_packages; do
+    if is_package_installed_with_version "$pkg" "$SLURM_VERSION"; then
+        echo "Package $pkg with version ${SLURM_VERSION}* is already installed"
+    else
+        echo "Package $pkg with version ${SLURM_VERSION}* needs to be installed"
+        packages_to_install="$packages_to_install ${pkg}=${SLURM_VERSION}*"
+        packages_to_hold="$packages_to_hold $pkg"
+    fi
 done
 
-if [ ${SLURM_ROLE} == "scheduler" ]; then
-    apt install -y "slurm-smd-slurmctld=${SLURM_VERSION}*" "slurm-smd-slurmdbd=${SLURM_VERSION}*" "slurm-smd-slurmrestd=${SLURM_VERSION}*"
-    apt-mark hold slurm-smd-slurmctld slurm-smd-slurmdbd slurm-smd-slurmrestd
-fi
-if [ ${SLURM_ROLE} == "execute" ]; then
-    apt install -y "slurm-smd-slurmd=${SLURM_VERSION}*"
-    apt-mark hold slurm-smd-slurmd
+# Install all packages in one command (system packages first, then SLURM packages)
+if [ -n "$packages_to_install" ]; then
+    apt update
+    echo "Installing all packages: $packages_to_install"
+    apt install -y $packages_to_install
+    echo "Successfully installed all required packages"
+    
+    # Hold SLURM packages to prevent automatic updates
+    if [ -n "$packages_to_hold" ]; then
+        echo "Holding packages: $packages_to_hold"
+        apt-mark hold $packages_to_hold
+    fi
+else
+    echo "All required packages are already installed"
 fi
 
-touch $INSALLED_FILE
+touch $INSTALLED_FILE
 exit
 
 if [[ $UBUNTU_VERSION > "19" ]]; then
