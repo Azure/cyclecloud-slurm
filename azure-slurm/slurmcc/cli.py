@@ -9,6 +9,7 @@ import shutil
 import sys
 import time
 import traceback
+from pathlib import Path
 from argparse import ArgumentParser
 from datetime import date, datetime, time, timedelta
 from math import ceil
@@ -234,6 +235,30 @@ class SlurmCLI(CommonCLI):
         else:
             raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_nvlink_domain")
     
+    def show_topology_parser(self, parser: ArgumentParser) -> None:
+        parser.add_argument(
+            "--output",
+            type=str,
+            default="/etc/slurm/topology.conf",
+            help="Output file for the topology (default: /etc/slurm/topology.conf)"
+        )
+        parser.add_argument(
+            "--format",
+            type=str,
+            choices=["table", "json"],
+            default="table",
+            help="Output format: table or json (default: table)"
+        )
+    
+    def show_topology(self, config: Dict, output: Optional[str] = None, format: Optional[str] = None) -> None:
+        """
+        Show the topology configuration for block topology
+        """
+        if format == "json":
+            print(slutil.output_block_nodelist(output))
+        else:
+            print(slutil.output_block_nodelist(output, table=True))
+
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
 
