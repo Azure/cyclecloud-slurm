@@ -768,6 +768,37 @@ def _load_config(bootstrap_config: str) -> Dict:
 
     return config
 
+def detect_platform() -> str:
+    """
+    Detects Os Platform
+    """
+    id_val = ""
+    id_like_val = ""
+    platform_map = {
+        "ubuntu": "ubuntu",
+        "debian": "ubuntu",
+        "almalinux": "rhel",
+        "centos": "rhel",
+        "fedora": "rhel",
+        "rhel": "rhel",
+        "suse": "suse",
+        "sles": "suse",
+        "sle_hpc": "suse"
+    }
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("ID="):
+                    id_val = line.strip().split("=", 1)[1].strip('"').lower()
+                elif line.startswith("ID_LIKE="):
+                    id_like_val = line.strip().split("=", 1)[1].strip('"').lower()
+    except Exception:
+        return "unknown"
+
+    for key, val in platform_map.items():
+        if key in id_val or key in id_like_val:
+            return val
+    return "unknown"
 
 def main() -> None:
     # needed to set slurmctld only
@@ -776,7 +807,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--platform", default="rhel", choices=["rhel", "ubuntu", "suse", "debian"]
+        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse", "debian"], required=False
     )
     parser.add_argument(
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
@@ -784,9 +815,6 @@ def main() -> None:
     parser.add_argument("--bootstrap-config", default="jetpack")
 
     args = parser.parse_args()
-
-    if args.platform == "debian":
-        args.platform = "ubuntu"
 
     config = _load_config(args.bootstrap_config)
     settings = InstallSettings(config, args.platform, args.mode)
