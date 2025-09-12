@@ -121,7 +121,7 @@ done
 if [ -n "$packages_to_install" ]; then
     apt update
     echo "Installing all packages: $packages_to_install"
-    apt install -y $packages_to_install
+    apt install -y --allow-downgrades --allow-change-held-packages $packages_to_install
     echo "Successfully installed all required packages"
     
     # Hold SLURM packages to prevent automatic updates
