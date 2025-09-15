@@ -14,53 +14,58 @@ if [ "$OS_VERSION" -lt "8" ]; then
     exit 1
 fi
 
-is_package_installed() {
-    local pkg_name=$1
-    rpm -qa | grep -q "^${pkg_name}-"
+rpm_pkg_install() {
+    local packages_to_install=""
+    local pkg_names=$1
+    for pkg_name in $pkg_names; do
+        if ! rpm -qa | grep -q "^${pkg_name}-"; then
+            packages_to_install="$packages_to_install $pkg_name"
+        fi
+    done
+    if [ -n "$packages_to_install" ]; then
+        echo "The following packages need to be installed: $packages_to_install"
+        dependent_pkgs=""
+        slurm_pkgs=""
+
+        for pkg in $packages_to_install; do
+            case "$pkg" in
+                epel-release|perl-Switch|munge|jq)
+                    dependent_pkgs="$dependent_pkgs $pkg"
+                    ;;
+                *)
+                    slurm_pkgs="$slurm_pkgs $pkg"
+                    ;;
+            esac
+        done
+
+        # Install dependent packages individually
+        for pkg in $dependent_pkgs; do
+            if [[ "$pkg" == "epel-release" ]]; then
+                if [ "${OS_ID,,}" == "rhel" ]; then
+                    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+                else
+                    yum install -y epel-release
+                fi
+            elif [[ "$pkg" == "perl-Switch" ]] && [ "${OS_ID,,}" != "rhel" ]; then
+                dnf -y --enablerepo=powertools install perl-Switch
+            else
+                echo "Installing $pkg"
+                yum install -y $pkg 
+            fi  
+        done
+
+        # Install slurm packages in one yum command
+        if [ -n "$slurm_pkgs" ]; then
+            echo "Installing slurm packages: $slurm_pkgs"
+            yum install -y $slurm_pkgs --disableexcludes slurm
+        fi
+        echo "Successfully installed all required packages"
+    else
+        echo "All required packages are already installed"
+    fi
 }
 
-system_packages=""
-
-# Handle EPEL and perl-Switch
-if [ "${OS_ID,,}" == "rhel" ]; then
-    if ! is_package_installed "epel-release"; then
-        echo "Installing EPEL repository for RHEL"
-        dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-    else
-        echo "EPEL repository is already installed"
-    fi
-    if ! is_package_installed "perl-Switch"; then
-        echo "perl-Switch needs to be installed"
-        dnf -y install perl-Switch
-    else
-        echo "perl-Switch is already installed"
-    fi
-else
-    if ! is_package_installed "epel-release"; then
-        echo "epel-release needs to be installed"
-        yum install -y epel-release
-    else
-        echo "epel-release is already installed"
-    fi
-    if ! is_package_installed "perl-Switch"; then
-        echo "perl-Switch needs to be installed"
-        dnf -y --enablerepo=powertools install perl-Switch
-    else
-        echo "perl-Switch is already installed"
-    fi
-    
-fi
-
-# Handle munge and jq
-for pkg in munge jq; do
-    if ! is_package_installed "$pkg"; then
-        echo "$pkg needs to be installed"
-        system_packages="$system_packages $pkg"
-    else
-        echo "$pkg is already installed"
-    fi
-done
-
+dependency_packages="epel-release perl-Switch munge jq"
 slurm_packages="slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd slurm-slurmrestd"
 execute_packages="slurm-slurmd"
@@ -85,14 +90,14 @@ else
 fi
 
 # Collect all SLURM packages based on role
-all_packages="$slurm_packages"
+all_slurm_packages="$slurm_packages"
 
 if [ "${SLURM_ROLE}" == "scheduler" ]; then
-    all_packages="$all_packages $sched_packages"
+    all_slurm_packages="$all_slurm_packages $sched_packages"
 fi
 
 if [ "${SLURM_ROLE}" == "execute" ]; then
-    all_packages="$all_packages $execute_packages"
+    all_slurm_packages="$all_slurm_packages $execute_packages"
 fi
 
 ## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to
@@ -103,26 +108,14 @@ if [ ! -e /etc/yum.repos.d/microsoft-prod.repo ]; then
     rm packages-microsoft-prod.rpm
 fi
 
-packages_to_install="$system_packages"
+all_packages="$dependency_packages"
 
-# Add SLURM packages that aren't installed
-for pkg in $all_packages; do
-    if is_package_installed "${pkg}-${SLURM_VERSION}*"; then
-        echo "Package $pkg with version ${SLURM_VERSION} is already installed"
-    else
-        echo "Package $pkg with version ${SLURM_VERSION}* needs to be installed"
-        packages_to_install="$packages_to_install ${pkg}-${SLURM_VERSION}*"
-    fi
+#add version suffix to all slurm packages
+for pkg in $all_slurm_packages; do
+    all_packages="$all_packages ${pkg}-${SLURM_VERSION}*"
 done
 
-# Install all packages in one command (system packages first, then SLURM packages)
-if [ -n "$packages_to_install" ]; then
-    echo "Installing all packages: $packages_to_install"
-    yum -y install $packages_to_install --disableexcludes slurm
-    echo "Successfully installed all required packages"
-else
-    echo "All required packages are already installed"
-fi
+rpm_pkg_install "$all_packages"
 
 touch $INSTALLED_FILE
 exit
