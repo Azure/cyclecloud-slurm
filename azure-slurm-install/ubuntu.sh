@@ -7,42 +7,55 @@ INSTALLED_FILE=/etc/azslurm-bins.installed
 SLURM_ROLE=$1
 SLURM_VERSION=$2
 
-# Function to check if a package is installed (for any version)
-is_package_installed() {
-    local pkg_name=$1
-    dpkg -l | grep -q "^[hi]i  ${pkg_name}"
-}
-
-# Function to check if a package is installed with specific version prefix
-is_package_installed_with_version() {
-    local pkg_name=$1
-    local version_prefix=$2
-    dpkg -l | grep "^[hi]i  ${pkg_name}" | grep -q "${version_prefix}"
-}
-
 UBUNTU_VERSION=$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2)
 
-system_packages=""
+dpkg_pkg_install() {
+    local packages_to_install=""
+    local packages_to_hold=""
+    local pkg_names=$1
+    
+    for pkg_name in $pkg_names; do
+        # Check if it's a versioned SLURM package
+        if [[ "$pkg_name" == *"=${SLURM_VERSION}"* ]]; then
+            local base_pkg=$(echo "$pkg_name" | sed "s/=${SLURM_VERSION}.*//")
+            if ! dpkg -l | grep "^[hi]i  ${base_pkg}" | grep -q "${SLURM_VERSION}"; then
+                packages_to_install="$packages_to_install $pkg_name"
+                packages_to_hold="$packages_to_hold $base_pkg"
+            fi
+        else
+            # Regular package check
+            if ! dpkg -l | grep -q "^[hi]i  ${pkg_name}"; then
+                packages_to_install="$packages_to_install $pkg_name"
+            fi
+        fi
+    done
+    
+    if [ -n "$packages_to_install" ]; then
+        echo "The following packages need to be installed: $packages_to_install"
+        apt update
+        
+        # Install all packages in one command
+        echo "Installing packages: $packages_to_install"
+        apt install -y --allow-downgrades --allow-change-held-packages $packages_to_install
+        # Hold SLURM packages to prevent automatic updates
+        if [ -n "$packages_to_hold" ]; then
+            apt-mark hold $packages_to_hold
+        fi
+        
+        echo "Successfully installed all required packages"
+    else
+        echo "All required packages are already installed"
+    fi
+}
+
+dependency_packages=""
 
 # Handle python3-venv for Ubuntu > 19
 if [[ $UBUNTU_VERSION > "19" ]]; then
-    if ! is_package_installed "python3-venv"; then
-        echo "python3-venv needs to be installed"
-        system_packages="$system_packages python3-venv"
-    else
-        echo "python3-venv is already installed"
-    fi
+    dependency_packages="$dependency_packages python3-venv"
 fi
 
-# Handle system packages
-for pkg in munge libmysqlclient-dev libssl-dev jq; do
-    if ! is_package_installed "$pkg"; then
-        echo "$pkg needs to be installed"
-        system_packages="$system_packages $pkg"
-    else
-        echo "$pkg is already installed"
-    fi
-done
+dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq"
 
 arch=$(dpkg --print-architecture)
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
@@ -93,45 +106,26 @@ sched_packages="slurm-smd-slurmctld slurm-smd-slurmdbd slurm-smd-slurmrestd"
 execute_packages="slurm-smd-slurmd"
 
 # Collect all SLURM packages based on role
-all_packages="$slurm_packages"
+all_slurm_packages="$slurm_packages"
 
 if [ "${SLURM_ROLE}" == "scheduler" ]; then
-    all_packages="$all_packages $sched_packages"
+    all_slurm_packages="$all_slurm_packages $sched_packages"
 fi
 
 if [ "${SLURM_ROLE}" == "execute" ]; then
-    all_packages="$all_packages $execute_packages"
+    all_slurm_packages="$all_slurm_packages $execute_packages"
 fi
 
-packages_to_install="$system_packages"
-packages_to_hold=""
+# Combine dependency packages and versioned SLURM packages
+all_packages="$dependency_packages"
 
-# Add SLURM packages that aren't installed
-for pkg in $all_packages; do
-    if is_package_installed_with_version "$pkg" "$SLURM_VERSION"; then
-        echo "Package $pkg with version ${SLURM_VERSION}* is already installed"
-    else
-        echo "Package $pkg with version ${SLURM_VERSION}* needs to be installed"
-        packages_to_install="$packages_to_install ${pkg}=${SLURM_VERSION}*"
-        packages_to_hold="$packages_to_hold $pkg"
-    fi
+# Add version suffix to all slurm packages
+for pkg in $all_slurm_packages; do
+    all_packages="$all_packages ${pkg}=${SLURM_VERSION}*"
 done
 
-# Install all packages in one command (system packages first, then SLURM packages)
-if [ -n "$packages_to_install" ]; then
-    apt update
-    echo "Installing all packages: $packages_to_install"
-    apt install -y --allow-downgrades --allow-change-held-packages $packages_to_install
-    echo "Successfully installed all required packages"
-    
-    # Hold SLURM packages to prevent automatic updates
-    if [ -n "$packages_to_hold" ]; then
-        echo "Holding packages: $packages_to_hold"
-        apt-mark hold $packages_to_hold
-    fi
-else
-    echo "All required packages are already installed"
-fi
+# Install all packages using the unified function
+dpkg_pkg_install "$all_packages"
 
 touch $INSTALLED_FILE
 exit
