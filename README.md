@@ -227,7 +227,7 @@ Formatting is only available for jobs and not for partition and partition_hourly
 Do note: `azslurm cost` relies on slurm's admincomment feature to associate specific vm_size and meter info for jobs.
 
 ### Topology
-`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the [topology plugin configuration](https://slurm.schedmd.com/topology.html) for slurm either using VMSS topology, a fabric manager that has SHARP enabled, or the NVLink Domain. `azslurm topology` can generate both tree and block topology plugin configurations for Slurm. Users may use `azslurm topology` to generate the topology file but must manually add it to `/etc/slurm/topology.conf` either by giving that as the output file or copying the file over. Additionally, users must specify `topologyType=tree|block` in `slurm.conf` for full functionality.
+`azslurm` in slurm 4.0 project upgrades `azslurm generate_topology` to `azslurm topology` to generate the [topology plugin configuration](https://slurm.schedmd.com/topology.html) for slurm either using VMSS topology, a fabric manager that has SHARP enabled, or the NVLink Domain. `azslurm topology` can generate both tree and block topology plugin configurations for Slurm. Users may use `azslurm topology` to generate the topology file but must manually add it to `/etc/slurm/topology.conf` either by giving that as the output file or copying the file over. Additionally, users must specify `topologyType=tree|block` in `slurm.conf` for full functionality. `azslurm` also includes `azslurm show_topology` to visualize block topology configurations as either a table or json format.
 
 Note: `azslurm topology` is only useful in manually scaled clusters or clusters of fixed size. Autoscaling does not take topology into account and topology is not updated on autoscale.
 
@@ -320,6 +320,112 @@ BlockName=block4 Nodes=ccw-1-3-gpu-5,ccw-1-3-gpu-17,ccw-1-3-gpu-254,ccw-1-3-gpu-
 BlockSizes=5
 ```
 This either prints out the topology in slurm topology format or creates an output file with the topology.
+
+`azslurm show_topology` can visualize block topology configurations as either a json or table format. 
+```
+usage: azslurm show_topology [-h] [--config CONFIG] [--output OUTPUT] [--format {table,json}]
+
+options:
+  -h, --help            show this help message and exit
+  --config CONFIG, -c CONFIG
+  --output OUTPUT       Output file for the topology (default: /etc/slurm/topology.conf)
+  --format {table,json}
+  ```
+  To view block topology configuration in table format:
+  ```
+azslurm show_topology --format table
+Block Name |   Size | Nodes
+-----------+----------+---------------------------------------------------
+block3     |      8 | ccw-1-3-gpu-31, ccw-1-3-gpu-52, ccw-1-3-gpu-297...
+block4     |      9 | ccw-1-3-gpu-5, ccw-1-3-gpu-17, ccw-1-3-gpu-254,...
+block2     |     16 | ccw-1-3-gpu-464, ccw-1-3-gpu-7, ccw-1-3-gpu-454...
+block1     |     18 | ccw-1-3-gpu-21, ccw-1-3-gpu-407, ccw-1-3-gpu-33...
+
+Total blocks: 4
+Total nodes: 51
+  ```
+  To view block topology configuration in json format:
+  ```
+  azslurm show_topology --format json
+[
+  {
+    "blockname": "block3",
+    "size": 8,
+    "nodelist": [
+      "ccw-1-3-gpu-31",
+      "ccw-1-3-gpu-52",
+      "ccw-1-3-gpu-297",
+      "ccw-1-3-gpu-319",
+      "ccw-1-3-gpu-349",
+      "ccw-1-3-gpu-62",
+      "ccw-1-3-gpu-394",
+      "ccw-1-3-gpu-122"
+    ]
+  },
+  {
+    "blockname": "block4",
+    "size": 9,
+    "nodelist": [
+      "ccw-1-3-gpu-5",
+      "ccw-1-3-gpu-17",
+      "ccw-1-3-gpu-254",
+      "ccw-1-3-gpu-284",
+      "ccw-1-3-gpu-249",
+      "ccw-1-3-gpu-37",
+      "ccw-1-3-gpu-229",
+      "ccw-1-3-gpu-109",
+      "ccw-1-3-gpu-294"
+    ]
+  },
+  {
+    "blockname": "block2",
+    "size": 16,
+    "nodelist": [
+      "ccw-1-3-gpu-464",
+      "ccw-1-3-gpu-7",
+      "ccw-1-3-gpu-454",
+      "ccw-1-3-gpu-344",
+      "ccw-1-3-gpu-91",
+      "ccw-1-3-gpu-217",
+      "ccw-1-3-gpu-324",
+      "ccw-1-3-gpu-43",
+      "ccw-1-3-gpu-188",
+      "ccw-1-3-gpu-97",
+      "ccw-1-3-gpu-434",
+      "ccw-1-3-gpu-172",
+      "ccw-1-3-gpu-153",
+      "ccw-1-3-gpu-277",
+      "ccw-1-3-gpu-147",
+      "ccw-1-3-gpu-354"
+    ]
+  },
+  {
+    "blockname": "block1",
+    "size": 18,
+    "nodelist": [
+      "ccw-1-3-gpu-21",
+      "ccw-1-3-gpu-407",
+      "ccw-1-3-gpu-333",
+      "ccw-1-3-gpu-60",
+      "ccw-1-3-gpu-387",
+      "ccw-1-3-gpu-145",
+      "ccw-1-3-gpu-190",
+      "ccw-1-3-gpu-205",
+      "ccw-1-3-gpu-115",
+      "ccw-1-3-gpu-236",
+      "ccw-1-3-gpu-164",
+      "ccw-1-3-gpu-180",
+      "ccw-1-3-gpu-195",
+      "ccw-1-3-gpu-438",
+      "ccw-1-3-gpu-305",
+      "ccw-1-3-gpu-255",
+      "ccw-1-3-gpu-14",
+      "ccw-1-3-gpu-400"
+    ]
+  }
+]
+```
+
 
 
 ### GB200/GB300 IMEX Support
@@ -474,6 +580,7 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
       retry_failed_nodes   - Retries all nodes in a failed state.
       scale                - 
       shell                - Interactive python shell with relevant objects in local scope. Use --script to run python scripts
+      show_topology        - Show the topology configuration for block topology
       suspend              - Equivalent to SuspendProgram, shutsdown nodes
       topology             - Generates topology plugin configuration
       wait_for_resume      - Wait for a set of nodes to converge.
