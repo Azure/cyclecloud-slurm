@@ -38,7 +38,7 @@ if [ "${OS_ID,,}" == "rhel" ]; then
 else
     if ! is_package_installed "epel-release"; then
         echo "epel-release needs to be installed"
-        system_packages="$system_packages epel-release"
+        yum install -y epel-release
     else
         echo "epel-release is already installed"
     fi
