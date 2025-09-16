@@ -40,12 +40,8 @@ rpm_pkg_install() {
 
         # Install dependent packages individually
         for pkg in $dependent_pkgs; do
-            if [[ "$pkg" == "epel-release" ]]; then
-                if [ "${OS_ID,,}" == "rhel" ]; then
-                    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-                else
-                    yum install -y epel-release
-                fi
+            if [[ "$pkg" == "epel-release" ]] &&  [ "${OS_ID,,}" == "rhel" ]; then
+                dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
             elif [[ "$pkg" == "perl-Switch" ]] && [ "${OS_ID,,}" != "rhel" ]; then
                 dnf -y --enablerepo=powertools install perl-Switch
             else
