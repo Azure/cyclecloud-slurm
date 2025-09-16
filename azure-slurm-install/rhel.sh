@@ -45,9 +45,8 @@ rpm_pkg_install() {
             elif [[ "$pkg" == "perl-Switch" ]] && [ "${OS_ID,,}" != "rhel" ]; then
                 dnf -y --enablerepo=powertools install perl-Switch
             else
-                echo "Installing $pkg"
-                yum install -y $pkg 
-            fi  
+                yum install -y $pkg
+            fi
         done
 
         # Install slurm packages in one yum command

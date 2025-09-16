@@ -33,15 +33,12 @@ dpkg_pkg_install() {
     if [ -n "$packages_to_install" ]; then
         echo "The following packages need to be installed: $packages_to_install"
         apt update
-        
         # Install all packages in one command
-        echo "Installing packages: $packages_to_install"
         apt install -y --allow-downgrades --allow-change-held-packages $packages_to_install
         # Hold SLURM packages to prevent automatic updates
         if [ -n "$packages_to_hold" ]; then
             apt-mark hold $packages_to_hold
         fi
-        
         echo "Successfully installed all required packages"
     else
         echo "All required packages are already installed"
