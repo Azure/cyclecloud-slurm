@@ -168,7 +168,7 @@ def run_installer(s: InstallSettings, path: str, mode: str) -> None:
     if os.path.exists(INSTALL_FILE):
         try:
             with open(INSTALL_FILE, 'r') as fp:
-                contents=fp.read()
+                contents = fp.read()
                 for line in contents.splitlines():
                     key, value = line.split("=")
                     attr[key] = value
