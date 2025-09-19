@@ -14,9 +14,31 @@ if [ "$OS_VERSION" -lt "8" ]; then
     exit 1
 fi
 
+#Almalinux 8/9 and RockyLinux 8/9 both need epel-release to install libjwt for slurm packages 
+enable_epel() {
+    if ! rpm -qa | grep -q "^epel-release-"; then
+        if [ "${OS_ID,,}" == "rhel" ]; then
+            yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${OS_VERSION}.noarch.rpm
+        else
+            yum -y install epel-release
+        fi
+    fi
+    if [ "${OS_ID}" != "rhel" ]; then
+        if [ "$OS_VERSION" == "8" ]; then
+            # Enable powertools repo for AlmaLinux 8 (needed for perl-Switch package)
+                yum config-manager --set-enabled powertools
+        else
+            # Enable crb repo for AlmaLinux 9 (needed for perl-Switch package)
+                yum config-manager --set-enabled crb
+        fi
+    fi
+
+}
+
 rpm_pkg_install() {
     local packages_to_install=""
     local pkg_names=$1
+    local extra_flags=$2
     for pkg_name in $pkg_names; do
         if ! rpm -qa | grep -q "^${pkg_name}-"; then
             packages_to_install="$packages_to_install $pkg_name"
@@ -24,43 +46,15 @@ rpm_pkg_install() {
     done
     if [ -n "$packages_to_install" ]; then
         echo "The following packages need to be installed: $packages_to_install"
-        dependent_pkgs=""
-        slurm_pkgs=""
-
-        for pkg in $packages_to_install; do
-            case "$pkg" in
-                epel-release|perl-Switch|munge|jq)
-                    dependent_pkgs="$dependent_pkgs $pkg"
-                    ;;
-                *)
-                    slurm_pkgs="$slurm_pkgs $pkg"
-                    ;;
-            esac
-        done
-
-        # Install dependent packages individually
-        for pkg in $dependent_pkgs; do
-            if [[ "$pkg" == "epel-release" ]] &&  [ "${OS_ID,,}" == "rhel" ]; then
-                dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-            elif [[ "$pkg" == "perl-Switch" ]] && [ "${OS_ID,,}" != "rhel" ]; then
-                dnf -y --enablerepo=powertools install perl-Switch
-            else
-                yum install -y $pkg
-            fi
-        done
-
-        # Install slurm packages in one yum command
-        if [ -n "$slurm_pkgs" ]; then
-            echo "Installing slurm packages: $slurm_pkgs"
-            yum install -y $slurm_pkgs --disableexcludes slurm
-        fi
+        # Install all packages in one yum command
+        yum install -y $packages_to_install $extra_flags
         echo "Successfully installed all required packages"
     else
         echo "All required packages are already installed"
     fi
 }
 
-dependency_packages="epel-release perl-Switch munge jq"
+dependency_packages="perl-Switch munge jq"
 slurm_packages="slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd slurm-slurmrestd"
 execute_packages="slurm-slurmd"
@@ -103,14 +97,15 @@ if [ ! -e /etc/yum.repos.d/microsoft-prod.repo ]; then
     rm packages-microsoft-prod.rpm
 fi
 
-all_packages="$dependency_packages"
-
+versioned_slurm_packages=""
 #add version suffix to all slurm packages
 for pkg in $all_slurm_packages; do
-    all_packages="$all_packages ${pkg}-${SLURM_VERSION}*"
+    versioned_slurm_packages="$versioned_slurm_packages ${pkg}-${SLURM_VERSION}*"
 done
 
-rpm_pkg_install "$all_packages"
+enable_epel
+rpm_pkg_install "$dependency_packages"
+rpm_pkg_install "$versioned_slurm_packages" "--disableexcludes slurm"
 
 touch $INSTALLED_FILE
 exit
