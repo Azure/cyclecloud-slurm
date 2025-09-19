@@ -5,7 +5,6 @@ do_install=$(jetpack config slurm.do_install True)
 install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.3.tar.gz)
 autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.3.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
-platform=$(jetpack config platform_family rhel)
 
 find_python3() {
     export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
@@ -72,7 +71,7 @@ if [ $do_install == "True" ]; then
     jetpack download --project $slurm_project_name $install_pkg
     tar xzf $install_pkg
     cd azure-slurm-install
-    $PYTHON_BIN install.py --platform $platform --mode scheduler --bootstrap-config $CYCLECLOUD_HOME/config/node.json
+    $PYTHON_BIN install.py --mode scheduler --bootstrap-config $CYCLECLOUD_HOME/config/node.json
     cd ..
 fi
 

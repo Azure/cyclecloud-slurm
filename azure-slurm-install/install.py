@@ -163,7 +163,42 @@ def setup_users(s: InstallSettings) -> None:
 
 
 def run_installer(s: InstallSettings, path: str, mode: str) -> None:
-    subprocess.check_call([path, mode, s.slurmver])
+    INSTALL_FILE = "/etc/azslurm-bins.installed"
+    attr = {}
+    if os.path.exists(INSTALL_FILE):
+        try:
+            with open(INSTALL_FILE, 'r') as fp:
+                contents = fp.read()
+                for line in contents.splitlines():
+                    key, value = line.split("=")
+                    attr[key] = value
+            if attr.get("SLURM_VERSION") != s.slurmver:
+                logging.warning(f"Slurm version installed: {attr['SLURM_VERSION']}, slurm version requested: {s.slurmver}")
+            elif attr["MODE"] != "install-only" and attr["MODE"] != mode:
+                logging.warning(f"Role configured {attr['MODE']} role requested: {mode}")
+            elif int(attr["EXIT_CODE"]) != 0:
+                logging.warning(f"Previous package install did not succeed, re-running it")
+            else:
+                # Everything is already installed
+                logging.info(f"Required slurm version: {attr['SLURM_VERSION']} already installed.")
+                return
+        except Exception as e:
+            logging.exception(e)
+        os.remove(INSTALL_FILE)
+
+
+    logging.info(f"Running script {path}, slurm version: {s.slurmver}, mode={mode}")
+    out = subprocess.run([path, mode, s.slurmver], stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    logging.debug(out.stdout)
+    if out.returncode != 0:
+        logging.error(out.stderr)
+        raise Exception(f"{path} returned error")
+    else:
+        with open(INSTALL_FILE, 'w') as fp:
+            fp.write(f"SLURM_VERSION={s.slurmver}\n")
+            fp.write(f"MODE={mode}\n")
+            fp.write(f"EXIT_CODE={out.returncode}\n")
+
 
 
 def fix_permissions(s: InstallSettings) -> None:
@@ -733,6 +768,37 @@ def _load_config(bootstrap_config: str) -> Dict:
 
     return config
 
+def detect_platform() -> str:
+    """
+    Detects Os Platform
+    """
+    id_val = ""
+    id_like_val = ""
+    platform_map = {
+        "ubuntu": "ubuntu",
+        "debian": "ubuntu",
+        "almalinux": "rhel",
+        "centos": "rhel",
+        "fedora": "rhel",
+        "rhel": "rhel",
+        "suse": "suse",
+        "sles": "suse",
+        "sle_hpc": "suse"
+    }
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("ID="):
+                    id_val = line.strip().split("=", 1)[1].strip('"').lower()
+                elif line.startswith("ID_LIKE="):
+                    id_like_val = line.strip().split("=", 1)[1].strip('"').lower()
+    except Exception:
+        return "unknown"
+
+    for key, val in platform_map.items():
+        if key in id_val or key in id_like_val:
+            return val
+    return "unknown"
 
 def main() -> None:
     # needed to set slurmctld only
@@ -741,7 +807,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--platform", default="rhel", choices=["rhel", "ubuntu", "suse", "debian"]
+        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse", "debian"], required=False
     )
     parser.add_argument(
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
@@ -749,9 +815,6 @@ def main() -> None:
     parser.add_argument("--bootstrap-config", default="jetpack")
 
     args = parser.parse_args()
-
-    if args.platform == "debian":
-        args.platform = "ubuntu"
 
     config = _load_config(args.bootstrap_config)
     settings = InstallSettings(config, args.platform, args.mode)
