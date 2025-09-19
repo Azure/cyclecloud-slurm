@@ -23,7 +23,7 @@ enable_epel() {
             yum -y install epel-release
         fi
     fi
-    if [ "${OS_ID}" != "rhel" ]; then
+    if [ "${OS_ID}" == "almalinux" ]; then
         if [ "$OS_VERSION" == "8" ]; then
             # Enable powertools repo for AlmaLinux 8 (needed for perl-Switch package)
                 yum config-manager --set-enabled powertools
