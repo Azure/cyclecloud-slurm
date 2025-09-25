@@ -39,6 +39,6 @@ function install_yq() {
 }
 
 function is_monitoring_enabled() {
-    monitoring_enabled=$(jetpack config monitoring.enabled false)
+    monitoring_enabled=$(jetpack config monitoring.enabled False)
     echo "$monitoring_enabled" | tr '[:upper:]' '[:lower:]' | grep -q 'true'
 }

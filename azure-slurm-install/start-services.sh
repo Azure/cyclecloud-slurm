@@ -99,14 +99,14 @@ EOF
     systemctl status slurmrestd.service
 }
 
-slurmrestd_disabled=$(/opt/cycle/jetpack/bin/jetpack config slurmrestd.disabled false)
-if [[ "$slurmrestd_disabled" == "false" ]]; then
+slurmrestd_disabled=$(/opt/cycle/jetpack/bin/jetpack config slurmrestd.disabled False)
+if [[ "$slurmrestd_disabled" == "False" ]]; then
     sleep 10
     configure_slurmrestd
 fi
 
-monitoring_enabled=$(jetpack config monitoring.enabled false)
-if [[ "$monitoring_enabled" == "true" ]]; then
+monitoring_enabled=$(jetpack config monitoring.enabled False)
+if [[ "$monitoring_enabled" == "True" ]]; then
     ./60_slurm_exporter.sh
-
+fi
 exit 0
