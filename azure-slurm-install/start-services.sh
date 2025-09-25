@@ -7,7 +7,7 @@ if [ "$1" == "" ]; then
 fi
 
 role=$1
-
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # all nodes need to have munge running
 echo restarting munge...
 systemctl restart munge
@@ -107,6 +107,6 @@ fi
 
 monitoring_enabled=$(jetpack config monitoring.enabled False)
 if [[ "$monitoring_enabled" == "True" ]]; then
-    ./60_slurm_exporter.sh
+    ./"${script_dir}/60_slurm_exporter.sh"
 fi
 exit 0
