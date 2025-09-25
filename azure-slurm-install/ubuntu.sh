@@ -52,7 +52,7 @@ if [[ $UBUNTU_VERSION > "19" ]]; then
     dependency_packages="$dependency_packages python3-venv"
 fi
 
-dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq"
+dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq libjansson-dev libjwt-dev binutils"
 
 arch=$(dpkg --print-architecture)
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then

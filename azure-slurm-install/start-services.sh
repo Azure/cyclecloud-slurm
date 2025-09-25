@@ -55,11 +55,58 @@ for i in $( seq 1 $attempts ); do
     scontrol ping
     if [ $? == 0 ]; then
         systemctl start slurmctld || exit 1
-        exit 0
+        break
     fi;
 done
+if [ $i == $attempts ] && [ $? != 0 ]; then
+    echo FATAL: slurmctld failed to start! 1>&2
+    echo Here are the last 100 lines of slurmctld.log
+    tail -n 100 /var/log/slurmctld/slurmctld.log 1>&2
+    exit 2
+fi
 
-echo FATAL: slurmctld has not started! 1>&2
-echo Here are the last 100 lines of slurmctld.log
-tail -n 100 /var/log/slurmctld/slurmctld.log 1>&2
-exit 2
+configure_slurmrestd() {
+    # Create an unprivileged user for slurmrestd
+    if id "slurmrestd" &>/dev/null; then
+        echo "User slurmrestd exists"
+    else
+        useradd -M -r -s /usr/sbin/nologin -U slurmrestd
+    fi
+
+    # Add user to the docker group
+    if getent group docker | grep -qw slurmrestd; then
+        echo "User slurmrestd belongs to group docker"
+    else
+        usermod -aG docker slurmrestd
+    fi
+
+    # Create a socket for the slurmrestd
+    mkdir -pv /var/spool/slurmrestd
+    touch /var/spool/slurmrestd/slurmrestd.socket
+    chown -R slurmrestd:slurmrestd /var/spool/slurmrestd
+    chmod 755 /var/spool/slurmrestd
+
+    # Configure the slurmrestd:
+     cat <<EOF > /etc/default/slurmrestd
+SLURMRESTD_OPTIONS="-u slurmrestd -g slurmrestd"
+SLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket
+EOF
+    chmod 644 /etc/default/slurmrestd
+
+    scontrol reconfigure
+    systemctl stop slurmrestd.service
+    systemctl start slurmrestd.service
+    systemctl status slurmrestd.service
+}
+
+slurmrestd_disabled=$(/opt/cycle/jetpack/bin/jetpack config slurmrestd.disabled false)
+if [[ "$slurmrestd_disabled" == "false" ]]; then
+    sleep 10
+    configure_slurmrestd
+fi
+
+monitoring_enabled=$(jetpack config monitoring.enabled false)
+if [[ "$monitoring_enabled" == "true" ]]; then
+    ./60_slurm_exporter.sh
+
+exit 0
