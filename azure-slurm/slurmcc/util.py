@@ -355,19 +355,17 @@ def output_block_nodelist(topology_input, table=False):
                     'size': len(nodelist),
                     'nodelist': nodelist
                 })
-
+    
+    if not blocks:
+        raise ValueError("No blocks found in topology")
     # Sort blocks by size (smallest to largest)
     blocks.sort(key=lambda x: x['size'])
-
+    
     if not table:
         # Return JSON format
         return json.dumps(blocks, indent=2)
     else:
         # Print tabular format
-        if not blocks:
-            print("No blocks found in topology")
-            return
-
         # Calculate column widths
         max_blockname = max(len(b['blockname']) for b in blocks)
         max_blockname = max(max_blockname, len("Block Name"))
