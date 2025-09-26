@@ -17,7 +17,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
         1. [AzureCA.pem and existing MariaDB/MySQL instances](#azurecapem-and-existing-mariadbmysql-instances)
     9. [Cost Reporting](#cost-reporting)
     10. [Topology](#topology)
-    11. [GB200 IMEX Support](#gb200-imex-support) 
+    11. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
     12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
@@ -322,8 +322,8 @@ BlockSizes=5
 This either prints out the topology in slurm topology format or creates an output file with the topology.
 
 
-### GB200 IMEX Support
-Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cleanup IMEX service on a per-job basis. The prolog script will attempt to kill an existing IMEX service before configuring a new instance that will be specific to the new, submitted job. The epilog script terminates the IMEX service. By default, these scripts will run for GB200 nodes and not run for non-GB200 nodes. A configurable parameter `slurm.imex.enabled` has been added to the slurm cluster configuration template to allow non-GB200 nodes to enable IMEX support for their jobs or allow GB200 nodes to disable IMEX support for their jobs.
+### GB200/GB300 IMEX Support
+Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cleanup IMEX service on a per-job basis. The prolog script will attempt to kill an existing IMEX service before configuring a new instance that will be specific to the new, submitted job. The epilog script terminates the IMEX service. By default, these scripts will run for GB200/GB300 nodes and not run for non-GB200/GB300 nodes. A configurable parameter `slurm.imex.enabled` has been added to the slurm cluster configuration template to allow non-GB200/GB300 nodes to enable IMEX support for their jobs or allow GB200/GB300 nodes to disable IMEX support for their jobs.
 ```
 #Parameter to enable or disable IMEX service on a per-job basis
         slurm.imex.enabled=True

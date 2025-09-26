@@ -37,7 +37,7 @@ Prolog={prolog}
 Epilog={epilog}
 # This flag executes prolog scripts on job allocation rather than first task/step launch.
 # It does not change how a prolog script is run but runs it earlier.
-# This flag is also required for GB200 IMEX integration.
+# This flag is also required for GB200/GB300 IMEX integration.
 # Recommended to keep this on.
 PrologFlags=alloc
 TreeWidth=65533

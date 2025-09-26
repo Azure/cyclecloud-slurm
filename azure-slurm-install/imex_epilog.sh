@@ -23,14 +23,14 @@ mkdir -p /var/log/slurm
 
   # Main logic
   set -e
-  if [[ "$VM_SIZE" == *"GB200"* ]]; then
+  if [[ "$VM_SIZE" == *"GB200"* || "$VM_SIZE" == *"GB300"* ]]; then
       if [[ "$IMEX_ENABLED" == "False" ]]; then
           exit 0  # No-op
       else
-          run_epilog  # Run prolog for GB200 by default
+          run_epilog  # Run epilog for GB200/GB300 by default
       fi
   elif [[ "$IMEX_ENABLED" == "True" ]]; then
-      run_epilog  # Run prolog for non-GB200 VM if explicitly enabled
+      run_epilog  # Run epilog for non-GB200/GB300 VM if explicitly enabled
   else
       exit 0  # No-op
   fi

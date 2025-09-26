@@ -53,14 +53,14 @@ echo "VM_SIZE: $VM_SIZE"
 echo "IMEX_ENABLED: $IMEX_ENABLED"
 # Main logic
 set -e
-if [[ "$VM_SIZE" == *"GB200"* ]]; then
-    if [[ "$IMEX_ENABLED" == "False" ]]; then
-        exit 0  # No-op
-    else
-        run_prolog  # Run prolog for GB200 by default
-    fi
+if [[ "$VM_SIZE" == *"GB200"* || "$VM_SIZE" == *"GB300"* ]]; then
+  if [[ "$IMEX_ENABLED" == "False" ]]; then
+    exit 0  # No-op
+  else
+    run_prolog  # Run prolog for GB200/GB300 series by default
+  fi
 elif [[ "$IMEX_ENABLED" == "True" ]]; then
-    run_prolog  # Run prolog for non-GB200 VM if explicitly enabled
+    run_prolog  # Run prolog for non-GB200/GB300 VM if explicitly enabled
 else
     exit 0  # No-op
 fi
