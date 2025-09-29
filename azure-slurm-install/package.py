@@ -65,6 +65,10 @@ def execute() -> None:
     for fil in os.listdir("templates"):
         if os.path.isfile(f"templates/{fil}"):
             _add(f"templates/{fil}", f"templates/{fil}")
+    
+    for fil in os.listdir("exporter"):
+        if os.path.isfile(f"exporter/{fil}"):
+            _add(f"exporter/{fil}", f"exporter/{fil}", 755)
 
 if __name__ == "__main__":
     execute()

@@ -93,6 +93,14 @@ SLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket
 EOF
     chmod 644 /etc/default/slurmrestd
 
+    # Add required capabilities to systemd unit
+    mkdir -p /etc/systemd/system/slurmrestd.service.d
+    cat <<EOF > /etc/systemd/system/slurmrestd.service.d/override.conf
+[Service]
+AmbientCapabilities=CAP_SETGID
+CapabilityBoundingSet=CAP_SETGID
+EOF
+    systemctl daemon-reload
     scontrol reconfigure
     systemctl stop slurmrestd.service
     systemctl start slurmrestd.service
@@ -100,13 +108,13 @@ EOF
 }
 
 slurmrestd_disabled=$(/opt/cycle/jetpack/bin/jetpack config slurmrestd.disabled False)
-if [[ "$slurmrestd_disabled" == "False" ]]; then
+accounting_enabled=$(/opt/cycle/jetpack/bin/jetpack config slurm.accounting.enabled False)
+if [[ "$slurmrestd_disabled" == "False" && "$accounting_enabled" == "True" ]]; then
     sleep 10
     configure_slurmrestd
-fi
-
-monitoring_enabled=$(jetpack config monitoring.enabled False)
-if [[ "$monitoring_enabled" == "True" ]]; then
-    ./"${script_dir}/60_slurm_exporter.sh"
+    monitoring_enabled=$(jetpack config monitoring.enabled False)
+    if [[ "$monitoring_enabled" == "True" ]]; then
+        . "${script_dir}/exporter/60_slurm_exporter.sh"
+    fi
 fi
 exit 0
