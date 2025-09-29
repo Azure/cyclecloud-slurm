@@ -112,7 +112,7 @@ accounting_enabled=$(/opt/cycle/jetpack/bin/jetpack config slurm.accounting.enab
 if [[ "$slurmrestd_disabled" == "False" && "$accounting_enabled" == "True" ]]; then
     sleep 10
     configure_slurmrestd
-    monitoring_enabled=$(jetpack config monitoring.enabled False)
+    monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
     if [[ "$monitoring_enabled" == "True" ]]; then
         . "${script_dir}/exporter/60_slurm_exporter.sh"
     fi
