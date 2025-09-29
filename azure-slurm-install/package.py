@@ -58,14 +58,11 @@ def execute() -> None:
     _add("suse.sh", "suse.sh", 600)
     _add("start-services.sh", "start-services.sh", 555)
     _add("capture_logs.sh", "capture_logs.sh", 755)
-    _add("60_slurm_exporter.sh", "60_slurm_exporter.sh", 755)
-    _add("common.sh", "common.sh", 755)
-    _add("slurm_exporter.yml", "slurm_exporter.yml", 755)
 
     for fil in os.listdir("templates"):
         if os.path.isfile(f"templates/{fil}"):
             _add(f"templates/{fil}", f"templates/{fil}")
-    
+
     for fil in os.listdir("exporter"):
         if os.path.isfile(f"exporter/{fil}"):
             _add(f"exporter/{fil}", f"exporter/{fil}", 755)
