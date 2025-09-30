@@ -12,6 +12,7 @@
 # Authentication info
 AuthType=auth/munge
 #AuthInfo=/var/run/munge/munge.socket.2
+{auth_alt_type}
 #
 # slurmDBD info
 DbdAddr=localhost

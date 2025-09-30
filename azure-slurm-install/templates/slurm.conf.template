@@ -71,5 +71,6 @@ Include accounting.conf
 # via azlurmd. There can be up to a 15 second delay.
 # Note this is a work around until ReconfigFlags=KeepPowerSaveSettings is fixed in slurm.
 Include keep_alive.conf
+{auth_alt_type}
 
 SlurmCtldHost={slurmctldhost}

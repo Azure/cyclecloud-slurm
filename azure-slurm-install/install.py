@@ -21,7 +21,7 @@ class InstallSettings:
             config["slurm"] = {}
 
         if "accounting" not in config["slurm"]:
-            config["slurm"]["acccounting"] = {}
+            config["slurm"]["accounting"] = {}
 
         if "user" not in config["slurm"]:
             config["slurm"]["user"] = {}
@@ -37,6 +37,9 @@ class InstallSettings:
 
         if "user" not in config["slurmrestd"]:
             config["slurmrestd"]["user"] = {}
+
+        if "monitoring" not in config:
+            config["monitoring"] = {}
 
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
@@ -79,6 +82,7 @@ class InstallSettings:
         self.slurmrestd_uid: str = config["slurmrestd"]["user"].get("uid") or "11102"
         self.slurmrestd_gid: str = config["slurmrestd"]["user"].get("gid") or "11102"
 
+        self.monitoring_enabled: bool = config["monitoring"].get("enabled", False)
 
         self.acct_enabled: bool = config["slurm"]["accounting"].get("enabled", False)
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
@@ -369,6 +373,10 @@ AccountingStorageTRES=gres/gpu
                                   else "#StorageParameters=",
             "slurmver": s.slurmver,
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
+            "auth_alt_type": (
+                "AuthAltType=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
+                if s.monitoring_enabled and not s.slurmrestd_disabled else ""
+            )
         },
     )
 
@@ -469,7 +477,11 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "epilog": "/etc/slurm/epilog.d/*",
             "launch_parameters" : s.launch_parameters,
             "health_interval": health_interval,
-            "health_program": health_program
+            "health_program": health_program,
+            "auth_alt_type": (
+                "AuthAltType=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
+                if s.monitoring_enabled and not s.slurmrestd_disabled else ""
+            )
         },
     )
 
@@ -779,8 +791,34 @@ def setup_slurmrestd(s: InstallSettings) -> None:
         mode=644,
     )
 
+    if s.monitoring_enabled:
+        configure_JWT_authentication(s)
 
     ilib.enable_service("slurmrestd")
+
+def configure_JWT_authentication(s: InstallSettings) -> None:
+    """
+    Configure JWT authentication for Slurm.
+    """
+    jwt_dir = "/var/spool/slurm/statesave"
+    jwt_key = f"{jwt_dir}/jwt_hs256.key"
+
+    # Create the directory and key file if they don't exist
+    ilib.directory(jwt_dir, owner=s.slurm_user, group=s.slurm_grp, mode=755)
+    ilib.directory("/var/spool/slurm", owner=s.slurm_user, group=s.slurm_grp, mode=755)
+
+    if not os.path.exists(jwt_key):
+        # Generate a 32-byte random key
+        with open("/dev/random", "rb") as fr:
+            key = fr.read(32)
+        ilib.file(jwt_key, content=key, owner=s.slurm_user, group=s.slurm_grp, mode=600)
+    else:
+        ilib.chown(jwt_key, owner=s.slurm_user, group=s.slurm_grp)
+        ilib.chmod(jwt_key, mode=600)
+
+    ilib.chown(jwt_dir, owner=s.slurm_user, group=s.slurm_grp)
+    ilib.chmod(jwt_dir, mode=755)
+    ilib.chmod("/var/spool/slurm", mode=755)
 
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
