@@ -3,14 +3,15 @@ set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROM_CONFIG=/opt/prometheus/prometheus.yml
 
-source "$script_dir/common.sh"
-
 SLURM_EXPORTER_PORT=9080
 
 SLURM_EXPORTER_REPO="https://github.com/SlinkyProject/slurm-exporter.git"
 SLURM_EXPORTER_COMMIT="478da458dd9f59ecc464c1b5e90a1a8ebc1a10fb"
 SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
 
+function is_scheduler() {
+    jetpack config slurm.role | grep -q 'scheduler'
+}
 # Only install Slurm Exporter on Scheduler
 if ! is_scheduler ; then
     echo "Do not install the Slurm Exporter since this is not the scheduler."
@@ -53,7 +54,7 @@ build_slurm_exporter() {
     popd
 }
 
-install_slurm_exporter() {
+run_slurm_exporter() {
 
     # Run Slurm Exporter in a container
     unset SLURM_JWT
@@ -93,7 +94,6 @@ function add_scraper() {
         echo "Prometheus config file not found at $PROM_CONFIG, skipping scraper configuration"
         return 0
     fi
-    install_yq
     # If slurm_exporter is already configured, do not add it again
     if grep -q "slurm_exporter" $PROM_CONFIG; then
         echo "Slurm Exporter is already configured in Prometheus"
@@ -111,7 +111,7 @@ function add_scraper() {
 }
 
 if is_scheduler ; then
-    install_slurm_exporter
+    run_slurm_exporter
     add_scraper
 
     # Check if metrics are available, can only be done after prometheus has been configured and restarted

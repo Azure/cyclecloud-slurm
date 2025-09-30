@@ -124,14 +124,17 @@ done
 # Install all packages using the unified function
 dpkg_pkg_install "$all_packages"
 
-# Install yq for slurm_exporter (will refactor this later)
-if [ "${SLURM_ROLE}" == "scheduler" ]; then
+# Install yq and slurm_exporter container (will refactor this later)
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
+if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; then
+    SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
     YQ_VERSION="v4.44.2"
     YQ_PACKAGE="yq_linux_${arch}"
     if ! command -v yq &> /dev/null; then
         wget -q "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_PACKAGE}" -O /usr/bin/yq
         chmod 0755 /usr/bin/yq
     fi
+    docker pull $SLURM_EXPORTER_IMAGE_NAME
 fi
 touch $INSTALLED_FILE
 exit
