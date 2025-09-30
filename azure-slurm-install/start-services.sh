@@ -65,21 +65,91 @@ if [ $i == $attempts ] && [ $? != 0 ]; then
     exit 2
 fi
 
-slurmrestd_disabled=$(/opt/cycle/jetpack/bin/jetpack config slurmrestd.disabled False)
+run_slurm_exporter() {
+    # Run Slurm Exporter in a container
+    script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    PROM_CONFIG=/opt/prometheus/prometheus.yml
+    SLURM_EXPORTER_PORT=9080
+    SLURM_EXPORTER_REPO="https://github.com/SlinkyProject/slurm-exporter.git"
+    SLURM_EXPORTER_COMMIT="478da458dd9f59ecc464c1b5e90a1a8ebc1a10fb"
+    SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
+    # Try to get the token, retry up to 3 times
+    unset SLURM_JWT
+    for attempt in 1 2 3; do
+        export $(scontrol token username="slurmrestd" lifespan=infinite)
+        if [ -n "$SLURM_JWT" ]; then
+            break
+        fi
+        echo "Attempt $attempt: Failed to get SLURM_JWT token, retrying in 5 seconds..."
+        scontrol reconfigure
+        sleep 5
+    done
+
+    if [ -z "$SLURM_JWT" ]; then
+        echo "Failed to get SLURM_JWT token after 3 attempts."
+        echo "Check slurmctld status, slurm.conf JWT configuration, and logs for errors."
+        /opt/cycle/jetpack/bin/jetpack log "Failed to get SLURM_JWT token after 3 attempts, disabling slurm_exporter setup." --level=warn --priority=medium
+        return 0
+    fi
+    # Check if the container is already running, and if so, stop it
+    if [ "$(docker ps -q -f ancestor=$SLURM_EXPORTER_IMAGE_NAME)" ]; then
+        echo "Slurm Exporter is already running, stopping it..."
+        docker stop $(docker ps -q -f ancestor=$SLURM_EXPORTER_IMAGE_NAME)
+    fi
+
+    # Run the Slurm Exporter container, expose the port so prometheus can scrape it. Redirect the host.docker.internal to the host gateway == localhost
+    docker run -v /var:/var -e SLURM_JWT=${SLURM_JWT} -d --restart always -p 9080:8080 --add-host=host.docker.internal:host-gateway $SLURM_EXPORTER_IMAGE_NAME -server http://host.docker.internal:6820 -cache-freq 10s
+
+    # Check if the container is running
+    if [ "$(docker ps -q -f ancestor=$SLURM_EXPORTER_IMAGE_NAME)" ]; then
+        echo "Slurm Exporter is running"
+    else
+        echo "Slurm Exporter is not running"
+        /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter container failed to start" --level=warn --priority=medium
+        return 0 # do not fail the slurm startup if exporter fails
+    fi
+    #add scraper if prometheus is installed
+    if [ ! -f "$PROM_CONFIG" ]; then
+        echo "Prometheus config file not found at $PROM_CONFIG, skipping scraper configuration"
+        return 0
+    fi
+    # If slurm_exporter is already configured, do not add it again
+    if grep -q "slurm_exporter" $PROM_CONFIG; then
+        echo "Slurm Exporter is already configured in Prometheus"
+        return 0
+    fi
+    INSTANCE_NAME=$(hostname)
+
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG $script_dir/exporter/slurm_exporter.yml > tmp.yml
+    mv -vf tmp.yml $PROM_CONFIG
+
+    # update the configuration file
+    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
+
+    systemctl restart prometheus
+}
+
+#start slurmrestd if accounting is enabled
 accounting_enabled=$(/opt/cycle/jetpack/bin/jetpack config slurm.accounting.enabled False)
-if [[ "$slurmrestd_disabled" == "False" && "$accounting_enabled" == "True" ]]; then
+if [[ "$accounting_enabled" == "True" ]]; then
     sleep 10
     systemctl start slurmrestd
     systemctl status slurmrestd
     if [ $? != 0 ]; then
         echo Warning: slurmrestd failed to start! 1>&2
-        echo Here are the last 100 lines of slurmrestd.log
-        tail -n 100 /var/log/slurmctld/slurmrestd.log 1>&2
         exit 2
     fi
+    # start slurm_exporter if monitoring is enabled and slurmrestd is running
     monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
     if [[ "$monitoring_enabled" == "True" ]]; then
-        . "${script_dir}/exporter/60_slurm_exporter.sh"
+        run_slurm_exporter
+        sleep 20
+        if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
+            echo "Slurm Exporter metrics are available"
+        else
+            echo "Slurm Exporter metrics are not available"
+            /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
+        fi    
     fi
 fi
 exit 0
