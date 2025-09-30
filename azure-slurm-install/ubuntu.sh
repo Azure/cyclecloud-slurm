@@ -124,5 +124,14 @@ done
 # Install all packages using the unified function
 dpkg_pkg_install "$all_packages"
 
+# Install yq for slurm_exporter (will refactor this later)
+if [ "${SLURM_ROLE}" == "scheduler" ]; then
+    YQ_VERSION="v4.44.2"
+    YQ_PACKAGE="yq_linux_${arch}"
+    if ! command -v yq &> /dev/null; then
+        wget -q "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_PACKAGE}" -O /usr/bin/yq
+        chmod 0755 /usr/bin/yq
+    fi
+fi
 touch $INSTALLED_FILE
 exit

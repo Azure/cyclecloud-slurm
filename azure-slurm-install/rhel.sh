@@ -106,6 +106,18 @@ done
 enable_epel
 rpm_pkg_install "$dependency_packages"
 rpm_pkg_install "$versioned_slurm_packages" "--disableexcludes slurm"
+# Install yq for slurm_exporter (will refactor this later)
+if [ "${SLURM_ROLE}" == "scheduler" ]; then
+    YQ_VERSION="v4.44.2"
+    YQ_PACKAGE="yq_linux_amd64"
+    if uname -m | grep -q 'aarch64\|arm64' ; then
+        YQ_PACKAGE="yq_linux_arm64"
+    fi
+    if ! command -v yq &> /dev/null; then
+        wget -q "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_PACKAGE}" -O /usr/bin/yq
+        chmod 0755 /usr/bin/yq
+    fi
+fi
 
 touch $INSTALLED_FILE
 exit
