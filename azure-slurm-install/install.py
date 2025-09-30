@@ -373,7 +373,7 @@ AccountingStorageTRES=gres/gpu
             "slurmver": s.slurmver,
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
             "auth_alt_type": (
-                "AuthAltType=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
+                "AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
                 if s.monitoring_enabled and not s.slurmrestd_disabled else ""
             )
         },
@@ -478,7 +478,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "health_interval": health_interval,
             "health_program": health_program,
             "auth_alt_type": (
-                "AuthAltType=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
+                "AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
                 if s.monitoring_enabled and not s.slurmrestd_disabled else ""
             )
         },
