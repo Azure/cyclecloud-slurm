@@ -31,6 +31,12 @@ class InstallSettings:
 
         if "user" not in config["munge"]:
             config["munge"]["user"] = {}
+        
+        if "slurmrestd" not in config:
+            config["slurmrestd"] = {}
+
+        if "user" not in config["slurmrestd"]:
+            config["slurmrestd"]["user"] = {}
 
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
@@ -66,6 +72,13 @@ class InstallSettings:
         self.munge_grp: str = config["munge"]["user"].get("group") or "munge"
         self.munge_uid: str = config["munge"]["user"].get("uid") or "11101"
         self.munge_gid: str = config["munge"]["user"].get("gid") or "11101"
+
+        self.slurmrestd_disabled: bool = config["slurmrestd"].get("disabled", False)
+        self.slurmrestd_user: str = config["slurmrestd"]["user"].get("name") or "slurmrestd"
+        self.slurmrestd_grp: str = config["slurmrestd"]["user"].get("group") or "slurmrestd"
+        self.slurmrestd_uid: str = config["slurmrestd"]["user"].get("uid") or "11102"
+        self.slurmrestd_gid: str = config["slurmrestd"]["user"].get("gid") or "11102"
+
 
         self.acct_enabled: bool = config["slurm"]["accounting"].get("enabled", False)
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
@@ -140,7 +153,7 @@ def _escape(s: str) -> str:
 
 
 def setup_users(s: InstallSettings) -> None:
-    # Set up users for Slurm and Munge
+    # Set up users for Slurm, Munge and Slurmrestd
     ilib.group(s.slurm_grp, gid=s.slurm_gid)
 
     ilib.user(
@@ -159,6 +172,16 @@ def setup_users(s: InstallSettings) -> None:
         shell="/bin/false",
         uid=s.munge_uid,
         gid=s.munge_gid,
+    )
+    
+    ilib.group(s.slurmrestd_grp, gid=s.slurmrestd_gid)
+    
+    ilib.user(
+        s.slurmrestd_user,
+        comment="User to run slurmrestd",
+        shell="/usr/sbin/nologin",
+        uid=s.slurmrestd_uid,
+        gid=s.slurmrestd_gid,
     )
 
 
@@ -232,6 +255,7 @@ def fix_permissions(s: InstallSettings) -> None:
 
     ilib.directory("/var/log/slurmd", owner=s.slurm_user, group=s.slurm_grp)
     ilib.directory("/var/log/slurmctld", owner=s.slurm_user, group=s.slurm_grp)
+    ilib.directory("/var/log/slurmrestd", owner=s.slurm_user, group=s.slurm_grp)
 
 
 def munge_key(s: InstallSettings) -> None:
@@ -411,7 +435,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
 
     if not os.path.exists(state_save_location):
         ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
-
+    
     if not os.path.exists(f"{s.config_dir}/prolog.d"):
         ilib.directory(f"{s.config_dir}/prolog.d", owner=s.slurm_user, group=s.slurm_grp)
 
@@ -531,8 +555,6 @@ def _complete_install_primary(s: InstallSettings) -> None:
             mode="0644",
             content=""
         )
-
-    
 
 def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
@@ -713,6 +735,52 @@ def setup_slurmd(s: InstallSettings) -> None:
     )
     ilib.enable_service("slurmd")
 
+def setup_slurmrestd(s: InstallSettings) -> None:
+    if s.mode != "scheduler" or s.slurmrestd_disabled:
+        logging.info("Running on non-scheduler node or slurmrestd.disabled is true, skipping this step.")
+        return
+        
+    # Add slurmrestd to docker group if docker group exists
+    try:
+        import grp
+        if "docker" in [g.gr_name for g in grp.getgrall()]:
+            ilib.group_members("docker", members=[s.slurmrestd_user], append=True)
+    except Exception as e:
+        logging.warning(f"Could not add slurmrestd to docker group: {e}")
+
+    slurmrestd_config = f"SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
+    ilib.file(
+        "/etc/sysconfig/slurmrestd" if s.platform_family == "rhel" else "/etc/default/slurmrestd",
+        content=slurmrestd_config,
+        owner=s.slurmrestd_user,
+        group=s.slurmrestd_grp,
+        mode="0644",
+    )
+    
+    ilib.directory(
+        "/var/spool/slurmrestd", owner=s.slurmrestd_user, group=s.slurmrestd_grp, mode=755
+    )
+    ilib.file(
+            f"/var/spool/slurmrestd/slurmrestd.socket",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0755",
+            content="",
+    )
+    ilib.directory(
+        "/etc/systemd/system/slurmrestd.service.d", owner="root", group="root", mode=755
+    )
+
+    ilib.template(
+        "/etc/systemd/system/slurmrestd.service.d/override.conf",
+        source="templates/slurmrestd.override",
+        owner="root",
+        group="root",
+        mode=644,
+    )
+
+
+    ilib.enable_service("slurmrestd")
 
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
@@ -838,6 +906,7 @@ def main() -> None:
 
     if settings.mode == "scheduler":
         accounting(settings)
+        setup_slurmrestd(settings)
         # TODO create a rotate log
         ilib.cron(
             "return_to_idle",
