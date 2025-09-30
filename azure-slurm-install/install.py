@@ -76,7 +76,6 @@ class InstallSettings:
         self.munge_uid: str = config["munge"]["user"].get("uid") or "11101"
         self.munge_gid: str = config["munge"]["user"].get("gid") or "11101"
 
-        self.slurmrestd_disabled: bool = config["slurmrestd"].get("disabled", False)
         self.slurmrestd_user: str = config["slurmrestd"]["user"].get("name") or "slurmrestd"
         self.slurmrestd_grp: str = config["slurmrestd"]["user"].get("group") or "slurmrestd"
         self.slurmrestd_uid: str = config["slurmrestd"]["user"].get("uid") or "11102"
@@ -374,7 +373,7 @@ AccountingStorageTRES=gres/gpu
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
             "auth_alt_type": (
                 "AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
-                if s.monitoring_enabled and not s.slurmrestd_disabled else ""
+                if s.monitoring_enabled else ""
             )
         },
     )
@@ -479,7 +478,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "health_program": health_program,
             "auth_alt_type": (
                 "AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
-                if s.monitoring_enabled and not s.slurmrestd_disabled else ""
+                if s.monitoring_enabled else ""
             )
         },
     )
@@ -747,8 +746,8 @@ def setup_slurmd(s: InstallSettings) -> None:
     ilib.enable_service("slurmd")
 
 def setup_slurmrestd(s: InstallSettings) -> None:
-    if s.mode != "scheduler" or s.slurmrestd_disabled:
-        logging.info("Running on non-scheduler node or slurmrestd.disabled is true, skipping this step.")
+    if s.mode != "scheduler" or not s.sacct_enabled:
+        logging.info("Running on non-scheduler node or slurm accounting not enabled, skipping this step.")
         return
         
     # Add slurmrestd to docker group if docker group exists
