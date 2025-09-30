@@ -259,7 +259,6 @@ def fix_permissions(s: InstallSettings) -> None:
 
     ilib.directory("/var/log/slurmd", owner=s.slurm_user, group=s.slurm_grp)
     ilib.directory("/var/log/slurmctld", owner=s.slurm_user, group=s.slurm_grp)
-    ilib.directory("/var/log/slurmrestd", owner=s.slurm_user, group=s.slurm_grp)
 
 
 def munge_key(s: InstallSettings) -> None:
@@ -760,7 +759,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
     except Exception as e:
         logging.warning(f"Could not add slurmrestd to docker group: {e}")
 
-    slurmrestd_config = f"SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
+    slurmrestd_config = "SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd --logfile=/var/log/slurmctld/slurmrestd.log\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
     ilib.file(
         "/etc/sysconfig/slurmrestd" if s.platform_family == "rhel" else "/etc/default/slurmrestd",
         content=slurmrestd_config,
