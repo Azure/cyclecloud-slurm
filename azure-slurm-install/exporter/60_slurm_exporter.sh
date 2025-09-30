@@ -19,33 +19,6 @@ fi
 
 echo "Installing Slurm Exporter..."
 
-install_prerequisites() {
-    # Configure JWT
-
-    # Create a local key
-    mkdir -pv /var/spool/slurm/statesave
-    dd if=/dev/random of=/var/spool/slurm/statesave/jwt_hs256.key bs=32 count=1
-    chown slurm:slurm /var/spool/slurm/statesave/jwt_hs256.key
-    chmod 0600 /var/spool/slurm/statesave/jwt_hs256.key
-    chown slurm:slurm /var/spool/slurm/statesave
-    chmod 0755 /var/spool/slurm/statesave
-    chmod 0755 /var/spool/slurm/
-
-    # Add to JWT Auth to the slurm.conf
-    # Check if the line already exists
-    lines_to_insert="AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
-    if ! grep -q "AuthAltTypes=auth/jwt" /etc/slurm/slurm.conf; then
-        sed -i --follow-symlinks '/^Include azure.conf/a '"$lines_to_insert"'' /etc/slurm/slurm.conf
-    fi
-    # if /etc/slurm/slurmdbd.conf exists then insert the JWT token
-    if [ -e /etc/slurm/slurmdbd.conf ]; then
-        if ! grep -q "AuthAltTypes=auth/jwt" /etc/slurm/slurmdbd.conf; then
-            sed -i --follow-symlinks '/^# Authentication info/a '"$lines_to_insert"'' /etc/slurm/slurmdbd.conf
-        fi
-    fi
-    scontrol reconfigure
-}
-
 # Function to build the slurm exporter
 # This is not used anymore, but kept for reference as we are using the docker conatainer
 build_slurm_exporter() {
@@ -88,9 +61,7 @@ install_slurm_exporter() {
     # Check if the token is set
     if [ -z "$SLURM_JWT" ]; then
         echo "Failed to get SLURM_JWT token - restarting slurm"
-        # Restart slurmctld
-        # /opt/cycle/jetpack/system/bootstrap/azure-slurm-install/start-services.sh scheduler
-        scontrol reconfigure
+        systemctl restart slurmctld
         unset SLURM_JWT
         export $(scontrol token username="slurmrestd" lifespan=infinite)
         if [ -z "$SLURM_JWT" ]; then
@@ -140,7 +111,6 @@ function add_scraper() {
 }
 
 if is_scheduler ; then
-    install_prerequisites
     install_slurm_exporter
     add_scraper
 

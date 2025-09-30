@@ -65,53 +65,18 @@ if [ $i == $attempts ] && [ $? != 0 ]; then
     exit 2
 fi
 
-configure_slurmrestd() {
-    # Create an unprivileged user for slurmrestd
-    if id "slurmrestd" &>/dev/null; then
-        echo "User slurmrestd exists"
-    else
-        useradd -M -r -s /usr/sbin/nologin -U slurmrestd
-    fi
-
-    # Add user to the docker group
-    if getent group docker | grep -qw slurmrestd; then
-        echo "User slurmrestd belongs to group docker"
-    else
-        usermod -aG docker slurmrestd
-    fi
-
-    # Create a socket for the slurmrestd
-    mkdir -pv /var/spool/slurmrestd
-    touch /var/spool/slurmrestd/slurmrestd.socket
-    chown -R slurmrestd:slurmrestd /var/spool/slurmrestd
-    chmod 755 /var/spool/slurmrestd
-
-    # Configure the slurmrestd:
-     cat <<EOF > /etc/default/slurmrestd
-SLURMRESTD_OPTIONS="-u slurmrestd -g slurmrestd"
-SLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket
-EOF
-    chmod 644 /etc/default/slurmrestd
-
-    # Add required capabilities to systemd unit
-    mkdir -p /etc/systemd/system/slurmrestd.service.d
-    cat <<EOF > /etc/systemd/system/slurmrestd.service.d/override.conf
-[Service]
-AmbientCapabilities=CAP_SETGID
-CapabilityBoundingSet=CAP_SETGID
-EOF
-    systemctl daemon-reload
-    scontrol reconfigure
-    systemctl stop slurmrestd.service
-    systemctl start slurmrestd.service
-    systemctl status slurmrestd.service
-}
-
 slurmrestd_disabled=$(/opt/cycle/jetpack/bin/jetpack config slurmrestd.disabled False)
 accounting_enabled=$(/opt/cycle/jetpack/bin/jetpack config slurm.accounting.enabled False)
 if [[ "$slurmrestd_disabled" == "False" && "$accounting_enabled" == "True" ]]; then
     sleep 10
-    configure_slurmrestd
+    systemctl start slurmrestd
+    systemctl status slurmrestd
+    if [ $? != 0 ]; then
+        echo Warning: slurmrestd failed to start! 1>&2
+        echo Here are the last 100 lines of slurmrestd.log
+        tail -n 100 /var/log/slurmctld/slurmrestd.log 1>&2
+        exit 2
+    fi
     monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
     if [[ "$monitoring_enabled" == "True" ]]; then
         . "${script_dir}/exporter/60_slurm_exporter.sh"
