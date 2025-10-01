@@ -134,31 +134,28 @@ run_slurm_exporter() {
     else
         echo "Prometheus process not found, unable to reload configuration"
          /opt/cycle/jetpack/bin/jetpack log "Unable to add slurm_exporter scrape config to Prometheus" --level=warn --priority=medium
-
     fi
 }
 
-#start slurmrestd if accounting is enabled
-accounting_enabled=$(/opt/cycle/jetpack/bin/jetpack config slurm.accounting.enabled False)
-if [[ "$accounting_enabled" == "True" ]]; then
-    sleep 10
-    systemctl start slurmrestd
-    systemctl status slurmrestd
-    if [ $? != 0 ]; then
-        echo Warning: slurmrestd failed to start! 1>&2
-        exit 2
-    fi
-    # start slurm_exporter if monitoring is enabled and slurmrestd is running
-    monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
-    if [[ "$monitoring_enabled" == "True" ]]; then
-        run_slurm_exporter
-        sleep 20
-        if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
-            echo "Slurm Exporter metrics are available"
-        else
-            echo "Slurm Exporter metrics are not available"
-            /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
-        fi    
-    fi
+# start slurmrestd
+sleep 10
+systemctl start slurmrestd
+systemctl status slurmrestd
+if [ $? != 0 ]; then
+    echo Warning: slurmrestd failed to start! 1>&2
+    /opt/cycle/jetpack/bin/jetpack log "slurmrestd failed to start" --level=warn --priority=medium
+    exit 0
+fi
+# start slurm_exporter if monitoring is enabled and slurmrestd is running
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
+if [[ "$monitoring_enabled" == "True" ]]; then
+    run_slurm_exporter
+    sleep 20
+    if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
+        echo "Slurm Exporter metrics are available"
+    else
+        echo "Slurm Exporter metrics are not available"
+        /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
+    fi    
 fi
 exit 0

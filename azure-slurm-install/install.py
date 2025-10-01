@@ -746,8 +746,8 @@ def setup_slurmd(s: InstallSettings) -> None:
     ilib.enable_service("slurmd")
 
 def setup_slurmrestd(s: InstallSettings) -> None:
-    if s.mode != "scheduler" or not s.acct_enabled:
-        logging.info("Running on non-scheduler node or slurm accounting not enabled, skipping this step.")
+    if s.mode != "scheduler":
+        logging.info("Running on non-scheduler node skipping this step.")
         return
         
     # Add slurmrestd to docker group if docker group exists
@@ -757,8 +757,8 @@ def setup_slurmrestd(s: InstallSettings) -> None:
             ilib.group_members("docker", members=[s.slurmrestd_user], append=True)
     except Exception as e:
         logging.warning(f"Could not add slurmrestd to docker group: {e}")
-
-    slurmrestd_config = "SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
+    openapi_flag = "" if s.acct_enabled else " -s openapi/slurmctld"
+    slurmrestd_config = f"SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd{openapi_flag}\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
     ilib.file(
         "/etc/sysconfig/slurmrestd" if s.platform_family == "rhel" else "/etc/default/slurmrestd",
         content=slurmrestd_config,
@@ -771,7 +771,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
         "/var/spool/slurmrestd", owner=s.slurmrestd_user, group=s.slurmrestd_grp, mode=755
     )
     ilib.file(
-            f"/var/spool/slurmrestd/slurmrestd.socket",
+            "/var/spool/slurmrestd/slurmrestd.socket",
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0755",
@@ -790,11 +790,11 @@ def setup_slurmrestd(s: InstallSettings) -> None:
     )
 
     if s.monitoring_enabled:
-        configure_JWT_authentication(s)
+        configure_jwt_authentication(s)
 
     ilib.enable_service("slurmrestd")
 
-def configure_JWT_authentication(s: InstallSettings) -> None:
+def configure_jwt_authentication(s: InstallSettings) -> None:
     """
     Configure JWT authentication for Slurm.
     """
