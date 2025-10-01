@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import yaml
 import installlib as ilib
 from typing import Dict, Optional
 
@@ -750,11 +751,10 @@ def setup_slurmrestd(s: InstallSettings) -> None:
         logging.info("Running on non-scheduler node skipping this step.")
         return
         
-    # Add slurmrestd to docker group if docker group exists
+    # Add slurmrestd to docker group
     try:
-        import grp
-        if "docker" in [g.gr_name for g in grp.getgrall()]:
-            ilib.group_members("docker", members=[s.slurmrestd_user], append=True)
+        ilib.group("docker")
+        ilib.group_members("docker", members=[s.slurmrestd_user], append=True)
     except Exception as e:
         logging.warning(f"Could not add slurmrestd to docker group: {e}")
     openapi_flag = "" if s.acct_enabled else " -s openapi/slurmctld"
@@ -790,11 +790,12 @@ def setup_slurmrestd(s: InstallSettings) -> None:
     )
 
     if s.monitoring_enabled:
-        configure_jwt_authentication(s)
+        _configure_jwt_authentication(s)
+        _add_slurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/slurm_exporter.yaml")
 
     ilib.enable_service("slurmrestd")
 
-def configure_jwt_authentication(s: InstallSettings) -> None:
+def _configure_jwt_authentication(s: InstallSettings) -> None:
     """
     Configure JWT authentication for Slurm.
     """
@@ -817,6 +818,47 @@ def configure_jwt_authentication(s: InstallSettings) -> None:
     ilib.chown(jwt_dir, owner=s.slurm_user, group=s.slurm_grp)
     ilib.chmod(jwt_dir, mode=755)
     ilib.chmod("/var/spool/slurm", mode=755)
+
+def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_yaml: str) -> None:
+    """
+    Add slurm_exporter scrape config to Prometheus.
+    """
+    if not os.path.isfile(prom_config):
+        logging.warning("Prometheus configuration file not found, skipping slurm_exporter configuration.")
+        return
+    
+    with open(prom_config, "r") as f:
+        prom_content = f.read()
+        if "slurm_exporter" in prom_content:
+            print("Slurm Exporter is already configured in Prometheus")
+            return
+    # Merge YAML files
+    with open(prom_config, "r") as f:
+        prom_yaml = yaml.safe_load(f) or {}
+    with open(exporter_yaml, "r") as f:
+        exporter_yaml_content = yaml.safe_load(f) or {}
+
+    # Simple merge: add/replace scrape_configs
+    def merge_scrape_configs(base, overlay):
+        base_scrapes = base.get("scrape_configs", [])
+        overlay_scrapes = overlay.get("scrape_configs", [])
+        base["scrape_configs"] = base_scrapes + overlay_scrapes
+        return base
+
+    merged_yaml = merge_scrape_configs(prom_yaml, exporter_yaml_content)
+
+    # Replace instance_name placeholder
+    merged_str = yaml.safe_dump(merged_yaml, default_flow_style=False)
+    merged_str = merged_str.replace("instance_name", s.hostname)
+
+    # Write back to prom_config
+    ilib.file(
+        prom_config,
+        content=merged_str,
+        owner="root",
+        group="root",
+        mode="0644"
+    )
 
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:

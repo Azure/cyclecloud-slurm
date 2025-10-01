@@ -108,32 +108,15 @@ run_slurm_exporter() {
         /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter container failed to start" --level=warn --priority=medium
         return 0 # do not fail the slurm startup if exporter fails
     fi
-    #add scraper if prometheus is installed
-    if [ ! -f "$PROM_CONFIG" ]; then
-        echo "Prometheus config file not found at $PROM_CONFIG, skipping scraper configuration"
-        return 0
-    fi
-    # If slurm_exporter is already configured, do not add it again
-    if grep -q "slurm_exporter" $PROM_CONFIG; then
-        echo "Slurm Exporter is already configured in Prometheus"
-        return 0
-    fi
-    INSTANCE_NAME=$(hostname)
 
-    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG $script_dir/exporter/slurm_exporter.yml > tmp.yml
-    mv -vf tmp.yml $PROM_CONFIG
-
-    # update the configuration file
-    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
-
-    # Find the Prometheus process and send SIGHUP to reload config
+    # Find the Prometheus process and send SIGHUP to reload config or log a warning if not found
     PROM_PID=$(pgrep -f 'prometheus')
     if [ -n "$PROM_PID" ]; then
         echo "Sending SIGHUP to Prometheus (PID $PROM_PID) to reload configuration"
         kill -HUP $PROM_PID
     else
         echo "Prometheus process not found, unable to reload configuration"
-         /opt/cycle/jetpack/bin/jetpack log "Unable to add slurm_exporter scrape config to Prometheus" --level=warn --priority=medium
+        /opt/cycle/jetpack/bin/jetpack log "Unable to add slurm_exporter scrape config to Prometheus" --level=warn --priority=medium
     fi
 }
 
