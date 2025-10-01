@@ -791,7 +791,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
 
     if s.monitoring_enabled:
         _configure_jwt_authentication(s)
-        _add_slurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/slurm_exporter.yaml")
+        _add_slurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/slurm_exporter.yml")
 
     ilib.enable_service("slurmrestd")
 
