@@ -746,7 +746,7 @@ def setup_slurmd(s: InstallSettings) -> None:
     ilib.enable_service("slurmd")
 
 def setup_slurmrestd(s: InstallSettings) -> None:
-    if s.mode != "scheduler" or not s.sacct_enabled:
+    if s.mode != "scheduler" or not s.acct_enabled:
         logging.info("Running on non-scheduler node or slurm accounting not enabled, skipping this step.")
         return
         
