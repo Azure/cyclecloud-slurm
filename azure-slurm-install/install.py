@@ -753,7 +753,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
         
     # Add slurmrestd to docker group
     try:
-        ilib.group("docker")
+        ilib.group("docker", gid=None)
         ilib.group_members("docker", members=[s.slurmrestd_user], append=True)
     except Exception as e:
         logging.warning(f"Could not add slurmrestd to docker group: {e}")
