@@ -126,7 +126,16 @@ run_slurm_exporter() {
     # update the configuration file
     sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
 
-    systemctl restart prometheus
+    # Find the Prometheus process and send SIGHUP to reload config
+    PROM_PID=$(pgrep -f 'prometheus')
+    if [ -n "$PROM_PID" ]; then
+        echo "Sending SIGHUP to Prometheus (PID $PROM_PID) to reload configuration"
+        kill -HUP $PROM_PID
+    else
+        echo "Prometheus process not found, unable to reload configuration"
+         /opt/cycle/jetpack/bin/jetpack log "Unable to add slurm_exporter scrape config to Prometheus" --level=warn --priority=medium
+
+    fi
 }
 
 #start slurmrestd if accounting is enabled
