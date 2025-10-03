@@ -823,6 +823,10 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
     """
     Add slurm_exporter scrape config to Prometheus.
     """
+    if not s.is_primary_scheduler:
+        logging.info("Not primary scheduler, skipping slurm_exporter configuration.")
+        return
+
     if not os.path.isfile(prom_config):
         logging.warning("Prometheus configuration file not found, skipping slurm_exporter configuration.")
         return

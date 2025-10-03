@@ -67,6 +67,17 @@ fi
 
 run_slurm_exporter() {
     # Run Slurm Exporter in a container
+    if [[ "$role" != "scheduler" ]]; then
+        echo "Slurm Exporter can only be run on the scheduler node, skipping setup."
+        return 0
+    fi
+
+    primary_scheduler=$(/opt/cycle/jetpack/bin/jetpack config slurm.is_primary_scheduler True)
+    if [[ "$primary_scheduler" != "True" ]]; then
+        echo "This is not the primary scheduler, skipping slurm_exporter setup."
+        return 0
+    fi
+
     script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     PROM_CONFIG=/opt/prometheus/prometheus.yml
     SLURM_EXPORTER_PORT=9080
