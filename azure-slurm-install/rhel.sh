@@ -107,19 +107,10 @@ enable_epel
 rpm_pkg_install "$dependency_packages"
 rpm_pkg_install "$versioned_slurm_packages" "--disableexcludes slurm"
 
-# Install yq and slurm_exporter container (will refactor this later)
+# Install slurm_exporter container (will refactor this later)
 monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
 if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; then
     SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
-    YQ_VERSION="v4.44.2"
-    YQ_PACKAGE="yq_linux_amd64"
-    if uname -m | grep -q 'aarch64\|arm64' ; then
-        YQ_PACKAGE="yq_linux_arm64"
-    fi
-    if ! command -v yq &> /dev/null; then
-        wget -q "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/${YQ_PACKAGE}" -O /usr/bin/yq
-        chmod 0755 /usr/bin/yq
-    fi
     docker pull $SLURM_EXPORTER_IMAGE_NAME
 fi
 
