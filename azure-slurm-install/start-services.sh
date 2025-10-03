@@ -7,7 +7,7 @@ if [ "$1" == "" ]; then
 fi
 
 role=$1
-script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # all nodes need to have munge running
 echo restarting munge...
 systemctl restart munge
@@ -77,12 +77,8 @@ run_slurm_exporter() {
         echo "This is not the primary scheduler, skipping slurm_exporter setup."
         return 0
     fi
-
-    script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    PROM_CONFIG=/opt/prometheus/prometheus.yml
+    
     SLURM_EXPORTER_PORT=9080
-    SLURM_EXPORTER_REPO="https://github.com/SlinkyProject/slurm-exporter.git"
-    SLURM_EXPORTER_COMMIT="478da458dd9f59ecc464c1b5e90a1a8ebc1a10fb"
     SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
     # Try to get the token, retry up to 3 times
     unset SLURM_JWT
@@ -129,6 +125,14 @@ run_slurm_exporter() {
         echo "Prometheus process not found, unable to reload configuration"
         /opt/cycle/jetpack/bin/jetpack log "Unable to add slurm_exporter scrape config to Prometheus" --level=warn --priority=medium
     fi
+    
+    sleep 20
+    if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
+        echo "Slurm Exporter metrics are available"
+    else
+        echo "Slurm Exporter metrics are not available"
+        /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
+    fi    
 }
 
 # start slurmrestd
@@ -144,12 +148,5 @@ fi
 monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
 if [[ "$monitoring_enabled" == "True" ]]; then
     run_slurm_exporter
-    sleep 20
-    if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
-        echo "Slurm Exporter metrics are available"
-    else
-        echo "Slurm Exporter metrics are not available"
-        /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
-    fi    
 fi
 exit 0
