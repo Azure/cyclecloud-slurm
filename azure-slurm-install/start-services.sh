@@ -138,7 +138,7 @@ run_slurm_exporter() {
 # start slurmrestd
 sleep 10
 systemctl start slurmrestd
-systemctl status slurmrestd
+systemctl status slurmrestd --no-pager
 if [ $? != 0 ]; then
     echo Warning: slurmrestd failed to start! 1>&2
     /opt/cycle/jetpack/bin/jetpack log "slurmrestd failed to start" --level=warn --priority=medium
