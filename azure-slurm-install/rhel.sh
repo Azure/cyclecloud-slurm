@@ -18,7 +18,7 @@ fi
 enable_epel() {
     if ! rpm -qa | grep -q "^epel-release-"; then
         if [ "${OS_ID,,}" == "rhel" ]; then
-            yum -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-${OS_VERSION}.noarch.rpm
+            yum -y install artifacts/epel-release-latest-${OS_VERSION}.noarch.rpm
         else
             yum -y install epel-release
         fi
