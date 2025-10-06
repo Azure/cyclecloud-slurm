@@ -45,6 +45,11 @@ class InstallSettings:
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
         )
+
+        self.jwt_key_path = (
+            config["slurm"].get("jwt_key_path") or "/var/spool/slurm/statesave/jwt_hs256.key"
+            )
+        
         self.cyclecloud_cluster_name = config["cluster_name"]
         # We use a "safe" form of the CycleCloud ClusterName
         # First we lowercase the cluster name, then replace anything
@@ -372,10 +377,9 @@ AccountingStorageTRES=gres/gpu
                                   else "#StorageParameters=",
             "slurmver": s.slurmver,
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
-            "auth_alt_type": (
-                "AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
-                if s.monitoring_enabled else ""
-            )
+            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.monitoring_enabled else "",
+            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}" 
+                                if s.monitoring_enabled else ""
         },
     )
 
@@ -477,10 +481,9 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "launch_parameters" : s.launch_parameters,
             "health_interval": health_interval,
             "health_program": health_program,
-            "auth_alt_type": (
-                "AuthAltTypes=auth/jwt\nAuthAltParameters=jwt_key=/var/spool/slurm/statesave/jwt_hs256.key\n"
-                if s.monitoring_enabled else ""
-            )
+            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.monitoring_enabled else "",
+            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}" 
+                                if s.monitoring_enabled else ""
         },
     )
 
@@ -799,25 +802,24 @@ def _configure_jwt_authentication(s: InstallSettings) -> None:
     """
     Configure JWT authentication for Slurm.
     """
-    jwt_dir = "/var/spool/slurm/statesave"
-    jwt_key = f"{jwt_dir}/jwt_hs256.key"
+    jwt_dir = os.path.dirname(s.jwt_key_path)
 
     # Create the directory and key file if they don't exist
     ilib.directory(jwt_dir, owner=s.slurm_user, group=s.slurm_grp, mode=755)
-    ilib.directory("/var/spool/slurm", owner=s.slurm_user, group=s.slurm_grp, mode=755)
+    ilib.directory(os.path.dirname(jwt_dir), owner=s.slurm_user, group=s.slurm_grp, mode=755)
 
-    if not os.path.exists(jwt_key):
+    if not os.path.exists(s.jwt_key_path):
         # Generate a 32-byte random key
         with open("/dev/random", "rb") as fr:
             key = fr.read(32)
-        ilib.file(jwt_key, content=key, owner=s.slurm_user, group=s.slurm_grp, mode=600)
+        ilib.file(s.jwt_key_path, content=key, owner=s.slurm_user, group=s.slurm_grp, mode=600)
     else:
-        ilib.chown(jwt_key, owner=s.slurm_user, group=s.slurm_grp)
-        ilib.chmod(jwt_key, mode=600)
+        ilib.chown(s.jwt_key_path, owner=s.slurm_user, group=s.slurm_grp)
+        ilib.chmod(s.jwt_key_path, mode=600)
 
     ilib.chown(jwt_dir, owner=s.slurm_user, group=s.slurm_grp)
     ilib.chmod(jwt_dir, mode=755)
-    ilib.chmod("/var/spool/slurm", mode=755)
+    ilib.chmod(os.path.dirname(jwt_dir), mode=755)
 
 def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_yaml: str) -> None:
     """

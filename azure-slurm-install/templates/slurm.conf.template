@@ -72,5 +72,6 @@ Include accounting.conf
 # Note this is a work around until ReconfigFlags=KeepPowerSaveSettings is fixed in slurm.
 Include keep_alive.conf
 {auth_alt_type}
+{auth_alt_parameters}
 
 SlurmCtldHost={slurmctldhost}
