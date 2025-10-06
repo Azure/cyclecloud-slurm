@@ -31,6 +31,8 @@ Autoscale = $Autoscale
         slurm.user.gid = 11100
         munge.user.uid = 11101
         munge.user.gid = 11101
+        slurmrestd.user.uid = 11102
+        slurmrestd.user.gid = 11102
         slurm.enable_healthchecks = true
         slurm.accounting.enabled = $configuration_slurm_accounting_enabled
         slurm.accounting.url = $configuration_slurm_accounting_url
@@ -63,6 +65,7 @@ Autoscale = $Autoscale
         cluster.identities.default = $ManagedIdentity
 
         [[[cluster-init cyclecloud/healthagent:default]]]
+        [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:default:4.0.3]]]
         Optional = true
         [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
@@ -119,6 +122,7 @@ Autoscale = $Autoscale
 
 
         [[[cluster-init cyclecloud/healthagent:default]]]
+        [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:scheduler:4.0.3]]]
         [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
 
@@ -183,6 +187,7 @@ Autoscale = $Autoscale
         AdditionalClusterInitSpecs = $LoginClusterInitSpecs
 
         [[[cluster-init cyclecloud/healthagent:default]]]
+        [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:login:4.0.3]]]
         [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
         [[[configuration]]]
@@ -201,6 +206,7 @@ Autoscale = $Autoscale
         slurm.use_nodename_as_hostname = $NodeNameIsHostname
 
         [[[cluster-init cyclecloud/healthagent:default]]]
+        [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:execute:4.0.3]]]
         [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
 

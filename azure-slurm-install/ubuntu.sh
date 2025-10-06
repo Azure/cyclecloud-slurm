@@ -52,7 +52,7 @@ if [[ $UBUNTU_VERSION > "19" ]]; then
     dependency_packages="$dependency_packages python3-venv"
 fi
 
-dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq"
+dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq libjansson-dev libjwt-dev binutils"
 
 arch=$(dpkg --print-architecture)
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
@@ -124,5 +124,11 @@ done
 # Install all packages using the unified function
 dpkg_pkg_install "$all_packages"
 
+# Install slurm_exporter container (will refactor this later)
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
+if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; then
+    SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
+    docker pull $SLURM_EXPORTER_IMAGE_NAME
+fi
 touch $INSTALLED_FILE
 exit

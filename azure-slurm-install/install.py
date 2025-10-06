@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import yaml
 import installlib as ilib
 from typing import Dict, Optional
 
@@ -21,7 +22,7 @@ class InstallSettings:
             config["slurm"] = {}
 
         if "accounting" not in config["slurm"]:
-            config["slurm"]["acccounting"] = {}
+            config["slurm"]["accounting"] = {}
 
         if "user" not in config["slurm"]:
             config["slurm"]["user"] = {}
@@ -31,10 +32,24 @@ class InstallSettings:
 
         if "user" not in config["munge"]:
             config["munge"]["user"] = {}
+        
+        if "slurmrestd" not in config:
+            config["slurmrestd"] = {}
+
+        if "user" not in config["slurmrestd"]:
+            config["slurmrestd"]["user"] = {}
+
+        if "monitoring" not in config:
+            config["monitoring"] = {}
 
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
         )
+
+        self.jwt_key_path = (
+            config["slurm"].get("jwt_key_path") or "/var/spool/slurm/statesave/jwt_hs256.key"
+            )
+        
         self.cyclecloud_cluster_name = config["cluster_name"]
         # We use a "safe" form of the CycleCloud ClusterName
         # First we lowercase the cluster name, then replace anything
@@ -66,6 +81,13 @@ class InstallSettings:
         self.munge_grp: str = config["munge"]["user"].get("group") or "munge"
         self.munge_uid: str = config["munge"]["user"].get("uid") or "11101"
         self.munge_gid: str = config["munge"]["user"].get("gid") or "11101"
+
+        self.slurmrestd_user: str = config["slurmrestd"]["user"].get("name") or "slurmrestd"
+        self.slurmrestd_grp: str = config["slurmrestd"]["user"].get("group") or "slurmrestd"
+        self.slurmrestd_uid: str = config["slurmrestd"]["user"].get("uid") or "11102"
+        self.slurmrestd_gid: str = config["slurmrestd"]["user"].get("gid") or "11102"
+
+        self.monitoring_enabled: bool = config["monitoring"].get("enabled", False)
 
         self.acct_enabled: bool = config["slurm"]["accounting"].get("enabled", False)
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
@@ -140,7 +162,7 @@ def _escape(s: str) -> str:
 
 
 def setup_users(s: InstallSettings) -> None:
-    # Set up users for Slurm and Munge
+    # Set up users for Slurm, Munge and Slurmrestd
     ilib.group(s.slurm_grp, gid=s.slurm_gid)
 
     ilib.user(
@@ -159,6 +181,16 @@ def setup_users(s: InstallSettings) -> None:
         shell="/bin/false",
         uid=s.munge_uid,
         gid=s.munge_gid,
+    )
+    
+    ilib.group(s.slurmrestd_grp, gid=s.slurmrestd_gid)
+    
+    ilib.user(
+        s.slurmrestd_user,
+        comment="User to run slurmrestd",
+        shell="/usr/sbin/nologin",
+        uid=s.slurmrestd_uid,
+        gid=s.slurmrestd_gid,
     )
 
 
@@ -345,6 +377,9 @@ AccountingStorageTRES=gres/gpu
                                   else "#StorageParameters=",
             "slurmver": s.slurmver,
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
+            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.monitoring_enabled else "",
+            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}" 
+                                if s.monitoring_enabled else ""
         },
     )
 
@@ -411,7 +446,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
 
     if not os.path.exists(state_save_location):
         ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
-
+    
     if not os.path.exists(f"{s.config_dir}/prolog.d"):
         ilib.directory(f"{s.config_dir}/prolog.d", owner=s.slurm_user, group=s.slurm_grp)
 
@@ -445,7 +480,10 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "epilog": "/etc/slurm/epilog.d/*",
             "launch_parameters" : s.launch_parameters,
             "health_interval": health_interval,
-            "health_program": health_program
+            "health_program": health_program,
+            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.monitoring_enabled else "",
+            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}" 
+                                if s.monitoring_enabled else ""
         },
     )
 
@@ -531,8 +569,6 @@ def _complete_install_primary(s: InstallSettings) -> None:
             mode="0644",
             content=""
         )
-
-    
 
 def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
@@ -713,6 +749,122 @@ def setup_slurmd(s: InstallSettings) -> None:
     )
     ilib.enable_service("slurmd")
 
+def setup_slurmrestd(s: InstallSettings) -> None:
+    if s.mode != "scheduler":
+        logging.info("Running on non-scheduler node skipping this step.")
+        return
+        
+    # Add slurmrestd to docker group
+    try:
+        ilib.group("docker", gid=None)
+        ilib.group_members("docker", members=[s.slurmrestd_user], append=True)
+    except Exception as e:
+        logging.warning(f"Could not add slurmrestd to docker group: {e}")
+    openapi_flag = "" if s.acct_enabled else " -s openapi/slurmctld"
+    slurmrestd_config = f"SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd{openapi_flag}\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
+    ilib.file(
+        "/etc/sysconfig/slurmrestd" if s.platform_family == "rhel" else "/etc/default/slurmrestd",
+        content=slurmrestd_config,
+        owner=s.slurmrestd_user,
+        group=s.slurmrestd_grp,
+        mode="0644",
+    )
+    
+    ilib.directory(
+        "/var/spool/slurmrestd", owner=s.slurmrestd_user, group=s.slurmrestd_grp, mode=755
+    )
+    ilib.file(
+            "/var/spool/slurmrestd/slurmrestd.socket",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0755",
+            content="",
+    )
+    ilib.directory(
+        "/etc/systemd/system/slurmrestd.service.d", owner="root", group="root", mode=755
+    )
+
+    ilib.template(
+        "/etc/systemd/system/slurmrestd.service.d/override.conf",
+        source="templates/slurmrestd.override",
+        owner="root",
+        group="root",
+        mode=644,
+    )
+
+    if s.monitoring_enabled:
+        _configure_jwt_authentication(s)
+        _add_slurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/slurm_exporter.yml")
+
+    ilib.enable_service("slurmrestd")
+
+def _configure_jwt_authentication(s: InstallSettings) -> None:
+    """
+    Configure JWT authentication for Slurm.
+    """
+    jwt_dir = os.path.dirname(s.jwt_key_path)
+
+    # Create the directory and key file if they don't exist
+    ilib.directory(jwt_dir, owner=s.slurm_user, group=s.slurm_grp, mode=755)
+    ilib.directory(os.path.dirname(jwt_dir), owner=s.slurm_user, group=s.slurm_grp, mode=755)
+
+    if not os.path.exists(s.jwt_key_path):
+        # Generate a 32-byte random key
+        with open("/dev/random", "rb") as fr:
+            key = fr.read(32)
+        ilib.file(s.jwt_key_path, content=key, owner=s.slurm_user, group=s.slurm_grp, mode=600)
+    else:
+        ilib.chown(s.jwt_key_path, owner=s.slurm_user, group=s.slurm_grp)
+        ilib.chmod(s.jwt_key_path, mode=600)
+
+    ilib.chown(jwt_dir, owner=s.slurm_user, group=s.slurm_grp)
+    ilib.chmod(jwt_dir, mode=755)
+    ilib.chmod(os.path.dirname(jwt_dir), mode=755)
+
+def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_yaml: str) -> None:
+    """
+    Add slurm_exporter scrape config to Prometheus.
+    """
+    if not s.is_primary_scheduler:
+        logging.info("Not primary scheduler, skipping slurm_exporter configuration.")
+        return
+
+    if not os.path.isfile(prom_config):
+        logging.warning("Prometheus configuration file not found, skipping slurm_exporter configuration.")
+        return
+    
+    with open(prom_config, "r") as f:
+        prom_content = f.read()
+        if "slurm_exporter" in prom_content:
+            print("Slurm Exporter is already configured in Prometheus")
+            return
+    # Merge YAML files
+    with open(prom_config, "r") as f:
+        prom_yaml = yaml.safe_load(f) or {}
+    with open(exporter_yaml, "r") as f:
+        exporter_yaml_content = yaml.safe_load(f) or {}
+
+    # Simple merge: add/replace scrape_configs
+    def merge_scrape_configs(base, overlay):
+        base_scrapes = base.get("scrape_configs", [])
+        overlay_scrapes = overlay.get("scrape_configs", [])
+        base["scrape_configs"] = base_scrapes + overlay_scrapes
+        return base
+
+    merged_yaml = merge_scrape_configs(prom_yaml, exporter_yaml_content)
+
+    # Replace instance_name placeholder
+    merged_str = yaml.safe_dump(merged_yaml, default_flow_style=False)
+    merged_str = merged_str.replace("instance_name", s.hostname)
+
+    # Write back to prom_config
+    ilib.file(
+        prom_config,
+        content=merged_str,
+        owner="root",
+        group="root",
+        mode="0644"
+    )
 
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
@@ -838,6 +990,7 @@ def main() -> None:
 
     if settings.mode == "scheduler":
         accounting(settings)
+        setup_slurmrestd(settings)
         # TODO create a rotate log
         ilib.cron(
             "return_to_idle",

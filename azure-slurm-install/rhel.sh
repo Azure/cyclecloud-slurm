@@ -54,7 +54,7 @@ rpm_pkg_install() {
     fi
 }
 
-dependency_packages="perl-Switch munge jq"
+dependency_packages="perl-Switch munge jq jansson-devel libjwt-devel binutils"
 slurm_packages="slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd slurm-slurmrestd"
 execute_packages="slurm-slurmd"
@@ -106,6 +106,13 @@ done
 enable_epel
 rpm_pkg_install "$dependency_packages"
 rpm_pkg_install "$versioned_slurm_packages" "--disableexcludes slurm"
+
+# Install slurm_exporter container (will refactor this later)
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
+if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; then
+    SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
+    docker pull $SLURM_EXPORTER_IMAGE_NAME
+fi
 
 touch $INSTALLED_FILE
 exit
