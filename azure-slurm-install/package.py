@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 import tarfile
+import requests
 from typing import Optional
 
 def execute() -> None:
@@ -31,6 +32,19 @@ def execute() -> None:
         f"dist/azure-slurm-install-pkg-{version}.tar.gz", "w"
     )
 
+    def _download(url: str, dest: str) -> None:
+        try:
+            response = requests.get(url, stream=True, timeout=60)
+            response.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        except requests.RequestException as e:
+            print(f"Error downloading {url}: {e}")
+
+    artifacts_dir = "artifacts"
+    os.makedirs(artifacts_dir, exist_ok=True)
+
     def _add(name: str, path: Optional[str] = None, mode: Optional[int] = None) -> None:
         path = path or name
         tarinfo = tarfile.TarInfo(f"azure-slurm-install/{name}")
@@ -42,6 +56,12 @@ def execute() -> None:
         with open(path, "rb") as fr:
             tf.addfile(tarinfo, fr)
 
+    epel_versions = ["8", "9"]
+    for ver in epel_versions:
+        url = f"https://dl.fedoraproject.org/pub/epel/epel-release-latest-{ver}.noarch.rpm"
+        dest = os.path.join(artifacts_dir, f"epel-release-latest-{ver}.noarch.rpm")
+        _download(url, dest)
+        _add(dest, dest)
     _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
     _add("install_logging.conf", "conf/install_logging.conf")
     _add("installlib.py", "installlib.py")
