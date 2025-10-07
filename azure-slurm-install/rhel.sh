@@ -14,10 +14,14 @@ if [ "$OS_VERSION" -lt "8" ]; then
     exit 1
 fi
 
-#Almalinux 8/9 and RockyLinux 8/9 both need epel-release to install libjwt for slurm packages 
+#Almalinux 8/9 and RHEL 8/9 both need epel-release to install libjwt for slurm packages 
 enable_epel() {
     if ! rpm -qa | grep -q "^epel-release-"; then
-        yum -y install artifacts/epel-release-latest-${OS_VERSION}.noarch.rpm
+        if [ "${OS_ID,,}" == "rhel" ]; then
+            yum -y install artifacts/epel-release-latest-${OS_VERSION}.noarch.rpm
+        else
+            yum -y install epel-release
+        fi
     fi
     if [ "${OS_ID}" == "almalinux" ]; then
         if [ "$OS_VERSION" == "8" ]; then
