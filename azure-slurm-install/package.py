@@ -33,11 +33,14 @@ def execute() -> None:
     )
 
     def _download(url: str, dest: str) -> None:
-        response = requests.get(url, stream=True, timeout=60)
-        response.raise_for_status()
-        with open(dest, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        try:
+            response = requests.get(url, stream=True, timeout=60)
+            response.raise_for_status()
+            with open(dest, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        except requests.RequestException as e:
+            print(f"Error downloading {url}: {e}")
 
     artifacts_dir = "artifacts"
     os.makedirs(artifacts_dir, exist_ok=True)
