@@ -963,11 +963,11 @@ Order = 25
             Widget.Label = Enable Monitoring
 
         [[[parameter configuration_identity_client_id]]]
-            Label = Monitoring Identity Client ID
+            Label = Client ID
             Description = Client ID of the Managed Identity with Monitoring Metrics Publisher role
             Conditions.Excluded := configuration_monitoring_enabled isnt true
 
         [[[parameter configuration_ingestion_endpoint]]]
-            Label = Azure Monitor Workspace Ingestion Endpoint
+            Label = Ingestion Endpoint
             Description = The Azure Monitor Workspace in which to push metrics
             Conditions.Excluded := configuration_monitoring_enabled isnt true
