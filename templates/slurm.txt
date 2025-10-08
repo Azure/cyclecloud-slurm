@@ -61,6 +61,11 @@ Autoscale = $Autoscale
         cyclecloud.exports.defaults.samba.enabled = false      
         cshared.server.legacy_links_disabled = true
 
+        # Monitoring, change to cyclecloud.monitoring later
+        monitoring.enabled = $configuration_monitoring_enabled
+        monitoring.identity_client_id = $configuration_identity_client_id
+        monitoring.ingestion_endpoint = $configuration_ingestion_endpoint
+
         # May be used to identify the ID in cluster-init scripts
         cluster.identities.default = $ManagedIdentity
 
@@ -945,3 +950,24 @@ Order = 20
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Run Node Health Checks on startup
+
+[parameters Monitoring]
+Order = 25
+    [[parameters Cyclecloud Monitoring]]
+    Description = "Monitoring CycleCloud clusters with Prometheus and Grafana"
+    Order = 10
+        [[[parameter configuration_monitoring_enabled]]]
+            Label = Monitoring
+            DefaultValue = false
+            Widget.Plugin = pico.form.BooleanCheckBox
+            Widget.Label = Enable Monitoring
+
+        [[[parameter configuration_identity_client_id]]]
+            Label = Monitoring Identity Client ID
+            Description = Client ID of the Managed Identity with Monitoring Metrics Publisher role
+            Conditions.Excluded := configuration_monitoring_enabled isnt true
+
+        [[[parameter configuration_ingestion_endpoint]]]
+            Label = Azure Monitor Workspace Ingestion Endpoint
+            Description = The Azure Monitor Workspace in which to push metrics
+            Conditions.Excluded := configuration_monitoring_enabled isnt true
