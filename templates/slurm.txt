@@ -970,10 +970,10 @@ Order = 25
             Label = Client ID
             Description = Client ID of the Managed Identity with Monitoring Metrics Publisher role
             Conditions.Excluded := configuration_monitoring_enabled isnt true
-            Conditions.Required = configuration_monitoring_enabled is true
+            Conditions.Required := configuration_monitoring_enabled is true
 
         [[[parameter configuration_ingestion_endpoint]]]
             Label = Ingestion Endpoint
             Description = The Azure Monitor Workspace in which to push metrics
             Conditions.Excluded := configuration_monitoring_enabled isnt true
-            Conditions.Required = configuration_monitoring_enabled is true
+            Conditions.Required := configuration_monitoring_enabled is true
