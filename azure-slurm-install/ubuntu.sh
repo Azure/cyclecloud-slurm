@@ -125,7 +125,7 @@ done
 dpkg_pkg_install "$all_packages"
 
 # Install slurm_exporter container (will refactor this later)
-monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
 if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; then
     SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
     docker pull $SLURM_EXPORTER_IMAGE_NAME
