@@ -145,7 +145,7 @@ if [ $? != 0 ]; then
     exit 0
 fi
 # start slurm_exporter if monitoring is enabled and slurmrestd is running
-monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config monitoring.enabled False)
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
 if [[ "$monitoring_enabled" == "True" ]]; then
     run_slurm_exporter
 fi

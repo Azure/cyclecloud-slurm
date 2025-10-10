@@ -62,9 +62,9 @@ Autoscale = $Autoscale
         cshared.server.legacy_links_disabled = true
 
         # Monitoring, change to cyclecloud.monitoring later
-        monitoring.enabled = $configuration_monitoring_enabled
-        monitoring.identity_client_id = $configuration_identity_client_id
-        monitoring.ingestion_endpoint = $configuration_ingestion_endpoint
+        cyclecloud.monitoring.enabled = $configuration_monitoring_enabled
+        cyclecloud.monitoring.identity_client_id = $configuration_identity_client_id
+        cyclecloud.monitoring.ingestion_endpoint = $configuration_ingestion_endpoint
 
         # May be used to identify the ID in cluster-init scripts
         cluster.identities.default = $ManagedIdentity
