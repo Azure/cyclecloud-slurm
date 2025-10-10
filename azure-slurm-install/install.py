@@ -39,8 +39,8 @@ class InstallSettings:
         if "user" not in config["slurmrestd"]:
             config["slurmrestd"]["user"] = {}
 
-        if "monitoring" not in config:
-            config["monitoring"] = {}
+        if "monitoring" not in config["cyclecloud"]:
+            config["cyclecloud"]["monitoring"] = {}
 
         self.autoscale_dir = (
             config["slurm"].get("autoscale_dir") or "/opt/azurehpc/slurm"
@@ -87,7 +87,7 @@ class InstallSettings:
         self.slurmrestd_uid: str = config["slurmrestd"]["user"].get("uid") or "11102"
         self.slurmrestd_gid: str = config["slurmrestd"]["user"].get("gid") or "11102"
 
-        self.monitoring_enabled: bool = config["monitoring"].get("enabled", False)
+        self.monitoring_enabled: bool = config["cyclecloud"]["monitoring"].get("enabled", False)
 
         self.acct_enabled: bool = config["slurm"]["accounting"].get("enabled", False)
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
