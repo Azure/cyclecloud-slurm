@@ -955,6 +955,10 @@ def set_hostname(s: InstallSettings) -> None:
     ilib.set_hostname(
         new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
     )
+    
+    #Update prom config with new hostname
+    _update_prom_config(s, "/opt/prometheus/prometheus.yml", new_hostname)
+    
     if _is_at_least_ubuntu22() and s.ubuntu22_waagent_fix:
         logging.warning("Restarting systemd-networkd to fix waagent/hostname issue on Ubuntu 22.04." +
                         " To disable this, set slurm.ubuntu22_waagent_fix=false under this" +
