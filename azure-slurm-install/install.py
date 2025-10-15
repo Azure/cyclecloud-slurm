@@ -866,6 +866,29 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
         mode="0644"
     )
 
+def update_prom_config(s: InstallSettings, prom_config: str) -> None:
+    """
+    Update hostnames in Prometheus config targets to be node name
+    """
+    with open(prom_config, "r") as f:
+        prom_content = f.read()
+    
+    # Replace hostnames in targets arrays, keeping the port
+    # Matches: "hostname:port" and replaces hostname with s.node_name
+    prom_content = re.sub(r'"([^":]+):(\d+)"', f'"{s.node_name}:\\2"', prom_content)
+    
+    # Also replace the global instance label
+    prom_content = re.sub(r'instance:\s*([^\s\n]+)', f'instance: {s.node_name}', prom_content)
+    
+    # Write back to prom_config
+    ilib.file(
+        prom_config,
+        content=prom_content,
+        owner="root",
+        group="root",
+        mode="0644"
+    )
+
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
