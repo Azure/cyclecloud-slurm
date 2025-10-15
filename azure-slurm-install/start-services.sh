@@ -7,7 +7,23 @@ if [ "$1" == "" ]; then
 fi
 
 role=$1
+monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
 
+reload_prom_config(){
+    # Find the Prometheus process and send SIGHUP to reload config or log a warning if not found
+    if [[ "$monitoring_enabled" == "False" ]]; then
+        echo "Monitoring is disabled, skipping Prometheus config reload"
+        return 0
+    fi
+    PROM_PID=$(pgrep -f 'prometheus')
+    if [ -n "$PROM_PID" ]; then
+        echo "Sending SIGHUP to Prometheus (PID $PROM_PID) to reload configuration"
+        kill -HUP $PROM_PID
+    else
+        echo "Prometheus process not found, unable to reload configuration"
+        /opt/cycle/jetpack/bin/jetpack log "Prometheus process not found, unable to reload configuration" --level=warn --priority=medium
+    fi  
+}
 # all nodes need to have munge running
 echo restarting munge...
 systemctl restart munge
@@ -24,12 +40,14 @@ done
 
 # login nodes explicitly should _not_ have slurmd running.
 if [ $role == "login" ]; then
+    reload_prom_config
     exit 0
 fi
 
 # execute nodes just need slurmd
 if [ $role == "execute" ]; then
     systemctl start slurmd
+    reload_prom_config
     exit 0
 fi
 
@@ -116,23 +134,15 @@ run_slurm_exporter() {
         return 0 # do not fail the slurm startup if exporter fails
     fi
 
-    # Find the Prometheus process and send SIGHUP to reload config or log a warning if not found
-    PROM_PID=$(pgrep -f 'prometheus')
-    if [ -n "$PROM_PID" ]; then
-        echo "Sending SIGHUP to Prometheus (PID $PROM_PID) to reload configuration"
-        kill -HUP $PROM_PID
-    else
-        echo "Prometheus process not found, unable to reload configuration"
-        /opt/cycle/jetpack/bin/jetpack log "Unable to add slurm_exporter scrape config to Prometheus" --level=warn --priority=medium
-    fi
-    
+    reload_prom_config
+        
     sleep 20
     if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
         echo "Slurm Exporter metrics are available"
     else
         echo "Slurm Exporter metrics are not available"
         /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
-    fi    
+    fi 
 }
 
 # start slurmrestd
@@ -145,7 +155,6 @@ if [ $? != 0 ]; then
     exit 0
 fi
 # start slurm_exporter if monitoring is enabled and slurmrestd is running
-monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
 if [[ "$monitoring_enabled" == "True" ]]; then
     run_slurm_exporter
 fi
