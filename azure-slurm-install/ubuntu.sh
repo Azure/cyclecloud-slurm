@@ -8,6 +8,9 @@ SLURM_ROLE=$1
 SLURM_VERSION=$2
 
 UBUNTU_VERSION=$(cat /etc/os-release | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2)
+ENROOT_VERSION="4.0.1"
+PYXIS_VERSION="0.21.0"
+PYXIS_DIR="/opt/pyxis"
 
 dpkg_pkg_install() {
     local packages_to_install=""
@@ -15,18 +18,26 @@ dpkg_pkg_install() {
     local pkg_names=$1
     
     for pkg_name in $pkg_names; do
+        # Check if it's a local .deb file
+        if [[ "$pkg_name" == *.deb ]]; then
+            # Extract package name from .deb filename
+            local base_pkg=$(basename "$pkg_name" | sed 's/_.*$//')
+            local version_pattern=$(basename "$pkg_name" | sed 's/^[^_]*_\([^-]*\).*$/\1/')
         # Check if it's a versioned SLURM package
-        if [[ "$pkg_name" == *"=${SLURM_VERSION}"* ]]; then
+        elif [[ "$pkg_name" == *"=${SLURM_VERSION}"* ]]; then
             local base_pkg=$(echo "$pkg_name" | sed "s/=${SLURM_VERSION}.*//")
-            if ! dpkg -l | grep "^[hi]i  ${base_pkg}" | grep -q "${SLURM_VERSION}"; then
-                packages_to_install="$packages_to_install $pkg_name"
-                packages_to_hold="$packages_to_hold $base_pkg"
-            fi
+            local version_pattern="${SLURM_VERSION}"
         else
             # Regular package check
-            if ! dpkg -l | grep -q "^[hi]i  ${pkg_name}"; then
+            if ! dpkg -l | grep -q "^[hi]i  ${pkg_name}[[:space:]]"; then
                 packages_to_install="$packages_to_install $pkg_name"
             fi
+            continue
+        fi
+        # For versioned packages, check if the installed version matches
+        if ! dpkg -l | grep "^[hi]i  ${base_pkg}[[:space:]]" | grep -q "${version_pattern}"; then
+            packages_to_install="$packages_to_install $pkg_name"
+            packages_to_hold="$packages_to_hold $base_pkg"
         fi
     done
     
@@ -52,7 +63,7 @@ if [[ $UBUNTU_VERSION > "19" ]]; then
     dependency_packages="$dependency_packages python3-venv"
 fi
 
-dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq libjansson-dev libjwt-dev binutils"
+dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq libjansson-dev libjwt-dev binutils gcc make wget"
 
 arch=$(dpkg --print-architecture)
 if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
@@ -130,5 +141,24 @@ if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; th
     SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
     docker pull $SLURM_EXPORTER_IMAGE_NAME
 fi
+
+#verify enroot package
+run_file=artifacts/enroot-check_${ENROOT_VERSION}_$(uname -m).run
+chmod 755 $run_file
+$run_file --verify
+
+# Install enroot package
+dpkg_pkg_install "./artifacts/enroot_${ENROOT_VERSION}-1_${arch}.deb ./artifacts/enroot+caps_${ENROOT_VERSION}-1_${arch}.deb"
+
+# Install pyxis
+if [[ ! -f $PYXIS_DIR/spank_pyxis.so ]]; then
+    tar -xzf artifacts/pyxis-${PYXIS_VERSION}.tar.gz
+    cd pyxis-${PYXIS_VERSION}
+    make
+    mkdir -p $PYXIS_DIR
+    cp -fv spank_pyxis.so $PYXIS_DIR
+    chmod +x $PYXIS_DIR/spank_pyxis.so
+fi
+
 touch $INSTALLED_FILE
 exit
