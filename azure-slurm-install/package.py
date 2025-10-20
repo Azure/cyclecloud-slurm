@@ -7,6 +7,8 @@ import requests
 from typing import Optional
 
 def execute() -> None:
+    ENROOT_VERSION = "4.0.1"
+    PYXIS_VERSION = "0.21.0"
 
     expected_cwd = os.path.abspath(os.path.dirname(__file__))
     os.chdir(expected_cwd)
@@ -56,12 +58,43 @@ def execute() -> None:
         with open(path, "rb") as fr:
             tf.addfile(tarinfo, fr)
 
-    epel_versions = ["8", "9"]
-    for ver in epel_versions:
+    #Download EPEL
+    for ver in ["8", "9"]:
         url = f"https://dl.fedoraproject.org/pub/epel/epel-release-latest-{ver}.noarch.rpm"
         dest = os.path.join(artifacts_dir, f"epel-release-latest-{ver}.noarch.rpm")
         _download(url, dest)
         _add(dest, dest)
+
+    # Download Pyxis and Enroot packages
+    for arch in ["x86_64", "aarch64"]:
+        enroot_check_url = f"https://github.com/NVIDIA/enroot/releases/download/v{ENROOT_VERSION}/enroot-check_{ENROOT_VERSION}_{arch}.run"
+        enroot_check_dest = os.path.join(artifacts_dir, f"enroot-check_{ENROOT_VERSION}_{arch}.run")
+        _download(enroot_check_url, enroot_check_dest)
+        _add(enroot_check_dest, enroot_check_dest)
+        enroot_rpm_url = f"https://github.com/NVIDIA/enroot/releases/download/v{ENROOT_VERSION}/enroot-{ENROOT_VERSION}-1.el8.{arch}.rpm"
+        enroot_rpm_dest = os.path.join(artifacts_dir, f"enroot-{ENROOT_VERSION}-1.el8.{arch}.rpm")
+        _download(enroot_rpm_url, enroot_rpm_dest)
+        _add(enroot_rpm_dest, enroot_rpm_dest)
+        enroot_caps_url = f"https://github.com/NVIDIA/enroot/releases/download/v{ENROOT_VERSION}/enroot+caps-{ENROOT_VERSION}-1.el8.{arch}.rpm"
+        enroot_caps_dest = os.path.join(artifacts_dir, f"enroot+caps-{ENROOT_VERSION}-1.el8.{arch}.rpm")
+        _download(enroot_caps_url, enroot_caps_dest)
+        _add(enroot_caps_dest, enroot_caps_dest)
+
+    for arch in ["amd64", "arm64"]:
+        enroot_deb_url = f"https://github.com/NVIDIA/enroot/releases/download/v{ENROOT_VERSION}/enroot_{ENROOT_VERSION}-1_{arch}.deb"
+        enroot_deb_dest = os.path.join(artifacts_dir, f"enroot_{ENROOT_VERSION}-1_{arch}.deb")
+        _download(enroot_deb_url, enroot_deb_dest)
+        _add(enroot_deb_dest, enroot_deb_dest)
+        enroot_caps_url = f"https://github.com/NVIDIA/enroot/releases/download/v{ENROOT_VERSION}/enroot+caps_{ENROOT_VERSION}-1_{arch}.deb"
+        enroot_caps_dest = os.path.join(artifacts_dir, f"enroot+caps_{ENROOT_VERSION}-1_{arch}.deb")
+        _download(enroot_caps_url, enroot_caps_dest)
+        _add(enroot_caps_dest, enroot_caps_dest)
+
+    pyxis_url = f"https://github.com/NVIDIA/pyxis/archive/refs/tags/v{PYXIS_VERSION}.tar.gz"
+    pyxis_dest = os.path.join(artifacts_dir, f"pyxis-{PYXIS_VERSION}.tar.gz")
+    _download(pyxis_url, pyxis_dest)
+    _add(pyxis_dest, pyxis_dest)
+
     _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
     _add("install_logging.conf", "conf/install_logging.conf")
     _add("installlib.py", "installlib.py")
