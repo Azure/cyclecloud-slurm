@@ -12,6 +12,9 @@ ENROOT_VERSION="4.0.1"
 PYXIS_VERSION="0.21.0"
 PYXIS_DIR="/opt/pyxis"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARTIFACTS_DIR="$SCRIPT_DIR/artifacts"
+
 dpkg_pkg_install() {
     local packages_to_install=""
     local packages_to_hold=""
@@ -29,13 +32,13 @@ dpkg_pkg_install() {
             local version_pattern="${SLURM_VERSION}"
         else
             # Regular package check
-            if ! dpkg -l | grep -q "^[hi]i  ${pkg_name}[[:space:]]"; then
+            if ! dpkg-query -W -f='${Status}' "${pkg_name}" 2>/dev/null | grep -q "install ok installed"; then
                 packages_to_install="$packages_to_install $pkg_name"
             fi
             continue
         fi
         # For versioned packages, check if the installed version matches
-        if ! dpkg -l | grep "^[hi]i  ${base_pkg}[[:space:]]" | grep -q "${version_pattern}"; then
+        if ! dpkg -l | grep "^[hi]i  ${base_pkg}" | grep -q "${version_pattern}"; then
             packages_to_install="$packages_to_install $pkg_name"
             packages_to_hold="$packages_to_hold $base_pkg"
         fi
@@ -142,17 +145,23 @@ if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; th
     docker pull $SLURM_EXPORTER_IMAGE_NAME
 fi
 
+# Check if artifacts directory exists
+if [ ! -d "$ARTIFACTS_DIR" ]; then
+    echo "Error: Artifacts directory not found: $ARTIFACTS_DIR"
+    exit 1
+fi
+
 #verify enroot package
-run_file=artifacts/enroot-check_${ENROOT_VERSION}_$(uname -m).run
+run_file=${ARTIFACTS_DIR}/enroot-check_${ENROOT_VERSION}_$(uname -m).run
 chmod 755 $run_file
 $run_file --verify
 
 # Install enroot package
-dpkg_pkg_install "./artifacts/enroot_${ENROOT_VERSION}-1_${arch}.deb ./artifacts/enroot+caps_${ENROOT_VERSION}-1_${arch}.deb"
+dpkg_pkg_install "${ARTIFACTS_DIR}/enroot_${ENROOT_VERSION}-1_${arch}.deb ${ARTIFACTS_DIR}/enroot+caps_${ENROOT_VERSION}-1_${arch}.deb"
 
 # Install pyxis
 if [[ ! -f $PYXIS_DIR/spank_pyxis.so ]]; then
-    tar -xzf artifacts/pyxis-${PYXIS_VERSION}.tar.gz
+    tar -xzf ${ARTIFACTS_DIR}/pyxis-${PYXIS_VERSION}.tar.gz
     cd pyxis-${PYXIS_VERSION}
     make
     mkdir -p $PYXIS_DIR
