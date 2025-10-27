@@ -49,10 +49,6 @@ class InstallSettings:
         self.jwt_key_path = (
             config["slurm"].get("jwt_key_path") or "/var/spool/slurm/statesave/jwt_hs256.key"
             )
-        
-        self.enroot_scratch_dir = (
-            config["slurm"].get("enroot_scratch_dir") or "/mnt/enroot"
-        )
 
         self.cyclecloud_cluster_name = config["cluster_name"]
         # We use a "safe" form of the CycleCloud ClusterName
@@ -878,19 +874,29 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
     if s.platform_family == "rhel" and s.major_version != 8:
         logging.warning("Enroot is only supported on Ubuntu and RHEL/AlmaLinux 8. Skipping enroot configuration.")
         return
+
+    def _get_enroot_scratch_base_dir() -> str:
+        if os.path.exists("/mnt/nvme") and ilib.is_mount_point("/mnt/nvme"):
+            logging.info("Using /mnt/nvme for enroot scratch directory (nvme mount detected)")
+            return "/mnt/nvme"
+        elif os.path.exists("/mnt") and ilib.is_mount_point("/mnt"):
+            logging.info("Using /mnt for enroot scratch directory (mnt mount detected)")
+            return "/mnt"
+        else:
+            logging.info("Using /tmp for enroot scratch directory (no suitable mounts found)")
+            return "/tmp"
+
+    # Determine scratch directory based on available mounts
+    scratch_base_dir = _get_enroot_scratch_base_dir()
+    enroot_scratch_dir = f"{scratch_base_dir}/enroot"
     
-    if os.path.exists("/mnt/nvme"):
-        # If /mnt/nvme exists, use it as the default scratch dir
-        ilib.directory("/mnt/nvme/enroot", owner="root", group="root", mode=755)
-        ilib.link("/mnt/nvme/enroot", s.enroot_scratch_dir, owner="root", group="root")
-    else:
-        ilib.directory("/mnt/scratch/enroot", owner="root", group="root", mode=755)
-        ilib.link("/mnt/scratch/enroot", s.enroot_scratch_dir, owner="root", group="root")
+    # Create the enroot directory
+    ilib.directory(enroot_scratch_dir, owner="root", group="root", mode=755)
 
     # Create enroot subdirectories
     subdirs = ["enroot-cache", "enroot-data", "enroot-temp", "enroot-runtime", "enroot-run"]
     for subdir in subdirs:
-        full_path = f"{s.enroot_scratch_dir}/{subdir}"
+        full_path = f"{enroot_scratch_dir}/{subdir}"
         ilib.directory(full_path, owner="root", group="root", mode=777)
     
     ilib.template(
@@ -900,7 +906,7 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
         mode="0644",
         source="templates/enroot.conf.template",
         variables={
-            "ENROOT_SCRATCH_DIR": s.enroot_scratch_dir
+            "ENROOT_SCRATCH_DIR": enroot_scratch_dir
         },
     )
     # Install extra hooks for PMIx on compute nodes
@@ -926,7 +932,7 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
                 logging.warning(f"Hook file {source_path} not found, skipping")
     
     # Create the pyxis.conf file with the required plugin configuration
-    pyxis_config = f'required /opt/pyxis/spank_pyxis.so runtime_path={s.enroot_scratch_dir}/enroot-runtime'
+    pyxis_config = f'required /opt/pyxis/spank_pyxis.so runtime_path={enroot_scratch_dir}/enroot-runtime'
     ilib.file(
         "/etc/slurm/plugstack.conf.d/pyxis.conf",
         content=pyxis_config,
