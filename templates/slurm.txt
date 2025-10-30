@@ -187,6 +187,7 @@ Autoscale = $Autoscale
 
     [[nodearray login]]
         InitialCount = $NumberLoginNodes
+        MaxCount = $MaxLoginNodeCount
         MachineType = $loginMachineType
         ImageName = $LoginImageName
         AdditionalClusterInitSpecs = $LoginClusterInitSpecs
@@ -445,6 +446,15 @@ Order = 10
         Label = Num Login Nodes
         DefaultValue = 0
         Description = Number of optional login nodes to create.
+        Config.Plugin = pico.form.NumberTextBox
+        Config.MinValue = 0
+        Config.MaxValue = 10000
+        Config.IntegerOnly = true
+
+        [[[parameter MaxLoginNodeCount]]]
+        Label = Max Login Nodes
+        DefaultValue = 0
+        Description = Maximum number of login nodes to create
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 0
         Config.MaxValue = 10000
