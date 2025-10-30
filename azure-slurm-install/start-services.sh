@@ -21,7 +21,6 @@ reload_prom_config(){
         kill -HUP $PROM_PID
     else
         echo "Prometheus process not found, unable to reload configuration"
-        /opt/cycle/jetpack/bin/jetpack log "Prometheus process not found, unable to reload configuration" --level=warn --priority=medium
     fi  
 }
 # all nodes need to have munge running
