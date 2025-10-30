@@ -133,10 +133,6 @@ fi
 # Install enroot package
 if [[ "$OS_VERSION" == "8" ]]; then
     rpm -e --nodeps enroot enroot+caps 2>/dev/null || true
-    # Enroot requires user namespaces to be enabled
-    echo "user.max_user_namespaces=32" > /etc/sysctl.d/userns.conf
-    sysctl -p /etc/sysctl.d/userns.conf
-
     arch=$(uname -m)
     run_file=${ARTIFACTS_DIR}/enroot-check_${ENROOT_VERSION}_$(uname -m).run
     chmod 755 $run_file
