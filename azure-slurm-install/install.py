@@ -941,6 +941,33 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
         mode="0644"
     )
 
+def _update_prom_config(s: InstallSettings, prom_config: str, host_name: str) -> None:
+    """
+    Update hostnames in Prometheus config targets to be new_hostname
+    """
+    if not s.monitoring_enabled or not os.path.isfile(prom_config):
+        logging.info("Monitoring is not enabled or prometheus config is not found, skipping Prometheus configuration update.")
+        return
+    
+    with open(prom_config, "r") as f:
+        prom_content = f.read()
+
+    # Replace hostnames in targets arrays, keeping the port
+    # Matches: "hostname:port" and replaces hostname with new host_name
+    prom_content = re.sub(r'"([^":]+):(\d+)"', f'"{host_name}:\\2"', prom_content)
+
+    # Also replace the global instance label
+    prom_content = re.sub(r'instance:\s*([^\s\n]+)', f'instance: {host_name}', prom_content)
+
+    # Write back to prom_config
+    ilib.file(
+        prom_config,
+        content=prom_content,
+        owner="root",
+        group="root",
+        mode="0644"
+    )
+    
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
@@ -955,6 +982,10 @@ def set_hostname(s: InstallSettings) -> None:
     ilib.set_hostname(
         new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
     )
+    
+    #Update prom config with new hostname
+    _update_prom_config(s, "/opt/prometheus/prometheus.yml", new_hostname)
+    
     if _is_at_least_ubuntu22() and s.ubuntu22_waagent_fix:
         logging.warning("Restarting systemd-networkd to fix waagent/hostname issue on Ubuntu 22.04." +
                         " To disable this, set slurm.ubuntu22_waagent_fix=false under this" +
