@@ -49,7 +49,7 @@ class InstallSettings:
         self.jwt_key_path = (
             config["slurm"].get("jwt_key_path") or "/var/spool/slurm/statesave/jwt_hs256.key"
             )
-        
+
         self.cyclecloud_cluster_name = config["cluster_name"]
         # We use a "safe" form of the CycleCloud ClusterName
         # First we lowercase the cluster name, then replace anything
@@ -71,6 +71,9 @@ class InstallSettings:
         self.ipv4 = config["ipaddress"]
         self.slurmver = config["slurm"]["version"]
         self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
+        self.version = config["azure"]["metadata"]["compute"]["version"]
+        # Extract major version for comparison (e.g., "8.10.2024101801" -> 8)
+        self.major_version = int(self.version.split('.')[0]) if self.version else 0
 
         self.slurm_user: str = config["slurm"]["user"].get("name") or "slurm"
         self.slurm_grp: str = config["slurm"]["user"].get("group") or "slurm"
@@ -641,6 +644,7 @@ def _complete_install_all(s: InstallSettings) -> None:
                        group=s.slurm_grp,
         )
 
+    _configure_enroot_pyxis(s)
 
     # Link the accounting.conf regardless
     ilib.link(
@@ -863,6 +867,77 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
         content=merged_str,
         owner="root",
         group="root",
+        mode="0644"
+    )
+
+def _configure_enroot_pyxis(s: InstallSettings) -> None:
+    if s.platform_family == "rhel" and s.major_version != 8:
+        logging.warning("Enroot is only supported on Ubuntu and RHEL/AlmaLinux 8. Skipping enroot configuration.")
+        return
+
+    def _get_enroot_scratch_base_dir() -> str:
+        if os.path.exists("/mnt/nvme") and ilib.is_mount_point("/mnt/nvme"):
+            logging.info("Using /mnt/nvme for enroot scratch directory (nvme mount detected)")
+            return "/mnt/nvme"
+        elif os.path.exists("/mnt") and ilib.is_mount_point("/mnt"):
+            logging.info("Using /mnt for enroot scratch directory (mnt mount detected)")
+            return "/mnt"
+        else:
+            logging.info("Using /tmp for enroot scratch directory (no suitable mounts found)")
+            return "/tmp"
+
+    # Determine scratch directory based on available mounts
+    scratch_base_dir = _get_enroot_scratch_base_dir()
+    enroot_scratch_dir = f"{scratch_base_dir}/enroot"
+    
+    # Create the enroot directory
+    ilib.directory(enroot_scratch_dir, owner="root", group="root", mode=755)
+
+    # Create enroot subdirectories
+    subdirs = ["enroot-cache", "enroot-data", "enroot-temp", "enroot-runtime", "enroot-run"]
+    for subdir in subdirs:
+        full_path = f"{enroot_scratch_dir}/{subdir}"
+        ilib.directory(full_path, owner="root", group="root", mode=777)
+    
+    ilib.template(
+        f"/etc/enroot/enroot.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+        mode="0644",
+        source="templates/enroot.conf.template",
+        variables={
+            "ENROOT_SCRATCH_DIR": enroot_scratch_dir
+        },
+    )
+    # Install extra hooks for PMIx on compute nodes
+    if s.mode == "execute":
+        # Ensure hooks directory exists
+        ilib.directory("/etc/enroot/hooks.d", owner="root", group="root", mode=755)
+        
+        # Copy hook files
+        hook_files = ["50-slurm-pmi.sh", "50-slurm-pytorch.sh"]
+        for hook_file in hook_files:
+            source_path = f"/usr/share/enroot/hooks.d/{hook_file}"
+            dest_path = f"/etc/enroot/hooks.d/{hook_file}"
+            
+            if os.path.exists(source_path):
+                ilib.copy_file(
+                    source_path,
+                    dest_path,
+                    owner="root",
+                    group="root",
+                    mode="0755"
+                )
+            else:
+                logging.warning(f"Hook file {source_path} not found, skipping")
+    
+    # Create the pyxis.conf file with the required plugin configuration
+    pyxis_config = f'required /opt/pyxis/spank_pyxis.so runtime_path={enroot_scratch_dir}/enroot-runtime'
+    ilib.file(
+        "/etc/slurm/plugstack.conf.d/pyxis.conf",
+        content=pyxis_config,
+        owner=s.slurm_user,
+        group=s.slurm_grp,
         mode="0644"
     )
 
