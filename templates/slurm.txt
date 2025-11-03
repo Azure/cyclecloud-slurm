@@ -72,8 +72,6 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:default:4.0.3]]]
-        Optional = true
-        [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
 
         [[[volume boot]]]
         Size = ${ifThenElse(BootDiskSize > 0, BootDiskSize, undefined)}
@@ -129,7 +127,6 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:scheduler:4.0.3]]]
-        [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -195,7 +192,6 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:login:4.0.3]]]
-        [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
         [[[configuration]]]
         slurm.role = login
         autoscale.enabled = false
@@ -214,7 +210,6 @@ Autoscale = $Autoscale
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
         [[[cluster-init cyclecloud/slurm:execute:4.0.3]]]
-        [[[cluster-init cyclecloud/slurm:pyxis:4.0.3]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic

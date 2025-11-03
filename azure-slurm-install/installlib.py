@@ -677,3 +677,19 @@ def get_ccnode(
                 software_configuration=node.get("Configuration") or {},
             )
     raise RuntimeError(f"Node {node_name} not found in cluster status!")
+
+def is_mount_point(path: str) -> bool:
+    """Check if a path is a mount point using mountpoint command"""
+    try:
+        subprocess.check_output(['mountpoint', '-q', path])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+    except FileNotFoundError:
+        # fallback method if mountpoint command is not available
+        try:
+            output = subprocess.check_output(['mount'], text=True)
+            return f" {path} " in output
+        except Exception:
+            logging.warning(f"Could not determine if {path} is a mount point")
+            return False
