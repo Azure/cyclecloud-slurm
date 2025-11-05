@@ -32,12 +32,12 @@ class InstallSettings:
 
         if "user" not in config["munge"]:
             config["munge"]["user"] = {}
-        
-        if "slurmrestd" not in config:
-            config["slurmrestd"] = {}
 
-        if "user" not in config["slurmrestd"]:
-            config["slurmrestd"]["user"] = {}
+        if "slurmrestd" not in config["slurm"]:
+            config["slurm"]["slurmrestd"] = {}
+
+        if "user" not in config["slurm"]["slurmrestd"]:
+            config["slurm"]["slurmrestd"]["user"] = {}
 
         if "monitoring" not in config["cyclecloud"]:
             config["cyclecloud"]["monitoring"] = {}
@@ -85,10 +85,10 @@ class InstallSettings:
         self.munge_uid: str = config["munge"]["user"].get("uid") or "11101"
         self.munge_gid: str = config["munge"]["user"].get("gid") or "11101"
 
-        self.slurmrestd_user: str = config["slurmrestd"]["user"].get("name") or "slurmrestd"
-        self.slurmrestd_grp: str = config["slurmrestd"]["user"].get("group") or "slurmrestd"
-        self.slurmrestd_uid: str = config["slurmrestd"]["user"].get("uid") or "11102"
-        self.slurmrestd_gid: str = config["slurmrestd"]["user"].get("gid") or "11102"
+        self.slurmrestd_user: str = config["slurm"]["slurmrestd"]["user"].get("name") or "slurmrestd"
+        self.slurmrestd_grp: str = config["slurm"]["slurmrestd"]["user"].get("group") or "slurmrestd"
+        self.slurmrestd_uid: str = config["slurm"]["slurmrestd"]["user"].get("uid") or "11102"
+        self.slurmrestd_gid: str = config["slurm"]["slurmrestd"]["user"].get("gid") or "11102"
 
         self.monitoring_enabled: bool = config["cyclecloud"]["monitoring"].get("enabled", False)
 
