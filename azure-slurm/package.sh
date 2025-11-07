@@ -21,7 +21,7 @@ else
     python3.11 setup.py sdist
     popd
     # swagger=`ls $LOCAL_SCALELIB/dist/swagger*.gz`
-    scalelib=`ls $LOCAL_SCALELIB/dist/cyclecloud-scalelib*.gz`
+    scalelib=`ls $LOCAL_SCALELIB/dist/cyclecloud_scalelib*.gz`
     # python3 package.py --scalelib $scalelib --swagger $swagger
     python3.11 package.py --scalelib $scalelib
 fi
