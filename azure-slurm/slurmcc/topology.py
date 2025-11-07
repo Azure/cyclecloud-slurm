@@ -246,6 +246,9 @@ class Topology:
         if os_id=="almalinux":
             log.debug("sharp_cmd_path: /opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/")
             return "/opt/hpcx-v2.18-gcc-mlnx_ofed-redhat8-cuda12-x86_64/"
+        if os_id=="rhel":
+            log.debug("sharp_cmd_path: /opt/hpcx-v2.24.1-gcc-inbox-redhat9-cuda12-x86_64/")
+            return "/opt/hpcx-v2.24.1-gcc-inbox-redhat9-cuda12-x86_64/"
         log.error("OS Not supported, exiting")
         sys.exit(1)
 
