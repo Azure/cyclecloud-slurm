@@ -20,6 +20,8 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     11. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
     12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
     13. [Slurmrestd](#slurmrestd)
+    14. [Monitoring](#monitoring)
+        1. [Example Dashboards](#example-dashboards)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
@@ -340,6 +342,30 @@ If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via t
 
 ### Slurmrestd
 As of version 4.0.3, `slurmrestd` is automatically configured and started on the scheduler node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+
+### Monitoring
+As of version 4.0.3, users have the option of enabling the [cyclecloud-monitoring project](https://github.com/Azure/cyclecloud-monitoring) in their slurm clusters via the Monitoring tab in the cluster creation UI.
+![Alt](/images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
+
+ To enable monitoring, users must create Azure Managed Monitoring Infrastructure following the cyclecloud-monitoring project instructions and input the Client ID of the Managed Identity with Monitoring Metrics Publisher role as well as the Ingestion Endpoint of the Azure Monitor Workspace in which to push metrics in the fields under the monitoring tab. These fields can be retrieved following the commands listed in the cyclecloud-monitoring project. Enabling monitoring will include the installation and configuration of:
+- Prometheus Node Exporter (for all execute nodes)
+- NVidia DCGM exporter (for Nvidia GPU nodes)
+- SchedMD Slurm exporter (for Slurm scheduler node).
+
+Once the cluster is started, you can access the Grafana dashboards by browsing to the Azure Managed Grafana instance created by the deployment script from the cyclecloud-monitoring project. The URL can be retrieved by browsing the Endpoint of the Azure Managed Grafana instance in the Azure portal, and when connected, access the pre-built dashboards under the Dashboards/Azure CycleCloud folder.
+
+#### Example Dashboards
+
+**Slurm Dashboard**
+![Alt](/images/slurmexporterdash.png "Example Slurm Exporter Grafana Dashboard")
+*Note: this dashboard is not published with cyclecloud-monitoring project and is used here as an example*
+
+**GPU Device View Dashboard**
+![Alt](/images/dcgmdash.png "Example DCGM Exporter Grafana Dashboard")
+
+**Node View Dashboard**
+![Alt](/images/nodeexporterdash.png "Example Node Exporter Grafana Dashboard")
+
 
 ## Supported Slurm and PMIX versions
 The current slurm version supported is `25.05.2` which is compiled with PMIX version `4.2.9`.
