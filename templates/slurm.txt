@@ -861,42 +861,42 @@ Order = 20
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.ubuntu22
-        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter LoginImageName]]]
         Label = Login Node OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.ubuntu22
-        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.ubuntu22
-        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.ubuntu22
-        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter GPUImageName]]]
         Label = GPU OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.ubuntu22
-        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter DynamicImageName]]]
         Label = Dynamic OS
         ParameterType = Cloud.Image
         Config.OS = linux
         DefaultValue = cycle.image.ubuntu22
-        Config.Filter := Package in {"cycle.image.ubuntu20", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8"}
+        Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
         Label = Scheduler Cluster-Init
