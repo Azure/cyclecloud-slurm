@@ -348,11 +348,16 @@ As of version 4.0.3, users have the option of enabling the [cyclecloud-monitorin
 ![Alt](/images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
 
  To enable monitoring, users must create Azure Managed Monitoring Infrastructure following the cyclecloud-monitoring project instructions and input the Client ID of the Managed Identity with Monitoring Metrics Publisher role as well as the Ingestion Endpoint of the Azure Monitor Workspace in which to push metrics in the fields under the monitoring tab. These fields can be retrieved following the commands listed in the cyclecloud-monitoring project. Enabling monitoring will include the installation and configuration of:
-- Prometheus Node Exporter (for all execute nodes)
+- Prometheus Node Exporter (for all nodes)
 - NVidia DCGM exporter (for Nvidia GPU nodes)
 - SchedMD Slurm exporter (for Slurm scheduler node).
 
 Once the cluster is started, you can access the Grafana dashboards by browsing to the Azure Managed Grafana instance created by the deployment script from the cyclecloud-monitoring project. The URL can be retrieved by browsing the Endpoint of the Azure Managed Grafana instance in the Azure portal, and when connected, access the pre-built dashboards under the Dashboards/Azure CycleCloud folder.
+
+To check if the configured exporters are exposing metrics, connect to a node and execute these `curls` commands :
+- For the Node Exporter : `curl -s http://localhost:9100/metrics` - available on all nodes
+- For the DCGM Exporter : `curl -s http://localhost:9400/metrics` - only available on VM type with NVidia GPU
+- For the Slurm Exporter : `curl -s http://localhost:9200/metrics` - only available on the Slurm scheduler VM
 
 #### Example Dashboards
 
