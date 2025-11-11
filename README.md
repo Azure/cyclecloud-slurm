@@ -345,12 +345,13 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 | OS                    | PMC Repo                                      |
 |-----------------------|-----------------------------------------------|
-| Ubuntu 20.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-focal/` |
 | Ubuntu 22.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-jammy/` |
 | Ubuntu 24.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
 | Ubuntu 24.04 [arm64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
 | AlmaLinux 8 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
 | Almalinux 9 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
+| RHEL 8 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
+| RHEL 9 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
 
 ## Troubleshooting
 
