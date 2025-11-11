@@ -514,6 +514,8 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
 6. For MPI jobs, the only network boundary that exists by default is the partition. There are not multiple "placement groups" per partition like 2.x. So you only have one colocated VMSS per partition. There is also no use of the topology plugin, which necessitated the use of a job submission plugin that is also no longer needed. Instead, submitting to multiple partitions is now the recommended option for use cases that require submitting jobs to multiple placement groups.
 ### Transitioning from 3.0 to 4.0
 1. Disable PMC is no longer supported and all slurm downloads will come from packages.microsoft.com. All blobs from github have been removed.
+2. Slurmrestd is now automatically configured and started for scheduler nodes.
+
 ### Ubuntu 22 or greater and DNS hostname resolution
 Due to an issue with the underlying DNS registration scheme that is used across Azure, our Slurm scripts use a mitigation that involves restarting `systemd-networkd` when changing the hostname of VMs deployed in a VMSS. This mitigation can be disabled by adding the following to your `Configuration` section.
 ```ini
