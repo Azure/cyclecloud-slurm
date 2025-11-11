@@ -19,6 +19,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     10. [Topology](#topology)
     11. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
     12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
+    13. [Slurmrestd](#slurmrestd)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
@@ -337,6 +338,9 @@ Added in 4.0.3: If the KeepAlive attribute is set in the CycleCloud UI, then the
 
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
+### Slurmrestd
+As of version 4.0.3, `slurmrestd` is automatically configured and started on the scheduler node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+
 ## Supported Slurm and PMIX versions
 The current slurm version supported is `25.05.2` which is compiled with PMIX version `4.2.9`.
 ## Packaging
@@ -355,9 +359,9 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 ## Troubleshooting
 
-### UID conflicts for Slurm and Munge users
+### UID conflicts for Slurm, Munge, and Slurmrestd users
 
-By default, this project uses a UID and GID of 11100 for the Slurm user and 11101 for the Munge user. If this causes a conflict with another user or group, these defaults may be overridden.
+By default, this project uses a UID and GID of 11100 for the Slurm user, 11101 for the Munge user and 11102 for the Slurmrestd user. If this causes a conflict with another user or group, these defaults may be overridden.
 
 To override the UID and GID, click the edit button for both the `scheduler` node:
 
