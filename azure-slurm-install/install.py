@@ -464,7 +464,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         # Run background checks every 1 minute
         health_interval = 60
         health_program = f"{s.config_dir}/health.sh"
-        epilog_program = f"{s.config_dir}/epilog.d/99-health_epilog.sh"
+        epilog_program = f"{s.config_dir}/epilog.d/10-health_epilog.sh"
         ilib.copy_file("/etc/healthagent/health.sh.example", health_program, owner="root", group="root", mode=755)
         ilib.copy_file("/etc/healthagent/epilog.sh.example", epilog_program, owner="root", group="root", mode=755)
 
@@ -490,9 +490,14 @@ def _complete_install_primary(s: InstallSettings) -> None:
         },
     )
 
+    ## SLurm Prolog/Epilog guide states:
+    #  When more than one prolog script is configured, they are executed in reverse alphabetical order (z-a -> Z-A -> 9-0).
+    #  Therefore we should make explicit numbering choice on imex prolog/epilog. By marking them 90- - We want them to execute first
+    #  but user can override that choice by putting a script that follows the ordering defined above.
+
     ilib.copy_file(
         "imex_prolog.sh",
-        f"{s.config_dir}/prolog.d/imex_prolog.sh",
+        f"{s.config_dir}/prolog.d/90-imex_prolog.sh",
         owner="root",
         group="root",
         mode="0755",
@@ -500,7 +505,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
     
     ilib.copy_file(
         "imex_epilog.sh",
-        f"{s.config_dir}/epilog.d/imex_epilog.sh",
+        f"{s.config_dir}/epilog.d/90-imex_epilog.sh",
         owner="root",
         group="root",
         mode="0755",
