@@ -19,6 +19,9 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     10. [Topology](#topology)
     11. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
     12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
+    13. [Slurmrestd](#slurmrestd)
+    14. [Monitoring](#monitoring)
+        1. [Example Dashboards](#example-dashboards)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
@@ -337,6 +340,38 @@ Added in 4.0.3: If the KeepAlive attribute is set in the CycleCloud UI, then the
 
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
+### Slurmrestd
+As of version 4.0.3, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+
+### Monitoring
+As of version 4.0.3, users have the option of enabling the [cyclecloud-monitoring project](https://github.com/Azure/cyclecloud-monitoring) in their slurm clusters via the Monitoring tab in the cluster creation UI.
+![Alt](/images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
+
+ To enable monitoring, users must create the Azure Managed Monitoring Infrastructure following the cyclecloud-monitoring project instructions under the [Build Managed Monitoring Infrastructure section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#build-the-managed-monitoring-infrastructure) and the [Grant the Monitoring Metrics Publisher role to the User Assigned Managed Identity section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#grant-the-monitoring-metrics-publisher-role-to-the-user-assigned-managed-identity). After deploying the Azure Managed Monitoring Infrastructure, input the Client ID of the Managed Identity with Monitoring Metrics Publisher role as well as the Ingestion Endpoint of the Azure Monitor Workspace in which to push metrics in the fields under the monitoring tab. These fields can be retrieved following the commands listed under the [Monitoring Configuration Parameters section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#monitoring-configuration-parameters) of the cyclecloud-monitoring project. Enabling monitoring will include the installation and configuration of:
+- Prometheus Node Exporter (for all nodes)
+- NVidia DCGM exporter (for Nvidia GPU nodes)
+- SchedMD Slurm exporter (for Slurm scheduler node).
+
+Once the cluster is started, you can access the Grafana dashboards by browsing to the Azure Managed Grafana instance created by the deployment script from the cyclecloud-monitoring project. The URL can be retrieved by browsing the Endpoint of the Azure Managed Grafana instance in the Azure portal, and when connected, access the pre-built dashboards under the Dashboards/Azure CycleCloud folder.
+
+To check if the configured exporters are exposing metrics, connect to a node and execute these `curls` commands :
+- For the Node Exporter : `curl -s http://localhost:9100/metrics` - available on all nodes
+- For the DCGM Exporter : `curl -s http://localhost:9400/metrics` - only available on VM type with NVidia GPU
+- For the Slurm Exporter : `curl -s http://localhost:9200/metrics` - only available on the Slurm scheduler VM
+
+#### Example Dashboards
+
+**Slurm Dashboard**
+![Alt](/images/slurmexporterdash.png "Example Slurm Exporter Grafana Dashboard")
+*Note: this dashboard is not published with cyclecloud-monitoring project and is used here as an example*
+
+**GPU Device View Dashboard**
+![Alt](/images/dcgmdash.png "Example DCGM Exporter Grafana Dashboard")
+
+**Node View Dashboard**
+![Alt](/images/nodeexporterdash.png "Example Node Exporter Grafana Dashboard")
+
+
 ## Supported Slurm and PMIX versions
 The current slurm version supported is `25.05.2` which is compiled with PMIX version `4.2.9`.
 ## Packaging
@@ -345,30 +380,47 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 | OS                    | PMC Repo                                      |
 |-----------------------|-----------------------------------------------|
-| Ubuntu 20.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-focal/` |
 | Ubuntu 22.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-jammy/` |
 | Ubuntu 24.04 [amd64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
 | Ubuntu 24.04 [arm64]  | `https://packages.microsoft.com/repos/slurm-ubuntu-noble/` |
 | AlmaLinux 8 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
 | Almalinux 9 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
+| RHEL 8 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
+| RHEL 9 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
 
 ## Troubleshooting
 
-### UID conflicts for Slurm and Munge users
+### UID conflicts for Slurm, Munge, and Slurmrestd users
 
-By default, this project uses a UID and GID of 11100 for the Slurm user and 11101 for the Munge user. If this causes a conflict with another user or group, these defaults may be overridden.
+By default, this project uses a UID and GID of 11100 for the Slurm user, 11101 for the Munge user and 11102 for the Slurmrestd user. If this causes a conflict with another user or group, these defaults may be overridden.
 
-To override the UID and GID, click the edit button for both the `scheduler` node:
+To override the UID and GID, first terminate the cluster and then for each nodearray click the edit button, for example the `scheduler-ha` array:
 
-![Alt](/images/schedulernodeedit.png "Edit Scheduler Node")
-
-And for each nodearray, for example the `htc` array:
 ![Alt](/images/nodearraytab.png "Edit nodearray")
 
- and add the following attributes at the end of the `Configuration` section:
+ For each nodearray, edit the following attributes in the `Configuration` section:
+```
+munge.user.uid
+munge.user.gid
+slurm.slurmrestd.user.uid
+slurm.slurmrestd.user.gid
+slurm.user.uid
+slurm.user.gid
+```
 
 
 ![Alt](/images/nodearrayedit.png "Edit configuration")
+
+After saving the attributes, you may restart the cluster.
+
+**Note: slurm requires UID/GID to be consistent across the cluster so you must edit all nodearray (including scheduler and scheduler-ha) configurations to override the defaults successfully. If you fail to do so you will see the following error in slurmd:**
+```
+Nov 18 17:50:18 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:50:18.003] error: Security violation, ping RPC from uid 11100
+Nov 18 17:50:26 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:50:26.011] error: Security violation, health check RPC from uid 11100
+Nov 18 17:51:32 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:32.767] debug:  _rpc_terminate_job: uid = 11100 JobId=2
+Nov 18 17:51:32 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:32.767] error: Security violation: kill_job(2) from uid 11100
+Nov 18 17:51:58 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:58.002] error: Security violation, ping RPC from uid 11100
+```
 
 
 ### Incorrect number of GPUs
@@ -483,6 +535,8 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
 6. For MPI jobs, the only network boundary that exists by default is the partition. There are not multiple "placement groups" per partition like 2.x. So you only have one colocated VMSS per partition. There is also no use of the topology plugin, which necessitated the use of a job submission plugin that is also no longer needed. Instead, submitting to multiple partitions is now the recommended option for use cases that require submitting jobs to multiple placement groups.
 ### Transitioning from 3.0 to 4.0
 1. Disable PMC is no longer supported and all slurm downloads will come from packages.microsoft.com. All blobs from github have been removed.
+2. Slurmrestd is now automatically configured and started for scheduler nodes and scheduler-ha nodes.
+
 ### Ubuntu 22 or greater and DNS hostname resolution
 Due to an issue with the underlying DNS registration scheme that is used across Azure, our Slurm scripts use a mitigation that involves restarting `systemd-networkd` when changing the hostname of VMs deployed in a VMSS. This mitigation can be disabled by adding the following to your `Configuration` section.
 ```ini
