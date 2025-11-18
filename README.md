@@ -394,17 +394,33 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 By default, this project uses a UID and GID of 11100 for the Slurm user, 11101 for the Munge user and 11102 for the Slurmrestd user. If this causes a conflict with another user or group, these defaults may be overridden.
 
-To override the UID and GID, click the edit button for both the `scheduler` node:
+To override the UID and GID, first terminate the cluster and then for each nodearray click the edit button, for example the `scheduler-ha` array:
 
-![Alt](/images/schedulernodeedit.png "Edit Scheduler Node")
-
-And for each nodearray, for example the `htc` array:
 ![Alt](/images/nodearraytab.png "Edit nodearray")
 
- and add the following attributes at the end of the `Configuration` section:
+ For each nodearray, edit the following attributes in the `Configuration` section:
+```
+munge.user.uid
+munge.user.gid
+slurm.slurmrestd.user.uid
+slurm.slurmrestd.user.gid
+slurm.user.uid
+slurm.user.gid
+```
 
 
 ![Alt](/images/nodearrayedit.png "Edit configuration")
+
+After saving the attributes, you may restart the cluster.
+
+**Note: slurm requires UID/GID to be consistent across the cluster so you must edit all nodearray (including scheduler and scheduler-ha) configurations to override the defaults successfully. If you fail to do so you will see the following error in slurmd:**
+```
+Nov 18 17:50:18 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:50:18.003] error: Security violation, ping RPC from uid 11100
+Nov 18 17:50:26 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:50:26.011] error: Security violation, health check RPC from uid 11100
+Nov 18 17:51:32 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:32.767] debug:  _rpc_terminate_job: uid = 11100 JobId=2
+Nov 18 17:51:32 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:32.767] error: Security violation: kill_job(2) from uid 11100
+Nov 18 17:51:58 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:58.002] error: Security violation, ping RPC from uid 11100
+```
 
 
 ### Incorrect number of GPUs
