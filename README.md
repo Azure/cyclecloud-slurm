@@ -391,7 +391,7 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 ## Slurm configuration reference
 
-The following table describes the Slurm-specific configuration options you can toggle to customize functionality:
+The following table describes the Slurm-specific configuration options you can toggle/define in the [slurm template](templates/slurm.txt) to customize functionality:
 
 | Slurm specific configuration options | Description |
 | ------------------------------------ | ----------- |
