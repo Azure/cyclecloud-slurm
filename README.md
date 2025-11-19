@@ -53,28 +53,20 @@ This should create the partitions with the correct number of nodes, the proper `
 As of 3.0.0, we are no longer pre-creating the nodes in CycleCloud. Nodes are created when `azslurm resume` is invoked, or by manually creating them in CycleCloud via CLI etc.
 
 ### Creating additional partitions
-The default template that ships with Azure CycleCloud has three partitions (`hpc`, `htc` and `dynamic`), and you can define custom nodearrays that map directly to Slurm partitions. For example, to create a GPU partition, add the following section to your cluster template:
+The default template that ships with Azure CycleCloud has four partitions (`hpc`, `htc`, `gpu` and `dynamic`), and you can define custom nodearrays that map directly to Slurm partitions. For example, to create a second GPU partition, add the following section to your cluster template:
 
 ```ini
-   [[nodearray gpu]]
-   MachineType = $GPUMachineType
-   ImageName = $GPUImageName
-   MaxCoreCount = $MaxGPUExecuteCoreCount
-   Interruptible = $GPUUseLowPrio
-   AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+   [[nodearray specialgpu]]
+   Extends = gpu
 
-      [[[configuration]]]
-      slurm.autoscale = true
-      # Set to true if nodes are used for tightly-coupled multi-node jobs
-      slurm.hpc = false
+   MachineType = $SpecialGPUMachineType
 
-      # Optionally over-ride the Device File locations for gres.conf 
-      # (The example here shows the default for an NVidia sku with 8 GPUs)
-      # slurm.gpu_device_config = /dev/nvidia[0-7]
+   MaxCoreCount = $MaxSpecialGPUCoreCount
 
-      [[[cluster-init cyclecloud/slurm:execute:4.0.3]]]
-      [[[network-interface eth0]]]
-      AssociatePublicIpAddress = $ExecuteNodesPublic
+...
+
+# Any new parameters [SpecialGPUMachineType, MaxSpecialGPUCoreCount] should be added n the [[parameters]] section
+
 ```
 
 ### Dynamic Partitions
