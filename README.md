@@ -403,7 +403,6 @@ The following table describes the Slurm-specific configuration options you can t
 | slurm.dampen_memory                  | Default: `5`. The percentage of memory to hold back for OS/VM overhead. |
 | slurm.suspend_timeout                | Default: `600`. The amount of time in seconds between a suspend call and when that node can be used again. |
 | slurm.resume_timeout                 | Default: `1800`. The amount of time in seconds to wait for a node to successfully boot. |
-| slurm.install                        | Default: `true`.  Determines if Slurm is installed at node boot (`true`). If you install Slurm in a custom image, set this configuration option to `false` (proj version 2.5.0+). |
 | slurm.use_pcpu                       | Default: `true`. A per-nodearray setting to control scheduling with hyperthreaded vCPUs. Set to `false` to set `CPUs=vcpus` in `cyclecloud.conf`. |
 | slurm.enable_healthchecks                       | Default: `false`. Setting to enable healthagent background healthchecks every minute|
 | slurm.accounting.enabled                       | Default: `false`. Setting to enable Slurm job accounting.  |
