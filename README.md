@@ -40,14 +40,38 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
 ## Managing Slurm Clusters in 4.0.3
 
 ### Making Cluster Changes
-The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
+In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
+ 
+When updating a running cluster, some changes may need to be applied directly on the running nodes.  Slurm clusters deployed by CycleCloud include a cli, available on the scheduler node, called `azslurm` which facilitates applying cluster configuration and scaling changes for running clusters.
+ 
+After making any changes to the running cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
+ 
 
 ```
       $ sudo -i
       # azslurm scale
 ```
-
 This should create the partitions with the correct number of nodes, the proper `gres.conf` and restart the `slurmctld`.
+ 
+For changes that are not available via the cluster's "Edit" dialog in the GUI,  the cluster template must be customized. First, download a copy of the [Slurm cluster template](#templates/slurm.txt), if you do not have it. Then, to make template changes for a cluster you can perform the following commands using the cyclecloud cli.
+```
+# First update a copy of the slurm template (shown as ./MODIFIED_SLURM.txt below)
+ 
+cyclecloud export_parameters MY_CLUSTERNAME > ./MY_CLUSTERNAME.json
+cyclecloud import_cluster MY_CLUSTERNAME -c slurm -f ./MODIFIED_slurm.txt -p ./MY_CLUSTERNAME.json
+```
+For a terminated cluster you can go ahead and start the cluster with all changes in effect.
+ 
+**IMPORTANT: There is no need to terminate the cluster or scale down to apply changes.**
+
+To apply changes to a running/started cluster perform the following steps after you have completed the previous steps:
+```
+cyclecloud start_cluster MY_CLUSTERNAME
+ssh $SCHEDULER_IP
+# azslurm scale will configure the partition and restart slurmctld
+# - this generally has no impact on the running workload
+sudo azslurm scale
+```
 
 ### No longer pre-creating execute nodes
 As of 3.0.0, we are no longer pre-creating the nodes in CycleCloud. Nodes are created when `azslurm resume` is invoked, or by manually creating them in CycleCloud via CLI etc.
