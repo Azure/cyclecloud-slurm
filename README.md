@@ -405,6 +405,8 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 | RHEL 8 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
 | RHEL 9 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
 
+**Note: CycleCloud also supports SLES 15 HPC, however we can only install the version supported by SLES HPC's zypper repos. At the time of this release, that is 23.02.7. Due to limited support, slurmrestd, monitoring, and background healthchecks are disabled for SUSE operting systems.**
+
 ## Slurm configuration reference
 
 The following table describes the Slurm-specific configuration options you can toggle/define in the [slurm template](templates/slurm.txt) to customize functionality:
