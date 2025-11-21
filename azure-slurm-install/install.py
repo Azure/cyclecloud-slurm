@@ -767,6 +767,10 @@ def setup_slurmrestd(s: InstallSettings) -> None:
     if s.mode != "scheduler":
         logging.info("Running on non-scheduler node skipping this step.")
         return
+    
+    if s.platform_family == "suse":
+        logging.warning("slurmrestd configuration is not supported on SUSE platforms, skipping this step.")
+        return
         
     # Add slurmrestd to docker group
     try:

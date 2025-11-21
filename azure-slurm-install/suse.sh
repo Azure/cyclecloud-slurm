@@ -28,8 +28,7 @@ if [ ${SLURM_ROLE} == "scheduler" ]; then
     zypper install -y slurm-${SLURM_VERSION} \
                       slurm-slurmdbd-${SLURM_VERSION} \
                       slurm-lua-${SLURM_VERSION} \
-                      slurm-sql-${SLURM_VERSION} \
-                      slurm-rest-${SLURM_VERSION}
+                      slurm-sql-${SLURM_VERSION}
 else
     zypper install -y slurm-${SLURM_VERSION}
 fi
