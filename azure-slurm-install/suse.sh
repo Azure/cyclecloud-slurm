@@ -33,7 +33,7 @@ else
     zypper install -y slurm-${SLURM_VERSION}
 fi
 
-for fil in slurm.conf cgroup.conf slurmdbd.conf; do
+for fil in slurm.conf cgroup.conf slurmdbd.conf plugstack.conf; do
     if [ -e /etc/slurm/$fil ]; then
         if [ ! -L /etc/slurm/$fil ]; then
             mv /etc/slurm/$fil /etc/slurm/$fil.suse_example

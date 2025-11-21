@@ -8,6 +8,7 @@ fi
 
 role=$1
 monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
+OS=$(. /etc/os-release; echo $ID)
 
 reload_prom_config(){
     # Find the Prometheus process and send SIGHUP to reload config or log a warning if not found
@@ -143,6 +144,11 @@ run_slurm_exporter() {
         /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
     fi 
 }
+
+if [[ "$OS" == "sle_hpc" ]]; then
+    echo Warning: slurmrestd is not supported on SUSE, skipping start. 1>&2
+    exit 0
+fi
 
 # start slurmrestd
 sleep 10
