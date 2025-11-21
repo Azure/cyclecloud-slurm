@@ -423,7 +423,7 @@ The following table describes the Slurm-specific configuration options you can t
 | slurm.enable_healthchecks                       | Default: `false`. Setting to enable healthagent background healthchecks every minute|
 | slurm.accounting.enabled                       | Default: `false`. Setting to enable Slurm job accounting.  |
 | slurm.accounting.url                       | Required when `slurm.accounting.enabled = true`. URL of the database to use for Slurm job accounting  |
-| slurm.accounting.storageloc                       | Required when `slurm.accounting.enabled = true`. Database name to store slurm accounting records  |
+| slurm.accounting.storageloc                       | Optional when `slurm.accounting.enabled = true`. Database name to store slurm accounting records  |
 | slurm.accounting.user                       | Required when `slurm.accounting.enabled = true`. User for Slurm DBD admin  |
 | slurm.accounting.password                       | Required when `slurm.accounting.enabled = true`. Password for Slurm DBD admin  |
 | slurm.accounting.certificate_url                       | Required when `slurm.accounting.enabled = true`. Url to fetch SSL Certificate for authentication to DB. Use AzureCA.pem (embedded) for use with deprecated MariaDB instances. |
