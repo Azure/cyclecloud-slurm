@@ -34,7 +34,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
-    8. [Capturing logs and configuration for troubleshooting] ()
+    8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-for-troubleshooting)
 6. [Contributing](#contributing)
 ---
 ## Managing Slurm Clusters in 4.0.3
