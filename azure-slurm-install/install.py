@@ -138,6 +138,11 @@ class InstallSettings:
         self.ubuntu22_waagent_fix = config["slurm"].get("ubuntu22_waagent_fix", True)
         self.enable_healthchecks = config["slurm"].get("enable_healthchecks", True)
 
+        if self.platform_family == "suse":
+            logging.warning("Disabling monitoring and healthchecks on SUSE platforms.")
+            self.enable_healthchecks = False
+            self.monitoring_enabled = False
+
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
 
@@ -876,7 +881,7 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
     )
 
 def _configure_enroot_pyxis(s: InstallSettings) -> None:
-    if s.platform_family == "rhel" and s.major_version != 8:
+    if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8):
         logging.warning("Enroot is only supported on Ubuntu and RHEL/AlmaLinux 8. Skipping enroot configuration.")
         return
 
