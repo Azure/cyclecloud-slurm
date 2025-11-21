@@ -8,6 +8,12 @@ fi
 
 role=$1
 monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
+OS=$(. /etc/os-release; echo $ID)
+
+if [[ "$OS" == "sle_hpc" ]]; then
+    # on SUSE, monitoring and healthchecks are disabled
+    monitoring_enabled="False"
+fi
 
 reload_prom_config(){
     # Find the Prometheus process and send SIGHUP to reload config or log a warning if not found
