@@ -139,7 +139,7 @@ class InstallSettings:
         self.enable_healthchecks = config["slurm"].get("enable_healthchecks", True)
 
         if self.platform_family == "suse":
-            logging.warning("Disabling monitoring and healthchecks on SUSE platforms.")
+            logging.warning("Monitoring and healthchecks are not supported on SUSE platforms, disabling configuration.")
             self.enable_healthchecks = False
             self.monitoring_enabled = False
 
