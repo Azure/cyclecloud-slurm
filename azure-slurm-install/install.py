@@ -191,6 +191,10 @@ def setup_users(s: InstallSettings) -> None:
         gid=s.munge_gid,
     )
     
+    if s.platform_family == "suse":
+        logging.warning("slurmrestd user configuration is not supported on SUSE platforms, skipping this step.")
+        return
+    
     ilib.group(s.slurmrestd_grp, gid=s.slurmrestd_gid)
     
     ilib.user(
