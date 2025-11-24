@@ -765,6 +765,18 @@ def setup_slurmd(s: InstallSettings) -> None:
         group=s.slurm_grp,
         mode="0700",
     )
+
+    ilib.directory(
+        "/etc/systemd/system/slurmd.service.d", owner="root", group="root", mode=755
+    )
+
+    ilib.template(
+        "/etc/systemd/system/slurmd.service.d/override.conf",
+        source="templates/slurmd.override",
+        owner="root",
+        group="root",
+        mode=644,
+    )
     ilib.enable_service("slurmd")
 
 def setup_slurmrestd(s: InstallSettings) -> None:

@@ -1,2 +1,5 @@
 [Service]
 Restart=always
+RestartSec=10s
+RuntimeDirectory=munge
+RuntimeDirectoryMode=0755
