@@ -474,7 +474,7 @@ Order = 10
 
         [[[parameter MaxLoginNodeCount]]]
         Label = Max Login Nodes
-        DefaultValue = 0
+        DefaultValue = 10
         Description = Maximum number of login nodes to create
         Config.Plugin = pico.form.NumberTextBox
         Config.MinValue = 0
