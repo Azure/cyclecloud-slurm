@@ -25,7 +25,8 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
-4. [Troubleshooting](#troubleshooting)
+4. [Slurm Configuration Reference](#slurm-configuration-reference)
+5. [Troubleshooting](#troubleshooting)
     1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
     2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
     3. [Dampening Memory](#dampening-memory)
@@ -33,47 +34,63 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
-    8. [Capturing logs and configuration for troubleshooting] ()
-5. [Contributing](#contributing)
+    8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-for-troubleshooting)
+6. [Contributing](#contributing)
 ---
 ## Managing Slurm Clusters in 4.0.3
 
 ### Making Cluster Changes
-The Slurm cluster deployed in CycleCloud contains a cli called `azslurm` which facilitates this. After making any changes to the cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
+In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
+ 
+When updating a running cluster, some changes may need to be applied directly on the running nodes.  Slurm clusters deployed by CycleCloud include a cli, available on the scheduler node, called `azslurm` which facilitates applying cluster configuration and scaling changes for running clusters.
+ 
+After making any changes to the running cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
+ 
 
 ```
       $ sudo -i
       # azslurm scale
 ```
-
 This should create the partitions with the correct number of nodes, the proper `gres.conf` and restart the `slurmctld`.
+ 
+For changes that are not available via the cluster's "Edit" dialog in the GUI,  the cluster template must be customized. First, download a copy of the [Slurm cluster template](#templates/slurm.txt), if you do not have it. Then, to make template changes for a cluster you can perform the following commands using the cyclecloud cli.
+```
+# First update a copy of the slurm template (shown as ./MODIFIED_SLURM.txt below)
+ 
+cyclecloud export_parameters MY_CLUSTERNAME > ./MY_CLUSTERNAME.json
+cyclecloud import_cluster MY_CLUSTERNAME -c slurm -f ./MODIFIED_slurm.txt -p ./MY_CLUSTERNAME.json --force
+```
+For a terminated cluster you can go ahead and start the cluster with all changes in effect.
+ 
+**IMPORTANT: There is no need to terminate the cluster or scale down to apply changes.**
+
+To apply changes to a running/started cluster perform the following steps after you have completed the previous steps:
+```
+cyclecloud start_cluster MY_CLUSTERNAME
+ssh $SCHEDULER_IP
+# azslurm scale will configure the partition and restart slurmctld
+# - this generally has no impact on the running workload
+sudo azslurm scale
+```
 
 ### No longer pre-creating execute nodes
 As of 3.0.0, we are no longer pre-creating the nodes in CycleCloud. Nodes are created when `azslurm resume` is invoked, or by manually creating them in CycleCloud via CLI etc.
 
 ### Creating additional partitions
-The default template that ships with Azure CycleCloud has three partitions (`hpc`, `htc` and `dynamic`), and you can define custom nodearrays that map directly to Slurm partitions. For example, to create a GPU partition, add the following section to your cluster template:
+The default template that ships with Azure CycleCloud has four partitions (`hpc`, `htc`, `gpu` and `dynamic`), and you can define custom nodearrays that map directly to Slurm partitions. For example, to create a second GPU partition, add the following section to your cluster template:
 
 ```ini
-   [[nodearray gpu]]
-   MachineType = $GPUMachineType
-   ImageName = $GPUImageName
-   MaxCoreCount = $MaxGPUExecuteCoreCount
-   Interruptible = $GPUUseLowPrio
-   AdditionalClusterInitSpecs = $ExecuteClusterInitSpecs
+   [[nodearray specialgpu]]
+   Extends = gpu
 
-      [[[configuration]]]
-      slurm.autoscale = true
-      # Set to true if nodes are used for tightly-coupled multi-node jobs
-      slurm.hpc = false
+   MachineType = $SpecialGPUMachineType
 
-      # Optionally over-ride the Device File locations for gres.conf 
-      # (The example here shows the default for an NVidia sku with 8 GPUs)
-      # slurm.gpu_device_config = /dev/nvidia[0-7]
+   MaxCoreCount = $MaxSpecialGPUCoreCount
 
-      [[[cluster-init cyclecloud/slurm:execute:4.0.3]]]
-      [[[network-interface eth0]]]
-      AssociatePublicIpAddress = $ExecuteNodesPublic
+...
+
+# Any new parameters [SpecialGPUMachineType, MaxSpecialGPUCoreCount] should be added n the [[parameters]] section
+
 ```
 
 ### Dynamic Partitions
@@ -387,6 +404,44 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 | Almalinux 9 [amd64]   | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
 | RHEL 8 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el8/`       |
 | RHEL 9 [amd64]        | `https://packages.microsoft.com/yumrepos/slurm-el9/`       |
+
+**Note: CycleCloud also supports SLES 15 HPC, however we can only install the version supported by SLES HPC's zypper repos. At the time of this release, that is 23.02.7. Due to limited support, slurmrestd, monitoring, and background healthchecks are disabled for SUSE operting systems.**
+
+## Slurm configuration reference
+
+The following table describes the Slurm-specific configuration options you can toggle/define in the [slurm template](templates/slurm.txt) to customize functionality:
+
+| Slurm specific configuration options | Description |
+| ------------------------------------ | ----------- |
+| slurm.version                        | Default: `25.05.2`. Sets the version of Slurm to install and run.  |
+| slurm.insiders                        | Default: `false`. Setting that controls whethere slurm is installed from pmc stable repo or pmc insiders repo. Set to `true` to install from insiders repo.  |
+| slurm.autoscale                      | Default: `false`. A per-nodearray setting that controls whether Slurm automatically stops and starts nodes in this node array. |
+| slurm.hpc                            | Default: `true`. A per-nodearray setting that controls whether nodes in the node array are in the same placement group. Primarily used for node arrays that use VM families with InfiniBand. It only applies when `slurm.autoscale` is set to `true`. |
+| slurm.default_partition              | Default: `false`. A per-nodearray setting that controls whether the nodearray should be the default partition for jobs that don't request a partition explicitly. |
+| slurm.dampen_memory                  | Default: `5`. The percentage of memory to hold back for OS/VM overhead. |
+| slurm.suspend_timeout                | Default: `600`. The amount of time in seconds between a suspend call and when that node can be used again. |
+| slurm.resume_timeout                 | Default: `1800`. The amount of time in seconds to wait for a node to successfully boot. |
+| slurm.use_pcpu                       | Default: `true`. A per-nodearray setting to control scheduling with hyperthreaded vCPUs. Set to `false` to set `CPUs=vcpus` in `cyclecloud.conf`. |
+| slurm.enable_healthchecks                       | Default: `false`. Setting to enable healthagent background healthchecks every minute|
+| slurm.accounting.enabled                       | Default: `false`. Setting to enable Slurm job accounting.  |
+| slurm.accounting.url                       | Required when `slurm.accounting.enabled = true`. URL of the database to use for Slurm job accounting  |
+| slurm.accounting.storageloc                       | Optional when `slurm.accounting.enabled = true`. Database name to store slurm accounting records  |
+| slurm.accounting.user                       | Required when `slurm.accounting.enabled = true`. User for Slurm DBD admin  |
+| slurm.accounting.password                       | Required when `slurm.accounting.enabled = true`. Password for Slurm DBD admin  |
+| slurm.accounting.certificate_url                       | Required when `slurm.accounting.enabled = true`. Url to fetch SSL Certificate for authentication to DB. Use AzureCA.pem (embedded) for use with deprecated MariaDB instances. |
+| slurm.additional.config                      | Any additional lines to add to slurm.conf |
+| slurm.ha_enabled                       | Default: `false`. Setting to deploy with an additional HA node |
+| slurm.launch_parameters                       | Default: `use_interactive_step`. Deploy Slurm with Launch Parameters (comma delimited) |
+| slurm.user.name                      | Default: `slurm`. The user name for the Slurm service to use. |
+| slurm.user.uid                       | Default: `11100`. The user ID to use for the Slurm user. |
+| slurm.user.gid                       | Default: `11100`. The group ID to use for the Slurm user. |
+| munge.user.name                      | Default: `munge`. The user name for the MUNGE authentication service to use. |
+| munge.user.uid                       | Default: `11101`. The user ID to use for the MUNGE user. |
+| munge.user.gid                       | Default: `11101`. The group ID for the MUNGE user. |
+| slurm.slurmrestd.user.name                      | Default: `slurmrestd`. The user name for the Slurmrestd service to use. |
+| slurm.slurmrestd.user.uid                       | Default: `11102`. The user ID to use for the Slurmrestd user. |
+| slurm.slurmrestd.user.gid                       | Default: `11102`. The group ID for the Slurmrestd user. |
+| slurm.imex.enabled                      | Default: `true` for GB200/GB300 nodes,`false` for all other skus.  A per-nodearray setting that controls whether to enable IMEX support for jobs. |
 
 ## Troubleshooting
 
