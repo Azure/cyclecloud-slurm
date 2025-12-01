@@ -260,6 +260,7 @@ Autoscale = $Autoscale
     AdditionalClusterInitSpecs = $GPUClusterInitSpecs
 
         [[[configuration]]]
+        slurm.default_partition = true
         slurm.hpc = true
         slurm.partition = gpu
         #Parameter to enable or disable IMEX service on a per-job basis
