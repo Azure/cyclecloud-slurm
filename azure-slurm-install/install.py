@@ -906,9 +906,9 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
         return
 
     def _get_enroot_scratch_base_dir() -> str:
-        if os.path.exists("/mnt/nvme") and ilib.is_mount_point("/mnt/nvme"):
-            logging.info("Using /mnt/nvme for enroot scratch directory (nvme mount detected)")
-            return "/mnt/nvme"
+        if os.path.exists("/nvme") and ilib.is_mount_point("/nvme"):
+            logging.info("Using /nvme for enroot scratch directory (nvme mount detected)")
+            return "/nvme"
         elif os.path.exists("/mnt") and ilib.is_mount_point("/mnt"):
             logging.info("Using /mnt for enroot scratch directory (mnt mount detected)")
             return "/mnt"
