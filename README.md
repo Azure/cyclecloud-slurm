@@ -58,7 +58,7 @@ For changes that are not available via the cluster's "Edit" dialog in the GUI,  
 # First update a copy of the slurm template (shown as ./MODIFIED_SLURM.txt below)
  
 cyclecloud export_parameters MY_CLUSTERNAME > ./MY_CLUSTERNAME.json
-cyclecloud import_cluster MY_CLUSTERNAME -c slurm -f ./MODIFIED_slurm.txt -p ./MY_CLUSTERNAME.json
+cyclecloud import_cluster MY_CLUSTERNAME -c slurm -f ./MODIFIED_slurm.txt -p ./MY_CLUSTERNAME.json --force
 ```
 For a terminated cluster you can go ahead and start the cluster with all changes in effect.
  
