@@ -6,7 +6,7 @@ import os
 import sys
 from slurmcc import azslurmd
 
-PID_FILE = os.environ.get("AZSLURM_PID_FILE", "/opt/azurehpc/slurm/azslurm.pid")
+PID_FILE = os.environ.get("AZSLURM_PID_FILE", "/var/run/azslurm.pid")
 
 
 def main() -> None:

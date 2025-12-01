@@ -45,6 +45,7 @@ ReconfigFlags=KeepPowerSaveSettings
 ResumeTimeout=1800
 SuspendTimeout=600
 SuspendTime=300
+SlurmctldTimeout=30
 ResumeProgram=/opt/azurehpc/slurm/resume_program.sh
 ResumeFailProgram=/opt/azurehpc/slurm/resume_fail_program.sh
 SuspendProgram=/opt/azurehpc/slurm/suspend_program.sh

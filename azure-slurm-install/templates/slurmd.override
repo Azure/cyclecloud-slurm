@@ -1,0 +1,13 @@
+[Unit]
+After=munge.service network-online.target local-fs.target remote-fs.target sssd.service
+Wants=network-online.target
+Requires=munge.service network-online.target remote-fs.target local-fs.target
+RequiresMountsFor=/sched
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/slurmd
+EnvironmentFile=-/etc/default/slurmd
+RuntimeDirectory=slurm
+RuntimeDirectoryMode=0755
+Restart=always
+RestartSec=10s

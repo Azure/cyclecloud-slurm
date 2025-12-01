@@ -138,6 +138,11 @@ class InstallSettings:
         self.ubuntu22_waagent_fix = config["slurm"].get("ubuntu22_waagent_fix", True)
         self.enable_healthchecks = config["slurm"].get("enable_healthchecks", True)
 
+        if self.platform_family == "suse":
+            logging.warning("Monitoring and healthchecks are not supported on SUSE platforms, disabling configuration.")
+            self.enable_healthchecks = False
+            self.monitoring_enabled = False
+
 
 def _inject_vm_size(dynamic_config: str, vm_size: str) -> str:
 
@@ -185,6 +190,10 @@ def setup_users(s: InstallSettings) -> None:
         uid=s.munge_uid,
         gid=s.munge_gid,
     )
+    
+    if s.platform_family == "suse":
+        logging.warning("slurmrestd user configuration is not supported on SUSE platforms, skipping this step.")
+        return
     
     ilib.group(s.slurmrestd_grp, gid=s.slurmrestd_gid)
     
@@ -756,11 +765,27 @@ def setup_slurmd(s: InstallSettings) -> None:
         group=s.slurm_grp,
         mode="0700",
     )
+
+    ilib.directory(
+        "/etc/systemd/system/slurmd.service.d", owner="root", group="root", mode=755
+    )
+
+    ilib.template(
+        "/etc/systemd/system/slurmd.service.d/override.conf",
+        source="templates/slurmd.override",
+        owner="root",
+        group="root",
+        mode=644,
+    )
     ilib.enable_service("slurmd")
 
 def setup_slurmrestd(s: InstallSettings) -> None:
     if s.mode != "scheduler":
         logging.info("Running on non-scheduler node skipping this step.")
+        return
+    
+    if s.platform_family == "suse":
+        logging.warning("slurmrestd configuration is not supported on SUSE platforms, skipping this step.")
         return
         
     # Add slurmrestd to docker group
@@ -876,14 +901,14 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
     )
 
 def _configure_enroot_pyxis(s: InstallSettings) -> None:
-    if s.platform_family == "rhel" and s.major_version != 8:
+    if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8):
         logging.warning("Enroot is only supported on Ubuntu and RHEL/AlmaLinux 8. Skipping enroot configuration.")
         return
 
     def _get_enroot_scratch_base_dir() -> str:
-        if os.path.exists("/mnt/nvme") and ilib.is_mount_point("/mnt/nvme"):
-            logging.info("Using /mnt/nvme for enroot scratch directory (nvme mount detected)")
-            return "/mnt/nvme"
+        if os.path.exists("/nvme") and ilib.is_mount_point("/nvme"):
+            logging.info("Using /nvme for enroot scratch directory (nvme mount detected)")
+            return "/nvme"
         elif os.path.exists("/mnt") and ilib.is_mount_point("/mnt"):
             logging.info("Using /mnt for enroot scratch directory (mnt mount detected)")
             return "/mnt"
