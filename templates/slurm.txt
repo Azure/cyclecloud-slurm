@@ -779,7 +779,7 @@ Order = 20
 	Config.Template := "<table role=\"presentation\"><tr><td> <b>Note: Checking this box will create persistent databases and tables in SQL DB provided. Deleting this cluster will not automatically delete those databases. User is responsible for periodically purging/archiving their slurm databases to maintain costs.</b></td></tr></table>"
 
         [[[parameter configuration_slurm_accounting_url]]]
-        Label = Slurm DBD URL
+        Label = Database URL
         Description = URL of the database to use for Slurm job accounting
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
@@ -789,12 +789,12 @@ Order = 20
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
         [[[parameter configuration_slurm_accounting_user]]]
-        Label = Slurm DBD User
+        Label = Database User
         Description = User for Slurm DBD admin
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
         [[[parameter configuration_slurm_accounting_password]]]
-        Label = Slurm DBD Password
+        Label = Database Password
         Description = Password for Slurm DBD admin
         ParameterType = Password
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
