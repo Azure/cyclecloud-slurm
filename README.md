@@ -5,7 +5,7 @@ Cyclecloud Slurm
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Managing Slurm Clusters in 4.0.3](#managing-slurm-clusters)
+1. [Managing Slurm Clusters in 4.0.4](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
@@ -30,14 +30,14 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
     2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
     3. [Dampening Memory](#dampening-memory)
-    4. [Pre:4.0.3: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
+    4. [Pre:4x: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
     8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-for-troubleshooting)
 6. [Contributing](#contributing)
 ---
-## Managing Slurm Clusters in 4.0.3
+## Managing Slurm Clusters in 4.0.4
 
 ### Making Cluster Changes
 In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
@@ -353,15 +353,15 @@ Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cl
 
 
 ### Setting KeepAlive
-Added in 4.0.3: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.3. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
+Added in 4.0.4: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.4. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
 
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
 ### Slurmrestd
-As of version 4.0.3, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+As of version 4.0.4, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
 
 ### Monitoring
-As of version 4.0.3, users have the option of enabling the [cyclecloud-monitoring project](https://github.com/Azure/cyclecloud-monitoring) in their slurm clusters via the Monitoring tab in the cluster creation UI.
+As of version 4.0.4, users have the option of enabling the [cyclecloud-monitoring project](https://github.com/Azure/cyclecloud-monitoring) in their slurm clusters via the Monitoring tab in the cluster creation UI.
 ![Alt](/images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
 
  To enable monitoring, users must create the Azure Managed Monitoring Infrastructure following the cyclecloud-monitoring project instructions under the [Build Managed Monitoring Infrastructure section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#build-the-managed-monitoring-infrastructure) and the [Grant the Monitoring Metrics Publisher role to the User Assigned Managed Identity section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#grant-the-monitoring-metrics-publisher-role-to-the-user-assigned-managed-identity). After deploying the Azure Managed Monitoring Infrastructure, input the Client ID of the Managed Identity with Monitoring Metrics Publisher role as well as the Ingestion Endpoint of the Azure Monitor Workspace in which to push metrics in the fields under the monitoring tab. These fields can be retrieved following the commands listed under the [Monitoring Configuration Parameters section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#monitoring-configuration-parameters) of the cyclecloud-monitoring project. Enabling monitoring will include the installation and configuration of:
