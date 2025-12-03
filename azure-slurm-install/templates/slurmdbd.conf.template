@@ -16,7 +16,6 @@ AuthType=auth/munge
 {auth_alt_parameters}
 #
 # slurmDBD info
-DbdAddr=localhost
 DbdHost={dbdhost}
 #DbdPort=7031
 SlurmUser=slurm
