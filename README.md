@@ -181,7 +181,7 @@ This feature is *highly recommended* to be enabled as this is what preserves you
 
 To setup job accounting, following fields are defined in the slurm cluster creation UI (coming from the slurm template):
 
-![Alt](/images/accounting.png "Slurm Accounting Setup")
+![Alt](images/accounting.png "Slurm Accounting Setup")
 
 
 - *Database URL* - What this refers to is the "Database" URL, a DNS resolvable address (or an IP address) of where mysql database lives.
@@ -417,7 +417,7 @@ If you want healthagent (for seeing issues in CC UI) but only want to disable sl
 As of version 4.0.3, users have the option of enabling the [cyclecloud-monitoring project](https://github.com/Azure/cyclecloud-monitoring) in their slurm clusters via the Monitoring tab in the cluster creation UI.
 
 
-![Alt](/images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
+![Alt](images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
 
 
  To enable monitoring, users must create the Azure Managed Monitoring Infrastructure following the cyclecloud-monitoring project instructions under the [Build Managed Monitoring Infrastructure section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#build-the-managed-monitoring-infrastructure) and the [Grant the Monitoring Metrics Publisher role to the User Assigned Managed Identity section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#grant-the-monitoring-metrics-publisher-role-to-the-user-assigned-managed-identity). After deploying the Azure Managed Monitoring Infrastructure, input the Client ID of the Managed Identity with Monitoring Metrics Publisher role as well as the Ingestion Endpoint of the Azure Monitor Workspace in which to push metrics in the fields under the monitoring tab. These fields can be retrieved following the commands listed under the [Monitoring Configuration Parameters section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#monitoring-configuration-parameters) of the cyclecloud-monitoring project. Enabling monitoring will include the installation and configuration of:
@@ -435,14 +435,14 @@ To check if the configured exporters are exposing metrics, connect to a node and
 #### Example Dashboards
 
 **Slurm Dashboard**
-![Alt](/images/slurmexporterdash.png "Example Slurm Exporter Grafana Dashboard")
+![Alt](images/slurmexporterdash.png "Example Slurm Exporter Grafana Dashboard")
 *Note: this dashboard is not published with cyclecloud-monitoring project and is used here as an example*
 
 **GPU Device View Dashboard**
-![Alt](/images/dcgmdash.png "Example DCGM Exporter Grafana Dashboard")
+![Alt](images/dcgmdash.png "Example DCGM Exporter Grafana Dashboard")
 
 **Node View Dashboard**
-![Alt](/images/nodeexporterdash.png "Example Node Exporter Grafana Dashboard")
+![Alt](images/nodeexporterdash.png "Example Node Exporter Grafana Dashboard")
 
 
 ## Supported Slurm and PMIX versions
@@ -507,7 +507,7 @@ By default, this project uses a UID and GID of 11100 for the Slurm user, 11101 f
 
 To override the UID and GID, first terminate the cluster and then for each nodearray click the edit button, for example the `scheduler-ha` array:
 
-![Alt](/images/nodearraytab.png "Edit nodearray")
+![Alt](images/nodearraytab.png "Edit nodearray")
 
  For each nodearray, edit the following attributes in the `Configuration` section:
 ```
@@ -520,7 +520,7 @@ slurm.user.gid
 ```
 
 
-![Alt](/images/nodearrayedit.png "Edit configuration")
+![Alt](images/nodearrayedit.png "Edit configuration")
 
 After saving the attributes, you may restart the cluster.
 
