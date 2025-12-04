@@ -419,13 +419,12 @@ def _accounting_all(s: InstallSettings) -> None:
     # This used to be required for all installations, but it is
     # now optional, so only create the link if required.
     original_azure_ca_pem = f"{s.config_dir}/AzureCA.pem"
-    if os.path.exists(original_azure_ca_pem):
-        ilib.link(
-            f"{s.config_dir}/AzureCA.pem",
-            "/etc/slurm/AzureCA.pem",
-            owner=s.slurm_user,
-            group=s.slurm_grp,
-        )
+    ilib.link(
+        f"{s.config_dir}/AzureCA.pem",
+        "/etc/slurm/AzureCA.pem",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
 
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
