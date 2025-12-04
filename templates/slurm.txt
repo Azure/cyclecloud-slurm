@@ -71,7 +71,7 @@ Autoscale = $Autoscale
 
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
-        [[[cluster-init cyclecloud/slurm:default:4.0.3]]]
+        [[[cluster-init cyclecloud/slurm:default:4.0.4]]]
 
         [[[volume boot]]]
         Size = ${ifThenElse(BootDiskSize > 0, BootDiskSize, undefined)}
@@ -126,7 +126,7 @@ Autoscale = $Autoscale
 
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
-        [[[cluster-init cyclecloud/slurm:scheduler:4.0.3]]]
+        [[[cluster-init cyclecloud/slurm:scheduler:4.0.4]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $UsePublicNetwork
@@ -191,7 +191,7 @@ Autoscale = $Autoscale
 
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
-        [[[cluster-init cyclecloud/slurm:login:4.0.3]]]
+        [[[cluster-init cyclecloud/slurm:login:4.0.4]]]
         [[[configuration]]]
         slurm.role = login
         autoscale.enabled = false
@@ -209,7 +209,7 @@ Autoscale = $Autoscale
 
         [[[cluster-init cyclecloud/healthagent:default]]]
         [[[cluster-init cyclecloud/monitoring:default]]]
-        [[[cluster-init cyclecloud/slurm:execute:4.0.3]]]
+        [[[cluster-init cyclecloud/slurm:execute:4.0.4]]]
 
         [[[network-interface eth0]]]
         AssociatePublicIpAddress = $ExecuteNodesPublic
@@ -779,7 +779,7 @@ Order = 20
 	Config.Template := "<table role=\"presentation\"><tr><td> <b>Note: Checking this box will create persistent databases and tables in SQL DB provided. Deleting this cluster will not automatically delete those databases. User is responsible for periodically purging/archiving their slurm databases to maintain costs.</b></td></tr></table>"
 
         [[[parameter configuration_slurm_accounting_url]]]
-        Label = Slurm DBD URL
+        Label = Database URL
         Description = URL of the database to use for Slurm job accounting
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
@@ -789,12 +789,12 @@ Order = 20
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
         [[[parameter configuration_slurm_accounting_user]]]
-        Label = Slurm DBD User
+        Label = Database User
         Description = User for Slurm DBD admin
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
         [[[parameter configuration_slurm_accounting_password]]]
-        Label = Slurm DBD Password
+        Label = Database Password
         Description = Password for Slurm DBD admin
         ParameterType = Password
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true

@@ -38,7 +38,7 @@ def make_partition(
     node_def = NodeDefinition(
         name,
         f"b-id-{name}",
-        "Standard_F4",
+        "Standard_F4s_v2",
         "southcentralus",
         False,
         "subnet",
@@ -47,11 +47,10 @@ def make_partition(
         Memory.value_of("16g"),
         f"pg-{name}" if is_hpc else None,
         resources,
-        {},
+        {},        
     )
 
     limits = SimpleMockLimits(100)
-
     bucket = NodeBucket(node_def, limits, 100, [])
     return Partition(
         name,
@@ -74,9 +73,9 @@ def make_partition(
 def test_partitions() -> None:
 
     partitions = [
-        make_partition("htc", False, False),
+        make_partition("htc", False, False, use_pcpu=False),
         make_partition("hpc", True, True),
-        make_partition("dynamic", False, False, dynamic_config="-Z Feature=dyn"),
+        make_partition("dynamic", False, False, dynamic_config="dyn"),
     ]
 
     # Define neither slurm_memory nor dampen_memory, autoscale=true
@@ -94,7 +93,7 @@ def test_partitions() -> None:
         == """PartitionName=htc Nodes=pre-[1-100] Default=NO DefMemPerCPU=3840 MaxTime=INFINITE State=UP
 Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=15360
 PartitionName=hpc Nodes=pre-[1-100] Default=YES DefMemPerCPU=3840 MaxTime=INFINITE State=UP
-Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=15360
+Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=2 RealMemory=15360
 Nodeset=dynamicns Feature=dyn
 PartitionName=dynamic Nodes=dynamicns"""
     )
@@ -112,7 +111,7 @@ PartitionName=dynamic Nodes=dynamicns"""
         == """PartitionName=htc Nodes=pre-[1-100] Default=NO DefMemPerCPU=3840 MaxTime=INFINITE State=UP
 Nodename=pre-[1-100] Feature=cloud STATE=FUTURE CPUs=4 ThreadsPerCore=1 RealMemory=15360
 PartitionName=hpc Nodes=pre-[1-100] Default=YES DefMemPerCPU=3840 MaxTime=INFINITE State=UP
-Nodename=pre-[1-100] Feature=cloud STATE=FUTURE CPUs=4 ThreadsPerCore=1 RealMemory=15360
+Nodename=pre-[1-100] Feature=cloud STATE=FUTURE CPUs=4 ThreadsPerCore=2 RealMemory=15360
 Nodeset=dynamicns Feature=dyn
 PartitionName=dynamic Nodes=dynamicns"""
     )
@@ -120,10 +119,10 @@ PartitionName=dynamic Nodes=dynamicns"""
     # Define only slurm_memory resource, autoscale=true
     # Expect slurm_memory (15g, 14g) will be applied.
     partitions = [
-        make_partition("htc", False, False, slurm_memory="15g"),
+        make_partition("htc", False, False, use_pcpu=False, slurm_memory="15g"),
         make_partition("hpc", True, True, slurm_memory="14g"),
         make_partition(
-            "dynamic", False, False, dynamic_config="-Z Feature=dyn", slurm_memory="13g"
+            "dynamic", False, False, dynamic_config="dyn", slurm_memory="13g"
         ),
     ]
     # No slurm.dampen_memory or slurm_memory resource, autoscale=FALSE
@@ -137,7 +136,7 @@ PartitionName=dynamic Nodes=dynamicns"""
         == """PartitionName=htc Nodes=pre-[1-100] Default=NO DefMemPerCPU=3840 MaxTime=INFINITE State=UP
 Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=15360
 PartitionName=hpc Nodes=pre-[1-100] Default=YES DefMemPerCPU=3584 MaxTime=INFINITE State=UP
-Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=14336
+Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=2 RealMemory=14336
 Nodeset=dynamicns Feature=dyn
 PartitionName=dynamic Nodes=dynamicns"""
     )
@@ -145,13 +144,13 @@ PartitionName=dynamic Nodes=dynamicns"""
     # Define both slurm_memory resource and slurm.dampen_memory, autoscale=true
     # Expect dampen_memory (25%, 50%) will be applied
     partitions = [
-        make_partition("htc", False, False, slurm_memory="15g", dampen_memory=0.25),
+        make_partition("htc", False, False, use_pcpu=False, slurm_memory="15g", dampen_memory=0.25),
         make_partition("hpc", True, True, slurm_memory="14g", dampen_memory=0.5),
         make_partition(
             "dynamic",
             False,
             False,
-            dynamic_config="-Z Feature=dyn",
+            dynamic_config="dyn",
             slurm_memory="13g",
             dampen_memory=0.75,
         ),
@@ -167,7 +166,7 @@ PartitionName=dynamic Nodes=dynamicns"""
         == """PartitionName=htc Nodes=pre-[1-100] Default=NO DefMemPerCPU=3072 MaxTime=INFINITE State=UP
 Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=12288
 PartitionName=hpc Nodes=pre-[1-100] Default=YES DefMemPerCPU=2048 MaxTime=INFINITE State=UP
-Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=8192
+Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=2 RealMemory=8192
 Nodeset=dynamicns Feature=dyn
 PartitionName=dynamic Nodes=dynamicns"""
     )
@@ -175,13 +174,13 @@ PartitionName=dynamic Nodes=dynamicns"""
     # Define both slurm_memory resource and slurm.dampen_memory, autoscale=true
     # Expect dampen_memory (use 1G as 1% is too small) will be applied
     partitions = [
-        make_partition("htc", False, False, slurm_memory="15g", dampen_memory=0.001),
+        make_partition("htc", False, False, use_pcpu=False, slurm_memory="15g", dampen_memory=0.001),
         make_partition("hpc", True, True, slurm_memory="14g", dampen_memory=0.001),
         make_partition(
             "dynamic",
             False,
             False,
-            dynamic_config="-Z Feature=dyn",
+            dynamic_config="dyn",
             slurm_memory="13g",
             dampen_memory=0.75,
         ),
@@ -197,10 +196,32 @@ PartitionName=dynamic Nodes=dynamicns"""
         == """PartitionName=htc Nodes=pre-[1-100] Default=NO DefMemPerCPU=3840 MaxTime=INFINITE State=UP
 Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=15360
 PartitionName=hpc Nodes=pre-[1-100] Default=YES DefMemPerCPU=3840 MaxTime=INFINITE State=UP
-Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=15360
+Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=2 RealMemory=15360
 Nodeset=dynamicns Feature=dyn
 PartitionName=dynamic Nodes=dynamicns"""
     )
+
+    # Define both slurm_memory resource and slurm.dampen_memory, autoscale=true
+    # Expect dampen_memory (use 1G as 1% is too small) will be applied
+    partitions = [
+        make_partition("htcp", False, False, use_pcpu=True, slurm_memory="15g", dampen_memory=0.001),
+        make_partition("htcv", False, False, use_pcpu=False, slurm_memory="15g", dampen_memory=0.001),
+
+    ]
+
+    writer = StringIO()
+    cli._partitions(partitions, writer, autoscale=True)
+    actual = "\n".join(
+        [x for x in writer.getvalue().splitlines() if not x.startswith("#")]
+    )
+    assert (
+        actual
+        == """PartitionName=htcp Nodes=pre-[1-100] Default=NO DefMemPerCPU=3840 MaxTime=INFINITE State=UP
+Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=2 RealMemory=15360
+PartitionName=htcv Nodes=pre-[1-100] Default=NO DefMemPerCPU=3840 MaxTime=INFINITE State=UP
+Nodename=pre-[1-100] Feature=cloud STATE=CLOUD CPUs=4 ThreadsPerCore=1 RealMemory=15360"""
+    )
+
 
 
 def test_return_to_idle() -> None:

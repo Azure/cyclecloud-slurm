@@ -1,43 +1,42 @@
 
-Cyclecloud Slurm
+CycleCloud Slurm Clusters in Azure
 ========
 
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Managing Slurm Clusters in 4.0.3](#managing-slurm-clusters)
+1. [Managing Slurm Clusters in 4.0.4](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
     4. [Dynamic Partitions](#dynamic-partitions)
     5. [Using Dynamic Partitions to Autoscale](#using-dynamic-partitions-to-autoscale)
-    6. [Dynamic Scaledown](#dynamic-scaledown)
-    7. [Manual scaling](#manual-scaling)
-    8. [Accounting](#accounting)
-        1. [AzureCA.pem and existing MariaDB/MySQL instances](#azurecapem-and-existing-mariadbmysql-instances)
-    9. [Cost Reporting](#cost-reporting)
-    10. [Topology](#topology)
-    11. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
-    12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
-    13. [Slurmrestd](#slurmrestd)
-    14. [Monitoring](#monitoring)
+    6. [Manual scaling](#manual-scaling)
+    7. [Slurm Job Accounting](#slurm-job-accounting)
+        1. [Cost Reporting](#cost-reporting)
+    8. [Topology](#topology)
+    9. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
+    10. [Setting KeepAlive in CycleCloud](#setting-keepalive)
+    11. [Slurmrestd](#slurmrestd)
+    12. [Node Health Checks](#node-health-checks)
+    13. [Monitoring](#monitoring)
         1. [Example Dashboards](#example-dashboards)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
-4. [Slurm Configuration Reference](#slurm-configuration-reference)
+4. [Slurm Template Configuration Reference](#slurm-template-configuration-reference)
 5. [Troubleshooting](#troubleshooting)
     1. [UID conflicts for Slurm and Munge users](#uid-conflicts-for-slurm-and-munge-users)
     2. [Incorrect number of GPUs](#incorrect-number-of-gpus)
     3. [Dampening Memory](#dampening-memory)
-    4. [Pre:4.0.3: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
+    4. [Pre:4x: KeepAlive set in CycleCloud and Zombie nodes](#keepalive-set-in-cyclecloud-and-zombie-nodes)
     5. [Transitioning from 2.7 to 3.0](#transitioning-from-27-to-30)
     6. [Transitioning from 3.0 to 4.0](#transitioning-from-30-to-40)
     7. [Ubuntu 22 or greater and DNS hostname resolution](#ubuntu-22-or-greater-and-dns-hostname-resolution)
-    8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-for-troubleshooting)
+    8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-data-for-troubleshooting)
 6. [Contributing](#contributing)
 ---
-## Managing Slurm Clusters in 4.0.3
+## Managing Slurm Clusters in 4.0.4
 
 ### Making Cluster Changes
 In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
@@ -112,7 +111,7 @@ Nodeset=mydynamicns Feature=mydyn
 PartitionName=mydynamic Nodes=mydynamicns
 ```
 
-### Using Dynamic Partitions to Autoscale
+#### Using Dynamic Partitions to Autoscale
 By default, we define no nodes in the dynamic partition. 
 
 You can pre-create node records like so, which allows Slurm to autoscale them up.
@@ -143,9 +142,9 @@ Multiple VM_Sizes are supported by default for dynamic partitions, and that is c
         Config.Multiselect = true
 ```
 
-### Note for slurm 23.11.7 users:
+#### Note for dynamic GPU partitions:
 
-Dynamic partition behaviour has changed in new version of Slurm 23.11.7. When adding dynamic nodes containing GRES such as gpu's, the `/etc/slurm/gres.conf` file needs to be modified **first** before
+When adding dynamic nodes containing GRES such as gpu's, the `/etc/slurm/gres.conf` file needs to be modified **first** before
 running `scontrol create nodename` command. If this is not done, slurm will report invalid nodename like shown here:
 
 ```bash
@@ -156,7 +155,7 @@ Error creating node(s): Invalid argument
 Simply add the node `e1` in `/etc/slurm/gres.conf` and then the command will work.
 
 
-### Dynamic Scaledown
+#### Dynamic Scaledown
 
 By default, all nodes in the dynamic partition will scale down just like the other partitions. To disable this, see [SuspendExcParts](https://slurm.schedmd.com/slurm.conf.html).
 
@@ -173,27 +172,37 @@ To start a cluster in this mode, simply add `SuspendTime=-1` to the additional s
 
 To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `azslurm remove_nodes && azslurm scale`. 
 
-### Accounting
+### Slurm Job Accounting
 
-To enable accounting in slurm, maria-db can now be started via cloud-init on the scheduler node and slurmdbd configured to enable db connection without a
-password string. In the absense of database URL and password, slurmdbd configuration defaults to localhost.
-One way of doing this is to add following lines in cluster-init:
+Accounting feature in slurm is described in detail here: [Accounting](https://slurm.schedmd.com/accounting.html)
+
+This feature is *highly recommended* to be enabled as this is what preserves your job history on the cluster.
+
+
+To setup job accounting, following fields are defined in the slurm cluster creation UI (coming from the slurm template):
+
+![Alt](/images/accounting.png "Slurm Accounting Setup")
+
+
+- *Database URL* - What this refers to is the "Database" URL, a DNS resolvable address (or an IP address) of where mysql database lives.
+- *Database Name* - This is the database name that the Slurm Cluster will use. If this is not defined, then this is "clustername-acct-db". 
+                    Each cluster typically (when not defined) has its own database. This helps to not cause roll ups between starting clusters of different slurm versions.
+- *Database User* - This refers to the username slurmdbd will use to connect to MySQL Server.
+- *Database Password* - This refers to the password slurmdbd will use to connect to MySQL Server.
+- *SSL Certificate URL* - If mysql connection requires SSL then this URL is used to provide certificate URL.
+
+***For connecting with MySql Flex, enter the following URL for SSL certificate***:
 
 ```
-#!/bin/bash
-yum install -y mariadb-server
-systemctl enable mariadb.service
-systemctl start mariadb.service
-mysql --connect-timeout=120 -u root -e "ALTER USER root@localhost IDENTIFIED VIA mysql_native_password ; FLUSH privileges;"
+https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem
 ```
 
-#### AzureCA.pem and existing MariaDB/MySQL instances
-In previous versions, we shipped with an embedded certificate to connect to Azure MariaDB and Azure MySQL instances. This is no longer required. However, if you wish to restore this behavior, select the 'AzureCA.pem' option from the dropdown for the _'Accounting Certificate URL'_ parameter in your your cluster settings.
+***Do Note: When deleting clusters, their corresponding databases in MySql are not deleted. User is responsible for archiving/purging their databases and manage their mysql costs.***
 
-### Cost Reporting
+#### Cost Reporting
 
-`azslurm` in slurm 3.0 project now comes with a new experimental feature `azslurm cost` to display costs of slurm jobs. This requires Cyclecloud 8.4 or newer, as well
-as slurm accounting enabled.
+`azslurm` now comes with a new experimental feature `azslurm cost` to display costs of slurm jobs. This requires Cyclecloud 8.4 or newer, as well
+as *slurm accounting enabled*.
 
 ```
 usage: azslurm cost [-h] [--config CONFIG] [-s START] [-e END] -o OUT [-f FMT]
@@ -353,16 +362,63 @@ Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cl
 
 
 ### Setting KeepAlive
-Added in 4.0.3: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.3. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
+Added in 4.0.4: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.4. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
 
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
 ### Slurmrestd
-As of version 4.0.3, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+As of version 4.0.4, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+
+### Node Health Checks
+
+Cyclecloud Slurm project now comes with a new *Healthagent* that is already installed and configured on every node.
+
+Healthagent is a persistent daemon that runs and checks for node health issues. Detailed docs can be found here: [Cyclecloud Healthagent](https://azure.github.io/cyclecloud-healthagent/)
+
+#### How we do Healthchecking in Slurm
+
+Slurm config (located in `/etc/slurm/slurm.conf`) contains a few health related settings:
+
+- *HealthCheckProgram* - This is a shell script which simply talks to healthagent via a CLI and if it discovers health errors, it marks the node **DRAIN**
+- *HealthCheckInterval* - This configuration determines how often health check program is run. By default this is set to *60 Seconds*
+- *HealthCheckState* - This determines if slurm health script will run on a particular node state. This is set to *ANY*. Which means slurm health check program will run on ALL nodes every 60 seconds.
+
+Slurm config also includes **epilog** checks.
+
+***Note: Slurm HealthCheckProgram is **just** a shell script that calls healthagent. Healthagent is a separate systemd service that is always running (see docs above) regardless of healthcheckpropgram***.
+
+`healthcheckprogram` only helps consume the output of healthagent to adjust slurm node states.
+
+#### Enabling Healthchecks
+
+These are enabled by default for you.
+
+#### Disabling Healthchecks
+
+To disable health checks:
+
+- You can set the *HealthCheckInterval* to -1 which will disable the *HealthCheckProgram*.
+- You can tune the *HealthCheckState* to a specific sub states in slurm (such as only run on IDLE or DRAIN nodes)
+
+None of these steps however disable the healthagent. Healthagent in most cases can continue running safely even if its not draining nodes in slurm. It is still useful in showing errors in cyclecloud UI.
+
+To disable Healthagent entirely however (not recommended):
+
+A few template parameters need to be set before starting the cluster:
+
+- `cyclecloud.healthagent.disable` set to true. This will disable healthagent setup entirely.
+
+If you want healthagent (for seeing issues in CC UI) but only want to disable slurm configuration (and node draining of unhealthy nodes)
+
+- `slurm.enable_healthchecks` set to false. Which will disable slurm related configuration during cluster setup.
+
 
 ### Monitoring
 As of version 4.0.3, users have the option of enabling the [cyclecloud-monitoring project](https://github.com/Azure/cyclecloud-monitoring) in their slurm clusters via the Monitoring tab in the cluster creation UI.
+
+
 ![Alt](/images/monitoringui.png "Monitoring Page in Slurm Cluster Creation/Edit UI")
+
 
  To enable monitoring, users must create the Azure Managed Monitoring Infrastructure following the cyclecloud-monitoring project instructions under the [Build Managed Monitoring Infrastructure section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#build-the-managed-monitoring-infrastructure) and the [Grant the Monitoring Metrics Publisher role to the User Assigned Managed Identity section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#grant-the-monitoring-metrics-publisher-role-to-the-user-assigned-managed-identity). After deploying the Azure Managed Monitoring Infrastructure, input the Client ID of the Managed Identity with Monitoring Metrics Publisher role as well as the Ingestion Endpoint of the Azure Monitor Workspace in which to push metrics in the fields under the monitoring tab. These fields can be retrieved following the commands listed under the [Monitoring Configuration Parameters section](https://github.com/Azure/cyclecloud-monitoring?tab=readme-ov-file#monitoring-configuration-parameters) of the cyclecloud-monitoring project. Enabling monitoring will include the installation and configuration of:
 - Prometheus Node Exporter (for all nodes)
@@ -407,7 +463,7 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 **Note: CycleCloud also supports SLES 15 HPC, however we can only install the version supported by SLES HPC's zypper repos. At the time of this release, that is 23.02.7. Due to limited support, slurmrestd, monitoring, and background healthchecks are disabled for SUSE operting systems.**
 
-## Slurm configuration reference
+## Slurm-Template configuration reference
 
 The following table describes the Slurm-specific configuration options you can toggle/define in the [slurm template](templates/slurm.txt) to customize functionality:
 

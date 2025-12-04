@@ -138,6 +138,10 @@ class InstallSettings:
         self.ubuntu22_waagent_fix = config["slurm"].get("ubuntu22_waagent_fix", True)
         self.enable_healthchecks = config["slurm"].get("enable_healthchecks", True)
 
+        self.healthagent = config["cyclecloud"].get("healthagent", {})
+        if self.healthagent.get("disabled", False) == True:
+            self.enable_healthchecks = False
+
         if self.platform_family == "suse":
             logging.warning("Monitoring and healthchecks are not supported on SUSE platforms, disabling configuration.")
             self.enable_healthchecks = False

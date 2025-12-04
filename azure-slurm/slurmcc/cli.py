@@ -39,7 +39,7 @@ from . import cost
 from . import topology
 
 
-VERSION = "4.0.3"
+VERSION = "4.0.4"
 
 
 def csv_list(x: str) -> List[str]:
@@ -784,13 +784,17 @@ def _partitions(
         default_yn = "YES" if partition.is_default else "NO"
 
         memory = max(1024, partition.memory)
-
+        # cpus is always a measure of vcpu_count - the only difference is if we
+        # then tell Slurm there are more than one thread per core.
+        # Slurm will always allocate in sets of threads_per_core, so effectively
+        # the result is / 2 for pcpu=true.
+        cpus = partition.vcpu_count
         if partition.use_pcpu:
-            cpus = partition.pcpu_count
             threads = max(1, partition.vcpu_count // partition.pcpu_count)
         else:
-            cpus = partition.vcpu_count
             threads = 1
+        # memory per cpu is always the same - slurm will just aquire 2 cores if pcpu=true
+        # and therefore will also acquire double the memory
         def_mem_per_cpu = memory // cpus
 
         comment_out = ""
