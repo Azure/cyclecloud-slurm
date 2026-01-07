@@ -763,8 +763,8 @@ Order = 20
         ParameterType = StringList
         Config.Plugin = pico.form.Dropdown
         Config.FreeForm = true
-        Config.Entries := {[Value="25.05.2"]}
-        DefaultValue = 25.05.2
+        Config.Entries := {[Value="25.05.5"]}
+        DefaultValue = 25.05.5
 
         [[[parameter configuration_slurm_accounting_enabled]]]
         Label = Job Accounting
