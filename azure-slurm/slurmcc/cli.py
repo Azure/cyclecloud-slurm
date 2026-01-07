@@ -234,6 +234,15 @@ class SlurmCLI(CommonCLI):
         else:
             raise ValueError("Please specify either --use_vmss or --use_fabric_manager or --use_nvlink_domain")
     
+    def version_parser(self, parser: ArgumentParser) -> None:
+        pass
+
+    def version(self, config: Dict) -> None:
+        """
+        Print azslurm version
+        """
+        print(f'azslurm {VERSION}')
+
     def partitions_parser(self, parser: ArgumentParser) -> None:
         parser.add_argument("--allow-empty", action="store_true", default=False)
 
