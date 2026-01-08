@@ -74,5 +74,6 @@ Include accounting.conf
 Include keep_alive.conf
 {auth_alt_type}
 {auth_alt_parameters}
+Include site_specific.conf
 
 SlurmCtldHost={slurmctldhost}

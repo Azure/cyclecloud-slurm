@@ -530,11 +530,20 @@ def _complete_install_primary(s: InstallSettings) -> None:
             comment_prefix="\n# Additional HA scheduler host -",
         )
 
+    if not os.path.exists(f"{s.config_dir}/site_specific.conf"):
+        ilib.file(
+            f"{s.config_dir}/site_specific.conf",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+            mode="0644",
+            content="",
+        )
+
     if s.additonal_slurm_config:
         ilib.append_file(
             f"{s.config_dir}/slurm.conf",
             content=s.additonal_slurm_config,
-            comment_prefix="\n# Additional config from CycleCloud -",
+            comment_prefix="\n# Additional config from CycleCloud cluster template-",
         )
 
     ilib.template(
@@ -615,6 +624,13 @@ def _complete_install_all(s: InstallSettings) -> None:
     ilib.link(
         f"{s.config_dir}/azure.conf",
         "/etc/slurm/azure.conf",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+    )
+
+    ilib.link(
+        f"{s.config_dir}/site_specific.conf",
+        "/etc/slurm/site_specific.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
