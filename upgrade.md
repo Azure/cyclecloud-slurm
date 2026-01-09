@@ -60,9 +60,10 @@ Following steps need to be run on the CC VM.
 
 6. Modify the template.
 
+   - Add `cyclecloud.enable_chef = False` in the configuration section of the node defaults section in the slurm template.
+   - Insert `[[[cluster-init cyclecloud/monitoring:default:1.0.5]]]` before `cyclecloud/slurm` cluster-init
    - Replace `cyclecloud/slurm` project version to `4.0.5`
    - Replace `cyclecloud/healthagent` project version to `1.0.4`
-   - Replace `cyclecloud/monitoring` project version to `1.0.5`
 
 7. Import the cluster
 
@@ -94,3 +95,68 @@ Following steps need to be run on the CC VM.
     ```
     curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/install_scalem1.sh | bash -
     ```
+
+## Notes (Optional)
+5. Export cyclecloud cluster parameters
+
+   On the cyclecloud VM:
+
+   ```
+   cyclecloud export_parameters $clustername -p params.json
+   cp params.json params_backup.json
+   ```
+
+   In params.json, Remove all cluster-init projects for all node-array cluster-init specs and make the value `null`
+   
+   Modify the template.
+
+   - Insert `[[[cluster-init cyclecloud/monitoring:default:1.0.5]]]` before `cyclecloud/slurm` cluster-init
+   - Replace `cyclecloud/slurm` project version to `4.0.5`
+   - Replace `cyclecloud/healthagent` project version to `1.0.4`
+
+   Reimport the cluster with null cluster-init params.json and new template
+   ```
+   cyclecloud import_cluster -f slurm.txt -p params.json -c slurm $clustername --force
+   ```
+   Update the following in params_backup.json
+      ```
+      "configuration_slurm_version": "25.05.5"
+      "configuration_slurm_ha_enabled": true
+      ```
+   In params_backup.json Remove the monitoring cluster-init from all node-array cluster-init specs
+   ```
+    "monitoring:default:1.0.0" : {
+      "Order" : 10000,
+      "Name" : "monitoring:default:1.0.0",
+      "Spec" : "default",
+      "Project" : "monitoring",
+      "Version" : "1.0.0",
+      "Locker" : "azure-storage"
+    },
+    ```
+   If we wamt to include CCWS cluster-init, add the CCW cluster-init version to `2025.12.01` for all node-array cluster-init specs
+   ```
+       "ccw:default:2025.12.01" : {
+      "Order" : 10100,
+      "Spec" : "default",
+      "Name" : "ccw:default:2025.12.01",
+      "Project" : "ccw",
+      "Locker" : "azure-storage",
+      "Version" : "2025.12.01"
+    }
+    ```
+    Verify the accounting certificate for MySql Flex:
+   ```
+   "configuration_slurm_accounting_certificate_url": "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem"
+   ```
+   Upload ccw cluster-init project to locker if needed
+   ```
+   git clone https://github.com/Azure/cyclecloud-slurm-workspace.git
+   cd cyclecloud-slurm-workspace
+   cyclecloud project upload "<locker name>"
+   ```
+   Reimport the cluster with updated params_backup.json and new template
+   ```
+   cyclecloud import_cluster -f slurm.txt -p params_backup.json -c slurm $clustername --force
+   ```
+
