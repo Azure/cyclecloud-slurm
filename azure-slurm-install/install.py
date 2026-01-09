@@ -536,7 +536,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0644",
-            content="",
+            content="# site specific slurm configuration. This is preserved during upgrades",
         )
 
     if s.additonal_slurm_config:
