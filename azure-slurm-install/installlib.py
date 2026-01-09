@@ -615,6 +615,29 @@ def await_node_hostname(
     )
 
 
+def await_node_converge(
+    config: Dict,
+    node_name: str,
+    timeout=600,
+    cluster_status_func: Callable[[Dict], Dict] = cluster_status,
+) -> CCNode:
+    """
+    Waits for node_name to fully converge.
+    """
+    omega = timeout + time()
+    while time() < omega:
+        referenced_node = get_ccnode(config, node_name, cluster_status_func)
+        if referenced_node.status == "Ready":
+            return referenced_node
+        logging.debug(
+            "Waiting for node to converge %s",
+            referenced_node.hostname,
+        )
+        sleep(10)
+    raise RuntimeError(
+        f"Node {node_name} did not converge in {timeout} seconds"
+    )
+
 def is_valid_hostname(config: Dict, node: CCNode) -> bool:
     """
 See await_node_hostname for details.
