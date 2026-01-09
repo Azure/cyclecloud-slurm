@@ -1156,7 +1156,7 @@ def main() -> None:
         if settings.is_primary_scheduler == False:
             # This is the HA node.
             logging.info(f"Secondary Scheduler {settings.secondary_scheduler_name} starting wait on primary to finish converging.")
-            ilib.await_node_converge(settings.config, "scheduler", timeout=3600)
+            ilib.await_node_converge(settings.config, "scheduler", timeout=600)
 
     if settings.mode == "execute":
         setup_slurmd(settings)

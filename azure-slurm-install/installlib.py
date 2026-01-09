@@ -618,7 +618,7 @@ def await_node_hostname(
 def await_node_converge(
     config: Dict,
     node_name: str,
-    timeout=3600,
+    timeout=600,
     cluster_status_func: Callable[[Dict], Dict] = cluster_status,
 ) -> CCNode:
     """
