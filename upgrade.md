@@ -1,64 +1,96 @@
 # Cyclecloud Slurm Clusters Upgrade procedure
 
-
-## Pre- upgrade
+## Pre-upgrade
 
 Slurm major version upgrade (from 24.x to 25.x) with job accounting enabled causes roll-up in the database. So the first step is to backup the database to persistent storage.
 
+1. Create a backups directory on a persistent storage or use an existing one.
 
-1. [OPTIONAL] Create a backups directory on a persistent storage or use an existing one.
-
-On scheduler VM:
-`mkdir -p /shared/cluster-backups`
+   On scheduler VM:
+   ```
+   mkdir -p /shared/cluster-backups
+   ```
 
 2. Stop slurmdbd
-    `systemctl stop slurmdbd`
+
+   ```
+   systemctl stop slurmdbd
+   ```
+
 3. Take the dump of the database.
 
-`mysqldump -h $db_hostname -u $dbuser -p --databases $clustername_acct_db > /tmp/$clustername_acct_db_backup_jan6.sql`
+   ```
+   mysqldump -h $db_hostname -u $dbuser -p --databases $clustername_acct_db > /tmp/$clustername_acct_db_backup_jan6.sql
+   ```
 
-dbhostname: hostname of the azure mysql flex. This can be found in /etc/slurm/slurmdbd.conf
-dbuser: user that can access database.
+   - `db_hostname`: hostname of the azure mysql flex. This can be found in `/etc/slurm/slurmdbd.conf`
+   - `dbuser`: user that can access database.
 
-4. Export cyclecloud cluster parameters
+## Upgrade
 
-On the cyclecloud VM:
+Following steps need to be run on the CC VM.
 
-`cyclecloud export_parameters $clustername -p params.json`
+4. Upgrade cyclecloud
 
-Update the following:
+   ```
+   export VERSION_NUMBER=
+   curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/upgrade_cyclecloud.sh $VERSION_NUMBER | bash -
+   ```
 
-`"configuration_slurm_version": 25.05.5`
-`"configuration_slurm_ha_enabled": true`
+5. Export cyclecloud cluster parameters
 
-Verify the accounting certificate for MySql Flex:
+   On the cyclecloud VM:
 
-`"configuration_slurm_accounting_certificate_url" : "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem"`
+   ```
+   cyclecloud export_parameters $clustername -p params.json
+   ```
 
-5. Modify the template.
+   Update the following:
 
-Replace cyclecloud/slurm project version to 4.0.5
-        cyclecloud/healthagent project version to 1.0.4
-        cyclecloud/monitoring project version to 1.0.5
+   ```
+   "configuration_slurm_version": "25.05.5"
+   "configuration_slurm_ha_enabled": true
+   ```
 
+   Verify the accounting certificate for MySql Flex:
 
+   ```
+   "configuration_slurm_accounting_certificate_url": "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem"
+   ```
 
-6. `cyclecloud import_cluster -f slurm.txt -p params.json -c slurm $clustername --force`
+6. Modify the template.
 
-7. Scale down the cluster.
+   - Replace `cyclecloud/slurm` project version to `4.0.5`
+   - Replace `cyclecloud/healthagent` project version to `1.0.4`
+   - Replace `cyclecloud/monitoring` project version to `1.0.5`
 
-8. terminate and restart the cluster.
+7. Import the cluster
 
-This will not terminate persistent data on /shared and /sched.
+   ```
+   cyclecloud import_cluster -f slurm.txt -p params.json -c slurm $clustername --force
+   ```
 
-9. Once scheduler and scheduler HA node are back.
+8. Scale down the cluster.
 
-Verify functionality:
+9. Terminate and restart the cluster.
 
-`sacctmgr ping`
-`scontrol ping`
-`sacct` and `sinfo` should work correctly.
+   This will not terminate persistent data on `/shared` and `/sched`.
 
-10. Install scale_m1.
-(MUST run as root)
+## Post-Upgrade
 
+[On the Scheduler Node]
+
+10. Once scheduler and scheduler HA node are back, verify functionality:
+
+    ```
+    sacctmgr ping
+    scontrol ping
+    sacct
+    sinfo
+    ```
+
+11. Install scale_m1. (MUST run as root)
+
+    ```
+    curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/install_scalem1.sh | bash -
+    ```

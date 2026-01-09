@@ -1,5 +1,12 @@
 #!/bin/bash
 
+
+if [ "$EUID" -ne 0 ]; then
+    echo "Error: This script must be run as root."
+    exit 1
+fi
+
+echo "Install scale_m1"
 curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/tags/slurm_m1-1.0.1/scale_m1/scale_to_n_nodes.py > ~/bin/scale_m1
 chmod +x ~/bin/scale_m1
 
@@ -14,3 +21,5 @@ fi
 azslurm resume --node-list $non_gpu
 exit $?
 ' > /opt/azurehpc/slurm/resume_program.sh
+
+echo "Success"
