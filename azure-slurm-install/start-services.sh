@@ -210,6 +210,26 @@ run_slurm_exporter() {
     fi 
 }
 
+ensure_enroot_dir() {
+    # In some cases /tmp or even ephemeral disks may clear on reboot.
+    # This ensures the directories are present. its a no-op if they
+    # are already present.
+    #
+    CONF=/etc/enroot/enroot.conf
+
+    # extract ENROOT_TEMP_PATH value
+    ENROOT_TEMP_PATH=$(awk '$1=="ENROOT_TEMP_PATH"{print $2}' "$CONF")
+
+    # expand command substitutions like $(id -u) if present
+    ENROOT_TEMP_PATH=$(eval echo "$ENROOT_TEMP_PATH")
+
+    # get base directory (two levels up)
+    BASE_DIR=$(dirname "$ENROOT_TEMP_PATH")
+
+    # create base dir and set perms
+    mkdir -p "$BASE_DIR"
+    chmod 1777 "$BASE_DIR"
+}
 
 { 
     if [ "$1" == "" ]; then
@@ -218,6 +238,8 @@ run_slurm_exporter() {
     fi
 
     role=$1
+
+    ensure_enroot_dir
 
     OS=$(. /etc/os-release; echo $ID)
     echo "Starting services"
