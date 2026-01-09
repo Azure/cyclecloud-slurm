@@ -36,8 +36,26 @@ Following steps need to be run on the CC VM.
    export VERSION_NUMBER=
    curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/upgrade_cyclecloud.sh $VERSION_NUMBER | bash -
    ```
+5. Scale down the cluster.
 
-5. Export cyclecloud cluster parameters
+6. Terminate the cluster.
+
+   This will not terminate persistent data on `/shared` and `/sched`.
+
+7. Make Changes to the UI via the edit button:
+   - Under the Required Settings Tab:
+      1. Check Slurm HA Node box under High Availibility section
+   - Under Network Attached Storage Tab
+      1. Check the Add Shared Filesystem mount under Additional Filesystem Mount section
+      2. Set FS Type to Azure Managed Lustre
+      3. Fill in mount details
+   - Under the Advanced Settings Tab:
+      1. Change slurm version to `25.05.5`
+      2. Set SSL Certificate URL under Slurm Settings as "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem"
+      3. remove the monitoring cluster-init for all node-arrays.
+   - Hit Save
+
+8. Export cyclecloud cluster parameters
 
    On the cyclecloud VM:
 
@@ -45,7 +63,7 @@ Following steps need to be run on the CC VM.
    cyclecloud export_parameters $clustername -p params.json
    ```
 
-   Update the following:
+   Verify the following:
 
    ```
    "configuration_slurm_version": "25.05.5"
@@ -58,30 +76,30 @@ Following steps need to be run on the CC VM.
    "configuration_slurm_accounting_certificate_url": "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem"
    ```
 
-6. Modify the template.
+   Verify monitoring cluster-init is not present in any node-array cluster-init specs.
+
+9. Modify the template.
 
    - Add `cyclecloud.enable_chef = False` in the configuration section of the node defaults section in the slurm template.
    - Insert `[[[cluster-init cyclecloud/monitoring:default:1.0.5]]]` before `cyclecloud/slurm` cluster-init
    - Replace `cyclecloud/slurm` project version to `4.0.5`
    - Replace `cyclecloud/healthagent` project version to `1.0.4`
 
-7. Import the cluster
+10. Import the cluster
 
    ```
    cyclecloud import_cluster -f slurm.txt -p params.json -c slurm $clustername --force
    ```
 
-8. Scale down the cluster.
+11. Start the Cluster
 
-9. Terminate and restart the cluster.
 
-   This will not terminate persistent data on `/shared` and `/sched`.
 
 ## Post-Upgrade
 
 [On the Scheduler Node]
 
-10. Once scheduler and scheduler HA node are back, verify functionality:
+12. Once scheduler and scheduler HA node are back, verify functionality:
 
     ```
     sacctmgr ping
@@ -90,14 +108,16 @@ Following steps need to be run on the CC VM.
     sinfo
     ```
 
-11. Install scale_m1. (MUST run as root)
+13. Install scale_m1. (MUST run as root)
 
     ```
     curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/install_scalem1.sh | bash -
     ```
 
-## Notes (Optional)
-5. Export cyclecloud cluster parameters
+## Notes (Optional if UI changes don't work)
+Steps after step 6 from above.
+
+7. Export cyclecloud cluster parameters
 
    On the cyclecloud VM:
 
