@@ -5,7 +5,7 @@ CycleCloud Slurm Clusters in Azure
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Managing Slurm Clusters in 4.0.4](#managing-slurm-clusters)
+1. [Managing Slurm Clusters in 4.0.5](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
@@ -36,7 +36,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-data-for-troubleshooting)
 6. [Contributing](#contributing)
 ---
-## Managing Slurm Clusters in 4.0.4
+## Managing Slurm Clusters in 4.0.5
 
 ### Making Cluster Changes
 In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
@@ -362,12 +362,12 @@ Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cl
 
 
 ### Setting KeepAlive
-Added in 4.0.4: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.4. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
+Added in 4.0.5: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.5. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
 
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
 
 ### Slurmrestd
-As of version 4.0.4, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+As of version 4.0.5, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
 
 ### Node Health Checks
 
