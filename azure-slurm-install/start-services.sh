@@ -155,6 +155,8 @@ run_slurm_exporter() {
 
     primary_scheduler=$(/opt/cycle/jetpack/bin/jetpack config slurm.is_primary_scheduler True)
     if [[ "$primary_scheduler" != "True" ]]; then
+        #reloading prom config to get updated hostname for HA node
+        reload_prom_config
         echo "This is not the primary scheduler, skipping slurm_exporter setup."
         return 0
     fi
