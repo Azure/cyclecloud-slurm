@@ -629,12 +629,11 @@ def await_node_converge(
         referenced_node = get_ccnode(config, node_name, cluster_status_func)
         if referenced_node.status == "Ready":
             return referenced_node
-        else:
-            logging.warning(
-                "Waiting for node to converge %s",
-                referenced_node.hostname,
-            )
-        sleep(60)
+        logging.debug(
+            "Waiting for node to converge %s",
+            referenced_node.hostname,
+        )
+        sleep(10)
     raise RuntimeError(
         f"Node {node_name} did not converge in {timeout} seconds"
     )

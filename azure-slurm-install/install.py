@@ -1132,6 +1132,7 @@ def main() -> None:
     # create the users
     setup_users(settings)
 
+    set_hostname(settings)
     # create the munge key and/or copy it to /etc/munge/
     munge_key(settings)
 
@@ -1152,8 +1153,10 @@ def main() -> None:
             minute="*/5",
             command=f"{settings.autoscale_dir}/return_to_idle.sh 1>&2 >> {settings.autoscale_dir}/logs/return_to_idle.log",
         )
-
-    set_hostname(settings)
+        if settings.is_primary_scheduler == False:
+            # This is the HA node.
+            logging.info(f"Secondary Scheduler {settings.secondary_scheduler_name} starting wait on primary to finish converging.")
+            ilib.await_node_converge(settings.config, "scheduler", timeout=3600)
 
     if settings.mode == "execute":
         setup_slurmd(settings)
