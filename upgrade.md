@@ -19,8 +19,14 @@ Slurm major version upgrade (from 24.x to 25.x) with job accounting enabled caus
 
 3. Take the dump of the database.
 
+   Export db auth variables
+
    ```
-   mysqldump -h $db_hostname -u $dbuser -p --databases $clustername_acct_db > /tmp/$clustername_acct_db_backup_jan6.sql
+   export $(cat /etc/slurm/slurmdbd.conf | grep Storage)
+   ```
+   
+   ```
+   mysqldump -h $StorageHost -u $StorageUser -p --databases $StorageLoc > /tmp/"$StorageLoc"_backup_"$(date +%Y_%m_%d)".sql
    ```
 
    - `db_hostname`: hostname of the azure mysql flex. This can be found in `/etc/slurm/slurmdbd.conf`
