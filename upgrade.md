@@ -47,7 +47,7 @@ Following steps need to be run on the CC VM.
 4. Upgrade cyclecloud
 
    ```
-   curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/upgrade_cyclecloud.sh $VERSION_NUMBER | bash -
+   curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/upgrade_cyclecloud8.sh | bash -
    ```
 5. Scale down the cluster.
 
@@ -93,10 +93,11 @@ Following steps need to be run on the CC VM.
 
 9. Modify the template.
 
-   - Add `cyclecloud.enable_chef = False` in the configuration section of the node defaults section in the slurm template.
+   - Add `cyclecloud.enable_chef = false` in the configuration section of the node defaults section in the slurm template.
    - Insert `[[[cluster-init cyclecloud/monitoring:default:1.0.5]]]` before `cyclecloud/slurm` cluster-init
    - Replace `cyclecloud/slurm` project version to `4.0.5`
    - Replace `cyclecloud/healthagent` project version to `1.0.4`
+
 
 10. Import the cluster
 
