@@ -47,7 +47,6 @@ Following steps need to be run on the CC VM.
 4. Upgrade cyclecloud
 
    ```
-   export VERSION_NUMBER=
    curl https://raw.githubusercontent.com/Azure/cyclecloud-slurm/refs/heads/upgrade_jan26/util/upgrade_cyclecloud.sh $VERSION_NUMBER | bash -
    ```
 5. Scale down the cluster.
