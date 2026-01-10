@@ -34,6 +34,12 @@ Slurm major version upgrade (from 24.x to 25.x) with job accounting enabled caus
    - `db_hostname`: hostname of the azure mysql flex. This can be found in `/etc/slurm/slurmdbd.conf`
    - `dbuser`: user that can access database.
 
+4. Take a backup of slurm config directory
+
+   ```
+   tar -cvf  /shared/cluster-backups/slurm-config-backup-"$(date +%Y_%m_%d)".tar.gz /sched/$clustername
+   ```
+
 ## Upgrade
 
 Following steps need to be run on the CC VM.
