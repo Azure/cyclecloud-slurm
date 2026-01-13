@@ -374,9 +374,7 @@ class SlurmCLI(CommonCLI):
     ) -> None:
         """
         Nodes that fail to resume in ResumeTimeout seconds will be left
-        in a down~ state - i.e. down and powered_down. It is also possible
-        the nodes will be in a drained~ state, if the node was drained during
-        resume. This command will set those nodes to idle~.
+        in a down~ state - i.e. down and powered_down. This command will set those nodes to idle~.
 
         The one exception is for nodes that have KeepAlive set in CycleCloud.
         Those nodes will be left as down~ and will be logged. When the user
@@ -429,7 +427,7 @@ class SlurmCLI(CommonCLI):
                 continue
             node_name = snode["NodeName"]
 
-            if "DOWN" in slurm_states or "DRAINED" in slurm_states:
+            if "DOWN" in slurm_states:
                 # Only nodes that do not exist in CycleCloud can be set to idle~
                 if node_name not in ccnodes_by_name:
                     to_set_to_idle.append(node_name)
