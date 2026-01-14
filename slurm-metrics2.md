@@ -44,7 +44,7 @@
 | `slurm_nodes_reserved_total` | `slurm_nodes_resv` | Reserved nodes | `sinfo -t resv -h -o "%D"` |
 | `slurm_nodes_down_total` | `slurm_nodes_down` | Down nodes | `sinfo -t down -h -o "%D"`<br>`scontrol show nodes -o \| grep "State=DOWN" \| wc -l` |
 | `slurm_nodes_drain_total` | `slurm_nodes_drain`<br> `slurm_nodes_draining` <br> `slurm_nodes_drained` | Draining/drained nodes | `sinfo -t drain,drng -h -o "%D"`<br>`scontrol show nodes -o \| grep -E "State=DRAIN\|State=DRNG" \| wc -l` |
-| `slurm_nodes_error_total` |  | Nodes in error state | `sinfo -t err -h -o "%D"` |
+| `slurm_nodes_error_total` |  | Nodes in error state |  |
 | `slurm_nodes_fail_total` | `slurm_nodes_fail` | Failed nodes | `sinfo -t fail -h -o "%D"` |
 |  | `slurm_nodes_powered_down` | Number of nodes powered down | `sinfo -t powered_down -h -o "%D"` |
 |  | `slurm_nodes_powering_up` | Number of nodes powering up | `sinfo -t powering_up -h -o "%D"` |
