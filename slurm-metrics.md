@@ -1,5 +1,5 @@
 
-### 1.1 Job Metrics (squeue snapshot)
+### 1.1 Job Status Metrics (squeue snapshot)
 
 | Description | Slurm Metrics Plugin Metric (25.11+) (all gauges)| sacct/squeue Command | slurmrestd query |
 |-------------|-------------|----------------------------------|---------------|
@@ -16,7 +16,7 @@
 |Jobs currently suspended |`slurm_jobs_suspended` | `squeue -t SUSPENDED -h \| wc -l` | `curl  -H X-SLURM-USER-TOKEN:$SLURM_JWT -X GET 'http://localhost:6820/slurmdb/v0.0.43/jobs/' #filter for SUSPENDED STATE` |
 |Jobs that were preempted | `slurm_jobs_preempted` | `sacct -s PREEMPTED --noheader \| wc -l` | `curl  -H X-SLURM-USER-TOKEN:$SLURM_JWT -X GET 'http://localhost:6820/slurmdb/v0.0.43/jobs/' #filter for PREEMPTED state` |
 
-### 1.2 Job Metrics (cumulative)
+### 1.2 Job Status Metrics (cumulative)
 | Description | Slurm Metrics Plugin Metric (25.11+) (all gauges)| sacct/scontrol Command | slurmrestd query|
 |-------------|-------------|----------------------------------|------------------|
 |Total Number of jobs submitted since last reset |  | `sacct -S "$START" -E now -a -X -n --noheader\| wc -l`  | `curl -H X-SLURM-USER-TOKEN:$SLURM_JWT -X GET "http://localhost:6820/slurmdb/v0.0.43/jobs/  --data-urlencode "start_time=${START}" \| jq '.jobs \| length'` |
