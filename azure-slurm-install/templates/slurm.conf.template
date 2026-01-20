@@ -40,7 +40,7 @@ Epilog={epilog}
 # This flag is also required for GB200/GB300 IMEX integration.
 # Recommended to keep this on.
 PrologFlags=alloc
-TreeWidth=65533
+TreeWidth=16
 ReconfigFlags=KeepPowerSaveSettings
 ResumeTimeout=1800
 SuspendTimeout=600
