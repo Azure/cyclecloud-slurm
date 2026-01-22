@@ -79,8 +79,10 @@ EOF
     # setup autocomplete of azslurm
     if [ -e /etc/profile.d ]; then
         cat > /etc/profile.d/azslurm_autocomplete.sh<<EOF
-which azslurm > /dev/null 2>&1 || export PATH=\$PATH:/root/bin
-eval "\$(/opt/azurehpc/slurm/venv/bin/register-python-argcomplete azslurm)" || echo "Warning: Autocomplete is disabled" 1>&2
+if [ "\$(whoami)" == "root" ]; then 
+  which azslurm > /dev/null 2>&1 || export PATH=\$PATH:/root/bin
+  eval "\$(/opt/azurehpc/slurm/venv/bin/register-python-argcomplete azslurm)" || echo "Warning: Autocomplete is disabled" 1>&2
+fi
 EOF
     fi
 
