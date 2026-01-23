@@ -44,29 +44,29 @@ install_python3() {
         echo "Detected AlmaLinux. Installing Python 3.12..." >&2
         yum install -y python3.12 python3.12-pyyaml
         PYTHON_BIN="/usr/bin/python3.12"
-
+        
     elif [ "$OS" == "ubuntu" ] && [ "$VERSION_ID" == "22.04" ]; then
         echo "Detected Ubuntu 22.04. Installing Python 3.11..." >&2
         apt update
         # We need python dev headers and systemd dev headers for same reaosn mentioned above.
         apt install -y python3.11 python3.11-venv python3-yaml
         PYTHON_BIN="/usr/bin/python3.11"
-
+        
     elif [ "$OS" == "ubuntu" ] && [[ $VERSION =~ ^24\.* ]]; then
         echo "Detected Ubuntu 24. Installing Python 3.12..." >&2
         apt update
         apt install -y python3.12 python3.12-venv python3-yaml
         PYTHON_BIN="/usr/bin/python3.12"
-
+    
     elif [ "$OS" == "rhel" ]; then
         echo "Detected RHEL, using system python3..." >&2
         PYTHON_BIN="/usr/bin/python3"
-
+    
     elif [ "$OS" == "sle_hpc" ]; then
         echo "Detected SUSE, installing Python 3.11..." >&2
         zypper install -y python311 python311-virtualenv python311-PyYAML
         PYTHON_BIN="/usr/bin/python3.11"
-
+    
     else
         echo "Unsupported operating system: $OS $VERSION_ID" >&2
         exit 1
