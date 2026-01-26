@@ -160,12 +160,22 @@ def test_zombie_node(bindings: testutil.MockClusterBinding) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), "/tmp/keep_alive.conf").run_once()
 
     # change the node state in slurm to powered / powering_down
     slutil.SLURM_CLI.scontrol(["update", "NodeName=hpc-1", "State=powered_down"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), "/tmp/keep_alive.conf").run_once()
 
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "down"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_zombie_node"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == "hpc-1"
+
+    # shutdown the node, and see the state goes away
+    bindings.shutdown_nodes(names=["hpc-1"])
+    slutil.SLURM_CLI.scontrol(["update", "NodeName=hpc-1", "State=powered_down"])
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), "/tmp/keep_alive.conf").run_once()
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "powered_down"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "(null)"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == "hpc-1"
+

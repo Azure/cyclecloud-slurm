@@ -8,7 +8,7 @@ slurm_project_name=$(jetpack config slurm.project_name slurm)
 
 find_python3() {
     export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
-    if [ ! -z $AZSLURM_PYTHON_PATH]; then
+    if [ -n "$AZSLURM_PYTHON_PATH" ]; then
         echo $AZSLURM_PYTHON_PATH
         return 0
     fi
@@ -23,8 +23,10 @@ find_python3() {
 }
 
 install_python3() {
-    PYTHON_BIN=find_python3
-    if [ -z "$PYTHON_BIN" ]; then
+    PYTHON_BIN=$(find_python3)
+    if [ -n "$PYTHON_BIN" ]; then
+        echo "Found Python at $PYTHON_BIN" >&2
+        export PYTHON_BIN
         return 0
     fi
     # NOTE: based off of healthagent 00-install.sh, but we have different needs - we don't need the devel/systemd paths.
