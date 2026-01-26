@@ -181,6 +181,26 @@ JOB_PARTITION_SCHEMAS = {
     )
 }
 
+# Partition-based Job History Metrics (sacct by partition - historical)
+JOB_PARTITION_HISTORY_SCHEMAS = {
+    'by_state': CommandSchema(
+        name='slurm_partition_jobs_{metric_name}',
+        command=['sacct'],
+        command_args=['-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
+                     '--noheader', '-X', '-n'],
+        parse_strategy=ParseStrategy.COUNT_LINES,
+        description='Historical jobs in {state} state for partition {partition} since start_time'
+    ),
+    'total_submitted': CommandSchema(
+        name='slurm_partition_jobs_total_submitted',
+        command=['sacct'],
+        command_args=['-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-a', '-X', 
+                     '-n', '--noheader'],
+        parse_strategy=ParseStrategy.COUNT_LINES,
+        description='Total jobs submitted to partition {partition} since start_time'
+    )
+}
+
 # Partition-based Node Metrics (sinfo by partition)
 NODE_PARTITION_SCHEMAS = {
     'total': CommandSchema(
@@ -568,6 +588,46 @@ class SlurmCommandExecutor:
                 metrics.get('slurm_partition_nodes_drained', 0)
             )
             metrics['slurm_partition_nodes_drain_total'] = drain_total
+            
+            partition_metrics[partition] = metrics
+        
+        return partition_metrics
+    
+    def collect_partition_job_history_metrics(self, start_time: str) -> Dict[str, Dict[str, float]]:
+        """
+        Collect historical job metrics per partition.
+        
+        Args:
+            start_time: Start time for historical queries (e.g., "24 hours ago")
+        
+        Returns:
+            Dictionary mapping partition names to metric dictionaries
+            Format: {partition_name: {metric_name: value}}
+        """
+        partition_metrics = {}
+        partitions = self.get_partitions()
+        
+        if not partitions:
+            logger.warning("No partitions found")
+            return partition_metrics
+        
+        for partition in partitions:
+            metrics = {}
+            
+            # Jobs by historical state in partition
+            schema = JOB_PARTITION_HISTORY_SCHEMAS['by_state']
+            for sacct_state, metric_suffix in JOB_HISTORY_STATES:
+                metric_name = schema.name.format(metric_name=metric_suffix)
+                value = self.execute_schema(schema, partition=partition, 
+                                           start_time=start_time, state=sacct_state, 
+                                           metric_name=metric_suffix)
+                metrics[metric_name] = value
+                logger.debug(f"{metric_name} [partition={partition}]: {value}")
+            
+            # Total submitted to partition
+            schema = JOB_PARTITION_HISTORY_SCHEMAS['total_submitted']
+            metrics[schema.name] = self.execute_schema(schema, partition=partition, 
+                                                       start_time=start_time)
             
             partition_metrics[partition] = metrics
         

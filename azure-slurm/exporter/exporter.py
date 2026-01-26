@@ -112,6 +112,19 @@ class SlurmMetricsCollector:
                     gauge.add_metric([partition], value)
                     yield gauge
             
+            # Collect partition-based job history metrics (cumulative)
+            logger.debug("Collecting partition job history metrics...")
+            partition_job_history_metrics = self.executor.collect_partition_job_history_metrics(self.reset_time)
+            for partition, metrics in partition_job_history_metrics.items():
+                for metric_name, value in metrics.items():
+                    gauge = GaugeMetricFamily(
+                        metric_name,
+                        f'Slurm partition cumulative job metric: {metric_name}',
+                        labels=['partition']
+                    )
+                    gauge.add_metric([partition], value)
+                    yield gauge
+            
             # Export collection duration
             duration = time.time() - start_time
             duration_gauge = GaugeMetricFamily(
