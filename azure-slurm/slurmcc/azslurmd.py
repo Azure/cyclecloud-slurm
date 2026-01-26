@@ -20,10 +20,9 @@ class NodeManagerSource(NodeSource):
 
 class AzslurmDaemon:
 
-    def __init__(self, node_source: NodeSource) -> None:
+    def __init__(self, node_source: NodeSource, keep_alive_conf: str = os.path.realpath("/etc/slurm/keep_alive.conf")) -> None:
         self.node_source = node_source
         self.sync_nodes = allocation.SyncNodes()
-        keep_alive_conf = os.path.realpath("/etc/slurm/keep_alive.conf")
         self.slurm_nodes = allocation.SlurmNodes(allocation.SuspendExcNodesSerializer(keep_alive_conf))
 
     def run_once(self) -> None:

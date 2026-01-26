@@ -177,6 +177,9 @@ class SlurmNodes:
             and self.__nodes[name].get("Reason") in ["cyclecloud_no_node", "cyclecloud_zombie_node"]
         )
     
+    def has_zombie_reason(self, name: str) -> bool:
+        return self.__nodes[name].get("Reason") in ["cyclecloud_zombie_node"]
+    
     def is_joined(self, name: str) -> bool:
         return not bool(self.states(name).intersection(set(["powered_down", "powering_down", "powering_up"])))
 
@@ -317,6 +320,11 @@ class SyncNodes:
                     continue
                 else:
                     # typical case - node is in neither CC or slurm
+                    # just make sure we clean up zombie reason codes here.
+                    # TODO should we unset all reason codes here?
+                    if slurm_nodes.has_zombie_reason(name):
+                        logging.info("Removing Reason=cyclecloud_zombie_node from %s. Node no longer exists in CycleCloud", name)
+                        slurm_nodes.unset_reason(name)
                     continue
             
             # slurm node has an internal cache of this information, so this is only called once.
@@ -333,8 +341,14 @@ class SyncNodes:
                     logging.warning("    - azslurm suspend --node-list %s", name)
                     logging.warning("    - Or simply terminate the node %s from the CycleCloud UI", name)
                     slurm_nodes.mark_down_as_zombie(name)
-
+                # Bail out here. Either the node is still powering up, or the node is a zombie.
                 continue
+
+            # the above continue means that all nodes from here on out should never be in a zombie state.
+            if slurm_nodes.has_zombie_reason(name):
+                logging.info("Removing Reason=cyclecloud_zombie_node from %s. CycleCloud State=%s Slurm State=%s", 
+                             name, node.state, "+".join(list(slurm_nodes.states(name))))
+                slurm_nodes.unset_reason(name)
 
             state = node.state or "UNKNOWN"
 
