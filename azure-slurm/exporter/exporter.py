@@ -86,6 +86,32 @@ class SlurmMetricsCollector:
                 gauge.add_metric([], value)
                 yield gauge
             
+            # Collect partition-based job metrics
+            logger.debug("Collecting partition job metrics...")
+            partition_job_metrics = self.executor.collect_partition_job_metrics()
+            for partition, metrics in partition_job_metrics.items():
+                for metric_name, value in metrics.items():
+                    gauge = GaugeMetricFamily(
+                        metric_name,
+                        f'Slurm partition job metric: {metric_name}',
+                        labels=['partition']
+                    )
+                    gauge.add_metric([partition], value)
+                    yield gauge
+            
+            # Collect partition-based node metrics
+            logger.debug("Collecting partition node metrics...")
+            partition_node_metrics = self.executor.collect_partition_node_metrics()
+            for partition, metrics in partition_node_metrics.items():
+                for metric_name, value in metrics.items():
+                    gauge = GaugeMetricFamily(
+                        metric_name,
+                        f'Slurm partition node metric: {metric_name}',
+                        labels=['partition']
+                    )
+                    gauge.add_metric([partition], value)
+                    yield gauge
+            
             # Export collection duration
             duration = time.time() - start_time
             duration_gauge = GaugeMetricFamily(

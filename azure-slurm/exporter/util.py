@@ -163,6 +163,51 @@ NODE_STATES = [
     ('powering_up', 'powering_up')
 ]
 
+# Partition-based Job Queue Metrics (squeue by partition)
+JOB_PARTITION_SCHEMAS = {
+    'total': CommandSchema(
+        name='slurm_partition_jobs',
+        command=['squeue'],
+        command_args=['-p', '{partition}', '-h'],
+        parse_strategy=ParseStrategy.COUNT_LINES,
+        description='Total jobs in partition {partition}'
+    ),
+    'by_state': CommandSchema(
+        name='slurm_partition_jobs_{state}',
+        command=['squeue'],
+        command_args=['-p', '{partition}', '-t', '{state}', '-h'],
+        parse_strategy=ParseStrategy.COUNT_LINES,
+        description='Jobs in {state} state for partition {partition}'
+    )
+}
+
+# Partition-based Node Metrics (sinfo by partition)
+NODE_PARTITION_SCHEMAS = {
+    'total': CommandSchema(
+        name='slurm_partition_nodes',
+        command=['sinfo'],
+        command_args=['-p', '{partition}', '-N', '-h'],
+        parse_strategy=ParseStrategy.COUNT_LINES,
+        description='Total nodes in partition {partition}'
+    ),
+    'by_state': CommandSchema(
+        name='slurm_partition_nodes_{metric_name}',
+        command=['sinfo'],
+        command_args=['-p', '{partition}', '-t', '{state}', '-h', '-o', '%D'],
+        parse_strategy=ParseStrategy.EXTRACT_NUMBER,
+        description='Nodes in {state} state for partition {partition}'
+    )
+}
+
+# Schema for getting partition list
+PARTITION_LIST_SCHEMA = CommandSchema(
+    name='partitions',
+    command=['sinfo'],
+    command_args=['-h', '-o', '%P'],
+    parse_strategy=ParseStrategy.CUSTOM,
+    description='List all partitions'
+)
+
 
 # ============================================================================
 # PARSER FUNCTIONS
@@ -246,6 +291,31 @@ def parse_columns(output: str, config: Dict[str, Any]) -> float:
     else:
         logger.warning(f"Unknown aggregation method: {aggregation}")
         return 0.0
+
+
+def parse_partition_list(output: str) -> List[str]:
+    """
+    Parse partition list from sinfo output.
+    
+    Args:
+        output: Command output string (partition names, one per line)
+        
+    Returns:
+        List of partition names (without asterisks)
+    """
+    if not output:
+        return []
+    
+    partitions = []
+    for line in output.split('\n'):
+        if not line.strip():
+            continue
+        # Remove asterisk from default partition
+        partition = line.strip().rstrip('*')
+        if partition and partition not in partitions:
+            partitions.append(partition)
+    
+    return partitions
 
 
 # Map parse strategies to functions
@@ -412,6 +482,96 @@ class SlurmCommandExecutor:
         metrics['slurm_nodes_drain_total'] = drain_total
         
         return metrics
+    
+    def get_partitions(self) -> List[str]:
+        """
+        Get list of all partitions in the cluster.
+        
+        Returns:
+            List of partition names
+        """
+        cmd = PARTITION_LIST_SCHEMA.build_command()
+        output = self.run_command(cmd)
+        partitions = parse_partition_list(output)
+        logger.debug(f"Found partitions: {partitions}")
+        return partitions
+    
+    def collect_partition_job_metrics(self) -> Dict[str, Dict[str, float]]:
+        """
+        Collect job metrics per partition.
+        
+        Returns:
+            Dictionary mapping partition names to metric dictionaries
+            Format: {partition_name: {metric_name: value}}
+        """
+        partition_metrics = {}
+        partitions = self.get_partitions()
+        
+        if not partitions:
+            logger.warning("No partitions found")
+            return partition_metrics
+        
+        for partition in partitions:
+            metrics = {}
+            
+            # Total jobs in partition
+            schema = JOB_PARTITION_SCHEMAS['total']
+            metrics[schema.name] = self.execute_schema(schema, partition=partition)
+            
+            # Jobs by state in partition
+            schema = JOB_PARTITION_SCHEMAS['by_state']
+            for state in JOB_QUEUE_STATES:
+                metric_name = schema.name.format(state=state.lower())
+                value = self.execute_schema(schema, partition=partition, state=state)
+                metrics[metric_name] = value
+                logger.debug(f"{metric_name} [partition={partition}]: {value}")
+            
+            partition_metrics[partition] = metrics
+        
+        return partition_metrics
+    
+    def collect_partition_node_metrics(self) -> Dict[str, Dict[str, float]]:
+        """
+        Collect node metrics per partition.
+        
+        Returns:
+            Dictionary mapping partition names to metric dictionaries
+            Format: {partition_name: {metric_name: value}}
+        """
+        partition_metrics = {}
+        partitions = self.get_partitions()
+        
+        if not partitions:
+            logger.warning("No partitions found")
+            return partition_metrics
+        
+        for partition in partitions:
+            metrics = {}
+            
+            # Total nodes in partition
+            schema = NODE_PARTITION_SCHEMAS['total']
+            metrics[schema.name] = self.execute_schema(schema, partition=partition)
+            
+            # Nodes by state in partition
+            schema = NODE_PARTITION_SCHEMAS['by_state']
+            for sinfo_state, metric_suffix in NODE_STATES:
+                metric_name = schema.name.format(metric_name=metric_suffix)
+                value = self.execute_schema(schema, partition=partition, 
+                                           state=sinfo_state, metric_name=metric_suffix)
+                metrics[metric_name] = value
+                logger.debug(f"{metric_name} [partition={partition}]: {value}")
+            
+            # Calculate total drain metric for partition
+            drain_total = (
+                metrics.get('slurm_partition_nodes_drain', 0) +
+                metrics.get('slurm_partition_nodes_draining', 0) +
+                metrics.get('slurm_partition_nodes_drained', 0)
+            )
+            metrics['slurm_partition_nodes_drain_total'] = drain_total
+            
+            partition_metrics[partition] = metrics
+        
+        return partition_metrics
 
 
 # ============================================================================
