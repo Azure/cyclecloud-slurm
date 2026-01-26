@@ -278,7 +278,12 @@ ensure_enroot_dir() {
     fi
 
     # lastly - the scheduler
-    run_slurmdbd
+    use_accounting=$(jetpack config slurm.accounting.enabled False)
+    if [ "$use_accounting" == "True" ]; then  
+        run_slurmdbd
+    else
+        echo "Warning: slurm.accounting.enabled=${use_accounting}: skipping slurmdbd" >&2
+    fi
 
     run_slurmctld
 
