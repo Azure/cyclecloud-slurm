@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 
-VERSION=8.9.0-3582
+VERSION=8.9.0-3597
 # Identify cyclecloud8 build version
 INITIAL_CC_BUILD_VERSION=$(cat /opt/cycle_server/system/version)
 
