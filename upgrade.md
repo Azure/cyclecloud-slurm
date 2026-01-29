@@ -96,7 +96,7 @@ Following steps need to be run on the CC VM.
    - Add `cyclecloud.enable_chef = false` in the configuration section of the node defaults section in the slurm template.
    - Insert `[[[cluster-init cyclecloud/monitoring:default:1.0.5]]]` before `cyclecloud/slurm` cluster-init
    - Replace `cyclecloud/slurm` project version to `4.0.5`
-   - Replace `cyclecloud/healthagent` project version to `1.0.4`
+   - Replace `cyclecloud/healthagent` project version to `1.0.5`
 
 
 10. Import the cluster
