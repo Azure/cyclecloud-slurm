@@ -7,3 +7,5 @@ ENROOT_MOUNT_HOME y
 ENROOT_RESTRICT_DEV y
 ENROOT_ROOTFS_WRITABLE y
 MELLANOX_VISIBLE_DEVICES all
+# Trailing comment - this file requires at least one trailing newline after the above
+
