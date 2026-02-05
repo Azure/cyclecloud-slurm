@@ -217,6 +217,11 @@ ensure_enroot_dir() {
     #
     CONF=/etc/enroot/enroot.conf
 
+    # no-op if enroot.conf does not exist
+    if [ ! -f "$CONF" ]; then
+        return 0
+    fi
+
     # extract ENROOT_TEMP_PATH value
     ENROOT_TEMP_PATH=$(awk '$1=="ENROOT_TEMP_PATH"{print $2}' "$CONF")
 
