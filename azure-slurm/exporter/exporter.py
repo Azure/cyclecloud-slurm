@@ -17,10 +17,10 @@ from prometheus_client.core import GaugeMetricFamily
 
 # Import our schema-based utilities
 try:
-    from .util import SlurmCommandExecutor
+    from .executor import SlurmCommandExecutor
 except ImportError:
     # Fallback for when run as a script rather than a package
-    from util import SlurmCommandExecutor
+    from executor import SlurmCommandExecutor
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +65,40 @@ class SlurmMetricsCollector:
                 )
                 gauge.add_metric([], value)
                 yield gauge
+            
+            # Collect per-job node allocation metrics
+            logger.debug("Collecting per-job node allocation metrics...")
+            try:
+                jobs_with_nodes_output = self.executor.run_command(
+                    ['squeue', '-h', '-o', '%i|%j|%P|%t|%D', '--states=RUNNING']
+                )
+                
+                # Create single gauge family for all jobs
+                job_nodes_gauge = GaugeMetricFamily(
+                    'squeue_job_nodes_allocated',
+                    'Number of nodes allocated/requested per job',
+                    labels=['job_id', 'job_name', 'partition', 'state']
+                )
+                
+                for line in jobs_with_nodes_output.strip().split('\n'):
+                    if not line:
+                        continue
+                    parts = line.split('|')
+                    if len(parts) != 5:
+                        continue
+                    job_id, job_name, partition, state, num_nodes = parts
+                    try:
+                        job_nodes_gauge.add_metric(
+                            [job_id, job_name, partition, state],
+                            float(num_nodes)
+                        )
+                    except (ValueError, IndexError):
+                        logger.warning(f"Failed to parse job node allocation: {line}")
+                        continue
+                
+                yield job_nodes_gauge
+            except Exception as e:
+                logger.error(f"Failed to collect per-job node metrics: {e}")
             
             # Collect job history metrics (cumulative)
             logger.debug("Collecting job history metrics...")
@@ -156,56 +190,68 @@ class SlurmMetricsCollector:
                     gauge.add_metric([partition], value)
                 yield gauge
             
-            # Collect job history metrics for last 6 months (updated daily)
-            logger.debug("Collecting 6-month job history metrics...")
-            job_history_six_months_data = self.executor.collect_job_history_six_months_metrics()
-            start_date = job_history_six_months_data['start_date']
-            for metric_name, value in job_history_six_months_data['metrics'].items():
+            # Collect job history metrics for last 6 months (OPTIMIZED - single sacct call)
+            logger.debug("Collecting 6-month job history metrics (optimized)...")
+            six_months_data = self.executor.collect_job_history_six_months_optimized()
+            start_date = six_months_data['start_date']
+            
+            # Total submitted
+            gauge = GaugeMetricFamily(
+                'sacct_jobs_total_six_months_submitted',
+                'Slurm 6-month rolling job metric: submitted',
+                labels=['start_date']
+            )
+            gauge.add_metric([start_date], float(six_months_data['total_submitted']))
+            yield gauge
+            
+            # Individual state metrics
+            for state, count in six_months_data['by_state'].items():
                 gauge = GaugeMetricFamily(
-                    metric_name,
-                    f'Slurm 6-month rolling job metric: {metric_name}',
+                    f'sacct_jobs_total_six_months_{state}',
+                    f'Slurm 6-month rolling job metric: {state}',
                     labels=['start_date']
                 )
-                gauge.add_metric([start_date], value)
+                gauge.add_metric([start_date], float(count))
                 yield gauge
             
-            # Collect 6-month job history with state labels
-            logger.debug("Collecting 6-month job history by state...")
-            job_history_six_months_by_state = self.executor.collect_job_history_six_months_metrics_by_state()
-            start_date_state = job_history_six_months_by_state['start_date']
+            # Metric with state labels
             jobs_by_state_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_six_months_by_state',
                 'Slurm 6-month rolling job metric by state',
                 labels=['state', 'start_date']
             )
-            for state, value in job_history_six_months_by_state['metrics_by_state'].items():
-                jobs_by_state_gauge.add_metric([state, start_date_state], value)
+            for state, count in six_months_data['by_state'].items():
+                jobs_by_state_gauge.add_metric([state, start_date], float(count))
             yield jobs_by_state_gauge
             
-            # Collect 6-month job history with state and exit code labels
-            logger.debug("Collecting 6-month job history by state and exit code...")
-            job_history_six_months_exit = self.executor.collect_job_history_six_months_metrics_by_state_and_exit_code()
-            start_date_exit = job_history_six_months_exit['start_date']
+            # Metric with state and exit code labels
             jobs_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_six_months_by_state_exit_code',
                 'Slurm 6-month rolling job metric by state and exit code',
                 labels=['state', 'exit_code', 'start_date']
             )
-            for state, exit_code, count in job_history_six_months_exit['metrics']:
-                jobs_by_state_exit_gauge.add_metric([state, exit_code, start_date_exit], float(count))
+            for state, exit_code, count in six_months_data['by_state_exit_code']:
+                jobs_by_state_exit_gauge.add_metric([state, exit_code, start_date], float(count))
             yield jobs_by_state_exit_gauge
             
-            # Collect partition-based job history metrics for last 6 months (updated daily)
-            logger.debug("Collecting partition 6-month job history metrics...")
-            partition_job_history_six_months_data = self.executor.collect_partition_job_history_six_months_metrics()
-            partition_start_date = partition_job_history_six_months_data['start_date']
+            # Partition-based 6-month metrics (from same optimized call)
+            logger.debug("Collecting partition 6-month job history metrics (from optimized data)...")
             # Group metrics by metric name across all partitions
             metrics_by_name = {}
-            for partition, metrics in partition_job_history_six_months_data['partition_metrics'].items():
-                for metric_name, value in metrics.items():
+            for partition, states in six_months_data['by_partition'].items():
+                # Total submitted for partition
+                partition_total = sum(states.values())
+                metric_name = 'sacct_partition_jobs_total_six_months_submitted'
+                if metric_name not in metrics_by_name:
+                    metrics_by_name[metric_name] = []
+                metrics_by_name[metric_name].append((partition, partition_total))
+                
+                # Individual states for partition
+                for state, count in states.items():
+                    metric_name = f'sacct_partition_jobs_total_six_months_{state}'
                     if metric_name not in metrics_by_name:
                         metrics_by_name[metric_name] = []
-                    metrics_by_name[metric_name].append((partition, value))
+                    metrics_by_name[metric_name].append((partition, count))
             
             # Yield one gauge per metric name with all partitions
             for metric_name, partition_values in metrics_by_name.items():
@@ -215,73 +261,81 @@ class SlurmMetricsCollector:
                     labels=['partition', 'start_date']
                 )
                 for partition, value in partition_values:
-                    gauge.add_metric([partition, partition_start_date], value)
+                    gauge.add_metric([partition, start_date], float(value))
                 yield gauge
             
-            # Collect partition 6-month job history with state and exit code labels
-            logger.debug("Collecting partition 6-month job history by state and exit code...")
-            partition_job_history_six_months_exit = self.executor.collect_partition_job_history_six_months_metrics_by_state_and_exit_code()
-            partition_start_date_exit = partition_job_history_six_months_exit['start_date']
+            # Partition 6-month job history with state and exit code labels
             partition_jobs_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_partition_jobs_total_six_months_by_state_exit_code',
                 'Slurm partition 6-month rolling job metric by state and exit code',
                 labels=['partition', 'state', 'exit_code', 'start_date']
             )
-            for partition, metrics_list in partition_job_history_six_months_exit['partition_metrics'].items():
+            for partition, metrics_list in six_months_data['by_partition_state_exit_code'].items():
                 for state, exit_code, count in metrics_list:
-                    partition_jobs_by_state_exit_gauge.add_metric([partition, state, exit_code, partition_start_date_exit], float(count))
+                    partition_jobs_by_state_exit_gauge.add_metric([partition, state, exit_code, start_date], float(count))
             yield partition_jobs_by_state_exit_gauge
             
-            # Collect job history metrics for last week (updated daily)
-            logger.debug("Collecting 1-week job history metrics...")
-            job_history_one_week_data = self.executor.collect_job_history_one_week_metrics()
-            week_start_date = job_history_one_week_data['start_date']
-            for metric_name, value in job_history_one_week_data['metrics'].items():
+            # Collect job history metrics for last week (OPTIMIZED - single sacct call)
+            logger.debug("Collecting 1-week job history metrics (optimized)...")
+            week_data = self.executor.collect_job_history_one_week_optimized()
+            week_start_date = week_data['start_date']
+            
+            # Total submitted
+            gauge = GaugeMetricFamily(
+                'sacct_jobs_total_one_week_submitted',
+                'Slurm 1-week rolling job metric: submitted',
+                labels=['start_date']
+            )
+            gauge.add_metric([week_start_date], float(week_data['total_submitted']))
+            yield gauge
+            
+            # Individual state metrics
+            for state, count in week_data['by_state'].items():
                 gauge = GaugeMetricFamily(
-                    metric_name,
-                    f'Slurm 1-week rolling job metric: {metric_name}',
+                    f'sacct_jobs_total_one_week_{state}',
+                    f'Slurm 1-week rolling job metric: {state}',
                     labels=['start_date']
                 )
-                gauge.add_metric([week_start_date], value)
+                gauge.add_metric([week_start_date], float(count))
                 yield gauge
             
-            # Collect 1-week job history with state labels
-            logger.debug("Collecting 1-week job history by state...")
-            job_history_one_week_by_state = self.executor.collect_job_history_one_week_metrics_by_state()
-            week_start_date_state = job_history_one_week_by_state['start_date']
+            # Metric with state labels
             jobs_week_by_state_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_one_week_by_state',
                 'Slurm 1-week rolling job metric by state',
                 labels=['state', 'start_date']
             )
-            for state, value in job_history_one_week_by_state['metrics_by_state'].items():
-                jobs_week_by_state_gauge.add_metric([state, week_start_date_state], value)
+            for state, count in week_data['by_state'].items():
+                jobs_week_by_state_gauge.add_metric([state, week_start_date], float(count))
             yield jobs_week_by_state_gauge
             
-            # Collect 1-week job history with state and exit code labels
-            logger.debug("Collecting 1-week job history by state and exit code...")
-            job_history_one_week_exit = self.executor.collect_job_history_one_week_metrics_by_state_and_exit_code()
-            week_start_date_exit = job_history_one_week_exit['start_date']
+            # Metric with state and exit code labels
             jobs_week_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_one_week_by_state_exit_code',
                 'Slurm 1-week rolling job metric by state and exit code',
                 labels=['state', 'exit_code', 'start_date']
             )
-            for state, exit_code, count in job_history_one_week_exit['metrics']:
-                jobs_week_by_state_exit_gauge.add_metric([state, exit_code, week_start_date_exit], float(count))
+            for state, exit_code, count in week_data['by_state_exit_code']:
+                jobs_week_by_state_exit_gauge.add_metric([state, exit_code, week_start_date], float(count))
             yield jobs_week_by_state_exit_gauge
             
-            # Collect partition-based job history metrics for last week (updated daily)
-            logger.debug("Collecting partition 1-week job history metrics...")
-            partition_job_history_one_week_data = self.executor.collect_partition_job_history_one_week_metrics()
-            partition_week_start_date = partition_job_history_one_week_data['start_date']
-            # Group metrics by metric name across all partitions
+            # Partition-based 1-week metrics (from same optimized call)
+            logger.debug("Collecting partition 1-week job history metrics (from optimized data)...")
             metrics_by_name = {}
-            for partition, metrics in partition_job_history_one_week_data['partition_metrics'].items():
-                for metric_name, value in metrics.items():
+            for partition, states in week_data['by_partition'].items():
+                # Total submitted for partition
+                partition_total = sum(states.values())
+                metric_name = 'sacct_partition_jobs_total_one_week_submitted'
+                if metric_name not in metrics_by_name:
+                    metrics_by_name[metric_name] = []
+                metrics_by_name[metric_name].append((partition, partition_total))
+                
+                # Individual states for partition
+                for state, count in states.items():
+                    metric_name = f'sacct_partition_jobs_total_one_week_{state}'
                     if metric_name not in metrics_by_name:
                         metrics_by_name[metric_name] = []
-                    metrics_by_name[metric_name].append((partition, value))
+                    metrics_by_name[metric_name].append((partition, count))
             
             # Yield one gauge per metric name with all partitions
             for metric_name, partition_values in metrics_by_name.items():
@@ -291,100 +345,107 @@ class SlurmMetricsCollector:
                     labels=['partition', 'start_date']
                 )
                 for partition, value in partition_values:
-                    gauge.add_metric([partition, partition_week_start_date], value)
+                    gauge.add_metric([partition, week_start_date], float(value))
                 yield gauge
             
-            # Collect partition 1-week job history with state and exit code labels
-            logger.debug("Collecting partition 1-week job history by state and exit code...")
-            partition_job_history_one_week_exit = self.executor.collect_partition_job_history_one_week_metrics_by_state_and_exit_code()
-            partition_week_start_date_exit = partition_job_history_one_week_exit['start_date']
+            # Partition 1-week job history with state and exit code labels
             partition_jobs_week_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_partition_jobs_total_one_week_by_state_exit_code',
                 'Slurm partition 1-week rolling job metric by state and exit code',
                 labels=['partition', 'state', 'exit_code', 'start_date']
             )
-            for partition, metrics_list in partition_job_history_one_week_exit['partition_metrics'].items():
+            for partition, metrics_list in week_data['by_partition_state_exit_code'].items():
                 for state, exit_code, count in metrics_list:
-                    partition_jobs_week_by_state_exit_gauge.add_metric([partition, state, exit_code, partition_week_start_date_exit], float(count))
+                    partition_jobs_week_by_state_exit_gauge.add_metric([partition, state, exit_code, week_start_date], float(count))
             yield partition_jobs_week_by_state_exit_gauge
             
-            # Collect job history metrics for last 24 hours (updated hourly)
-            logger.debug("Collecting 24-hour job history metrics...")
-            job_history_24_hours_data = self.executor.collect_job_history_24_hours_metrics()
-            hours_start_datetime = job_history_24_hours_data['start_datetime']
-            for metric_name, value in job_history_24_hours_data['metrics'].items():
+            # Collect job history metrics for last month (updated daily)
+            logger.debug("Collecting 1-month job history metrics...")
+            # Collect job history metrics for last month (OPTIMIZED - single sacct call)
+            logger.debug("Collecting 1-month job history metrics (optimized)...")
+            month_data = self.executor.collect_job_history_one_month_optimized()
+            month_start_date = month_data['start_date']
+            
+            # Total submitted
+            gauge = GaugeMetricFamily(
+                'sacct_jobs_total_one_month_submitted',
+                'Slurm 30-day rolling job metric: submitted',
+                labels=['start_date']
+            )
+            gauge.add_metric([month_start_date], float(month_data['total_submitted']))
+            yield gauge
+            
+            # Individual state metrics
+            for state, count in month_data['by_state'].items():
                 gauge = GaugeMetricFamily(
-                    metric_name,
-                    f'Slurm 24-hour rolling job metric: {metric_name}',
-                    labels=['start_datetime']
+                    f'sacct_jobs_total_one_month_{state}',
+                    f'Slurm 30-day rolling job metric: {state}',
+                    labels=['start_date']
                 )
-                gauge.add_metric([hours_start_datetime], value)
+                gauge.add_metric([month_start_date], float(count))
                 yield gauge
             
-            # Collect 24-hour job history with state labels
-            logger.debug("Collecting 24-hour job history by state...")
-            job_history_24_hours_by_state = self.executor.collect_job_history_24_hours_metrics_by_state()
-            hours_start_datetime_state = job_history_24_hours_by_state['start_datetime']
-            jobs_24h_by_state_gauge = GaugeMetricFamily(
-                'sacct_jobs_total_24_hours_by_state',
-                'Slurm 24-hour rolling job metric by state',
-                labels=['state', 'start_datetime']
+            # Metric with state labels
+            jobs_1m_by_state_gauge = GaugeMetricFamily(
+                'sacct_jobs_total_one_month_by_state',
+                'Slurm 30-day rolling job metric by state',
+                labels=['state', 'start_date']
             )
-            for state, value in job_history_24_hours_by_state['metrics_by_state'].items():
-                jobs_24h_by_state_gauge.add_metric([state, hours_start_datetime_state], value)
-            yield jobs_24h_by_state_gauge
+            for state, count in month_data['by_state'].items():
+                jobs_1m_by_state_gauge.add_metric([state, month_start_date], float(count))
+            yield jobs_1m_by_state_gauge
             
-            # Collect 24-hour job history with state and exit code labels
-            logger.debug("Collecting 24-hour job history by state and exit code...")
-            job_history_24_hours_exit = self.executor.collect_job_history_24_hours_metrics_by_state_and_exit_code()
-            hours_start_datetime_exit = job_history_24_hours_exit['start_datetime']
-            jobs_24h_by_state_exit_gauge = GaugeMetricFamily(
-                'sacct_jobs_total_24_hours_by_state_exit_code',
-                'Slurm 24-hour rolling job metric by state and exit code',
-                labels=['state', 'exit_code', 'start_datetime']
+            # Metric with state and exit code labels
+            jobs_1m_by_state_exit_gauge = GaugeMetricFamily(
+                'sacct_jobs_total_one_month_by_state_exit_code',
+                'Slurm 30-day rolling job metric by state and exit code',
+                labels=['state', 'exit_code', 'start_date']
             )
-            for state, exit_code, count in job_history_24_hours_exit['metrics']:
-                jobs_24h_by_state_exit_gauge.add_metric([state, exit_code, hours_start_datetime_exit], float(count))
-            yield jobs_24h_by_state_exit_gauge
+            for state, exit_code, count in month_data['by_state_exit_code']:
+                jobs_1m_by_state_exit_gauge.add_metric([state, exit_code, month_start_date], float(count))
+            yield jobs_1m_by_state_exit_gauge
             
-            # Collect partition-based job history metrics for last 24 hours (updated hourly)
-            logger.debug("Collecting partition 24-hour job history metrics...")
-            partition_job_history_24_hours_data = self.executor.collect_partition_job_history_24_hours_metrics()
-            partition_hours_start_datetime = partition_job_history_24_hours_data['start_datetime']
-            # Group metrics by metric name across all partitions
+            # Partition-based 1-month metrics (from same optimized call)
+            logger.debug("Collecting partition 1-month job history metrics (from optimized data)...")
             metrics_by_name = {}
-            for partition, metrics in partition_job_history_24_hours_data['partition_metrics'].items():
-                for metric_name, value in metrics.items():
+            for partition, states in month_data['by_partition'].items():
+                # Total submitted for partition
+                partition_total = sum(states.values())
+                metric_name = 'sacct_partition_jobs_total_one_month_submitted'
+                if metric_name not in metrics_by_name:
+                    metrics_by_name[metric_name] = []
+                metrics_by_name[metric_name].append((partition, partition_total))
+                
+                # Individual states for partition
+                for state, count in states.items():
+                    metric_name = f'sacct_partition_jobs_total_one_month_{state}'
                     if metric_name not in metrics_by_name:
                         metrics_by_name[metric_name] = []
-                    metrics_by_name[metric_name].append((partition, value))
+                    metrics_by_name[metric_name].append((partition, count))
             
             # Yield one gauge per metric name with all partitions
             for metric_name, partition_values in metrics_by_name.items():
                 gauge = GaugeMetricFamily(
                     metric_name,
-                    f'Slurm partition 24-hour rolling job metric: {metric_name}',
-                    labels=['partition', 'start_datetime']
+                    f'Slurm partition 30-day rolling job metric: {metric_name}',
+                    labels=['partition', 'start_date']
                 )
                 for partition, value in partition_values:
-                    gauge.add_metric([partition, partition_hours_start_datetime], value)
+                    gauge.add_metric([partition, month_start_date], float(value))
                 yield gauge
             
-            # Collect partition 24-hour job history with state and exit code labels
-            logger.debug("Collecting partition 24-hour job history by state and exit code...")
-            partition_job_history_24_hours_exit = self.executor.collect_partition_job_history_24_hours_metrics_by_state_and_exit_code()
-            partition_hours_start_datetime_exit = partition_job_history_24_hours_exit['start_datetime']
-            partition_jobs_24h_by_state_exit_gauge = GaugeMetricFamily(
-                'sacct_partition_jobs_total_24_hours_by_state_exit_code',
-                'Slurm partition 24-hour rolling job metric by state and exit code',
-                labels=['partition', 'state', 'exit_code', 'start_datetime']
+            # Partition 1-month job history with state and exit code labels
+            partition_jobs_1m_by_state_exit_gauge = GaugeMetricFamily(
+                'sacct_partition_jobs_total_one_month_by_state_exit_code',
+                'Slurm partition 30-day rolling job metric by state and exit code',
+                labels=['partition', 'state', 'exit_code', 'start_date']
             )
-            for partition, metrics_list in partition_job_history_24_hours_exit['partition_metrics'].items():
+            for partition, metrics_list in month_data['by_partition_state_exit_code'].items():
                 for state, exit_code, count in metrics_list:
-                    partition_jobs_24h_by_state_exit_gauge.add_metric([partition, state, exit_code, partition_hours_start_datetime_exit], float(count))
-            yield partition_jobs_24h_by_state_exit_gauge
+                    partition_jobs_1m_by_state_exit_gauge.add_metric([partition, state, exit_code, month_start_date], float(count))
+            yield partition_jobs_1m_by_state_exit_gauge
             
-            # Collect cluster info (cached for 24 hours)
+            # Collect cluster info (cached for 1 hour)
             logger.debug("Collecting cluster info...")
             cluster_info = self.executor.collect_cluster_info()
             
@@ -392,9 +453,13 @@ class SlurmMetricsCollector:
             cluster_name_gauge = GaugeMetricFamily(
                 'azslurm_cluster_info',
                 'Static cluster information from azslurm',
-                labels=['cluster_name']
+                labels=['cluster_name', 'region', 'resource_group', 'subscription_id']
             )
-            cluster_name_gauge.add_metric([cluster_info['cluster_name']], 1)
+            cluster_name_gauge.add_metric(
+                [cluster_info['cluster_name'], cluster_info['region'], 
+                 cluster_info['resource_group'], cluster_info['subscription_id']], 
+                1
+            )
             yield cluster_name_gauge
             
             # Partition info metric with labels
