@@ -13,13 +13,20 @@ find_python3() {
         return 0
     fi
     for version in $( seq 11 20 ); do
-        which python3.$version
+        which python3.$version > /dev/null 2>/dev/null
         if [ $? == 0 ]; then
-            return 0
+            python3.$version -m "import yaml, venv"
+            if [ $? == 0 ]; then
+                # write to stdout the validated path
+                which python3.$version
+                return 0
+            else
+                echo Warning: Found python3.$version but venv and/or yaml are not installed. 1>&2
+            fi
         fi
     done
-    echo Could not find python3 version 3.11 >&2
-    return 1
+    # Quietly return nothing
+    return 0
 }
 
 install_python3() {
@@ -29,6 +36,7 @@ install_python3() {
         export PYTHON_BIN
         return 0
     fi
+    echo "No suitable python3 installation found, beginning installation." >&2
     # NOTE: based off of healthagent 00-install.sh, but we have different needs - we don't need the devel/systemd paths.
     # most likely if healthagent is already installed, this won't be an issue.
     if [ -f /etc/os-release ]; then
