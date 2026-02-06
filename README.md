@@ -5,7 +5,7 @@ CycleCloud Slurm Clusters in Azure
 This project sets up an auto-scaling Slurm cluster
 Slurm is a highly configurable open source workload manager. See the [Slurm project site](https://www.schedmd.com/) for an overview.
 # Table of Contents:
-1. [Managing Slurm Clusters in 4.0.5](#managing-slurm-clusters)
+1. [Managing Slurm Clusters in 4.0.6](#managing-slurm-clusters)
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
@@ -36,7 +36,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     8. [Capturing logs and configuration for troubleshooting](#capturing-logs-and-configuration-data-for-troubleshooting)
 6. [Contributing](#contributing)
 ---
-## Managing Slurm Clusters in 4.0.5
+## Managing Slurm Clusters in 4.0.6
 
 ### Making Cluster Changes
 In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
