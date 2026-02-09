@@ -30,6 +30,32 @@ logging.basicConfig(
 logger = logging.getLogger('slurm-exporter')
 
 
+# Slurm exit code to reason mapping
+SLURM_EXIT_CODE_MAPPING = {
+    "0:0": "",
+    "1:0": "General failure",
+    "2:0": "Misuse of shell built-in",
+    "126:0": "Command invoked cannot execute",
+    "127:0": "Command not found",
+    "128:0": "Invalid argument to exit",
+    "129:0": "SIGHUP (128+1)",
+    "130:0": "SIGINT (128+2) - Ctrl+C",
+    "131:0": "SIGQUIT (128+3)",
+    "134:0": "SIGABRT (128+6)",
+    "137:0": "SIGKILL (128+9) - Force killed",
+    "139:0": "SIGSEGV (128+11) - Segfault",
+    "141:0": "SIGPIPE (128+13)",
+    "143:0": "SIGTERM (128+15) - Terminated",
+    "152:0": "SIGXCPU (128+24) - CPU limit",
+    "153:0": "SIGXFSZ (128+25) - File size limit",
+}
+
+
+def get_exit_code_reason(exit_code: str) -> str:
+    """Convert Slurm exit code to human-readable reason."""
+    return SLURM_EXIT_CODE_MAPPING.get(exit_code, "Other")
+
+
 class SlurmMetricsCollector:
     """Collects Slurm metrics using schema-based command execution."""
     
@@ -228,10 +254,11 @@ class SlurmMetricsCollector:
             jobs_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_six_months_by_state_exit_code',
                 'Slurm 6-month rolling job metric by state and exit code',
-                labels=['state', 'exit_code', 'start_date']
+                labels=['state', 'exit_code', 'reason', 'start_date']
             )
             for state, exit_code, count in six_months_data['by_state_exit_code']:
-                jobs_by_state_exit_gauge.add_metric([state, exit_code, start_date], float(count))
+                reason = get_exit_code_reason(exit_code)
+                jobs_by_state_exit_gauge.add_metric([state, exit_code, reason, start_date], float(count))
             yield jobs_by_state_exit_gauge
             
             # Partition-based 6-month metrics (from same optimized call)
@@ -268,11 +295,12 @@ class SlurmMetricsCollector:
             partition_jobs_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_partition_jobs_total_six_months_by_state_exit_code',
                 'Slurm partition 6-month rolling job metric by state and exit code',
-                labels=['partition', 'state', 'exit_code', 'start_date']
+                labels=['partition', 'state', 'exit_code', 'reason', 'start_date']
             )
             for partition, metrics_list in six_months_data['by_partition_state_exit_code'].items():
                 for state, exit_code, count in metrics_list:
-                    partition_jobs_by_state_exit_gauge.add_metric([partition, state, exit_code, start_date], float(count))
+                    reason = get_exit_code_reason(exit_code)
+                    partition_jobs_by_state_exit_gauge.add_metric([partition, state, exit_code, reason, start_date], float(count))
             yield partition_jobs_by_state_exit_gauge
             
             # Collect job history metrics for last week (OPTIMIZED - single sacct call)
@@ -313,10 +341,11 @@ class SlurmMetricsCollector:
             jobs_week_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_one_week_by_state_exit_code',
                 'Slurm 1-week rolling job metric by state and exit code',
-                labels=['state', 'exit_code', 'start_date']
+                labels=['state', 'exit_code', 'reason', 'start_date']
             )
             for state, exit_code, count in week_data['by_state_exit_code']:
-                jobs_week_by_state_exit_gauge.add_metric([state, exit_code, week_start_date], float(count))
+                reason = get_exit_code_reason(exit_code)
+                jobs_week_by_state_exit_gauge.add_metric([state, exit_code, reason, week_start_date], float(count))
             yield jobs_week_by_state_exit_gauge
             
             # Partition-based 1-week metrics (from same optimized call)
@@ -352,11 +381,12 @@ class SlurmMetricsCollector:
             partition_jobs_week_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_partition_jobs_total_one_week_by_state_exit_code',
                 'Slurm partition 1-week rolling job metric by state and exit code',
-                labels=['partition', 'state', 'exit_code', 'start_date']
+                labels=['partition', 'state', 'exit_code', 'reason', 'start_date']
             )
             for partition, metrics_list in week_data['by_partition_state_exit_code'].items():
                 for state, exit_code, count in metrics_list:
-                    partition_jobs_week_by_state_exit_gauge.add_metric([partition, state, exit_code, week_start_date], float(count))
+                    reason = get_exit_code_reason(exit_code)
+                    partition_jobs_week_by_state_exit_gauge.add_metric([partition, state, exit_code, reason, week_start_date], float(count))
             yield partition_jobs_week_by_state_exit_gauge
             
             # Collect job history metrics for last month (updated daily)
@@ -399,10 +429,11 @@ class SlurmMetricsCollector:
             jobs_1m_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_jobs_total_one_month_by_state_exit_code',
                 'Slurm 30-day rolling job metric by state and exit code',
-                labels=['state', 'exit_code', 'start_date']
+                labels=['state', 'exit_code', 'reason', 'start_date']
             )
             for state, exit_code, count in month_data['by_state_exit_code']:
-                jobs_1m_by_state_exit_gauge.add_metric([state, exit_code, month_start_date], float(count))
+                reason = get_exit_code_reason(exit_code)
+                jobs_1m_by_state_exit_gauge.add_metric([state, exit_code, reason, month_start_date], float(count))
             yield jobs_1m_by_state_exit_gauge
             
             # Partition-based 1-month metrics (from same optimized call)
@@ -438,11 +469,12 @@ class SlurmMetricsCollector:
             partition_jobs_1m_by_state_exit_gauge = GaugeMetricFamily(
                 'sacct_partition_jobs_total_one_month_by_state_exit_code',
                 'Slurm partition 30-day rolling job metric by state and exit code',
-                labels=['partition', 'state', 'exit_code', 'start_date']
+                labels=['partition', 'state', 'exit_code', 'reason', 'start_date']
             )
             for partition, metrics_list in month_data['by_partition_state_exit_code'].items():
                 for state, exit_code, count in metrics_list:
-                    partition_jobs_1m_by_state_exit_gauge.add_metric([partition, state, exit_code, month_start_date], float(count))
+                    reason = get_exit_code_reason(exit_code)
+                    partition_jobs_1m_by_state_exit_gauge.add_metric([partition, state, exit_code, reason, month_start_date], float(count))
             yield partition_jobs_1m_by_state_exit_gauge
             
             # Collect cluster info (cached for 1 hour)
