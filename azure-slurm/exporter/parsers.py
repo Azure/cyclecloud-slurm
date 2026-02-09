@@ -196,6 +196,14 @@ def parse_scontrol_nodes_json(output: str, partition: Optional[str] = None,
             # Convert to uppercase for matching
             node_states_upper = [s.upper() for s in node_states_list]
             
+            # Special case: ALLOCATED+DRAIN should be treated as DRAINING
+            # scontrol returns this as separate items in the list
+            if 'ALLOCATED' in node_states_upper and 'DRAIN' in node_states_upper:
+                node_states_upper.append('DRAINING')
+                logger.debug(f"Node {node.get('name')} has ALLOCATED+DRAIN -> adding DRAINING")
+            elif 'DRAIN' in node_states_upper:
+                logger.debug(f"Node {node.get('name')} has DRAIN (no ALLOCATED): {node_states_upper}")
+            
             # Find highest priority state for this node
             assigned_state = None
             highest_priority = 999

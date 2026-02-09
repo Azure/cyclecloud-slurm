@@ -38,16 +38,16 @@ SLURM_EXIT_CODE_MAPPING = {
     "126:0": "Command invoked cannot execute",
     "127:0": "Command not found",
     "128:0": "Invalid argument to exit",
-    "129:0": "SIGHUP (128+1)",
-    "130:0": "SIGINT (128+2) - Ctrl+C",
-    "131:0": "SIGQUIT (128+3)",
-    "134:0": "SIGABRT (128+6)",
-    "137:0": "SIGKILL (128+9) - Force killed",
-    "139:0": "SIGSEGV (128+11) - Segfault",
-    "141:0": "SIGPIPE (128+13)",
-    "143:0": "SIGTERM (128+15) - Terminated",
-    "152:0": "SIGXCPU (128+24) - CPU limit",
-    "153:0": "SIGXFSZ (128+25) - File size limit",
+    "129:0": "SIGHUP",
+    "130:0": "SIGINT - Ctrl+C",
+    "131:0": "SIGQUIT",
+    "134:0": "SIGABRT",
+    "137:0": "SIGKILL - Force killed",
+    "139:0": "SIGSEGV - Segfault",
+    "141:0": "SIGPIPE",
+    "143:0": "SIGTERM - Terminated",
+    "152:0": "SIGXCPU - CPU limit",
+    "153:0": "SIGXFSZ - File size limit",
 }
 
 
@@ -498,11 +498,12 @@ class SlurmMetricsCollector:
             partition_info_gauge = GaugeMetricFamily(
                 'azslurm_partition_info',
                 'Static partition information from azslurm with VM size and node details',
-                labels=['partition', 'vm_size', 'node_list']
+                labels=['partition', 'vm_size', 'node_list', 'available_azure_quota']
             )
             for partition in cluster_info.get('partitions', []):
                 partition_info_gauge.add_metric(
-                    [partition['name'], partition['vm_size'], partition['node_list']],
+                    [partition['name'], partition['vm_size'], partition['node_list'], 
+                     partition.get('available_azure_quota', '0')],
                     float(partition['total_nodes'])
                 )
             yield partition_info_gauge

@@ -214,15 +214,15 @@ NODE_STATE_PRIORITY = [
     ('POWERING_UP', 'powering_up', 2),        # Node is starting
     ('DOWN', 'down', 3),                      # Node not responding
     ('FAIL', 'fail', 4),                      # Node has failed
-    ('DRAINED', 'drained', 5),                # Node fully drained
-    ('DRAINING', 'draining', 6),              # Node being drained  
-    ('DRAIN', 'draining', 6),                 # Alias for draining
-    ('MAINT', 'maint', 7),                    # Maintenance mode
-    ('RESERVED', 'resv', 8),                  # Node reserved
-    ('COMPLETING', 'completing', 9),          # Job completing
-    ('ALLOCATED', 'alloc', 10),               # Node fully allocated
-    ('MIXED', 'mixed', 11),                   # Node partially allocated
-    ('IDLE', 'idle', 12),                     # Lowest priority - available
+    ('DRAINED', 'drained', 5),                # Node fully drained (DRAINED state)
+    ('DRAINING', 'draining', 6),              # Node being drained (ALLOCATED+DRAIN)
+    ('DRAIN', 'drained', 7),                  # Node drained but not allocated
+    ('MAINT', 'maint', 8),                    # Maintenance mode
+    ('RESERVED', 'resv', 9),                  # Node reserved
+    ('COMPLETING', 'completing', 10),         # Job completing
+    ('ALLOCATED', 'alloc', 11),               # Node fully allocated
+    ('MIXED', 'mixed', 12),                   # Node partially allocated
+    ('IDLE', 'idle', 13),                     # Lowest priority - available
 ]
 
 # Metric suffixes for the final mutually exclusive states

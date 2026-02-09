@@ -1072,8 +1072,11 @@ class SlurmCommandExecutor:
             if buckets_output:
                 lines = buckets_output.strip().split('\n')
                 if len(lines) > 1:  # Skip header
-                    # Track unique partitions (nodearrays without placement groups)
-                    seen_partitions = set()
+                    # Track unique partition+vm_size combinations
+                    seen_partition_vmsize = set()
+                    # Cache node lists per partition to avoid redundant sinfo calls
+                    partition_node_lists = {}
+                    
                     for line in lines[1:]:
                         parts = line.split()
                         if not parts:
@@ -1085,9 +1088,6 @@ class SlurmCommandExecutor:
                         # Skip placement group entries (contain _pg in nodearray name)
                         if '_pg' in nodearray or not nodearray:
                             continue
-                        if nodearray in seen_partitions:
-                            continue
-                        seen_partitions.add(nodearray)
                         
                         # When PLACEMENT_GROUP is empty, VM_SIZE is at index 1
                         # When PLACEMENT_GROUP has a value, VM_SIZE is at index 2
@@ -1096,6 +1096,12 @@ class SlurmCommandExecutor:
                         vm_size_index = 1 if (len(parts) > 1 and parts[1].startswith('Standard_') and '_pg' not in parts[1]) else 2
                         vm_size = parts[vm_size_index] if len(parts) > vm_size_index else 'unknown'
                         
+                        # Skip duplicate partition+vm_size combinations
+                        partition_vmsize_key = f"{nodearray}:{vm_size}"
+                        if partition_vmsize_key in seen_partition_vmsize:
+                            continue
+                        seen_partition_vmsize.add(partition_vmsize_key)
+                        
                         # Extract AVAILABLE_COUNT based on VM_SIZE position
                         # Columns after VM_SIZE: VCPU_COUNT, PCPU_COUNT, MEMORY, AVAILABLE_COUNT
                         # So AVAILABLE_COUNT is at vm_size_index + 4
@@ -1103,18 +1109,54 @@ class SlurmCommandExecutor:
                         if vm_size_index + 4 < len(parts):
                             available_count = parts[vm_size_index + 4]
                         
-                        # Get node list from sinfo
-                        node_list = 'N/A'
-                        sinfo_output = self.run_command(['sinfo', '-p', nodearray, '-h', '-o', '%N'])
-                        if sinfo_output:
-                            node_list = sinfo_output.strip()
+                        # Get node list from sinfo (cached per partition)
+                        # Note: sinfo returns all nodes in partition regardless of VM size
+                        # so all VM sizes in the same partition will have the same node_list
+                        if nodearray not in partition_node_lists:
+                            node_list = 'N/A'
+                            sinfo_output = self.run_command(['sinfo', '-p', nodearray, '-h', '-o', '%N'])
+                            if sinfo_output:
+                                node_list = sinfo_output.strip()
+                            partition_node_lists[nodearray] = node_list
+                        else:
+                            node_list = partition_node_lists[nodearray]
                         
                         cluster_info['partitions'].append({
                             'name': nodearray,
                             'vm_size': vm_size,
                             'total_nodes': available_count,
-                            'node_list': node_list
+                            'node_list': node_list,
+                            'available_azure_quota': '0'  # Will be filled in below
                         })
+            
+            # Get Azure quota limits from azslurm limits
+            try:
+                limits_output = self.run_command(['azslurm', 'limits'])
+                if limits_output:
+                    limits_data = json.loads(limits_output)
+                    # Build a map of (nodearray, vm_size) -> min(family_available_count, regional_available_count)
+                    quota_map = {}
+                    for limit_entry in limits_data:
+                        nodearray = limit_entry.get('nodearray', '')
+                        vm_size = limit_entry.get('vm_size', '')
+                        # Skip placement group entries
+                        if not nodearray or limit_entry.get('placement_group'):
+                            continue
+                        
+                        family_available = limit_entry.get('family_available_count', 0)
+                        regional_available = limit_entry.get('regional_available_count', 0)
+                        min_quota = min(family_available, regional_available)
+                        
+                        # Store quota per nodearray+vm_size combination
+                        quota_key = f"{nodearray}:{vm_size}"
+                        quota_map[quota_key] = min_quota
+                    
+                    # Update partitions with quota info
+                    for partition in cluster_info['partitions']:
+                        quota_key = f"{partition['name']}:{partition['vm_size']}"
+                        partition['available_azure_quota'] = str(quota_map.get(quota_key, 0))
+            except Exception as e:
+                logger.warning(f"Could not retrieve Azure quota limits: {e}")
             
             # Cache the result
             self._cluster_info_cache = cluster_info
