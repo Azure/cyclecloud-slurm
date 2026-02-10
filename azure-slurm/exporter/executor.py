@@ -25,9 +25,7 @@ from schemas import (
 )
 from parsers import (
     parse_count_lines, parse_extract_number, parse_columns,
-    parse_scontrol_partitions_json, parse_scontrol_nodes_json
-)
-from optimized_parser import (
+    parse_scontrol_partitions_json, parse_scontrol_nodes_json,
     collect_job_history_six_months_optimized,
     collect_job_history_one_month_optimized,
     collect_job_history_one_week_optimized
