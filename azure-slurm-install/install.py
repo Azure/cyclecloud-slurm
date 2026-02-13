@@ -920,7 +920,7 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
     )
 
 def _configure_enroot_pyxis(s: InstallSettings) -> None:
-    if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8):
+    if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8) or s.platform_family == "azurelinux":
         logging.warning("Enroot is only supported on Ubuntu and RHEL/AlmaLinux 8. Skipping enroot configuration.")
         return
 
@@ -1090,7 +1090,8 @@ def detect_platform() -> str:
         "rhel": "rhel",
         "suse": "suse",
         "sles": "suse",
-        "sle_hpc": "suse"
+        "sle_hpc": "suse",
+        "azurelinux": "azurelinux"
     }
     try:
         with open("/etc/os-release") as f:
@@ -1114,7 +1115,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse", "debian"], required=False
+        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse", "debian", "azurelinux"], required=False
     )
     parser.add_argument(
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
