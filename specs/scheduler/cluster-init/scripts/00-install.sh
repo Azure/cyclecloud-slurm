@@ -70,6 +70,10 @@ install_python3() {
         echo "Detected RHEL, using system python3..." >&2
         PYTHON_BIN="/usr/bin/python3"
     
+    elif [ "$OS" == "azurelinux" ]; then
+        echo "Detected AzureLinux, using system python3..." >&2
+        PYTHON_BIN="/usr/bin/python3"
+    
     elif [ "$OS" == "sle_hpc" ]; then
         echo "Detected SUSE, installing Python 3.11..." >&2
         zypper install -y python311 python311-virtualenv python311-PyYAML
