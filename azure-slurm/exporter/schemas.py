@@ -16,6 +16,9 @@ class ParseStrategy(Enum):
     COUNT_LINES = "count_lines"           # Count non-empty lines
     EXTRACT_NUMBER = "extract_number"     # Extract a number from output
     PARSE_COLUMNS = "parse_columns"       # Parse columnar output
+    PARSE_SACCT_JOB_HISTORY = "parse_sacct_job_history"  # Parse sacct job history output
+    PARSE_SCONTROL_NODES = "parse_scontrol_nodes"        # Parse scontrol nodes JSON output
+    PARSE_SCONTROL_PARTITIONS = "parse_scontrol_partitions"  # Parse scontrol partitions JSON output
     CUSTOM = "custom"                     # Use custom parser function
 
 
@@ -94,24 +97,6 @@ JOB_QUEUE_STATES = [
 # ============================================================================
 
 # Job History Metrics (sacct - historical)
-JOB_HISTORY_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_jobs_total_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state since start_time'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_jobs_total_submitted',
-        command=['sacct'],
-        command_args=['-S', '{start_time}', '-E', 'now', '-a', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted since start_time'
-    )
-}
 
 # States to query from sacct for job history
 JOB_HISTORY_STATES = [
@@ -128,65 +113,17 @@ JOB_HISTORY_STATES_WITH_EXIT_CODES = [
     'FAILED', 'TIMEOUT', 'NODE_FAIL', 'OUT_OF_MEMORY', 'CANCELLED'
 ]
 
-# Job History Metrics - Last 6 Months (sacct - updated daily)
-JOB_HISTORY_SIX_MONTHS_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_jobs_total_six_months_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state in last 6 months'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_jobs_total_six_months_submitted',
-        command=['sacct'],
-        command_args=['-S', '{start_time}', '-E', 'now', '-a', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted in last 6 months'
-    )
-}
-
-# Job History Metrics - Last Week (sacct - updated daily)
-JOB_HISTORY_ONE_WEEK_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_jobs_total_one_week_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state in last week'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_jobs_total_one_week_submitted',
-        command=['sacct'],
-        command_args=['-S', '{start_time}', '-E', 'now', '-a', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted in last week'
-    )
-}
-
-# Job History Metrics - Last Month (sacct - updated daily)
-JOB_HISTORY_ONE_MONTH_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_jobs_total_one_month_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state in last month'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_jobs_total_one_month_submitted',
-        command=['sacct'],
-        command_args=['-S', '{start_time}', '-E', 'now', '-a', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted in last month'
-    )
-}
+# Job History Metrics - OPTIMIZED (single sacct call)
+# Returns comprehensive metrics dict instead of single float
+JOB_HISTORY_OPTIMIZED_SCHEMA = CommandSchema(
+    name='sacct_job_history_optimized',
+    command=['sacct'],
+    command_args=['-a', '-S', '{start_date}', '-E', 'now',
+                  '-o', 'JobID,JobName,Partition,State,ExitCode',
+                  '--parsable2', '-n', '-X'],
+    parse_strategy=ParseStrategy.PARSE_SACCT_JOB_HISTORY,
+    description='Optimized job history collection (single sacct call)'
+)
 
 
 # ============================================================================
@@ -199,9 +136,8 @@ NODE_SCHEMAS = {
         name='scontrol_nodes',
         command=['scontrol', 'show', 'nodes', '--json'],
         command_args=[],
-        parse_strategy=ParseStrategy.CUSTOM,
-        description='All node information from scontrol in JSON format',
-        custom_parser=None  # Will be set to parse_scontrol_nodes_json
+        parse_strategy=ParseStrategy.PARSE_SCONTROL_NODES,
+        description='All node information from scontrol in JSON format'
     )
 }
 
@@ -271,95 +207,14 @@ JOB_PARTITION_SCHEMAS = {
     )
 }
 
-# Partition-based Job History Metrics (sacct by partition - historical)
-JOB_PARTITION_HISTORY_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_partition_jobs_total_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state for partition {partition} since start_time'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_partition_jobs_total_submitted',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted to partition {partition} since start_time'
-    )
-}
-
-# Partition-based Job History Metrics - Last 6 Months
-JOB_PARTITION_HISTORY_SIX_MONTHS_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_partition_jobs_total_six_months_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state for partition {partition} in last 6 months'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_partition_jobs_total_six_months_submitted',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted to partition {partition} in last 6 months'
-    )
-}
-
-# Partition-based Job History Metrics - Last Week
-JOB_PARTITION_HISTORY_ONE_WEEK_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_partition_jobs_total_one_week_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state for partition {partition} in last week'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_partition_jobs_total_one_week_submitted',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted to partition {partition} in last week'
-    )
-}
-
-# Partition-based Job History Metrics - Last Month
-JOB_PARTITION_HISTORY_ONE_MONTH_SCHEMAS = {
-    'by_state': CommandSchema(
-        name='sacct_partition_jobs_total_one_month_{metric_name}',
-        command=['sacct'],
-        command_args=['-a', '-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-s', '{state}', 
-                     '--noheader', '-X', '-n'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Historical jobs in {state} state for partition {partition} in last month'
-    ),
-    'total_submitted': CommandSchema(
-        name='sacct_partition_jobs_total_one_month_submitted',
-        command=['sacct'],
-        command_args=['-r', '{partition}', '-S', '{start_time}', '-E', 'now', '-a', '-X', 
-                     '-n', '--noheader'],
-        parse_strategy=ParseStrategy.COUNT_LINES,
-        description='Total jobs submitted to partition {partition} in last month'
-    )
-}
-
 # Partition-based Node Metrics (scontrol show nodes --json)
 NODE_PARTITION_SCHEMAS = {
     'all_nodes': CommandSchema(
         name='scontrol_partition_nodes',
         command=['scontrol', 'show', 'nodes', '--json'],
         command_args=[],
-        parse_strategy=ParseStrategy.CUSTOM,
-        description='All node information from scontrol in JSON format (filtered by partition in parser)',
-        custom_parser=None  # Will be set to parse_scontrol_nodes_json
+        parse_strategy=ParseStrategy.PARSE_SCONTROL_NODES,
+        description='All node information from scontrol in JSON format (filtered by partition in parser)'
     )
 }
 
@@ -368,7 +223,6 @@ PARTITION_LIST_SCHEMA = CommandSchema(
     name='partitions',
     command=['scontrol', 'show', 'partitions', '--json'],
     command_args=[],
-    parse_strategy=ParseStrategy.CUSTOM,
-    description='List all partitions from scontrol',
-    custom_parser=None  # Will use parse_scontrol_partitions_json
+    parse_strategy=ParseStrategy.PARSE_SCONTROL_PARTITIONS,
+    description='List all partitions from scontrol'
 )

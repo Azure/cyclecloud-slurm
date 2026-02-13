@@ -168,7 +168,10 @@ def parse_scontrol_nodes_json(output: str, partition: Optional[str] = None,
     Returns:
         Dictionary of metric names to values (states are mutually exclusive)
     """
-    from schemas import NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS
+    try:
+        from .schemas import NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS
+    except ImportError:
+        from schemas import NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS
     
     if not output:
         return {'scontrol_nodes': 0.0}
@@ -282,13 +285,13 @@ def normalize_state(state: str) -> str:
         return state.lower()
 
 
-def collect_job_metrics_optimized(days_back: int, timeout: int = 30) -> Dict[str, any]:
+def parse_sacct_job_history(output: str, start_date: str) -> Dict[str, any]:
     """
-    Collect all job history metrics by running sacct once.
+    Parse sacct job history output into comprehensive metrics.
     
     Args:
-        days_back: Number of days to look back
-        timeout: Command timeout in seconds
+        output: sacct command output (parsable2 format with JobID,JobName,Partition,State,ExitCode)
+        start_date: Start date of the query (for metadata)
         
     Returns:
         Dictionary with comprehensive metrics:
@@ -301,35 +304,6 @@ def collect_job_metrics_optimized(days_back: int, timeout: int = 30) -> Dict[str
             'by_partition_state_exit_code': {partition: [(state, exit_code, count)]}
         }
     """
-    # Calculate start date
-    start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
-    
-    # Run sacct once with all needed fields
-    cmd = ['sacct', '-a', '-S', start_date, '-E', 'now', 
-           '-o', 'JobID,JobName,Partition,State,ExitCode', 
-           '--parsable2', '-n', '-X']
-    
-    logger.info(f"Running: {' '.join(cmd)}")
-    
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=True
-        )
-        output = result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        logger.error(f"sacct command failed: {e.stderr}")
-        return _empty_metrics(start_date)
-    except subprocess.TimeoutExpired:
-        logger.error(f"sacct command timeout")
-        return _empty_metrics(start_date)
-    except Exception as e:
-        logger.error(f"sacct command error: {e}")
-        return _empty_metrics(start_date)
-    
     # Parse output
     state_counts = defaultdict(int)
     partition_state_counts = defaultdict(lambda: defaultdict(int))
@@ -402,18 +376,3 @@ def _empty_metrics(start_date: str) -> Dict[str, any]:
         'by_state_exit_code': [],
         'by_partition_state_exit_code': {}
     }
-
-
-def collect_job_history_six_months_optimized(timeout: int = 30) -> Dict[str, any]:
-    """Collect 6-month job history with single sacct call."""
-    return collect_job_metrics_optimized(180, timeout)
-
-
-def collect_job_history_one_month_optimized(timeout: int = 30) -> Dict[str, any]:
-    """Collect 1-month job history with single sacct call."""
-    return collect_job_metrics_optimized(30, timeout)
-
-
-def collect_job_history_one_week_optimized(timeout: int = 30) -> Dict[str, any]:
-    """Collect 1-week job history with single sacct call."""
-    return collect_job_metrics_optimized(7, timeout)

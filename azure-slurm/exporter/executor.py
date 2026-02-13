@@ -12,24 +12,36 @@ import time
 from typing import Dict, List
 from datetime import datetime, timedelta
 
-from schemas import (
-    ParseStrategy, CommandSchema,
-    JOB_QUEUE_SCHEMAS, JOB_QUEUE_STATES,
-    JOB_HISTORY_SCHEMAS, JOB_HISTORY_STATES, JOB_HISTORY_STATES_WITH_EXIT_CODES,
-    JOB_HISTORY_SIX_MONTHS_SCHEMAS, JOB_HISTORY_ONE_WEEK_SCHEMAS, JOB_HISTORY_ONE_MONTH_SCHEMAS,
-    JOB_PARTITION_SCHEMAS, JOB_PARTITION_HISTORY_SCHEMAS,
-    JOB_PARTITION_HISTORY_SIX_MONTHS_SCHEMAS, JOB_PARTITION_HISTORY_ONE_WEEK_SCHEMAS,
-    JOB_PARTITION_HISTORY_ONE_MONTH_SCHEMAS,
-    NODE_SCHEMAS, NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS, NODE_PARTITION_SCHEMAS,
-    PARTITION_LIST_SCHEMA
-)
-from parsers import (
-    parse_count_lines, parse_extract_number, parse_columns,
-    parse_scontrol_partitions_json, parse_scontrol_nodes_json,
-    collect_job_history_six_months_optimized,
-    collect_job_history_one_month_optimized,
-    collect_job_history_one_week_optimized
-)
+try:
+    from .schemas import (
+        ParseStrategy, CommandSchema,
+        JOB_QUEUE_SCHEMAS, JOB_QUEUE_STATES,
+        JOB_HISTORY_STATES, JOB_HISTORY_STATES_WITH_EXIT_CODES,
+        JOB_HISTORY_OPTIMIZED_SCHEMA,
+        JOB_PARTITION_SCHEMAS,
+        NODE_SCHEMAS, NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS, NODE_PARTITION_SCHEMAS,
+        PARTITION_LIST_SCHEMA
+    )
+    from .parsers import (
+        parse_count_lines, parse_extract_number, parse_columns,
+        parse_scontrol_partitions_json, parse_scontrol_nodes_json,
+        parse_sacct_job_history
+    )
+except ImportError:
+    from schemas import (
+        ParseStrategy, CommandSchema,
+        JOB_QUEUE_SCHEMAS, JOB_QUEUE_STATES,
+        JOB_HISTORY_STATES, JOB_HISTORY_STATES_WITH_EXIT_CODES,
+        JOB_HISTORY_OPTIMIZED_SCHEMA,
+        JOB_PARTITION_SCHEMAS,
+        NODE_SCHEMAS, NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS, NODE_PARTITION_SCHEMAS,
+        PARTITION_LIST_SCHEMA
+    )
+    from parsers import (
+        parse_count_lines, parse_extract_number, parse_columns,
+        parse_scontrol_partitions_json, parse_scontrol_nodes_json,
+        parse_sacct_job_history
+    )
 
 logger = logging.getLogger('slurm-exporter.util')
 
@@ -38,6 +50,9 @@ PARSER_MAP = {
     ParseStrategy.COUNT_LINES: parse_count_lines,
     ParseStrategy.EXTRACT_NUMBER: parse_extract_number,
     ParseStrategy.PARSE_COLUMNS: parse_columns,
+    ParseStrategy.PARSE_SCONTROL_NODES: parse_scontrol_nodes_json,
+    ParseStrategy.PARSE_SCONTROL_PARTITIONS: parse_scontrol_partitions_json,
+    ParseStrategy.PARSE_SACCT_JOB_HISTORY: parse_sacct_job_history,
 }
 
 class SlurmCommandExecutor:
@@ -108,11 +123,46 @@ class SlurmCommandExecutor:
             parser = PARSER_MAP[schema.parse_strategy]
             if schema.parse_strategy == ParseStrategy.PARSE_COLUMNS:
                 return parser(output, schema.parser_config or {})
+            elif schema.parse_strategy == ParseStrategy.PARSE_SCONTROL_NODES:
+                # parse_scontrol_nodes_json can take optional partition parameter
+                partition = kwargs.get('partition', None)
+                return parser(output, partition)
             else:
                 return parser(output)
         else:
             logger.error(f"Unknown parse strategy: {schema.parse_strategy}")
             return 0.0
+    
+    def execute_schema_dict(self, schema: CommandSchema, **kwargs) -> Dict[str, any]:
+        """
+        Execute a command based on its schema and return parsed dict result.
+        Similar to execute_schema but for parsers that return complex structures.
+        
+        Args:
+            schema: CommandSchema to execute
+            **kwargs: Arguments to pass to schema.build_command() and custom_parser
+            
+        Returns:
+            Parsed metric dictionary
+        """
+        # Build the command
+        cmd = schema.build_command(**kwargs)
+        
+        # Run the command
+        output = self.run_command(cmd)
+        
+        # Parse the output - custom_parser should accept output and other kwargs
+        if schema.parse_strategy == ParseStrategy.CUSTOM and schema.custom_parser:
+            # Pass kwargs like start_date to the parser
+            return schema.custom_parser(output, **kwargs)
+        elif schema.parse_strategy == ParseStrategy.PARSE_SACCT_JOB_HISTORY:
+            # parse_sacct_job_history requires start_date parameter
+            parser = PARSER_MAP[schema.parse_strategy]
+            start_date = kwargs.get('start_date')
+            return parser(output, start_date)
+        else:
+            logger.error(f"execute_schema_dict requires CUSTOM or PARSE_SACCT_JOB_HISTORY strategy")
+            return {}
     
     def collect_job_queue_metrics(self) -> Dict[str, float]:
         """
@@ -139,7 +189,7 @@ class SlurmCommandExecutor:
     
     def collect_job_history_metrics(self, start_time: str) -> Dict[str, float]:
         """
-        Collect historical job metrics using sacct.
+        Collect historical job metrics using sacct with optimized single-call approach.
         
         Args:
             start_time: Start time for historical queries (e.g., "24 hours ago")
@@ -149,42 +199,22 @@ class SlurmCommandExecutor:
         """
         metrics = {}
         
-        # Jobs by historical state
-        schema = JOB_HISTORY_SCHEMAS['by_state']
+        # Get comprehensive job data from single optimized call
+        job_data = self.collect_job_history(start_time)
+        
+        # Extract by-state metrics
         for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            metric_name = schema.name.format(metric_name=metric_suffix)
-            value = self.execute_schema(schema, start_time=start_time, 
-                                       state=sacct_state, metric_name=metric_suffix)
+            metric_name = f'sacct_jobs_total_{metric_suffix}'
+            # Get count from by_state dict, default to 0 if state not present
+            state_lower = sacct_state.lower().replace('_', '_')
+            value = float(job_data['by_state'].get(state_lower, 0))
             metrics[metric_name] = value
             logger.debug(f"{metric_name}: {value}")
         
-        # Total submitted
-        schema = JOB_HISTORY_SCHEMAS['total_submitted']
-        metrics[schema.name] = self.execute_schema(schema, start_time=start_time)
+        # Total submitted is already in the optimized response
+        metrics['sacct_jobs_total_submitted'] = float(job_data['total_submitted'])
         
         return metrics
-    
-    def collect_job_history_metrics_by_state(self, start_time: str) -> Dict[str, float]:
-        """
-        Collect historical job metrics using sacct, organized by state for labeling.
-        
-        Args:
-            start_time: Start time for historical queries (e.g., "24 hours ago")
-            
-        Returns:
-            Dictionary with state as key, count as value
-        """
-        metrics_by_state = {}
-        
-        # Jobs by historical state
-        schema = JOB_HISTORY_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            value = self.execute_schema(schema, start_time=start_time, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics_by_state[metric_suffix] = value
-            logger.debug(f"State {metric_suffix}: {value}")
-        
-        return metrics_by_state
     
     def collect_node_metrics(self) -> Dict[str, float]:
         """
@@ -285,270 +315,48 @@ class SlurmCommandExecutor:
     
     def collect_partition_job_history_metrics(self, start_time: str) -> Dict[str, Dict[str, float]]:
         """
-        Collect historical job metrics per partition.
+        Collect historical job metrics per partition using optimized single sacct call.
         
         Args:
-            start_time: Start time for historical queries (e.g., "24 hours ago")
+            start_time: Start time for historical queries (e.g., "2026-01-01")
         
         Returns:
             Dictionary mapping partition names to metric dictionaries
             Format: {partition_name: {metric_name: value}}
         """
+        # Use optimized single-call method
+        job_data = self.collect_job_history(start_time)
+        
         partition_metrics = {}
-        partitions = self.get_partitions()
         
-        if not partitions:
-            logger.warning("No partitions found")
-            return partition_metrics
-        
-        for partition in partitions:
+        # Extract partition-level data from optimized result
+        for partition, state_counts in job_data.get('by_partition', {}).items():
             metrics = {}
             
-            # Jobs by historical state in partition
-            schema = JOB_PARTITION_HISTORY_SCHEMAS['by_state']
-            for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-                metric_name = schema.name.format(metric_name=metric_suffix)
-                value = self.execute_schema(schema, partition=partition, 
-                                           start_time=start_time, state=sacct_state, 
-                                           metric_name=metric_suffix)
-                metrics[metric_name] = value
-                logger.debug(f"{metric_name} [partition={partition}]: {value}")
+            # Add state counts
+            for state, count in state_counts.items():
+                metric_name = f"sacct_partition_jobs_total_{state}"
+                metrics[metric_name] = float(count)
+                logger.debug(f"{metric_name} [partition={partition}]: {count}")
             
-            # Total submitted to partition
-            schema = JOB_PARTITION_HISTORY_SCHEMAS['total_submitted']
-            metrics[schema.name] = self.execute_schema(schema, partition=partition, 
-                                                       start_time=start_time)
+            # Calculate total submitted for this partition
+            total_submitted = sum(state_counts.values())
+            metrics['sacct_partition_jobs_total_submitted'] = float(total_submitted)
             
             partition_metrics[partition] = metrics
         
         return partition_metrics
     
-    def collect_job_history_six_months_metrics(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last 6 months using sacct.
-        These metrics are updated daily and provide a rolling 6-month window.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 6 months ago in YYYY-MM-DD format
-        six_months_ago = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
-        
-        metrics = {}
-        
-        # Jobs by historical state (last 6 months)
-        schema = JOB_HISTORY_SIX_MONTHS_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            metric_name = schema.name.format(metric_name=metric_suffix)
-            value = self.execute_schema(schema, start_time=six_months_ago, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics[metric_name] = value
-            logger.debug(f"{metric_name}: {value}")
-        
-        # Total submitted (last 6 months)
-        schema = JOB_HISTORY_SIX_MONTHS_SCHEMAS['total_submitted']
-        metrics[schema.name] = self.execute_schema(schema, start_time=six_months_ago)
-        
-        return {
-            'start_date': six_months_ago,
-            'metrics': metrics
-        }
-    
-    def collect_job_history_six_months_metrics_by_state(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last 6 months, organized by state for labeling.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics_by_state' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 6 months ago in YYYY-MM-DD format
-        six_months_ago = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
-        
-        metrics_by_state = {}
-        
-        # Jobs by historical state (last 6 months)
-        schema = JOB_HISTORY_SIX_MONTHS_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            value = self.execute_schema(schema, start_time=six_months_ago, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics_by_state[metric_suffix] = value
-            logger.debug(f"State {metric_suffix}: {value}")
-        
-        return {
-            'start_date': six_months_ago,
-            'metrics_by_state': metrics_by_state
-        }
-    
-    def collect_job_history_six_months_metrics_by_state_and_exit_code(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last 6 months with state and exit code labels.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics' keys where metrics is a list of (state, exit_code, count) tuples
-        """
-        from datetime import datetime, timedelta
-        from collections import defaultdict
-        
-        # Calculate date 6 months ago in YYYY-MM-DD format
-        six_months_ago = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
-        
-        # Build sacct command to get state and exit codes
-        states = ','.join(JOB_HISTORY_STATES_WITH_EXIT_CODES)
-        cmd = ['sacct', '-a', '-S', six_months_ago, '-E', 'now', '-s', states,
-               '-o', 'State,ExitCode', '--parsable2', '-n', '-X']
-        
-        output = self.run_command(cmd)
-        
-        # Parse output and count by (state, exit_code)
-        metrics = defaultdict(int)
-        if output:
-            for line in output.strip().split('\n'):
-                if not line.strip():
-                    continue
-                parts = line.split('|')
-                if len(parts) >= 2:
-                    state = parts[0].strip()
-                    exit_code = parts[1].strip()
-                    # Normalize state name to metric suffix format
-                    state_normalized = state.lower().replace('_', '_')
-                    if state == 'NODE_FAIL':
-                        state_normalized = 'node_failed'
-                    elif state == 'OUT_OF_MEMORY':
-                        state_normalized = 'out_of_memory'
-                    else:
-                        state_normalized = state.lower()
-                    
-                    metrics[(state_normalized, exit_code)] += 1
-        
-        # Convert to list format
-        metrics_list = [(state, exit_code, count) for (state, exit_code), count in metrics.items()]
-        
-        return {
-            'start_date': six_months_ago,
-            'metrics': metrics_list
-        }
-    
-    def collect_partition_job_history_six_months_metrics(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics per partition for the last 6 months.
-        These metrics are updated daily and provide a rolling 6-month window.
-        
-        Returns:
-            Dictionary with 'start_date' and 'partition_metrics' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 6 months ago in YYYY-MM-DD format
-        six_months_ago = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
-        
-        partition_metrics = {}
-        partitions = self.get_partitions()
-        
-        if not partitions:
-            logger.warning("No partitions found")
-            return {
-                'start_date': six_months_ago,
-                'partition_metrics': partition_metrics
-            }
-        
-        for partition in partitions:
-            metrics = {}
-            
-            # Jobs by historical state in partition (last 6 months)
-            schema = JOB_PARTITION_HISTORY_SIX_MONTHS_SCHEMAS['by_state']
-            for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-                metric_name = schema.name.format(metric_name=metric_suffix)
-                value = self.execute_schema(schema, partition=partition, 
-                                           start_time=six_months_ago,
-                                           state=sacct_state, metric_name=metric_suffix)
-                metrics[metric_name] = value
-                logger.debug(f"{metric_name} [partition={partition}]: {value}")
-            
-            # Total submitted to partition (last 6 months)
-            schema = JOB_PARTITION_HISTORY_SIX_MONTHS_SCHEMAS['total_submitted']
-            metrics[schema.name] = self.execute_schema(schema, partition=partition,
-                                                       start_time=six_months_ago)
-            
-            partition_metrics[partition] = metrics
-        
-        return {
-            'start_date': six_months_ago,
-            'partition_metrics': partition_metrics
-        }
-    
-    def collect_partition_job_history_six_months_metrics_by_state_and_exit_code(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics per partition for the last 6 months with state and exit code labels.
-        
-        Returns:
-            Dictionary with 'start_date' and 'partition_metrics' keys where partition_metrics contains
-            partition -> list of (state, exit_code, count) tuples
-        """
-        from datetime import datetime, timedelta
-        from collections import defaultdict
-        
-        # Calculate date 6 months ago in YYYY-MM-DD format
-        six_months_ago = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
-        
-        partition_metrics = {}
-        partitions = self.get_partitions()
-        
-        if not partitions:
-            logger.warning("No partitions found")
-            return {
-                'start_date': six_months_ago,
-                'partition_metrics': partition_metrics
-            }
-        
-        for partition in partitions:
-            # Build sacct command to get state and exit codes for this partition
-            states = ','.join(JOB_HISTORY_STATES_WITH_EXIT_CODES)
-            cmd = ['sacct', '-a', '-r', partition, '-S', six_months_ago, '-E', 'now', '-s', states,
-                   '-o', 'State,ExitCode', '--parsable2', '-n', '-X']
-            
-            output = self.run_command(cmd)
-            
-            # Parse output and count by (state, exit_code)
-            metrics = defaultdict(int)
-            if output:
-                for line in output.strip().split('\n'):
-                    if not line.strip():
-                        continue
-                    parts = line.split('|')
-                    if len(parts) >= 2:
-                        state = parts[0].strip()
-                        exit_code = parts[1].strip()
-                        # Normalize state name
-                        state_normalized = state.lower()
-                        if state == 'NODE_FAIL':
-                            state_normalized = 'node_failed'
-                        elif state == 'OUT_OF_MEMORY':
-                            state_normalized = 'out_of_memory'
-                        
-                        metrics[(state_normalized, exit_code)] += 1
-            
-            # Convert to list format
-            partition_metrics[partition] = [(state, exit_code, count) for (state, exit_code), count in metrics.items()]
-        
-        return {
-            'start_date': six_months_ago,
-            'partition_metrics': partition_metrics
-        }
-    
     # ========================================================================
     # OPTIMIZED JOB HISTORY METHODS (Single sacct call per time period)
     # ========================================================================
     
-    def collect_job_history_six_months_optimized(self) -> Dict[str, any]:
+    def collect_job_history(self, start_date: str) -> Dict[str, any]:
         """
-        Collect all 6-month job history metrics with a SINGLE sacct call.
+        Collect job history metrics with a SINGLE sacct call.
         
-        This optimized version replaces multiple sacct calls with one,
-        reducing overhead by ~89% (1 call vs 9+ calls).
+        Args:
+            start_date: Start date in YYYY-MM-DD format
         
         Returns:
             Dictionary with comprehensive metrics:
@@ -561,461 +369,30 @@ class SlurmCommandExecutor:
                 'by_partition_state_exit_code': {partition: [(state, exit_code, count)]}
             }
         """
-        return collect_job_history_six_months_optimized(timeout=self.timeout)
+        return self.execute_schema_dict(JOB_HISTORY_OPTIMIZED_SCHEMA, start_date=start_date)
+    
+    def collect_job_history_six_months_optimized(self) -> Dict[str, any]:
+        """
+        Collect all 6-month job history metrics with a SINGLE sacct call.
+        
+        This optimized version replaces multiple sacct calls with one,
+        reducing overhead by ~89% (1 call vs 9+ calls).
+        """
+        days_back = 180
+        start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        return self.collect_job_history(start_date)
     
     def collect_job_history_one_month_optimized(self) -> Dict[str, any]:
-        """
-        Collect all 1-month job history metrics with a SINGLE sacct call.
-        
-        Returns:
-            Dictionary with comprehensive metrics (same structure as six_months)
-        """
-        return collect_job_history_one_month_optimized(timeout=self.timeout)
+        """Collect all 1-month job history metrics with a SINGLE sacct call."""
+        days_back = 30
+        start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        return self.collect_job_history(start_date)
     
     def collect_job_history_one_week_optimized(self) -> Dict[str, any]:
-        """
-        Collect all 1-week job history metrics with a SINGLE sacct call.
-        
-        Returns:
-            Dictionary with comprehensive metrics (same structure as six_months)
-        """
-        return collect_job_history_one_week_optimized(timeout=self.timeout)
-    
-    # ========================================================================
-    # LEGACY JOB HISTORY METHODS (Multiple sacct calls - kept for compatibility)
-    # ========================================================================
-    
-    def collect_job_history_one_week_metrics(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last week using sacct.
-        These metrics are updated daily and provide a rolling 7-day window.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 1 week ago in YYYY-MM-DD format
-        one_week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        
-        metrics = {}
-        
-        # Jobs by historical state (last week)
-        schema = JOB_HISTORY_ONE_WEEK_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            metric_name = schema.name.format(metric_name=metric_suffix)
-            value = self.execute_schema(schema, start_time=one_week_ago, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics[metric_name] = value
-            logger.debug(f"{metric_name}: {value}")
-        
-        # Total submitted (last week)
-        schema = JOB_HISTORY_ONE_WEEK_SCHEMAS['total_submitted']
-        metrics[schema.name] = self.execute_schema(schema, start_time=one_week_ago)
-        
-        return {
-            'start_date': one_week_ago,
-            'metrics': metrics
-        }
-    
-    def collect_job_history_one_week_metrics_by_state(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last week, organized by state for labeling.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics_by_state' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 1 week ago in YYYY-MM-DD format
-        one_week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        
-        metrics_by_state = {}
-        
-        # Jobs by historical state (last week)
-        schema = JOB_HISTORY_ONE_WEEK_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            value = self.execute_schema(schema, start_time=one_week_ago, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics_by_state[metric_suffix] = value
-            logger.debug(f"State {metric_suffix}: {value}")
-        
-        return {
-            'start_date': one_week_ago,
-            'metrics_by_state': metrics_by_state
-        }
-    
-    def collect_job_history_one_week_metrics_by_state_and_exit_code(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last week with state and exit code labels.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics' keys where metrics is a list of (state, exit_code, count) tuples
-        """
-        from datetime import datetime, timedelta
-        from collections import defaultdict
-        
-        # Calculate date 1 week ago in YYYY-MM-DD format
-        one_week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        
-        # Build sacct command to get state and exit codes
-        states = ','.join(JOB_HISTORY_STATES_WITH_EXIT_CODES)
-        cmd = ['sacct', '-a', '-S', one_week_ago, '-E', 'now', '-s', states,
-               '-o', 'State,ExitCode', '--parsable2', '-n', '-X']
-        
-        output = self.run_command(cmd)
-        
-        # Parse output and count by (state, exit_code)
-        metrics = defaultdict(int)
-        if output:
-            for line in output.strip().split('\n'):
-                if not line.strip():
-                    continue
-                parts = line.split('|')
-                if len(parts) >= 2:
-                    state = parts[0].strip()
-                    exit_code = parts[1].strip()
-                    # Normalize state name to metric suffix format
-                    state_normalized = state.lower().replace('_', '_')
-                    if state == 'NODE_FAIL':
-                        state_normalized = 'node_failed'
-                    elif state == 'OUT_OF_MEMORY':
-                        state_normalized = 'out_of_memory'
-                    else:
-                        state_normalized = state.lower()
-                    
-                    metrics[(state_normalized, exit_code)] += 1
-        
-        # Convert to list format
-        metrics_list = [(state, exit_code, count) for (state, exit_code), count in metrics.items()]
-        
-        return {
-            'start_date': one_week_ago,
-            'metrics': metrics_list
-        }
-    
-    def collect_partition_job_history_one_week_metrics(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics per partition for the last week.
-        These metrics are updated daily and provide a rolling 7-day window.
-        
-        Returns:
-            Dictionary with 'start_date' and 'partition_metrics' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 1 week ago in YYYY-MM-DD format
-        one_week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        
-        partition_metrics = {}
-        partitions = self.get_partitions()
-        
-        if not partitions:
-            logger.warning("No partitions found")
-            return {
-                'start_date': one_week_ago,
-                'partition_metrics': partition_metrics
-            }
-        
-        for partition in partitions:
-            metrics = {}
-            
-            # Jobs by historical state in partition (last week)
-            schema = JOB_PARTITION_HISTORY_ONE_WEEK_SCHEMAS['by_state']
-            for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-                metric_name = schema.name.format(metric_name=metric_suffix)
-                value = self.execute_schema(schema, partition=partition, 
-                                           start_time=one_week_ago,
-                                           state=sacct_state, metric_name=metric_suffix)
-                metrics[metric_name] = value
-                logger.debug(f"{metric_name} [partition={partition}]: {value}")
-            
-            # Total submitted to partition (last week)
-            schema = JOB_PARTITION_HISTORY_ONE_WEEK_SCHEMAS['total_submitted']
-            metrics[schema.name] = self.execute_schema(schema, partition=partition,
-                                                       start_time=one_week_ago)
-            
-            partition_metrics[partition] = metrics
-        
-        return {
-            'start_date': one_week_ago,
-            'partition_metrics': partition_metrics
-        }
-    
-    def collect_partition_job_history_one_week_metrics_by_state_and_exit_code(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics per partition for the last week with state and exit code labels.
-        
-        Returns:
-            Dictionary with 'start_date' and 'partition_metrics' keys where partition_metrics contains
-            partition -> list of (state, exit_code, count) tuples
-        """
-        from datetime import datetime, timedelta
-        from collections import defaultdict
-        
-        # Calculate date 1 week ago in YYYY-MM-DD format
-        one_week_ago = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-        
-        partition_metrics = {}
-        partitions = self.get_partitions()
-        
-        if not partitions:
-            logger.warning("No partitions found")
-            return {
-                'start_date': one_week_ago,
-                'partition_metrics': partition_metrics
-            }
-        
-        for partition in partitions:
-            # Build sacct command to get state and exit codes for this partition
-            states = ','.join(JOB_HISTORY_STATES_WITH_EXIT_CODES)
-            cmd = ['sacct', '-a', '-r', partition, '-S', one_week_ago, '-E', 'now', '-s', states,
-                   '-o', 'State,ExitCode', '--parsable2', '-n', '-X']
-            
-            output = self.run_command(cmd)
-            
-            # Parse output and count by (state, exit_code)
-            metrics = defaultdict(int)
-            if output:
-                for line in output.strip().split('\n'):
-                    if not line.strip():
-                        continue
-                    parts = line.split('|')
-                    if len(parts) >= 2:
-                        state = parts[0].strip()
-                        exit_code = parts[1].strip()
-                        # Normalize state name
-                        state_normalized = state.lower()
-                        if state == 'NODE_FAIL':
-                            state_normalized = 'node_failed'
-                        elif state == 'OUT_OF_MEMORY':
-                            state_normalized = 'out_of_memory'
-                        
-                        metrics[(state_normalized, exit_code)] += 1
-            
-            # Convert to list format
-            partition_metrics[partition] = [(state, exit_code, count) for (state, exit_code), count in metrics.items()]
-        
-        return {
-            'start_date': one_week_ago,
-            'partition_metrics': partition_metrics
-        }
-    
-    def collect_job_history_one_month_metrics(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last month using sacct.
-        These metrics are updated daily and provide a rolling 30-day window.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 30 days ago in YYYY-MM-DD format
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        
-        metrics = {}
-        
-        # Jobs by historical state (last month)
-        schema = JOB_HISTORY_ONE_MONTH_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            metric_name = schema.name.format(metric_name=metric_suffix)
-            value = self.execute_schema(schema, start_time=thirty_days_ago, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics[metric_name] = value
-            logger.debug(f"{metric_name}: {value}")
-        
-        # Total submitted (last month)
-        schema = JOB_HISTORY_ONE_MONTH_SCHEMAS['total_submitted']
-        metrics[schema.name] = self.execute_schema(schema, start_time=thirty_days_ago)
-        
-        return {
-            'start_date': thirty_days_ago,
-            'metrics': metrics
-        }
-    
-    def collect_job_history_one_month_metrics_by_state(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last month, organized by state for labeling.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics_by_state' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 30 days ago in YYYY-MM-DD format
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        
-        metrics_by_state = {}
-        
-        # Jobs by historical state (last month)
-        schema = JOB_HISTORY_ONE_MONTH_SCHEMAS['by_state']
-        for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-            value = self.execute_schema(schema, start_time=thirty_days_ago, 
-                                       state=sacct_state, metric_name=metric_suffix)
-            metrics_by_state[metric_suffix] = value
-            logger.debug(f"State {metric_suffix}: {value}")
-        
-        return {
-            'start_date': thirty_days_ago,
-            'metrics_by_state': metrics_by_state
-        }
-    
-    def collect_job_history_one_month_metrics_by_state_and_exit_code(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics for the last month with state and exit code labels.
-        
-        Returns:
-            Dictionary with 'start_date' and 'metrics' keys where metrics is a list of (state, exit_code, count) tuples
-        """
-        from datetime import datetime, timedelta
-        from collections import defaultdict
-        
-        # Calculate date 30 days ago in YYYY-MM-DD format
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        
-        # Build sacct command to get state and exit codes
-        states = ','.join(JOB_HISTORY_STATES_WITH_EXIT_CODES)
-        cmd = ['sacct', '-a', '-S', thirty_days_ago, '-E', 'now', '-s', states,
-               '-o', 'State,ExitCode', '--parsable2', '-n', '-X']
-        
-        output = self.run_command(cmd)
-        
-        # Parse output and count by (state, exit_code)
-        metrics = defaultdict(int)
-        if output:
-            for line in output.strip().split('\n'):
-                if not line.strip():
-                    continue
-                parts = line.split('|')
-                if len(parts) >= 2:
-                    state = parts[0].strip()
-                    exit_code = parts[1].strip()
-                    # Normalize state name to metric suffix format
-                    state_normalized = state.lower().replace('_', '_')
-                    if state == 'NODE_FAIL':
-                        state_normalized = 'node_failed'
-                    elif state == 'OUT_OF_MEMORY':
-                        state_normalized = 'out_of_memory'
-                    else:
-                        state_normalized = state.lower()
-                    
-                    metrics[(state_normalized, exit_code)] += 1
-        
-        # Convert to list format
-        metrics_list = [(state, exit_code, count) for (state, exit_code), count in metrics.items()]
-        
-        return {
-            'start_date': thirty_days_ago,
-            'metrics': metrics_list
-        }
-    
-    def collect_partition_job_history_one_month_metrics(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics per partition for the last month.
-        These metrics are updated daily and provide a rolling 30-day window.
-        
-        Returns:
-            Dictionary with 'start_date' and 'partition_metrics' keys
-        """
-        from datetime import datetime, timedelta
-        
-        # Calculate date 30 days ago in YYYY-MM-DD format
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        
-        partition_metrics = {}
-        partitions = self.get_partitions()
-        
-        if not partitions:
-            logger.warning("No partitions found")
-            return {
-                'start_date': thirty_days_ago,
-                'partition_metrics': partition_metrics
-            }
-        
-        for partition in partitions:
-            metrics = {}
-            
-            # Jobs by historical state in partition (last month)
-            schema = JOB_PARTITION_HISTORY_ONE_MONTH_SCHEMAS['by_state']
-            for sacct_state, metric_suffix in JOB_HISTORY_STATES:
-                metric_name = schema.name.format(metric_name=metric_suffix)
-                value = self.execute_schema(schema, partition=partition, 
-                                           start_time=thirty_days_ago,
-                                           state=sacct_state, metric_name=metric_suffix)
-                metrics[metric_name] = value
-                logger.debug(f"{metric_name} [partition={partition}]: {value}")
-            
-            # Total submitted to partition (last month)
-            schema = JOB_PARTITION_HISTORY_ONE_MONTH_SCHEMAS['total_submitted']
-            metrics[schema.name] = self.execute_schema(schema, partition=partition,
-                                                       start_time=thirty_days_ago)
-            
-            partition_metrics[partition] = metrics
-        
-        return {
-            'start_date': thirty_days_ago,
-            'partition_metrics': partition_metrics
-        }
-    
-    def collect_partition_job_history_one_month_metrics_by_state_and_exit_code(self) -> Dict[str, any]:
-        """
-        Collect historical job metrics per partition for the last month with state and exit code labels.
-        
-        Returns:
-            Dictionary with 'start_date' and 'partition_metrics' keys where partition_metrics contains
-            partition -> list of (state, exit_code, count) tuples
-        """
-        from datetime import datetime, timedelta
-        from collections import defaultdict
-        
-        # Calculate date 30 days ago in YYYY-MM-DD format
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-        
-        partition_metrics = {}
-        partitions = self.get_partitions()
-        
-        if not partitions:
-            logger.warning("No partitions found")
-            return {
-                'start_date': thirty_days_ago,
-                'partition_metrics': partition_metrics
-            }
-        
-        for partition in partitions:
-            # Build sacct command to get state and exit codes for this partition
-            states = ','.join(JOB_HISTORY_STATES_WITH_EXIT_CODES)
-            cmd = ['sacct', '-a', '-r', partition, '-S', thirty_days_ago, '-E', 'now', '-s', states,
-                   '-o', 'State,ExitCode', '--parsable2', '-n', '-X']
-            
-            output = self.run_command(cmd)
-            
-            # Parse output and count by (state, exit_code)
-            metrics = defaultdict(int)
-            if output:
-                for line in output.strip().split('\n'):
-                    if not line.strip():
-                        continue
-                    parts = line.split('|')
-                    if len(parts) >= 2:
-                        state = parts[0].strip()
-                        exit_code = parts[1].strip()
-                        # Normalize state name
-                        state_normalized = state.lower()
-                        if state == 'NODE_FAIL':
-                            state_normalized = 'node_failed'
-                        elif state == 'OUT_OF_MEMORY':
-                            state_normalized = 'out_of_memory'
-                        
-                        metrics[(state_normalized, exit_code)] += 1
-            
-            # Convert to list format
-            partition_metrics[partition] = [(state, exit_code, count) for (state, exit_code), count in metrics.items()]
-        
-        return {
-            'start_date': thirty_days_ago,
-            'partition_metrics': partition_metrics
-        }
+        """Collect all 1-week job history metrics with a SINGLE sacct call."""
+        days_back = 7
+        start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        return self.collect_job_history(start_date)
     
     def collect_cluster_info(self) -> Dict[str, any]:
         """

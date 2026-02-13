@@ -15,46 +15,72 @@ For backward compatibility, all public symbols are re-exported from this module.
 from typing import Dict
 
 # Re-export everything from submodules for backward compatibility
-from schemas import (
-    ParseStrategy,
-    CommandSchema,
-    # Job schemas
-    JOB_QUEUE_SCHEMAS,
-    JOB_QUEUE_STATES,
-    JOB_HISTORY_SCHEMAS,
-    JOB_HISTORY_STATES,
-    JOB_HISTORY_STATES_WITH_EXIT_CODES,
-    JOB_HISTORY_SIX_MONTHS_SCHEMAS,
-    JOB_HISTORY_ONE_WEEK_SCHEMAS,
-    JOB_HISTORY_ONE_MONTH_SCHEMAS,
-    # Node schemas
-    NODE_SCHEMAS,
-    NODE_STATE_PRIORITY,
-    NODE_STATES_EXCLUSIVE,
-    NODE_FLAGS,
-    # Partition schemas
-    JOB_PARTITION_SCHEMAS,
-    JOB_PARTITION_HISTORY_SCHEMAS,
-    JOB_PARTITION_HISTORY_SIX_MONTHS_SCHEMAS,
-    JOB_PARTITION_HISTORY_ONE_WEEK_SCHEMAS,
-    JOB_PARTITION_HISTORY_ONE_MONTH_SCHEMAS,
-    NODE_PARTITION_SCHEMAS,
-    PARTITION_LIST_SCHEMA,
-)
+try:
+    from .schemas import (
+        ParseStrategy,
+        CommandSchema,
+        # Job schemas
+        JOB_QUEUE_SCHEMAS,
+        JOB_QUEUE_STATES,
+        JOB_HISTORY_STATES,
+        JOB_HISTORY_STATES_WITH_EXIT_CODES,
+        # Node schemas
+        NODE_SCHEMAS,
+        NODE_STATE_PRIORITY,
+        NODE_STATES_EXCLUSIVE,
+        NODE_FLAGS,
+        # Partition schemas
+        JOB_PARTITION_SCHEMAS,
+        NODE_PARTITION_SCHEMAS,
+        PARTITION_LIST_SCHEMA,
+    )
 
-from parsers import (
-    parse_count_lines,
-    parse_extract_number,
-    parse_columns,
-    parse_partition_list,
-    parse_scontrol_partitions_json,
-    parse_scontrol_nodes_json,
-)
+    from .parsers import (
+        parse_count_lines,
+        parse_extract_number,
+        parse_columns,
+        parse_partition_list,
+        parse_scontrol_partitions_json,
+        parse_scontrol_nodes_json,
+    )
 
-from executor import (
-    SlurmCommandExecutor,
-    PARSER_MAP,
-)
+    from .executor import (
+        SlurmCommandExecutor,
+        PARSER_MAP,
+    )
+except ImportError:
+    from schemas import (
+        ParseStrategy,
+        CommandSchema,
+        # Job schemas
+        JOB_QUEUE_SCHEMAS,
+        JOB_QUEUE_STATES,
+        JOB_HISTORY_STATES,
+        JOB_HISTORY_STATES_WITH_EXIT_CODES,
+        # Node schemas
+        NODE_SCHEMAS,
+        NODE_STATE_PRIORITY,
+        NODE_STATES_EXCLUSIVE,
+        NODE_FLAGS,
+        # Partition schemas
+        JOB_PARTITION_SCHEMAS,
+        NODE_PARTITION_SCHEMAS,
+        PARTITION_LIST_SCHEMA,
+    )
+
+    from parsers import (
+        parse_count_lines,
+        parse_extract_number,
+        parse_columns,
+        parse_partition_list,
+        parse_scontrol_partitions_json,
+        parse_scontrol_nodes_json,
+    )
+
+    from executor import (
+        SlurmCommandExecutor,
+        PARSER_MAP,
+    )
 
 
 # ============================================================================
@@ -91,19 +117,11 @@ __all__ = [
     # Schemas
     'JOB_QUEUE_SCHEMAS',
     'JOB_QUEUE_STATES',
-    'JOB_HISTORY_SCHEMAS',
     'JOB_HISTORY_STATES',
     'JOB_HISTORY_STATES_WITH_EXIT_CODES',
-    'JOB_HISTORY_SIX_MONTHS_SCHEMAS',
-    'JOB_HISTORY_ONE_WEEK_SCHEMAS',
-    'JOB_HISTORY_ONE_MONTH_SCHEMAS',
     'NODE_SCHEMAS',
     'NODE_STATES',
     'JOB_PARTITION_SCHEMAS',
-    'JOB_PARTITION_HISTORY_SCHEMAS',
-    'JOB_PARTITION_HISTORY_SIX_MONTHS_SCHEMAS',
-    'JOB_PARTITION_HISTORY_ONE_WEEK_SCHEMAS',
-    'JOB_PARTITION_HISTORY_ONE_MONTH_SCHEMAS',
     'NODE_PARTITION_SCHEMAS',
     'PARTITION_LIST_SCHEMA',
     
