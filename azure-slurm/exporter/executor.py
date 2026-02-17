@@ -20,12 +20,12 @@ try:
         JOB_HISTORY_OPTIMIZED_SCHEMA,
         JOB_PARTITION_SCHEMAS,
         NODE_SCHEMAS, NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS, NODE_PARTITION_SCHEMAS,
-        PARTITION_LIST_SCHEMA
+        PARTITION_LIST_SCHEMA, CLUSTER_INFO_SCHEMAS
     )
     from .parsers import (
         parse_count_lines, parse_extract_number, parse_columns,
         parse_scontrol_partitions_json, parse_scontrol_nodes_json,
-        parse_sacct_job_history
+        parse_sacct_job_history, parse_azslurm_config, parse_azslurm_buckets, parse_azslurm_limits
     )
 except ImportError:
     from schemas import (
@@ -35,12 +35,12 @@ except ImportError:
         JOB_HISTORY_OPTIMIZED_SCHEMA,
         JOB_PARTITION_SCHEMAS,
         NODE_SCHEMAS, NODE_STATE_PRIORITY, NODE_STATES_EXCLUSIVE, NODE_FLAGS, NODE_PARTITION_SCHEMAS,
-        PARTITION_LIST_SCHEMA
+        PARTITION_LIST_SCHEMA, CLUSTER_INFO_SCHEMAS
     )
     from parsers import (
         parse_count_lines, parse_extract_number, parse_columns,
         parse_scontrol_partitions_json, parse_scontrol_nodes_json,
-        parse_sacct_job_history
+        parse_sacct_job_history, parse_azslurm_config, parse_azslurm_buckets, parse_azslurm_limits
     )
 
 logger = logging.getLogger('slurm-exporter.util')
@@ -423,108 +423,57 @@ class SlurmCommandExecutor:
         
         try:
             # Get cluster name and subscription from azslurm config
-            config_output = self.run_command(['azslurm', 'config'])
+            cmd = CLUSTER_INFO_SCHEMAS['azslurm_config'].build_command()
+            config_output = self.run_command(cmd)
             if config_output:
-                config_data = json.loads(config_output)
-                cluster_info['cluster_name'] = config_data.get('cluster_name', 'unknown')
-                if 'accounting' in config_data and 'subscription_id' in config_data['accounting']:
-                    cluster_info['subscription_id'] = config_data['accounting']['subscription_id']
+                config_data = parse_azslurm_config(config_output)
+                cluster_info.update(config_data)
             
             # Get Azure metadata (region, resource group) from jetpack
             try:
-                region_output = self.run_command(['sudo', '/opt/cycle/jetpack/bin/jetpack', 'config', 'azure.metadata.compute.location'])
+                cmd = CLUSTER_INFO_SCHEMAS['jetpack_location'].build_command()
+                region_output = self.run_command(cmd)
                 if region_output and 'Error:' not in region_output:
                     cluster_info['region'] = region_output.strip()
                 
-                rg_output = self.run_command(['sudo', '/opt/cycle/jetpack/bin/jetpack', 'config', 'azure.metadata.compute.resourceGroupName'])
+                cmd = CLUSTER_INFO_SCHEMAS['jetpack_resource_group'].build_command()
+                rg_output = self.run_command(cmd)
                 if rg_output and 'Error:' not in rg_output:
                     cluster_info['resource_group'] = rg_output.strip()
             except Exception as e:
                 logger.warning(f"Could not retrieve Azure metadata: {e}")
             
             # Get partition details from azslurm buckets
-            buckets_output = self.run_command(['azslurm', 'buckets'])
+            cmd = CLUSTER_INFO_SCHEMAS['azslurm_buckets'].build_command()
+            buckets_output = self.run_command(cmd)
             if buckets_output:
-                lines = buckets_output.strip().split('\n')
-                if len(lines) > 1:  # Skip header
-                    # Track unique partition+vm_size combinations
-                    seen_partition_vmsize = set()
-                    # Cache node lists per partition to avoid redundant sinfo calls
-                    partition_node_lists = {}
+                partitions = parse_azslurm_buckets(buckets_output)
+                
+                # Cache node lists per partition to avoid redundant sinfo calls
+                partition_node_lists = {}
+                
+                for partition in partitions:
+                    nodearray = partition['name']
                     
-                    for line in lines[1:]:
-                        parts = line.split()
-                        if not parts:
-                            continue
-                        
-                        # First column is always NODEARRAY
-                        nodearray = parts[0]
-                        
-                        # Skip placement group entries (contain _pg in nodearray name)
-                        if '_pg' in nodearray or not nodearray:
-                            continue
-                        
-                        # When PLACEMENT_GROUP is empty, VM_SIZE is at index 1
-                        # When PLACEMENT_GROUP has a value, VM_SIZE is at index 2
-                        # We can tell by checking if index 1 starts with "Standard_" AND doesn't contain '_pg'
-                        # (placement groups end with _pg0, _pg1, etc.)
-                        vm_size_index = 1 if (len(parts) > 1 and parts[1].startswith('Standard_') and '_pg' not in parts[1]) else 2
-                        vm_size = parts[vm_size_index] if len(parts) > vm_size_index else 'unknown'
-                        
-                        # Skip duplicate partition+vm_size combinations
-                        partition_vmsize_key = f"{nodearray}:{vm_size}"
-                        if partition_vmsize_key in seen_partition_vmsize:
-                            continue
-                        seen_partition_vmsize.add(partition_vmsize_key)
-                        
-                        # Extract AVAILABLE_COUNT based on VM_SIZE position
-                        # Columns after VM_SIZE: VCPU_COUNT, PCPU_COUNT, MEMORY, AVAILABLE_COUNT
-                        # So AVAILABLE_COUNT is at vm_size_index + 4
-                        available_count = '0'
-                        if vm_size_index + 4 < len(parts):
-                            available_count = parts[vm_size_index + 4]
-                        
-                        # Get node list from sinfo (cached per partition)
-                        # Note: sinfo returns all nodes in partition regardless of VM size
-                        # so all VM sizes in the same partition will have the same node_list
-                        if nodearray not in partition_node_lists:
-                            node_list = 'N/A'
-                            sinfo_output = self.run_command(['sinfo', '-p', nodearray, '-h', '-o', '%N'])
-                            if sinfo_output:
-                                node_list = sinfo_output.strip()
-                            partition_node_lists[nodearray] = node_list
-                        else:
-                            node_list = partition_node_lists[nodearray]
-                        
-                        cluster_info['partitions'].append({
-                            'name': nodearray,
-                            'vm_size': vm_size,
-                            'total_nodes': available_count,
-                            'node_list': node_list,
-                            'available_azure_quota': '0'  # Will be filled in below
-                        })
+                    # Get node list from sinfo (cached per partition)
+                    if nodearray not in partition_node_lists:
+                        cmd = CLUSTER_INFO_SCHEMAS['sinfo_nodes'].build_command(partition=nodearray)
+                        sinfo_output = self.run_command(cmd)
+                        node_list = sinfo_output.strip() if sinfo_output else 'N/A'
+                        partition_node_lists[nodearray] = node_list
+                    else:
+                        node_list = partition_node_lists[nodearray]
+                    
+                    partition['node_list'] = node_list
+                    partition['available_azure_quota'] = '0'  # Will be filled in below
+                    cluster_info['partitions'].append(partition)
             
             # Get Azure quota limits from azslurm limits
             try:
-                limits_output = self.run_command(['azslurm', 'limits'])
+                cmd = CLUSTER_INFO_SCHEMAS['azslurm_limits'].build_command()
+                limits_output = self.run_command(cmd)
                 if limits_output:
-                    limits_data = json.loads(limits_output)
-                    # Build a map of (nodearray, vm_size) -> min(family_available_count, regional_available_count)
-                    quota_map = {}
-                    for limit_entry in limits_data:
-                        nodearray = limit_entry.get('nodearray', '')
-                        vm_size = limit_entry.get('vm_size', '')
-                        # Skip placement group entries
-                        if not nodearray or limit_entry.get('placement_group'):
-                            continue
-                        
-                        family_available = limit_entry.get('family_available_count', 0)
-                        regional_available = limit_entry.get('regional_available_count', 0)
-                        min_quota = min(family_available, regional_available)
-                        
-                        # Store quota per nodearray+vm_size combination
-                        quota_key = f"{nodearray}:{vm_size}"
-                        quota_map[quota_key] = min_quota
+                    quota_map = parse_azslurm_limits(limits_output)
                     
                     # Update partitions with quota info
                     for partition in cluster_info['partitions']:

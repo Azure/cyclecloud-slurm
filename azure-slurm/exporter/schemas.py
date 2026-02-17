@@ -226,3 +226,50 @@ PARTITION_LIST_SCHEMA = CommandSchema(
     parse_strategy=ParseStrategy.PARSE_SCONTROL_PARTITIONS,
     description='List all partitions from scontrol'
 )
+
+# Cluster info schemas
+CLUSTER_INFO_SCHEMAS = {
+    'azslurm_config': CommandSchema(
+        name='azslurm_config',
+        command=['azslurm', 'config'],
+        command_args=[],
+        parse_strategy=ParseStrategy.CUSTOM,
+        description='Get cluster configuration from azslurm'
+    ),
+    'jetpack_location': CommandSchema(
+        name='azure_location',
+        command=['sudo', '/opt/cycle/jetpack/bin/jetpack', 'config', 'azure.metadata.compute.location'],
+        command_args=[],
+        parse_strategy=ParseStrategy.CUSTOM,
+        description='Get Azure region from jetpack'
+    ),
+    'jetpack_resource_group': CommandSchema(
+        name='azure_resource_group',
+        command=['sudo', '/opt/cycle/jetpack/bin/jetpack', 'config', 'azure.metadata.compute.resourceGroupName'],
+        command_args=[],
+        parse_strategy=ParseStrategy.CUSTOM,
+        description='Get Azure resource group from jetpack'
+    ),
+    'azslurm_buckets': CommandSchema(
+        name='azslurm_buckets',
+        command=['azslurm', 'buckets'],
+        command_args=[],
+        parse_strategy=ParseStrategy.CUSTOM,
+        description='Get partition details from azslurm buckets'
+    ),
+    'azslurm_limits': CommandSchema(
+        name='azslurm_limits',
+        command=['azslurm', 'limits'],
+        command_args=[],
+        parse_strategy=ParseStrategy.CUSTOM,
+        description='Get Azure quota limits from azslurm'
+    ),
+    'sinfo_nodes': CommandSchema(
+        name='sinfo_nodes',
+        command=['sinfo'],
+        command_args=['-p', '{partition}', '-h', '-o', '%N'],
+        parse_strategy=ParseStrategy.CUSTOM,
+        description='Get node list for partition from sinfo'
+    )
+}
+

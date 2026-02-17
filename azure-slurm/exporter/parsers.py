@@ -376,3 +376,144 @@ def _empty_metrics(start_date: str) -> Dict[str, any]:
         'by_state_exit_code': [],
         'by_partition_state_exit_code': {}
     }
+
+
+# ============================================================================
+# CLUSTER INFO PARSING
+# ============================================================================
+
+def parse_azslurm_config(output: str) -> Dict[str, str]:
+    """
+    Parse azslurm config JSON output.
+    
+    Args:
+        output: JSON output from azslurm config
+        
+    Returns:
+        Dictionary with cluster_name and subscription_id
+    """
+    result = {
+        'cluster_name': 'unknown',
+        'subscription_id': 'unknown'
+    }
+    
+    if not output:
+        return result
+    
+    try:
+        data = json.loads(output)
+        result['cluster_name'] = data.get('cluster_name', 'unknown')
+        if 'accounting' in data and 'subscription_id' in data['accounting']:
+            result['subscription_id'] = data['accounting']['subscription_id']
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse azslurm config JSON: {e}")
+    except Exception as e:
+        logger.error(f"Error processing azslurm config: {e}")
+    
+    return result
+
+
+def parse_azslurm_buckets(output: str) -> List[Dict[str, str]]:
+    """
+    Parse azslurm buckets output to extract partition information.
+    
+    Args:
+        output: Text output from azslurm buckets command
+        
+    Returns:
+        List of partition dictionaries with name, vm_size, and total_nodes
+    """
+    partitions = []
+    
+    if not output:
+        return partitions
+    
+    try:
+        lines = output.strip().split('\n')
+        if len(lines) <= 1:  # Need header + at least one data line
+            return partitions
+        
+        # Track unique partition+vm_size combinations
+        seen_partition_vmsize = set()
+        
+        for line in lines[1:]:  # Skip header
+            parts = line.split()
+            if not parts:
+                continue
+            
+            # First column is always NODEARRAY
+            nodearray = parts[0]
+            
+            # Skip placement group entries (contain _pg in nodearray name)
+            if '_pg' in nodearray or not nodearray:
+                continue
+            
+            # When PLACEMENT_GROUP is empty, VM_SIZE is at index 1
+            # When PLACEMENT_GROUP has a value, VM_SIZE is at index 2
+            vm_size_index = 1 if (len(parts) > 1 and parts[1].startswith('Standard_') and '_pg' not in parts[1]) else 2
+            vm_size = parts[vm_size_index] if len(parts) > vm_size_index else 'unknown'
+            
+            # Skip duplicate partition+vm_size combinations
+            partition_vmsize_key = f"{nodearray}:{vm_size}"
+            if partition_vmsize_key in seen_partition_vmsize:
+                continue
+            seen_partition_vmsize.add(partition_vmsize_key)
+            
+            # Extract AVAILABLE_COUNT based on VM_SIZE position
+            # Columns after VM_SIZE: VCPU_COUNT, PCPU_COUNT, MEMORY, AVAILABLE_COUNT
+            available_count = '0'
+            if vm_size_index + 4 < len(parts):
+                available_count = parts[vm_size_index + 4]
+            
+            partitions.append({
+                'name': nodearray,
+                'vm_size': vm_size,
+                'total_nodes': available_count
+            })
+    
+    except Exception as e:
+        logger.error(f"Error parsing azslurm buckets output: {e}")
+    
+    return partitions
+
+
+def parse_azslurm_limits(output: str) -> Dict[str, int]:
+    """
+    Parse azslurm limits JSON output to extract quota information.
+    
+    Args:
+        output: JSON output from azslurm limits
+        
+    Returns:
+        Dictionary mapping "nodearray:vm_size" to minimum available quota
+    """
+    quota_map = {}
+    
+    if not output:
+        return quota_map
+    
+    try:
+        data = json.loads(output)
+        for limit_entry in data:
+            nodearray = limit_entry.get('nodearray', '')
+            vm_size = limit_entry.get('vm_size', '')
+            
+            # Skip placement group entries
+            if not nodearray or limit_entry.get('placement_group'):
+                continue
+            
+            family_available = limit_entry.get('family_available_count', 0)
+            regional_available = limit_entry.get('regional_available_count', 0)
+            min_quota = min(family_available, regional_available)
+            
+            # Store quota per nodearray+vm_size combination
+            quota_key = f"{nodearray}:{vm_size}"
+            quota_map[quota_key] = min_quota
+    
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse azslurm limits JSON: {e}")
+    except Exception as e:
+        logger.error(f"Error processing azslurm limits: {e}")
+    
+    return quota_map
+
