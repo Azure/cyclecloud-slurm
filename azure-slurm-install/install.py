@@ -847,7 +847,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
 
     if s.monitoring_enabled:
         _configure_jwt_authentication(s)
-        _add_slurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/slurm_exporter.yml")
+        _add_azslurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/azslurm_exporter.yml")
 
     ilib.enable_service("slurmrestd")
 
@@ -874,22 +874,22 @@ def _configure_jwt_authentication(s: InstallSettings) -> None:
     ilib.chmod(jwt_dir, mode=755)
     ilib.chmod(os.path.dirname(jwt_dir), mode=755)
 
-def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_yaml: str) -> None:
+def _add_azslurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_yaml: str) -> None:
     """
-    Add slurm_exporter scrape config to Prometheus.
+    Add azslurm_exporter scrape config to Prometheus.
     """
     if not s.is_primary_scheduler:
-        logging.info("Not primary scheduler, skipping slurm_exporter configuration.")
+        logging.info("Not primary scheduler, skipping azslurm_exporter configuration.")
         return
 
     if not os.path.isfile(prom_config):
-        logging.warning("Prometheus configuration file not found, skipping slurm_exporter configuration.")
+        logging.warning("Prometheus configuration file not found, skipping azslurm_exporter configuration.")
         return
     
     with open(prom_config, "r") as f:
         prom_content = f.read()
-        if "slurm_exporter" in prom_content:
-            print("Slurm Exporter is already configured in Prometheus")
+        if "azslurm_exporter" in prom_content:
+            print("AzSlurm Exporter is already configured in Prometheus")
             return
     # Merge YAML files
     with open(prom_config, "r") as f:
