@@ -175,23 +175,68 @@ class SlurmMetricsCollector:
             # Collect partition-based node metrics
             logger.debug("Collecting partition node metrics...")
             partition_node_metrics = self.executor.collect_partition_node_metrics()
-            # Group metrics by metric name across all partitions
-            metrics_by_name = {}
-            for partition, metrics in partition_node_metrics.items():
-                for metric_name, value in metrics.items():
-                    if metric_name not in metrics_by_name:
-                        metrics_by_name[metric_name] = []
-                    metrics_by_name[metric_name].append((partition, value))
             
-            # Yield one gauge per metric name with all partitions
-            for metric_name, partition_values in metrics_by_name.items():
+            # Only yield the total count metric (scontrol_partition_nodes), not the per-state ones
+            # The per-state metrics will come from the detailed collection below
+            total_gauge = GaugeMetricFamily(
+                'scontrol_partition_nodes',
+                'Total nodes per partition',
+                labels=['partition']
+            )
+            for partition, metrics in partition_node_metrics.items():
+                if 'scontrol_partition_nodes' in metrics:
+                    total_gauge.add_metric([partition], metrics['scontrol_partition_nodes'])
+            yield total_gauge
+            
+            # Now collect and yield detailed metrics with nodelist and reason labels for each state
+            logger.debug("Collecting partition node metrics with details...")
+            partition_node_details = self.executor.collect_partition_node_details()
+            
+            # Group by metric name (state) and collect all partition/nodelist/reason combinations
+            metrics_by_state = {}
+            
+            # First, get all partitions from the detailed data
+            all_partitions = set(partition_node_details.keys())
+            
+            # Import NODE_STATES_EXCLUSIVE to ensure we export all states
+            from schemas import NODE_STATES_EXCLUSIVE
+            
+            # Initialize all state metrics with empty lists
+            for state in NODE_STATES_EXCLUSIVE:
+                metric_name = f'scontrol_partition_nodes_{state}'
+                metrics_by_state[metric_name] = []
+            
+            # Populate metrics with actual data
+            for partition, state_details in partition_node_details.items():
+                for state, details_list in state_details.items():
+                    metric_name = f'scontrol_partition_nodes_{state}'
+                    
+                    # Add each nodelist/reason combination for this partition/state
+                    for detail in details_list:
+                        nodelist = detail['nodelist']
+                        reason = detail['reason'] if detail['reason'] else 'none'
+                        count = detail['count']
+                        metrics_by_state[metric_name].append((partition, nodelist, reason, count))
+            
+            # For each partition, ensure all states are represented (add 0-count entries for missing states)
+            for partition in all_partitions:
+                for state in NODE_STATES_EXCLUSIVE:
+                    metric_name = f'scontrol_partition_nodes_{state}'
+                    # Check if this partition already has this state
+                    has_state = any(p == partition for p, _, _, _ in metrics_by_state[metric_name])
+                    if not has_state:
+                        # Add a zero-count entry for this partition/state
+                        metrics_by_state[metric_name].append((partition, 'none', 'none', 0))
+            
+            # Yield one gauge per metric name (state) with partition, nodelist, and reason labels
+            for metric_name, metric_values in metrics_by_state.items():
                 gauge = GaugeMetricFamily(
                     metric_name,
-                    f'Slurm partition node metric: {metric_name}',
-                    labels=['partition']
+                    f'Slurm partition node metric with nodelist and reason: {metric_name}',
+                    labels=['partition', 'nodelist', 'reason']
                 )
-                for partition, value in partition_values:
-                    gauge.add_metric([partition], value)
+                for partition, nodelist, reason, count in metric_values:
+                    gauge.add_metric([partition, nodelist, reason], float(count))
                 yield gauge
             
             # Collect partition-based job history metrics (cumulative)

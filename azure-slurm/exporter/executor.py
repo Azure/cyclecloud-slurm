@@ -9,7 +9,7 @@ commands and collects metrics.
 import subprocess
 import logging
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 
 try:
@@ -24,7 +24,7 @@ try:
     )
     from .parsers import (
         parse_count_lines, parse_extract_number, parse_columns,
-        parse_scontrol_partitions_json, parse_scontrol_nodes_json,
+        parse_scontrol_partitions_json, parse_scontrol_nodes_json, parse_scontrol_nodes_detailed,
         parse_sacct_job_history, parse_azslurm_config, parse_azslurm_buckets, parse_azslurm_limits
     )
 except ImportError:
@@ -39,7 +39,7 @@ except ImportError:
     )
     from parsers import (
         parse_count_lines, parse_extract_number, parse_columns,
-        parse_scontrol_partitions_json, parse_scontrol_nodes_json,
+        parse_scontrol_partitions_json, parse_scontrol_nodes_json, parse_scontrol_nodes_detailed,
         parse_sacct_job_history, parse_azslurm_config, parse_azslurm_buckets, parse_azslurm_limits
     )
 
@@ -235,6 +235,35 @@ class SlurmCommandExecutor:
         
         return metrics
     
+    def collect_node_details(self, partition: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Collect detailed node information with nodelists and reasons grouped by state.
+        
+        Args:
+            partition: Optional partition name to filter nodes by
+            
+        Returns:
+            Dictionary mapping state names to list of dicts with nodelist, reason, and count
+            
+        Example:
+            {
+                'drain': [
+                    {'nodelist': 'hpc-[1-3]', 'reason': 'maintenance', 'count': 3}
+                ],
+                'idle': [
+                    {'nodelist': 'hpc-[4-16]', 'reason': '', 'count': 13}
+                ]
+            }
+        """
+        schema = NODE_SCHEMAS['all_nodes']
+        cmd = schema.build_command()
+        output = self.run_command(cmd)
+        
+        # Parse JSON output to get detailed node information
+        node_details = parse_scontrol_nodes_detailed(output, partition=partition)
+        
+        return node_details
+    
     def get_partitions(self) -> List[str]:
         """
         Get list of all partitions in the cluster using scontrol.
@@ -312,6 +341,41 @@ class SlurmCommandExecutor:
             partition_metrics[partition] = metrics
         
         return partition_metrics
+    
+    def collect_partition_node_details(self) -> Dict[str, Dict[str, List[Dict[str, Any]]]]:
+        """
+        Collect detailed node information per partition with nodelists and reasons grouped by state.
+        
+        Returns:
+            Dictionary mapping partition names to state dictionaries
+            Format: {partition_name: {state: [{nodelist, reason, count}]}}
+            
+        Example:
+            {
+                'hpc': {
+                    'drained': [{'nodelist': 'hpc-[1-3]', 'reason': 'maintenance', 'count': 3}],
+                    'idle': [{'nodelist': 'hpc-[4-16]', 'reason': '', 'count': 13}]
+                }
+            }
+        """
+        partition_details = {}
+        partitions = self.get_partitions()
+        
+        if not partitions:
+            logger.warning("No partitions found")
+            return partition_details
+        
+        # Get all nodes once with JSON output
+        schema = NODE_PARTITION_SCHEMAS['all_nodes']
+        cmd = schema.build_command()
+        output = self.run_command(cmd)
+        
+        # Parse detailed info for each partition
+        for partition in partitions:
+            node_details = parse_scontrol_nodes_detailed(output, partition=partition)
+            partition_details[partition] = node_details
+        
+        return partition_details
     
     def collect_partition_job_history_metrics(self, start_time: str) -> Dict[str, Dict[str, float]]:
         """

@@ -517,3 +517,180 @@ def parse_azslurm_limits(output: str) -> Dict[str, int]:
     
     return quota_map
 
+
+def condense_nodelist(node_names: List[str]) -> str:
+    """
+    Condense a list of node names into Slurm nodelist format.
+    
+    Examples:
+        ['node-1', 'node-2', 'node-3'] -> 'node-[1-3]'
+        ['node-1', 'node-3', 'node-5'] -> 'node-[1,3,5]'
+        ['hpc-1', 'hpc-2', 'htc-1'] -> 'hpc-[1-2],htc-1'
+    
+    Args:
+        node_names: List of node names
+        
+    Returns:
+        Condensed nodelist string
+    """
+    if not node_names:
+        return ""
+    
+    if len(node_names) == 1:
+        return node_names[0]
+    
+    # Group nodes by prefix
+    prefix_groups = defaultdict(list)
+    for name in sorted(node_names):
+        # Split name into prefix and number
+        parts = name.rsplit('-', 1)
+        if len(parts) == 2 and parts[1].isdigit():
+            prefix = parts[0]
+            number = int(parts[1])
+            prefix_groups[prefix].append(number)
+        else:
+            # Non-numeric suffix, keep as-is
+            prefix_groups[name].append(None)
+    
+    # Condense each prefix group
+    condensed_parts = []
+    for prefix in sorted(prefix_groups.keys()):
+        numbers = prefix_groups[prefix]
+        
+        # If None in list, this is a literal name
+        if None in numbers:
+            condensed_parts.append(prefix)
+            continue
+        
+        # Sort numbers
+        numbers = sorted(set(numbers))
+        
+        if len(numbers) == 1:
+            condensed_parts.append(f"{prefix}-{numbers[0]}")
+        else:
+            # Find consecutive ranges
+            ranges = []
+            start = numbers[0]
+            end = numbers[0]
+            
+            for i in range(1, len(numbers)):
+                if numbers[i] == end + 1:
+                    end = numbers[i]
+                else:
+                    if start == end:
+                        ranges.append(str(start))
+                    else:
+                        ranges.append(f"{start}-{end}")
+                    start = numbers[i]
+                    end = numbers[i]
+            
+            # Add final range
+            if start == end:
+                ranges.append(str(start))
+            else:
+                ranges.append(f"{start}-{end}")
+            
+            condensed_parts.append(f"{prefix}-[{','.join(ranges)}]")
+    
+    return ','.join(condensed_parts)
+
+
+def parse_scontrol_nodes_detailed(output: str, partition: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Parse scontrol show nodes --json output and return detailed node information
+    grouped by state, including nodelists and reasons.
+    
+    Args:
+        output: JSON output from scontrol show nodes --json
+        partition: Optional partition name to filter nodes by
+        
+    Returns:
+        Dictionary mapping state names to list of dicts with:
+        - 'nodelist': Condensed nodelist string
+        - 'reason': Reason string (empty if no reason)
+        - 'count': Number of nodes in this state/reason combination
+        
+    Example:
+        {
+            'drain': [
+                {'nodelist': 'hpc-[1-3]', 'reason': 'maintenance', 'count': 3},
+                {'nodelist': 'hpc-[7,9]', 'reason': 'testing', 'count': 2}
+            ],
+            'idle': [
+                {'nodelist': 'hpc-[4-6,8,10-16]', 'reason': '', 'count': 12}
+            ],
+            'allocated': [
+                {'nodelist': 'htc-[1-5]', 'reason': '', 'count': 5}
+            ]
+        }
+    """
+    try:
+        from .schemas import NODE_STATE_PRIORITY
+    except ImportError:
+        from schemas import NODE_STATE_PRIORITY
+        
+    if not output:
+        return {}
+    
+    try:
+        data = json.loads(output)
+        nodes = data.get('nodes', [])
+        
+        # Filter by partition if specified
+        if partition:
+            nodes = [n for n in nodes if partition in n.get('partitions', [])]
+        
+        # Group nodes by (state, reason)
+        state_reason_nodes = defaultdict(lambda: defaultdict(list))
+        
+        for node in nodes:
+            node_name = node.get('name', '')
+            node_states_list = node.get('state', [])
+            node_reason = node.get('reason', '').strip()
+            
+            if not isinstance(node_states_list, list):
+                node_states_list = [node_states_list] if node_states_list else []
+            
+            # Convert to uppercase for matching
+            node_states_upper = [s.upper() for s in node_states_list]
+            
+            # Special case: ALLOCATED+DRAIN should be treated as DRAINING
+            if 'ALLOCATED' in node_states_upper and 'DRAIN' in node_states_upper:
+                node_states_upper.append('DRAINING')
+            
+            # Find highest priority state for this node
+            assigned_state = None
+            highest_priority = 999
+            
+            for state_str, metric_suffix, priority in NODE_STATE_PRIORITY:
+                if state_str in node_states_upper and priority < highest_priority:
+                    assigned_state = metric_suffix
+                    highest_priority = priority
+            
+            # Default to idle if no recognized state
+            if not assigned_state:
+                assigned_state = 'idle'
+            
+            # Group by state and reason
+            state_reason_nodes[assigned_state][node_reason].append(node_name)
+        
+        # Build result with condensed nodelists
+        result = {}
+        for state, reason_dict in state_reason_nodes.items():
+            result[state] = []
+            for reason, node_names in reason_dict.items():
+                condensed = condense_nodelist(node_names)
+                result[state].append({
+                    'nodelist': condensed,
+                    'reason': reason,
+                    'count': len(node_names)
+                })
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse scontrol JSON output: {e}")
+        return {}
+    except Exception as e:
+        logger.error(f"Error processing scontrol node data: {e}")
+        return {}
