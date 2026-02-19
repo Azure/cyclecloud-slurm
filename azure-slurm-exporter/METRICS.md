@@ -17,16 +17,20 @@ The exporter runs the following number of commands per metric collection:
 | Category | Commands | Details |
 |----------|----------|---------|
 | **Job Queue (Real-time)** | 7 | 1 total + 6 states |
-| **Job History (Since reset)** | 13 | 6 states + 1 total + 6 per partition states |
-| **Node Metrics** | 2 | 1 scontrol command (all nodes), 1 partition list |
-| **Partition Job Metrics** | Variable | 6 states × N partitions + 1 × N partitions |
-| **Partition Node Metrics** | 1 | Uses data from node metrics |
-| **6-Month History** | 13 + 2 | Regular + state/exit code queries |
-| **1-Week History** | 13 + 2 | Regular + state/exit code queries |
-| **1-Month History** | 13 + 2 | Regular + state/exit code queries |
-| **Cluster Info (Cached)** | 1 | Cached for 1 hour |
+| **Job History (Since reset)** | 7 | 6 states + 1 total |
+| **Partition Job History (Since reset)** | 7 × N | Per partition: 6 states + 1 total |
+| **Node Metrics** | 2 | 1 scontrol nodes + 1 scontrol partitions |
+| **Partition Job Metrics** | 7 × N | Per partition: 6 states + 1 total |
+| **Partition Node Metrics** | 0 | Reuses data from node metrics |
+| **6-Month History (Optimized)** | 1 | Single sacct with state/exit code query |
+| **1-Week History (Optimized)** | 1 | Single sacct with state/exit code query |
+| **1-Month History (Optimized)** | 1 | Single sacct with state/exit code query |
+| **Cluster Info (Cached 1hr)** | 2 + N | azslurm config + buckets + N sinfo |
 
-**Estimated Total: ~65-85 commands per scrape** (varies with number of partitions)
+**Estimated Total: ~20-30 commands per scrape** (varies with number of partitions N, typically 2-5)
+
+**Example with 3 partitions:** 7 + 7 + (7×3) + 2 + (7×3) + 0 + 1 + 1 + 1 + 5 = **66 commands**  
+**Note:** Cluster info cached for 1 hour, so effectively ~61 commands after first scrape
 
 ### Performance Optimization
 
