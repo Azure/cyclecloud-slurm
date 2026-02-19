@@ -199,7 +199,10 @@ class SlurmMetricsCollector:
             all_partitions = set(partition_node_details.keys())
             
             # Import NODE_STATES_EXCLUSIVE to ensure we export all states
-            from schemas import NODE_STATES_EXCLUSIVE
+            try:
+                from .schemas import NODE_STATES_EXCLUSIVE
+            except ImportError:
+                from schemas import NODE_STATES_EXCLUSIVE
             
             # Initialize all state metrics with empty lists
             for state in NODE_STATES_EXCLUSIVE:

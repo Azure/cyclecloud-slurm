@@ -225,6 +225,7 @@ class TestSlurmMetricsCollector:
         mock_executor.collect_node_metrics.return_value = {}
         mock_executor.collect_partition_job_metrics.return_value = {}
         mock_executor.collect_partition_node_metrics.return_value = {}
+        mock_executor.collect_partition_node_details.return_value = {}
         
         # Mock partition history metrics
         mock_executor.collect_partition_job_history_metrics.return_value = {
