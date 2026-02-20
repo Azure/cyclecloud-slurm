@@ -2818,66 +2818,21 @@
     "list": [
       {
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": "cbbe2034-c78b-4e9b-89b4-8b78530247e5",
+          "value": "cbbe2034-c78b-4e9b-89b4-8b78530247e5"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${promDatasource}"
         },
-        "definition": "label_values(slurm_user_jobs, username)",
-        "includeAll": true,
-        "name": "username",
-        "options": [],
-        "query": {
-          "qryType": 5,
-          "query": "label_values(slurm_user_jobs, username)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${promDatasource}"
-        },
-        "definition": "label_values(slurm_account_jobs,instance)",
-        "includeAll": true,
-        "multi": true,
-        "name": "instance",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(slurm_account_jobs,instance)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "current": {
-          "text": "",
-          "value": ""
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${promDatasource}"
-        },
-        "definition": "label_values(slurm_account_jobs,subscription)",
+        "definition": "label_values(azslurm_cluster_info,subscription)",
         "includeAll": false,
         "label": "Subscription",
         "name": "Subscription",
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(slurm_account_jobs,subscription)",
+          "query": "label_values(azslurm_cluster_info,subscription)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -2900,35 +2855,6 @@
       },
       {
         "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${promDatasource}"
-        },
-        "definition": "label_values(slurm_partition_jobs_running, partition)",
-        "includeAll": true,
-        "multi": true,
-        "name": "partition",
-        "options": [],
-        "query": {
-          "qryType": 5,
-          "query": "label_values(slurm_partition_jobs_running, partition)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "allowCustomValue": true,
-        "current": {
           "text": "All",
           "value": [
             "$__all"
@@ -2938,15 +2864,14 @@
           "type": "prometheus",
           "uid": "${promDatasource}"
         },
-        "definition": "label_values(slurm_node_cpus, node)",
-        "description": "",
+        "definition": "label_values(squeue_partition_jobs_running, partition)",
         "includeAll": true,
         "multi": true,
-        "name": "node",
+        "name": "partition",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(slurm_node_cpus, node)",
+          "query": "label_values(squeue_partition_jobs_running, partition)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -3059,5 +2984,5 @@
   "timezone": "",
   "title": "SLURM Dashboard",
   "uid": "bfayhmcy3lg5cf",
-  "version": 75
+  "version": 1
 }
