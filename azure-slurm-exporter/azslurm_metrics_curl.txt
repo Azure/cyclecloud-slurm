@@ -1,0 +1,489 @@
+cc-admin@azslurm-exporter-scheduler:~$ curl -s localhost:9500/metrics
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 313.0
+python_gc_objects_collected_total{generation="1"} 49.0
+python_gc_objects_collected_total{generation="2"} 289.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 89481.0
+python_gc_collections_total{generation="1"} 8134.0
+python_gc_collections_total{generation="2"} 729.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="11",patchlevel="0rc1",version="3.11.0rc1"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 6.14395904e+08
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 3.106816e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.77144788156e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 200.66
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 6.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1024.0
+# HELP squeue_jobs Slurm job queue metric: squeue_jobs
+# TYPE squeue_jobs gauge
+squeue_jobs 0.0
+# HELP squeue_jobs_running Slurm job queue metric: squeue_jobs_running
+# TYPE squeue_jobs_running gauge
+squeue_jobs_running 0.0
+# HELP squeue_jobs_pending Slurm job queue metric: squeue_jobs_pending
+# TYPE squeue_jobs_pending gauge
+squeue_jobs_pending 0.0
+# HELP squeue_jobs_configuring Slurm job queue metric: squeue_jobs_configuring
+# TYPE squeue_jobs_configuring gauge
+squeue_jobs_configuring 0.0
+# HELP squeue_jobs_completing Slurm job queue metric: squeue_jobs_completing
+# TYPE squeue_jobs_completing gauge
+squeue_jobs_completing 0.0
+# HELP squeue_jobs_suspended Slurm job queue metric: squeue_jobs_suspended
+# TYPE squeue_jobs_suspended gauge
+squeue_jobs_suspended 0.0
+# HELP squeue_jobs_failed Slurm job queue metric: squeue_jobs_failed
+# TYPE squeue_jobs_failed gauge
+squeue_jobs_failed 0.0
+# HELP squeue_job_nodes_allocated Number of nodes allocated/requested per job
+# TYPE squeue_job_nodes_allocated gauge
+# HELP sacct_jobs_total_completed Slurm cumulative job metric: sacct_jobs_total_completed
+# TYPE sacct_jobs_total_completed gauge
+sacct_jobs_total_completed 223.0
+# HELP sacct_jobs_total_failed Slurm cumulative job metric: sacct_jobs_total_failed
+# TYPE sacct_jobs_total_failed gauge
+sacct_jobs_total_failed 51.0
+# HELP sacct_jobs_total_timeout Slurm cumulative job metric: sacct_jobs_total_timeout
+# TYPE sacct_jobs_total_timeout gauge
+sacct_jobs_total_timeout 23.0
+# HELP sacct_jobs_total_cancelled Slurm cumulative job metric: sacct_jobs_total_cancelled
+# TYPE sacct_jobs_total_cancelled gauge
+sacct_jobs_total_cancelled 3.0
+# HELP sacct_jobs_total_node_failed Slurm cumulative job metric: sacct_jobs_total_node_failed
+# TYPE sacct_jobs_total_node_failed gauge
+sacct_jobs_total_node_failed 0.0
+# HELP sacct_jobs_total_out_of_memory Slurm cumulative job metric: sacct_jobs_total_out_of_memory
+# TYPE sacct_jobs_total_out_of_memory gauge
+sacct_jobs_total_out_of_memory 0.0
+# HELP sacct_jobs_total_submitted Slurm cumulative job metric: sacct_jobs_total_submitted
+# TYPE sacct_jobs_total_submitted gauge
+sacct_jobs_total_submitted 301.0
+# HELP scontrol_nodes Slurm node metric: scontrol_nodes
+# TYPE scontrol_nodes gauge
+scontrol_nodes 88.0
+# HELP scontrol_nodes_powered_down Slurm node metric: scontrol_nodes_powered_down
+# TYPE scontrol_nodes_powered_down gauge
+scontrol_nodes_powered_down 72.0
+# HELP scontrol_nodes_powering_up Slurm node metric: scontrol_nodes_powering_up
+# TYPE scontrol_nodes_powering_up gauge
+scontrol_nodes_powering_up 0.0
+# HELP scontrol_nodes_down Slurm node metric: scontrol_nodes_down
+# TYPE scontrol_nodes_down gauge
+scontrol_nodes_down 0.0
+# HELP scontrol_nodes_fail Slurm node metric: scontrol_nodes_fail
+# TYPE scontrol_nodes_fail gauge
+scontrol_nodes_fail 0.0
+# HELP scontrol_nodes_drained Slurm node metric: scontrol_nodes_drained
+# TYPE scontrol_nodes_drained gauge
+scontrol_nodes_drained 3.0
+# HELP scontrol_nodes_draining Slurm node metric: scontrol_nodes_draining
+# TYPE scontrol_nodes_draining gauge
+scontrol_nodes_draining 0.0
+# HELP scontrol_nodes_maint Slurm node metric: scontrol_nodes_maint
+# TYPE scontrol_nodes_maint gauge
+scontrol_nodes_maint 0.0
+# HELP scontrol_nodes_resv Slurm node metric: scontrol_nodes_resv
+# TYPE scontrol_nodes_resv gauge
+scontrol_nodes_resv 0.0
+# HELP scontrol_nodes_completing Slurm node metric: scontrol_nodes_completing
+# TYPE scontrol_nodes_completing gauge
+scontrol_nodes_completing 0.0
+# HELP scontrol_nodes_alloc Slurm node metric: scontrol_nodes_alloc
+# TYPE scontrol_nodes_alloc gauge
+scontrol_nodes_alloc 0.0
+# HELP scontrol_nodes_mixed Slurm node metric: scontrol_nodes_mixed
+# TYPE scontrol_nodes_mixed gauge
+scontrol_nodes_mixed 0.0
+# HELP scontrol_nodes_idle Slurm node metric: scontrol_nodes_idle
+# TYPE scontrol_nodes_idle gauge
+scontrol_nodes_idle 13.0
+# HELP scontrol_nodes_cloud Slurm node metric: scontrol_nodes_cloud
+# TYPE scontrol_nodes_cloud gauge
+scontrol_nodes_cloud 88.0
+# HELP squeue_partition_jobs Slurm partition job metric: squeue_partition_jobs
+# TYPE squeue_partition_jobs gauge
+squeue_partition_jobs{partition="dynamic"} 0.0
+squeue_partition_jobs{partition="gpu"} 0.0
+squeue_partition_jobs{partition="hpc"} 0.0
+squeue_partition_jobs{partition="htc"} 0.0
+# HELP squeue_partition_jobs_running Slurm partition job metric: squeue_partition_jobs_running
+# TYPE squeue_partition_jobs_running gauge
+squeue_partition_jobs_running{partition="dynamic"} 0.0
+squeue_partition_jobs_running{partition="gpu"} 0.0
+squeue_partition_jobs_running{partition="hpc"} 0.0
+squeue_partition_jobs_running{partition="htc"} 0.0
+# HELP squeue_partition_jobs_pending Slurm partition job metric: squeue_partition_jobs_pending
+# TYPE squeue_partition_jobs_pending gauge
+squeue_partition_jobs_pending{partition="dynamic"} 0.0
+squeue_partition_jobs_pending{partition="gpu"} 0.0
+squeue_partition_jobs_pending{partition="hpc"} 0.0
+squeue_partition_jobs_pending{partition="htc"} 0.0
+# HELP squeue_partition_jobs_configuring Slurm partition job metric: squeue_partition_jobs_configuring
+# TYPE squeue_partition_jobs_configuring gauge
+squeue_partition_jobs_configuring{partition="dynamic"} 0.0
+squeue_partition_jobs_configuring{partition="gpu"} 0.0
+squeue_partition_jobs_configuring{partition="hpc"} 0.0
+squeue_partition_jobs_configuring{partition="htc"} 0.0
+# HELP squeue_partition_jobs_completing Slurm partition job metric: squeue_partition_jobs_completing
+# TYPE squeue_partition_jobs_completing gauge
+squeue_partition_jobs_completing{partition="dynamic"} 0.0
+squeue_partition_jobs_completing{partition="gpu"} 0.0
+squeue_partition_jobs_completing{partition="hpc"} 0.0
+squeue_partition_jobs_completing{partition="htc"} 0.0
+# HELP squeue_partition_jobs_suspended Slurm partition job metric: squeue_partition_jobs_suspended
+# TYPE squeue_partition_jobs_suspended gauge
+squeue_partition_jobs_suspended{partition="dynamic"} 0.0
+squeue_partition_jobs_suspended{partition="gpu"} 0.0
+squeue_partition_jobs_suspended{partition="hpc"} 0.0
+squeue_partition_jobs_suspended{partition="htc"} 0.0
+# HELP squeue_partition_jobs_failed Slurm partition job metric: squeue_partition_jobs_failed
+# TYPE squeue_partition_jobs_failed gauge
+squeue_partition_jobs_failed{partition="dynamic"} 0.0
+squeue_partition_jobs_failed{partition="gpu"} 0.0
+squeue_partition_jobs_failed{partition="hpc"} 0.0
+squeue_partition_jobs_failed{partition="htc"} 0.0
+# HELP scontrol_partition_nodes Total nodes per partition
+# TYPE scontrol_partition_nodes gauge
+scontrol_partition_nodes{partition="dynamic"} 21.0
+scontrol_partition_nodes{partition="gpu"} 1.0
+scontrol_partition_nodes{partition="hpc"} 16.0
+scontrol_partition_nodes{partition="htc"} 50.0
+# HELP scontrol_partition_nodes_powered_down Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_powered_down
+# TYPE scontrol_partition_nodes_powered_down gauge
+scontrol_partition_nodes_powered_down{nodelist="dyn1-[1-10],dyn2-[1-10],g1",partition="dynamic",reason="none"} 21.0
+scontrol_partition_nodes_powered_down{nodelist="azslurm-exporter-gpu-1",partition="gpu",reason="none"} 1.0
+scontrol_partition_nodes_powered_down{nodelist="azslurm-exporter-htc-[1-50]",partition="htc",reason="none"} 50.0
+scontrol_partition_nodes_powered_down{nodelist="none",partition="hpc",reason="none"} 0.0
+# HELP scontrol_partition_nodes_powering_up Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_powering_up
+# TYPE scontrol_partition_nodes_powering_up gauge
+scontrol_partition_nodes_powering_up{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_powering_up{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_powering_up{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_powering_up{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_down Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_down
+# TYPE scontrol_partition_nodes_down gauge
+scontrol_partition_nodes_down{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_down{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_down{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_down{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_fail Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_fail
+# TYPE scontrol_partition_nodes_fail gauge
+scontrol_partition_nodes_fail{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_fail{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_fail{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_fail{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_drained Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_drained
+# TYPE scontrol_partition_nodes_drained gauge
+scontrol_partition_nodes_drained{nodelist="azslurm-exporter-hpc-[1-3]",partition="hpc",reason="blah"} 3.0
+scontrol_partition_nodes_drained{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_drained{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_drained{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_draining Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_draining
+# TYPE scontrol_partition_nodes_draining gauge
+scontrol_partition_nodes_draining{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_draining{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_draining{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_draining{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_maint Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_maint
+# TYPE scontrol_partition_nodes_maint gauge
+scontrol_partition_nodes_maint{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_maint{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_maint{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_maint{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_resv Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_resv
+# TYPE scontrol_partition_nodes_resv gauge
+scontrol_partition_nodes_resv{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_resv{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_resv{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_resv{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_completing Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_completing
+# TYPE scontrol_partition_nodes_completing gauge
+scontrol_partition_nodes_completing{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_completing{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_completing{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_completing{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_alloc Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_alloc
+# TYPE scontrol_partition_nodes_alloc gauge
+scontrol_partition_nodes_alloc{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_alloc{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_alloc{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_alloc{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_mixed Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_mixed
+# TYPE scontrol_partition_nodes_mixed gauge
+scontrol_partition_nodes_mixed{nodelist="none",partition="hpc",reason="none"} 0.0
+scontrol_partition_nodes_mixed{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_mixed{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_mixed{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP scontrol_partition_nodes_idle Slurm partition node metric with nodelist and reason: scontrol_partition_nodes_idle
+# TYPE scontrol_partition_nodes_idle gauge
+scontrol_partition_nodes_idle{nodelist="azslurm-exporter-hpc-[4-16]",partition="hpc",reason="none"} 13.0
+scontrol_partition_nodes_idle{nodelist="none",partition="htc",reason="none"} 0.0
+scontrol_partition_nodes_idle{nodelist="none",partition="dynamic",reason="none"} 0.0
+scontrol_partition_nodes_idle{nodelist="none",partition="gpu",reason="none"} 0.0
+# HELP sacct_partition_jobs_total_completed Slurm partition cumulative job metric: sacct_partition_jobs_total_completed
+# TYPE sacct_partition_jobs_total_completed gauge
+sacct_partition_jobs_total_completed{partition="hpc"} 138.0
+sacct_partition_jobs_total_completed{partition="htc"} 80.0
+sacct_partition_jobs_total_completed{partition="dynamic"} 5.0
+# HELP sacct_partition_jobs_total_failed Slurm partition cumulative job metric: sacct_partition_jobs_total_failed
+# TYPE sacct_partition_jobs_total_failed gauge
+sacct_partition_jobs_total_failed{partition="hpc"} 29.0
+sacct_partition_jobs_total_failed{partition="htc"} 22.0
+# HELP sacct_partition_jobs_total_timeout Slurm partition cumulative job metric: sacct_partition_jobs_total_timeout
+# TYPE sacct_partition_jobs_total_timeout gauge
+sacct_partition_jobs_total_timeout{partition="hpc"} 15.0
+sacct_partition_jobs_total_timeout{partition="htc"} 8.0
+# HELP sacct_partition_jobs_total_submitted Slurm partition cumulative job metric: sacct_partition_jobs_total_submitted
+# TYPE sacct_partition_jobs_total_submitted gauge
+sacct_partition_jobs_total_submitted{partition="hpc"} 182.0
+sacct_partition_jobs_total_submitted{partition="htc"} 112.0
+sacct_partition_jobs_total_submitted{partition="dynamic"} 6.0
+sacct_partition_jobs_total_submitted{partition="gpu"} 1.0
+# HELP sacct_partition_jobs_total_cancelled Slurm partition cumulative job metric: sacct_partition_jobs_total_cancelled
+# TYPE sacct_partition_jobs_total_cancelled gauge
+sacct_partition_jobs_total_cancelled{partition="htc"} 2.0
+sacct_partition_jobs_total_cancelled{partition="gpu"} 1.0
+# HELP sacct_partition_jobs_total_node_failed Slurm partition cumulative job metric: sacct_partition_jobs_total_node_failed
+# TYPE sacct_partition_jobs_total_node_failed gauge
+sacct_partition_jobs_total_node_failed{partition="dynamic"} 1.0
+# HELP sacct_jobs_total_six_months_submitted Slurm 6-month rolling job metric: submitted
+# TYPE sacct_jobs_total_six_months_submitted gauge
+sacct_jobs_total_six_months_submitted{start_date="2025-08-23"} 301.0
+# HELP sacct_jobs_total_six_months_completed Slurm 6-month rolling job metric: completed
+# TYPE sacct_jobs_total_six_months_completed gauge
+sacct_jobs_total_six_months_completed{start_date="2025-08-23"} 223.0
+# HELP sacct_jobs_total_six_months_failed Slurm 6-month rolling job metric: failed
+# TYPE sacct_jobs_total_six_months_failed gauge
+sacct_jobs_total_six_months_failed{start_date="2025-08-23"} 51.0
+# HELP sacct_jobs_total_six_months_timeout Slurm 6-month rolling job metric: timeout
+# TYPE sacct_jobs_total_six_months_timeout gauge
+sacct_jobs_total_six_months_timeout{start_date="2025-08-23"} 23.0
+# HELP sacct_jobs_total_six_months_node_failed Slurm 6-month rolling job metric: node_failed
+# TYPE sacct_jobs_total_six_months_node_failed gauge
+sacct_jobs_total_six_months_node_failed{start_date="2025-08-23"} 1.0
+# HELP sacct_jobs_total_six_months_cancelled Slurm 6-month rolling job metric: cancelled
+# TYPE sacct_jobs_total_six_months_cancelled gauge
+sacct_jobs_total_six_months_cancelled{start_date="2025-08-23"} 3.0
+# HELP sacct_jobs_total_six_months_by_state Slurm 6-month rolling job metric by state
+# TYPE sacct_jobs_total_six_months_by_state gauge
+sacct_jobs_total_six_months_by_state{start_date="2025-08-23",state="completed"} 223.0
+sacct_jobs_total_six_months_by_state{start_date="2025-08-23",state="failed"} 51.0
+sacct_jobs_total_six_months_by_state{start_date="2025-08-23",state="timeout"} 23.0
+sacct_jobs_total_six_months_by_state{start_date="2025-08-23",state="node_failed"} 1.0
+sacct_jobs_total_six_months_by_state{start_date="2025-08-23",state="cancelled"} 3.0
+# HELP sacct_jobs_total_six_months_by_state_exit_code Slurm 6-month rolling job metric by state and exit code
+# TYPE sacct_jobs_total_six_months_by_state_exit_code gauge
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="1:0",reason="General failure",start_date="2025-08-23",state="failed"} 27.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="127:0",reason="Command not found",start_date="2025-08-23",state="failed"} 11.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="2:0",reason="Misuse of shell built-in",start_date="2025-08-23",state="failed"} 4.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="137:0",reason="SIGKILL - Force killed",start_date="2025-08-23",state="failed"} 4.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="143:0",reason="SIGTERM - Terminated",start_date="2025-08-23",state="failed"} 3.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="42:0",reason="Other",start_date="2025-08-23",state="failed"} 1.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="255:0",reason="Other",start_date="2025-08-23",state="failed"} 1.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="0:0",reason="",start_date="2025-08-23",state="timeout"} 23.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="1:0",reason="General failure",start_date="2025-08-23",state="node_failed"} 1.0
+sacct_jobs_total_six_months_by_state_exit_code{exit_code="0:0",reason="",start_date="2025-08-23",state="cancelled"} 3.0
+# HELP sacct_partition_jobs_total_six_months_submitted Slurm partition 6-month rolling job metric: sacct_partition_jobs_total_six_months_submitted
+# TYPE sacct_partition_jobs_total_six_months_submitted gauge
+sacct_partition_jobs_total_six_months_submitted{partition="hpc",start_date="2025-08-23"} 182.0
+sacct_partition_jobs_total_six_months_submitted{partition="htc",start_date="2025-08-23"} 112.0
+sacct_partition_jobs_total_six_months_submitted{partition="dynamic",start_date="2025-08-23"} 6.0
+sacct_partition_jobs_total_six_months_submitted{partition="gpu",start_date="2025-08-23"} 1.0
+# HELP sacct_partition_jobs_total_six_months_completed Slurm partition 6-month rolling job metric: sacct_partition_jobs_total_six_months_completed
+# TYPE sacct_partition_jobs_total_six_months_completed gauge
+sacct_partition_jobs_total_six_months_completed{partition="hpc",start_date="2025-08-23"} 138.0
+sacct_partition_jobs_total_six_months_completed{partition="htc",start_date="2025-08-23"} 80.0
+sacct_partition_jobs_total_six_months_completed{partition="dynamic",start_date="2025-08-23"} 5.0
+# HELP sacct_partition_jobs_total_six_months_failed Slurm partition 6-month rolling job metric: sacct_partition_jobs_total_six_months_failed
+# TYPE sacct_partition_jobs_total_six_months_failed gauge
+sacct_partition_jobs_total_six_months_failed{partition="hpc",start_date="2025-08-23"} 29.0
+sacct_partition_jobs_total_six_months_failed{partition="htc",start_date="2025-08-23"} 22.0
+# HELP sacct_partition_jobs_total_six_months_timeout Slurm partition 6-month rolling job metric: sacct_partition_jobs_total_six_months_timeout
+# TYPE sacct_partition_jobs_total_six_months_timeout gauge
+sacct_partition_jobs_total_six_months_timeout{partition="hpc",start_date="2025-08-23"} 15.0
+sacct_partition_jobs_total_six_months_timeout{partition="htc",start_date="2025-08-23"} 8.0
+# HELP sacct_partition_jobs_total_six_months_cancelled Slurm partition 6-month rolling job metric: sacct_partition_jobs_total_six_months_cancelled
+# TYPE sacct_partition_jobs_total_six_months_cancelled gauge
+sacct_partition_jobs_total_six_months_cancelled{partition="htc",start_date="2025-08-23"} 2.0
+sacct_partition_jobs_total_six_months_cancelled{partition="gpu",start_date="2025-08-23"} 1.0
+# HELP sacct_partition_jobs_total_six_months_node_failed Slurm partition 6-month rolling job metric: sacct_partition_jobs_total_six_months_node_failed
+# TYPE sacct_partition_jobs_total_six_months_node_failed gauge
+sacct_partition_jobs_total_six_months_node_failed{partition="dynamic",start_date="2025-08-23"} 1.0
+# HELP sacct_partition_jobs_total_six_months_by_state_exit_code Slurm partition 6-month rolling job metric by state and exit code
+# TYPE sacct_partition_jobs_total_six_months_by_state_exit_code gauge
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="1:0",partition="hpc",reason="General failure",start_date="2025-08-23",state="failed"} 15.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="127:0",partition="hpc",reason="Command not found",start_date="2025-08-23",state="failed"} 6.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="2:0",partition="hpc",reason="Misuse of shell built-in",start_date="2025-08-23",state="failed"} 3.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="137:0",partition="hpc",reason="SIGKILL - Force killed",start_date="2025-08-23",state="failed"} 3.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="143:0",partition="hpc",reason="SIGTERM - Terminated",start_date="2025-08-23",state="failed"} 1.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="42:0",partition="hpc",reason="Other",start_date="2025-08-23",state="failed"} 1.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="0:0",partition="hpc",reason="",start_date="2025-08-23",state="timeout"} 15.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="1:0",partition="htc",reason="General failure",start_date="2025-08-23",state="failed"} 12.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="127:0",partition="htc",reason="Command not found",start_date="2025-08-23",state="failed"} 5.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="2:0",partition="htc",reason="Misuse of shell built-in",start_date="2025-08-23",state="failed"} 1.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="137:0",partition="htc",reason="SIGKILL - Force killed",start_date="2025-08-23",state="failed"} 1.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="143:0",partition="htc",reason="SIGTERM - Terminated",start_date="2025-08-23",state="failed"} 2.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="255:0",partition="htc",reason="Other",start_date="2025-08-23",state="failed"} 1.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="0:0",partition="htc",reason="",start_date="2025-08-23",state="timeout"} 8.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="0:0",partition="htc",reason="",start_date="2025-08-23",state="cancelled"} 2.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="1:0",partition="dynamic",reason="General failure",start_date="2025-08-23",state="node_failed"} 1.0
+sacct_partition_jobs_total_six_months_by_state_exit_code{exit_code="0:0",partition="gpu",reason="",start_date="2025-08-23",state="cancelled"} 1.0
+# HELP sacct_jobs_total_one_week_submitted Slurm 1-week rolling job metric: submitted
+# TYPE sacct_jobs_total_one_week_submitted gauge
+sacct_jobs_total_one_week_submitted{start_date="2026-02-12"} 38.0
+# HELP sacct_jobs_total_one_week_completed Slurm 1-week rolling job metric: completed
+# TYPE sacct_jobs_total_one_week_completed gauge
+sacct_jobs_total_one_week_completed{start_date="2026-02-12"} 30.0
+# HELP sacct_jobs_total_one_week_failed Slurm 1-week rolling job metric: failed
+# TYPE sacct_jobs_total_one_week_failed gauge
+sacct_jobs_total_one_week_failed{start_date="2026-02-12"} 8.0
+# HELP sacct_jobs_total_one_week_by_state Slurm 1-week rolling job metric by state
+# TYPE sacct_jobs_total_one_week_by_state gauge
+sacct_jobs_total_one_week_by_state{start_date="2026-02-12",state="completed"} 30.0
+sacct_jobs_total_one_week_by_state{start_date="2026-02-12",state="failed"} 8.0
+# HELP sacct_jobs_total_one_week_by_state_exit_code Slurm 1-week rolling job metric by state and exit code
+# TYPE sacct_jobs_total_one_week_by_state_exit_code gauge
+sacct_jobs_total_one_week_by_state_exit_code{exit_code="1:0",reason="General failure",start_date="2026-02-12",state="failed"} 3.0
+sacct_jobs_total_one_week_by_state_exit_code{exit_code="42:0",reason="Other",start_date="2026-02-12",state="failed"} 1.0
+sacct_jobs_total_one_week_by_state_exit_code{exit_code="127:0",reason="Command not found",start_date="2026-02-12",state="failed"} 3.0
+sacct_jobs_total_one_week_by_state_exit_code{exit_code="255:0",reason="Other",start_date="2026-02-12",state="failed"} 1.0
+# HELP sacct_partition_jobs_total_one_week_submitted Slurm partition 1-week rolling job metric: sacct_partition_jobs_total_one_week_submitted
+# TYPE sacct_partition_jobs_total_one_week_submitted gauge
+sacct_partition_jobs_total_one_week_submitted{partition="hpc",start_date="2026-02-12"} 28.0
+sacct_partition_jobs_total_one_week_submitted{partition="htc",start_date="2026-02-12"} 10.0
+# HELP sacct_partition_jobs_total_one_week_completed Slurm partition 1-week rolling job metric: sacct_partition_jobs_total_one_week_completed
+# TYPE sacct_partition_jobs_total_one_week_completed gauge
+sacct_partition_jobs_total_one_week_completed{partition="hpc",start_date="2026-02-12"} 23.0
+sacct_partition_jobs_total_one_week_completed{partition="htc",start_date="2026-02-12"} 7.0
+# HELP sacct_partition_jobs_total_one_week_failed Slurm partition 1-week rolling job metric: sacct_partition_jobs_total_one_week_failed
+# TYPE sacct_partition_jobs_total_one_week_failed gauge
+sacct_partition_jobs_total_one_week_failed{partition="hpc",start_date="2026-02-12"} 5.0
+sacct_partition_jobs_total_one_week_failed{partition="htc",start_date="2026-02-12"} 3.0
+# HELP sacct_partition_jobs_total_one_week_by_state_exit_code Slurm partition 1-week rolling job metric by state and exit code
+# TYPE sacct_partition_jobs_total_one_week_by_state_exit_code gauge
+sacct_partition_jobs_total_one_week_by_state_exit_code{exit_code="1:0",partition="hpc",reason="General failure",start_date="2026-02-12",state="failed"} 2.0
+sacct_partition_jobs_total_one_week_by_state_exit_code{exit_code="42:0",partition="hpc",reason="Other",start_date="2026-02-12",state="failed"} 1.0
+sacct_partition_jobs_total_one_week_by_state_exit_code{exit_code="127:0",partition="hpc",reason="Command not found",start_date="2026-02-12",state="failed"} 2.0
+sacct_partition_jobs_total_one_week_by_state_exit_code{exit_code="127:0",partition="htc",reason="Command not found",start_date="2026-02-12",state="failed"} 1.0
+sacct_partition_jobs_total_one_week_by_state_exit_code{exit_code="1:0",partition="htc",reason="General failure",start_date="2026-02-12",state="failed"} 1.0
+sacct_partition_jobs_total_one_week_by_state_exit_code{exit_code="255:0",partition="htc",reason="Other",start_date="2026-02-12",state="failed"} 1.0
+# HELP sacct_jobs_total_one_month_submitted Slurm 30-day rolling job metric: submitted
+# TYPE sacct_jobs_total_one_month_submitted gauge
+sacct_jobs_total_one_month_submitted{start_date="2026-01-20"} 301.0
+# HELP sacct_jobs_total_one_month_completed Slurm 30-day rolling job metric: completed
+# TYPE sacct_jobs_total_one_month_completed gauge
+sacct_jobs_total_one_month_completed{start_date="2026-01-20"} 223.0
+# HELP sacct_jobs_total_one_month_failed Slurm 30-day rolling job metric: failed
+# TYPE sacct_jobs_total_one_month_failed gauge
+sacct_jobs_total_one_month_failed{start_date="2026-01-20"} 51.0
+# HELP sacct_jobs_total_one_month_timeout Slurm 30-day rolling job metric: timeout
+# TYPE sacct_jobs_total_one_month_timeout gauge
+sacct_jobs_total_one_month_timeout{start_date="2026-01-20"} 23.0
+# HELP sacct_jobs_total_one_month_node_failed Slurm 30-day rolling job metric: node_failed
+# TYPE sacct_jobs_total_one_month_node_failed gauge
+sacct_jobs_total_one_month_node_failed{start_date="2026-01-20"} 1.0
+# HELP sacct_jobs_total_one_month_cancelled Slurm 30-day rolling job metric: cancelled
+# TYPE sacct_jobs_total_one_month_cancelled gauge
+sacct_jobs_total_one_month_cancelled{start_date="2026-01-20"} 3.0
+# HELP sacct_jobs_total_one_month_by_state Slurm 30-day rolling job metric by state
+# TYPE sacct_jobs_total_one_month_by_state gauge
+sacct_jobs_total_one_month_by_state{start_date="2026-01-20",state="completed"} 223.0
+sacct_jobs_total_one_month_by_state{start_date="2026-01-20",state="failed"} 51.0
+sacct_jobs_total_one_month_by_state{start_date="2026-01-20",state="timeout"} 23.0
+sacct_jobs_total_one_month_by_state{start_date="2026-01-20",state="node_failed"} 1.0
+sacct_jobs_total_one_month_by_state{start_date="2026-01-20",state="cancelled"} 3.0
+# HELP sacct_jobs_total_one_month_by_state_exit_code Slurm 30-day rolling job metric by state and exit code
+# TYPE sacct_jobs_total_one_month_by_state_exit_code gauge
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="1:0",reason="General failure",start_date="2026-01-20",state="failed"} 27.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="127:0",reason="Command not found",start_date="2026-01-20",state="failed"} 11.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="2:0",reason="Misuse of shell built-in",start_date="2026-01-20",state="failed"} 4.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="137:0",reason="SIGKILL - Force killed",start_date="2026-01-20",state="failed"} 4.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="143:0",reason="SIGTERM - Terminated",start_date="2026-01-20",state="failed"} 3.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="42:0",reason="Other",start_date="2026-01-20",state="failed"} 1.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="255:0",reason="Other",start_date="2026-01-20",state="failed"} 1.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="0:0",reason="",start_date="2026-01-20",state="timeout"} 23.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="1:0",reason="General failure",start_date="2026-01-20",state="node_failed"} 1.0
+sacct_jobs_total_one_month_by_state_exit_code{exit_code="0:0",reason="",start_date="2026-01-20",state="cancelled"} 3.0
+# HELP sacct_partition_jobs_total_one_month_submitted Slurm partition 30-day rolling job metric: sacct_partition_jobs_total_one_month_submitted
+# TYPE sacct_partition_jobs_total_one_month_submitted gauge
+sacct_partition_jobs_total_one_month_submitted{partition="hpc",start_date="2026-01-20"} 182.0
+sacct_partition_jobs_total_one_month_submitted{partition="htc",start_date="2026-01-20"} 112.0
+sacct_partition_jobs_total_one_month_submitted{partition="dynamic",start_date="2026-01-20"} 6.0
+sacct_partition_jobs_total_one_month_submitted{partition="gpu",start_date="2026-01-20"} 1.0
+# HELP sacct_partition_jobs_total_one_month_completed Slurm partition 30-day rolling job metric: sacct_partition_jobs_total_one_month_completed
+# TYPE sacct_partition_jobs_total_one_month_completed gauge
+sacct_partition_jobs_total_one_month_completed{partition="hpc",start_date="2026-01-20"} 138.0
+sacct_partition_jobs_total_one_month_completed{partition="htc",start_date="2026-01-20"} 80.0
+sacct_partition_jobs_total_one_month_completed{partition="dynamic",start_date="2026-01-20"} 5.0
+# HELP sacct_partition_jobs_total_one_month_failed Slurm partition 30-day rolling job metric: sacct_partition_jobs_total_one_month_failed
+# TYPE sacct_partition_jobs_total_one_month_failed gauge
+sacct_partition_jobs_total_one_month_failed{partition="hpc",start_date="2026-01-20"} 29.0
+sacct_partition_jobs_total_one_month_failed{partition="htc",start_date="2026-01-20"} 22.0
+# HELP sacct_partition_jobs_total_one_month_timeout Slurm partition 30-day rolling job metric: sacct_partition_jobs_total_one_month_timeout
+# TYPE sacct_partition_jobs_total_one_month_timeout gauge
+sacct_partition_jobs_total_one_month_timeout{partition="hpc",start_date="2026-01-20"} 15.0
+sacct_partition_jobs_total_one_month_timeout{partition="htc",start_date="2026-01-20"} 8.0
+# HELP sacct_partition_jobs_total_one_month_cancelled Slurm partition 30-day rolling job metric: sacct_partition_jobs_total_one_month_cancelled
+# TYPE sacct_partition_jobs_total_one_month_cancelled gauge
+sacct_partition_jobs_total_one_month_cancelled{partition="htc",start_date="2026-01-20"} 2.0
+sacct_partition_jobs_total_one_month_cancelled{partition="gpu",start_date="2026-01-20"} 1.0
+# HELP sacct_partition_jobs_total_one_month_node_failed Slurm partition 30-day rolling job metric: sacct_partition_jobs_total_one_month_node_failed
+# TYPE sacct_partition_jobs_total_one_month_node_failed gauge
+sacct_partition_jobs_total_one_month_node_failed{partition="dynamic",start_date="2026-01-20"} 1.0
+# HELP sacct_partition_jobs_total_one_month_by_state_exit_code Slurm partition 30-day rolling job metric by state and exit code
+# TYPE sacct_partition_jobs_total_one_month_by_state_exit_code gauge
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="1:0",partition="hpc",reason="General failure",start_date="2026-01-20",state="failed"} 15.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="127:0",partition="hpc",reason="Command not found",start_date="2026-01-20",state="failed"} 6.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="2:0",partition="hpc",reason="Misuse of shell built-in",start_date="2026-01-20",state="failed"} 3.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="137:0",partition="hpc",reason="SIGKILL - Force killed",start_date="2026-01-20",state="failed"} 3.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="143:0",partition="hpc",reason="SIGTERM - Terminated",start_date="2026-01-20",state="failed"} 1.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="42:0",partition="hpc",reason="Other",start_date="2026-01-20",state="failed"} 1.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="0:0",partition="hpc",reason="",start_date="2026-01-20",state="timeout"} 15.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="1:0",partition="htc",reason="General failure",start_date="2026-01-20",state="failed"} 12.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="127:0",partition="htc",reason="Command not found",start_date="2026-01-20",state="failed"} 5.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="2:0",partition="htc",reason="Misuse of shell built-in",start_date="2026-01-20",state="failed"} 1.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="137:0",partition="htc",reason="SIGKILL - Force killed",start_date="2026-01-20",state="failed"} 1.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="143:0",partition="htc",reason="SIGTERM - Terminated",start_date="2026-01-20",state="failed"} 2.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="255:0",partition="htc",reason="Other",start_date="2026-01-20",state="failed"} 1.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="0:0",partition="htc",reason="",start_date="2026-01-20",state="timeout"} 8.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="0:0",partition="htc",reason="",start_date="2026-01-20",state="cancelled"} 2.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="1:0",partition="dynamic",reason="General failure",start_date="2026-01-20",state="node_failed"} 1.0
+sacct_partition_jobs_total_one_month_by_state_exit_code{exit_code="0:0",partition="gpu",reason="",start_date="2026-01-20",state="cancelled"} 1.0
+# HELP azslurm_cluster_info Static cluster information from azslurm
+# TYPE azslurm_cluster_info gauge
+azslurm_cluster_info{cluster_name="azslurm-exporter",region="westeurope",resource_group="azcyclecloudwesteu-rg",subscription_id="cbbe2034-c78b-4e9b-89b4-8b78530247e5"} 1.0
+# HELP azslurm_partition_info Static partition information from azslurm with VM size and node details
+# TYPE azslurm_partition_info gauge
+azslurm_partition_info{available_azure_quota="4",node_list="dyn1-[1-10],dyn2-[1-10],g1",partition="dynamic",vm_size="Standard_F2s_v2"} 4.0
+azslurm_partition_info{available_azure_quota="4",node_list="dyn1-[1-10],dyn2-[1-10],g1",partition="dynamic",vm_size="Standard_D2ds_v5"} 4.0
+azslurm_partition_info{available_azure_quota="0",node_list="dyn1-[1-10],dyn2-[1-10],g1",partition="dynamic",vm_size="Standard_NC80adis_H100_v5"} 0.0
+azslurm_partition_info{available_azure_quota="1",node_list="azslurm-exporter-gpu-1",partition="gpu",vm_size="Standard_NC80adis_H100_v5"} 1.0
+azslurm_partition_info{available_azure_quota="4",node_list="azslurm-exporter-hpc-[1-16]",partition="hpc",vm_size="Standard_F2s_v2"} 0.0
+azslurm_partition_info{available_azure_quota="4",node_list="azslurm-exporter-htc-[1-50]",partition="htc",vm_size="Standard_F2s_v2"} 4.0
+# HELP slurm_exporter_collect_duration_seconds Time spent collecting Slurm metrics
+# TYPE slurm_exporter_collect_duration_seconds gauge
+slurm_exporter_collect_duration_seconds 0.69551682472229
+# HELP slurm_exporter_last_collect_timestamp_seconds Timestamp of last successful metric collection
+# TYPE slurm_exporter_last_collect_timestamp_seconds gauge
+slurm_exporter_last_collect_timestamp_seconds 1.771529638582487e+09
