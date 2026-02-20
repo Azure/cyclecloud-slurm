@@ -37,6 +37,41 @@
       "type": "row"
     },
     {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false,
+            "minWidth": 150
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 11,
         "w": 16,
@@ -44,12 +79,101 @@
         "y": 1
       },
       "id": 1050,
-      "libraryPanel": {
-        "name": "Failed Jobs by Exit Code in last week",
-        "uid": "cfbjxnqn2hnnkf"
+      "options": {
+        "cellHeight": "lg",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": []
       },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sacct_partition_jobs_total_one_week_by_state_exit_code{cluster=\"$cluster\",partition=~\"$partition\"}",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
       "title": "Failed Jobs by Exit Code in last week",
-      "type": "library-panel-ref"
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {}
+        },
+        {
+          "disabled": true,
+          "id": "labelsToFields",
+          "options": {
+            "keepLabels": [
+              "exit_code",
+              "partition",
+              "state"
+            ],
+            "mode": "columns"
+          }
+        },
+        {
+          "disabled": true,
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "partition"
+            ],
+            "keepFields": false,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "__name__": true,
+              "cluster": true,
+              "instance": true,
+              "job": true,
+              "physical_host": true,
+              "start_datetime hpc": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #A": 3,
+              "__name__": 0,
+              "cluster": 1,
+              "exit_code": 5,
+              "instance": 6,
+              "job": 7,
+              "partition": 2,
+              "physical_host": 8,
+              "start_datetime": 9,
+              "state": 4,
+              "subscription": 10
+            },
+            "renameByName": {
+              "Trend #A": "# of Failed Jobs"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
