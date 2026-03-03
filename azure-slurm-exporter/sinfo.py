@@ -38,11 +38,6 @@ class Sinfo(BaseCollector):
     def initialize(self) -> None:
         """
         Initialize the Sinfo object by validating the binary path.
-
-        Checks if the binary file at self.binary_path exists and is executable.
-
-        Raises:
-            SinfoNotAvailException: If the binary path is not a valid file or not executable.
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -50,40 +45,21 @@ class Sinfo(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously.
-
-        This method initializes the metric collection process and runs it at regular
-        intervals as defined by the configured downstream interval. The collection
-        runs asynchronously without blocking the event loop.
+        Begin collecting metrics asynchronously and runs it at regular
+        intervals as defined by the configured downstream interval.
         """
         self.launch_task(func=self.sinfo_query, interval=self.interval)
 
     def export_metrics(self) -> List[Gauge]:
         """
-        Return metrics in Prometheus-compatible format.
-
-        Returns:
-            list: A list of metric objects in Prometheus-compatible format,
-                  ready for exposition to monitoring backends.
+        Return metrics in Prometheus-compatible format from cache.
         """
         return self.cached_output["sinfo_query"]
 
     def normalize_state(self, state) -> str:
         """
-        Normalize SLURM node state by mapping state suffixes to their base states.
-
-        This method extracts the last character of the input state string and checks if it
-        matches a known suffix in STATE_SUFFIXES. If a matching suffix is found, it returns
-        the mapped state value; otherwise, it returns the original state string unchanged.
-
-        Args:
-            state (str): The SLURM node state string that may contain a suffix character.
-
-        Returns:
-            str: The normalized state. If the last character is a known suffix, returns the
-                 mapped state value from STATE_SUFFIXES. Otherwise, returns the original
-                 state string.
-
+        Normalize SLURM node state by mapping state suffixes to their base states. If
+        node state has a suffix, then we set that node's state to the suffix state.
         """
         suffix = state[-1]
         if suffix in self.STATE_SUFFIXES:
@@ -93,19 +69,8 @@ class Sinfo(BaseCollector):
 
     def parse_output(self, stdout) -> List[Gauge]:
         """
-        Parse the output from the sinfo command and create a Gauge metric.
-
-        This method processes the stdout from an sinfo command execution, parses each line
-        into structured data, normalizes the node state, and creates a Prometheus Gauge metric
-        that tracks the number of nodes in each state per partition.
-
-        Args:
-            stdout (bytes): The raw output from the sinfo command as bytes.
-
-        Returns:
-            list: A list containing a single Gauge metric object with labels for node_list,
-                  partition, state, and reason, where the metric value represents the number
-                  of nodes in that particular state.
+        Parse the output from the sinfo command and create a Gauge metric that track each nodelist's
+        state per partition.
         """
         sinfo_partitions_nodes_state = Gauge(
                 f"sinfo_partition_nodes_state",
@@ -126,10 +91,7 @@ class Sinfo(BaseCollector):
 
     async def sinfo_query(self) -> None:
         """
-        Execute sinfo command asynchronously and cache the results.
-
-        This method runs the sinfo command with configured default options and a specified timeout.
-        The command output is parsed and stored in the cached_output dictionary for later retrieval.
+        Execute sinfo command asynchronously and cache the parsed output in prometheus metric format.
         """
         args = [self.binary_path]
         args.extend(self.default_options)
