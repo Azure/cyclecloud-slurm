@@ -93,11 +93,15 @@ def execute() -> None:
 
     for fil in os.listdir(build_dir):
         # Skip platform-specific or unnecessary packages
+        skip_packages = ["aiohttp", "frozenlist","multidict","propcache","yarl"]
+        if any(pkg in fil.lower() for pkg in skip_packages):
+            print(f"WARNING: Ignoring unnecessary package {fil}, platform specific or not needed.")
+            continue
         path = os.path.join(build_dir, fil)
         _add("packages/" + fil, path)
 
     _add("exporter_logging.conf", "conf/exporter_logging.conf")
-
+    _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ set -e
 do_install=$(jetpack config slurm.do_install True)
 install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.6.tar.gz)
 autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.6.tar.gz)
+exporter_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-exporter-pkg-4.0.6.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
 
 find_python3() {
@@ -52,29 +53,29 @@ install_python3() {
         echo "Detected AlmaLinux. Installing Python 3.12..." >&2
         yum install -y python3.12 python3.12-pyyaml
         PYTHON_BIN="/usr/bin/python3.12"
-        
+
     elif [ "$OS" == "ubuntu" ] && [ "$VERSION_ID" == "22.04" ]; then
         echo "Detected Ubuntu 22.04. Installing Python 3.11..." >&2
         apt update
         # We need python dev headers and systemd dev headers for same reaosn mentioned above.
         apt install -y python3.11 python3.11-venv python3-yaml
         PYTHON_BIN="/usr/bin/python3.11"
-        
+
     elif [ "$OS" == "ubuntu" ] && [[ $VERSION =~ ^24\.* ]]; then
         echo "Detected Ubuntu 24. Installing Python 3.12..." >&2
         apt update
         apt install -y python3.12 python3.12-venv python3-yaml
         PYTHON_BIN="/usr/bin/python3.12"
-    
+
     elif [ "$OS" == "rhel" ]; then
         echo "Detected RHEL, using system python3..." >&2
         PYTHON_BIN="/usr/bin/python3"
-    
+
     elif [ "$OS" == "sle_hpc" ]; then
         echo "Detected SUSE, installing Python 3.11..." >&2
         zypper install -y python311 python311-virtualenv python311-PyYAML
         PYTHON_BIN="/usr/bin/python3.11"
-    
+
     else
         echo "Unsupported operating system: $OS $VERSION_ID" >&2
         exit 1
@@ -99,6 +100,12 @@ rm -rf azure-slurm
 jetpack download --project $slurm_project_name $autoscale_pkg
 tar xzf $autoscale_pkg
 cd azure-slurm
+AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
+
+rm -rf azure-slurm-exporter
+jetpack download --project $slurm_project_name $exporter_pkg
+tar xzf $exporter_pkg
+cd azure-slurm-exporter
 AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
 
 echo "installation complete. Run start-services scheduler|execute|login to start the slurm services."
