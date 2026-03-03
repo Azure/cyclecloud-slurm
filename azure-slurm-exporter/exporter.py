@@ -1,8 +1,10 @@
 import asyncio
 import logging
+import logging.config
 import signal
 import sys
 import time
+import os
 from prometheus_client import CollectorRegistry, Metric, Counter, Gauge, Summary
 from abc import ABC, abstractmethod
 from functools import partial
@@ -185,11 +187,9 @@ class AzslurmCollector:
 
 
 async def main():
-    #TODO: file based logging
-    logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s %(name)s %(levelname)s %(message)s"
-    )
+
+    if os.path.exists("exporter_logging.conf"):
+        logging.config.fileConfig("exporter_logging.conf")
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
 
