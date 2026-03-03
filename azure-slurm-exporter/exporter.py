@@ -24,11 +24,8 @@ class BaseCollector(ABC):
     @abstractmethod
     async def start(self) -> None:
         """
-        Begin collecting metrics asynchronously.
-
-        This method initializes the metric collection process and runs it at regular
-        intervals as defined by the configured downstream interval. The collection
-        runs asynchronously without blocking the event loop.
+        Begin collecting metrics asynchronously and runs it at regular
+        intervals as defined by the configured downstream interval.
         """
         ...
 
@@ -36,34 +33,13 @@ class BaseCollector(ABC):
     def export_metrics(self) -> List[Union[Gauge,Counter,Summary]]:
         """
         Return metrics in Prometheus-compatible format.
-
-        Returns:
-            list: A list of metric objects in Prometheus-compatible format,
-                  ready for exposition to monitoring backends.
         """
         ...
 
     async def run_command(self, *args, timeout=120,) -> CommandResult:
         """
-        Execute a command asynchronously and capture its output.
-
-        This method runs an external command in a subprocess, capturing both stdout
+        Executes a command asynchronously in a subprocess, capturing both stdout
         and stderr, with support for timeout handling.
-
-        Args:
-            *args: Command and arguments to execute. Each argument is converted to string.
-            timeout (int, optional): Maximum time in seconds to wait for command completion.
-                Defaults to 120 seconds.
-
-        Returns:
-            CommandResult: An object containing:
-                - returncode (int): The exit code of the process
-                - stdout (bytes): The standard output of the command
-                - stderr (bytes): The standard error output of the command
-
-        Raises:
-            RuntimeError: If the command exceeds the specified timeout duration.
-                The process is terminated before raising this exception.
         """
         start = time.monotonic()
         cmd_str = " ".join(str(a) for a in args)
@@ -84,27 +60,14 @@ class BaseCollector(ABC):
 
     def launch_task(self, func, interval) -> None:
         """
-        Launch an asynchronous task that executes a function at regular intervals.
-
-        Args:
-            func: A callable function to be executed repeatedly.
-            interval: The time interval (in seconds) between successive executions of the function.
+        Launch an asynchronous task that executes a callable function at regular intervals.
         """
 
         asyncio.create_task(self.__schedule(func, interval))
 
     async def __schedule(self, func, interval: int) -> None:
         """
-        Schedule a function to be executed periodically at specified intervals.
-
-        Args:
-            func: A callable function to be scheduled for execution.
-            interval (int): The time interval in seconds between function executions.
-
-        Notes:
-            - This is an async method that executes the function once immediately,
-              then schedules subsequent executions using asyncio's call_later.
-            - The function is executed in a non-blocking manner using asyncio.
+        Schedule a callable function to be executed periodically at specified intervals.
         """
         if callable(func):
             reponse = await func()
@@ -120,18 +83,11 @@ class AzslurmCollector:
     def initialize_collectors(self) -> None:
         """
         Initialize and start all collectors concurrently.
-
-        Attempts to initialize three types of collectors in sequence:
         - Squeue: Collects job queue information
         - Sacct: Collects job accounting data
-        - Sinfo: Collects node/partition information
-
-        Each collector is independently initialized and added to the collectors list
-        if available. If a collector is not available, a warning is logged and the
-        initialization continues with the next collector.
-
-        Raises:
-            NoCollectorsFoundException: If no collectors were successfully initialized.
+        - Sinfo: Collects node/partition
+        - Azslurm: Collects partition specs
+        - Jetpack: Collects cluster specs
         """
         try:
             from squeue import Squeue, SqueueNotAvailException
@@ -160,6 +116,24 @@ class AzslurmCollector:
         else:
             self.collectors.append(sinfo)
 
+        try:
+            from azslurm import Azslurm, AzslurmNotAvailException
+            azslurm = Azslurm()
+            azslurm.initialize()
+        except AzslurmNotAvailException:
+            log.warning("azslurm is not available, disabling azslurm metrics")
+        else:
+            self.collectors.append(azslurm)
+
+        try:
+            from jetpack import Jetpack, JetpackNotAvailException
+            jetpack = Jetpack()
+            jetpack.initialize()
+        except JetpackNotAvailException:
+            log.warning("jetpack is not available, disabling jetpack metrics")
+        else:
+            self.collectors.append(jetpack)
+
         if not self.collectors:
             log.error("No collectors intialized")
             raise NoCollectorsFoundException
@@ -169,13 +143,6 @@ class AzslurmCollector:
     def export_metrics(self) -> List[Union[Gauge,Counter,Summary]]:
         """
         Collect and aggregate metrics from all configured collectors.
-
-        Iterates through ``self.collectors``, calls each collector's
-        ``export_metrics()`` method, and combines all returned metric items
-        into a single list.
-
-        Returns:
-            list: A flattened list containing metric objects from every collector.
         """
 
         metrics = []
@@ -185,43 +152,18 @@ class AzslurmCollector:
 
     def collect(self) -> Iterator[Metric]:
         """
-        Collect and yield Prometheus metrics.
-
-        This method retrieves exported metrics and iterates through them,
-        yielding collected metric samples for each metric object.
-
-        Yields:
-            Metric samples from each exported metric's collect() method.
+        Collect and yield Prometheus metrics every scrape interval
         """
 
         metrics = self.export_metrics()
         for metric in metrics:
             yield from metric.collect()
 
-    async def start_http_server(self, host, port) -> web.AppRunner:
+    async def start_http_server(self, host:str, port:int) -> web.AppRunner:
         """
-        Start an HTTP server for Prometheus metrics collection.
-
-        This asynchronous method initializes and starts an aiohttp web server that
+        Initializes and starts an aiohttp web server that
         exposes Prometheus metrics on the /metrics endpoint. The server listens on
         the specified host and port.
-        Args:
-            host (str): The host address to bind the server to (e.g., '0.0.0.0').
-            port (int): The port number to listen on (e.g., 9101).
-
-        Returns:
-            web.AppRunner: The runner object for the started HTTP server, which can
-                           be used to manage the server lifecycle.
-
-        Raises:
-            HTTPServerFailedException: Raised if the server fails to bind to the
-                                       specified host and port (OSError) or if any
-                                       unexpected error occurs during server startup.
-
-        Note:
-            The server registers the current instance as a Prometheus collector
-            to expose metrics. After calling this method, metrics will be available
-            at at http://{host}:{port}/metrics.
         """
         try:
             registry = CollectorRegistry()
@@ -243,7 +185,7 @@ class AzslurmCollector:
 
 
 async def main():
-    #TODO: file based logging 
+    #TODO: file based logging
     logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(name)s %(levelname)s %(message)s"

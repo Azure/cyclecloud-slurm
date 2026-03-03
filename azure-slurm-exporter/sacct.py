@@ -37,7 +37,7 @@ class Sacct(BaseCollector):
         self.interval = interval
         self.timeout = timeout
         self.sacct_terminal_jobs= Counter("sacct_terminal_jobs","Total Number of completed slurm jobs",
-                                    ["partition", "exit_code","reason","state"], registry=None)
+                                    ["partition", "exit_code","reason","state", "nodelist"], registry=None)
         self.default_output_fmt = "jobid,jobname,nodelist,nnodes,partition,exitcode,derivedexitcode,state,user,start,submit,end,reason"
         self.sacct_output = namedtuple("sacct_output", self.default_output_fmt)
         self.terminal_states = "completed,failed,cancelled,timeout,node_fail,preempted,out_of_memory,deadline,boot_fail"
@@ -48,12 +48,6 @@ class Sacct(BaseCollector):
     def initialize(self) -> None:
         """
         Initialize the Sacct instance by validating the binary and disabling created metrics.
-
-        Checks if the sacct binary exists and is executable. If the binary is not found
-        or is not executable, logs an error and raises an exception.
-
-        Raises:
-            SacctNotAvailException: If the sacct binary is not available or not executable.
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -62,21 +56,14 @@ class Sacct(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously.
-
-        This method initializes the metric collection process and runs it at regular
-        intervals as defined by the configured downstream interval. The collection
-        runs asynchronously without blocking the event loop.
+        Begin collecting metrics asynchronously and runs it at regular
+        intervals as defined by the configured downstream interval.
         """
         self.launch_task(func=self.sacct_query, interval=self.interval)
 
     def export_metrics(self) -> List[Counter]:
         """
         Return metrics in Prometheus-compatible format.
-
-        Returns:
-            list: A list of metric objects in Prometheus-compatible format,
-                  ready for exposition to monitoring backends.
         """
         #TODO: DO we need to lock this?
         return [self.sacct_terminal_jobs]
@@ -84,15 +71,7 @@ class Sacct(BaseCollector):
     def parse_output(self, stdout) -> None:
         """
         Parse sacct command output and increment terminal job metrics.
-
-        Processes the raw stdout from sacct command, splits it into lines and fields,
-        and updates Prometheus metrics for completed SLURM jobs with their partition,
-        exit code, reason, and state.
-
-        Args:
-            stdout (bytes): The raw output from sacct command execution.
         """
-        seen={}
         lines = stdout.decode().strip().splitlines()
         log.debug(f"Number of jobs:{len(lines)}")
         lines_iter = (line.split("|") for line in lines)
@@ -102,23 +81,18 @@ class Sacct(BaseCollector):
                 partition=row.partition,
                 exit_code=row.exitcode,
                 reason=reason,
-                state=row.state).inc()
+                state=row.state,
+                nodelist=row.nodelist).inc()
 
     async def sacct_query(self) -> None:
         """
-        Query SLURM accounting data (sacct) for jobs within a specified time window.
-
-        This method queries sacct filtering by a time window of size `interval`, which represents
-        the frequency at which queries are executed. For example, if interval is 5 minutes, the
-        query retrieves job data from the last 5 minutes.
+        Queries sacct filtering by a time window of size `interval`, which represents
+        the frequency at which queries are executed.
 
         The time window progresses as follows:
         - The start time of the current query is set to the end time of the previous query
         - The end time is set to the current moment when the query is executed
         - After execution, starttime is updated to the current endtime for the next query iteration
-
-        The method constructs and executes the sacct command with appropriate filters and handles
-        any exceptions that occur during query execution. Query output is parsed upon successful completion.
         """
         args = []
         self.endtime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
