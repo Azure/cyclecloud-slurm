@@ -1,9 +1,9 @@
-from exporter import BaseCollector
+from .exporter import BaseCollector
 from collections import namedtuple
 from prometheus_client import Counter, disable_created_metrics
 from datetime import datetime, timedelta
 import logging
-import util as util
+import exporter.util as util
 from typing import List
 log = logging.getLogger(__name__)
 

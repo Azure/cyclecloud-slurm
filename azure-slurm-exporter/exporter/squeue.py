@@ -1,9 +1,9 @@
-from exporter import BaseCollector
+from .exporter import BaseCollector
 from collections import namedtuple
 from prometheus_client import Gauge
 from dataclasses import dataclass, field
 import logging
-import util
+import exporter.util as util
 from typing import List
 # @dataclass
 # class SqueueMetrics:

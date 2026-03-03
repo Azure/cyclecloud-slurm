@@ -1,8 +1,8 @@
-from exporter import BaseCollector
+from .exporter import BaseCollector
 from collections import namedtuple
 from prometheus_client import Gauge
 import logging
-import util as util
+import exporter.util as util
 from typing import List
 
 log = logging.getLogger(__name__)

@@ -92,7 +92,7 @@ class AzslurmCollector:
         - Jetpack: Collects cluster specs
         """
         try:
-            from squeue import Squeue, SqueueNotAvailException
+            from exporter.squeue import Squeue, SqueueNotAvailException
             squeue = Squeue()
             squeue.initialize()
         except SqueueNotAvailException:
@@ -101,7 +101,7 @@ class AzslurmCollector:
             self.collectors.append(squeue)
 
         try:
-            from sacct import Sacct, SacctNotAvailException
+            from exporter.sacct import Sacct, SacctNotAvailException
             sacct = Sacct()
             sacct.initialize()
         except SacctNotAvailException:
@@ -110,7 +110,7 @@ class AzslurmCollector:
             self.collectors.append(sacct)
 
         try:
-            from sinfo import Sinfo, SinfoNotAvailException
+            from exporter.sinfo import Sinfo, SinfoNotAvailException
             sinfo = Sinfo()
             sinfo.initialize()
         except SinfoNotAvailException:
@@ -119,7 +119,7 @@ class AzslurmCollector:
             self.collectors.append(sinfo)
 
         try:
-            from azslurm import Azslurm, AzslurmNotAvailException
+            from exporter.azslurm import Azslurm, AzslurmNotAvailException
             azslurm = Azslurm()
             azslurm.initialize()
         except AzslurmNotAvailException:
@@ -128,7 +128,7 @@ class AzslurmCollector:
             self.collectors.append(azslurm)
 
         try:
-            from jetpack import Jetpack, JetpackNotAvailException
+            from exporter.jetpack import Jetpack, JetpackNotAvailException
             jetpack = Jetpack()
             jetpack.initialize()
         except JetpackNotAvailException:
