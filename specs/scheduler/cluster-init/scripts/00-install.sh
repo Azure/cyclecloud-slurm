@@ -6,6 +6,7 @@ install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.6.tar
 autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.6.tar.gz)
 exporter_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-exporter-pkg-4.0.6.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
+monitoring_enabled=$(jetpack config cyclecloud.monitoring.enabled False)
 
 find_python3() {
     export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
@@ -102,10 +103,12 @@ tar xzf $autoscale_pkg
 cd azure-slurm
 AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
 
-rm -rf azure-slurm-exporter
-jetpack download --project $slurm_project_name $exporter_pkg
-tar xzf $exporter_pkg
-cd azure-slurm-exporter
-AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
+if [[ "$monitoring_enabled" == "True" ]]; then
+    rm -rf azure-slurm-exporter
+    jetpack download --project $slurm_project_name $exporter_pkg
+    tar xzf $exporter_pkg
+    cd azure-slurm-exporter
+    AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
+fi
 
 echo "installation complete. Run start-services scheduler|execute|login to start the slurm services."

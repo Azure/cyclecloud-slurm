@@ -40,16 +40,8 @@ setup_venv() {
     python3 -m pip install --upgrade --no-deps packages/*
 
     # Create exporter executable
-    # NOTE: dynamically generated due to the SCALELIB_LOG_USER and SCALELIB_LOG_GROUP
     cat > $VENV/bin/azslurm-exporter <<EOF
 #!$VENV/bin/python
-
-import os
-
-if "SCALELIB_LOG_USER" not in os.environ:
-    os.environ["SCALELIB_LOG_USER"] = "$SCALELIB_LOG_USER"
-if "SCALELIB_LOG_GROUP" not in os.environ:
-    os.environ["SCALELIB_LOG_GROUP"] = "$SCALELIB_LOG_GROUP"
 
 from exporter import main
 import asyncio
@@ -63,13 +55,10 @@ EOF
     fi
 
     ln -sf $VENV/bin/azslurm-exporter ~/bin/
-
-    azslurm-exporter -h 2>&1 > /dev/null || exit 1
 }
 
 setup_install_dir() {
-    mkdir -p $INSTALL_DIR/logs
-    cp exporter-logging.conf $INSTALL_DIR/
+    cp exporter_logging.conf $INSTALL_DIR/
 }
 
 setup_azslurm_exporter() {
@@ -92,10 +81,6 @@ EOF
     systemctl enable azslurm-exporter
 }
 
-no_jetpack() {
-    echo "--no-jetpack is set. Please run $INSTALL_DIR/init-config.sh then $INSTALL_DIR/post-install.sh."
-}
-
 require_root() {
     if [ $(whoami) != root ]; then
     echo "Please run as root"
@@ -107,22 +92,14 @@ parse_args_set_variables() {
     export SCHEDULER=slurm
     export VENV=/opt/azurehpc/azslurm-exporter/venv
     export INSTALL_DIR=$(dirname $VENV)
-    export NO_JETPACK=0
-    # if jetpack doesn't exist or this is not defined, it will silently use slurm as default
-    export SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
-    export SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
     # Set this globally before running main.
     export PYTHON_PATH=$(find_python3)
     export PATH=$PATH:/root/bin
 
     while (( "$#" )); do
         case "$1" in
-            --no-jetpack)
-                NO_JETPACK=1
-                shift
-                ;;
             --help)
-                echo "Usage: $0 [--no-jetpack]"
+                echo "Usage: $0"
                 exit 0
                 ;;
             -*|--*=)
@@ -150,41 +127,6 @@ require_root() {
     echo "Please run as root"
     exit 1
     fi
-}
-
-
-parse_args_set_variables() {
-    export SCHEDULER=slurm
-    export VENV=/opt/azurehpc/azslurm-exporter/venv
-    export INSTALL_DIR=$(dirname $VENV)
-    export NO_JETPACK=0
-    # if jetpack doesn't exist or this is not defined, it will silently use slurm as default
-    export SCALELIB_LOG_USER=$(jetpack config slurm.user.name 2> /dev/null || echo slurm)
-    export SCALELIB_LOG_GROUP=$(jetpack config slurm.group.name 2>/dev/null || echo slurm)
-    # Set this globally before running main.
-    export PYTHON_PATH=$(find_python3)
-    export PATH=$PATH:/root/bin
-
-    while (( "$#" )); do
-        case "$1" in
-            --no-jetpack)
-                NO_JETPACK=1
-                shift
-                ;;
-            --help)
-                echo "Usage: $0 [--no-jetpack]"
-                exit 0
-                ;;
-            -*|--*=)
-                echo "Unknown option $1" >&2
-                exit 1
-                ;;
-            *)
-                echo "Unknown option  $1" >&2
-                exit 1
-                ;;
-        esac
-    done
 }
 
 require_root
