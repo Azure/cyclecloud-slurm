@@ -52,7 +52,8 @@ if "SCALELIB_LOG_GROUP" not in os.environ:
     os.environ["SCALELIB_LOG_GROUP"] = "$SCALELIB_LOG_GROUP"
 
 from exporter import main
-main()
+import asyncio
+asyncio.run(main())
 EOF
 
 
@@ -66,7 +67,10 @@ EOF
     azslurm-exporter -h 2>&1 > /dev/null || exit 1
 }
 
-
+setup_install_dir() {
+    mkdir -p $INSTALL_DIR/logs
+    cp exporter-logging.conf $INSTALL_DIR/
+}
 
 setup_azslurm_exporter() {
     cat > /etc/systemd/system/azslurm-exporter.service <<EOF
@@ -134,9 +138,10 @@ parse_args_set_variables() {
 }
 
 main() {
-    # create the venv and make sure azslurm is in the path
+    # create the venv and make sure azslurm-exporter is in the path
     setup_venv
-    # setup the azslurmd but do not start it.
+    setup_install_dir
+    # setup the azslurm-exporter but do not start it.
     setup_azslurm_exporter
 }
 
