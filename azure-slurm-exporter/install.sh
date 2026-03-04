@@ -56,6 +56,32 @@ EOF
 
     ln -sf $VENV/bin/azslurm-exporter ~/bin/
 }
+add_scraper() {
+    # If az_exporter is already configured, do not add it again
+    if grep -q "azslurm_exporter" $PROM_CONFIG; then
+        echo "AzSlurm Exporter is already configured in Prometheus"
+        return 0
+    fi
+    INSTANCE_NAME=$(hostname)
+
+    cat > azslurm-exporter.yml <<-EOF
+    scrape_configs:
+    - job_name: azslurm_exporter
+      static_configs:
+      - targets: ["instance_name:9101"]
+      relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(:[0-9]+)?'
+        replacement: '\${1}'
+EOF
+
+    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG azslurm-exporter.yml > tmp.yml
+    mv -vf tmp.yml $PROM_CONFIG
+
+    # update the configuration file
+    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
+}
 
 setup_install_dir() {
     mkdir -p $INSTALL_DIR/logs
@@ -96,6 +122,7 @@ parse_args_set_variables() {
     # Set this globally before running main.
     export PYTHON_PATH=$(find_python3)
     export PATH=$PATH:/root/bin
+    export PROM_CONFIG=/opt/prometheus/prometheus.yml
 
     while (( "$#" )); do
         case "$1" in
@@ -119,6 +146,7 @@ main() {
     # create the venv and make sure azslurm-exporter is in the path
     setup_venv
     setup_install_dir
+    add_scraper
     # setup the azslurm-exporter but do not start it.
     setup_azslurm_exporter
 }
