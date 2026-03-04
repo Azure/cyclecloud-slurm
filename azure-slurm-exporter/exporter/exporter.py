@@ -13,7 +13,7 @@ from aiohttp import web
 from prometheus_client.aiohttp import make_aiohttp_handler
 from typing import Iterator, List, Union
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("root")
 CommandResult = namedtuple("CommandResult", ["returncode", "stdout", "stderr"])
 
 class NoCollectorsFoundException(Exception):
