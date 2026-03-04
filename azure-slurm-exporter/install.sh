@@ -58,6 +58,7 @@ EOF
 }
 
 setup_install_dir() {
+    mkdir -p $INSTALL_DIR/logs
     cp exporter_logging.conf $INSTALL_DIR/
 }
 
