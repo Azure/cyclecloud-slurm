@@ -187,8 +187,8 @@ class AzslurmCollector:
 
 
 async def main():
-    if os.path.exists("exporter_logging.conf"):
-        logging.config.fileConfig("exporter_logging.conf")
+    if os.path.exists("/opt/azurehpc/azslurm-exporter/exporter_logging.conf"):
+        logging.config.fileConfig("/opt/azurehpc/azslurm-exporter/exporter_logging.conf")
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
