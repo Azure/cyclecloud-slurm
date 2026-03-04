@@ -847,7 +847,6 @@ def setup_slurmrestd(s: InstallSettings) -> None:
 
     if s.monitoring_enabled:
         _configure_jwt_authentication(s)
-        _add_azslurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/azslurm-exporter.yml")
 
     ilib.enable_service("slurmrestd")
 
@@ -873,51 +872,6 @@ def _configure_jwt_authentication(s: InstallSettings) -> None:
     ilib.chown(jwt_dir, owner=s.slurm_user, group=s.slurm_grp)
     ilib.chmod(jwt_dir, mode=755)
     ilib.chmod(os.path.dirname(jwt_dir), mode=755)
-
-def _add_azslurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_yaml: str) -> None:
-    """
-    Add azslurm-exporter scrape config to Prometheus.
-    """
-    if not s.is_primary_scheduler:
-        logging.info("Not primary scheduler, skipping azslurm-exporter configuration.")
-        return
-
-    if not os.path.isfile(prom_config):
-        logging.warning("Prometheus configuration file not found, skipping azslurm-exporter configuration.")
-        return
-
-    with open(prom_config, "r") as f:
-        prom_content = f.read()
-        if "azslurm_exporter" in prom_content:
-            print("AzSlurm Exporter is already configured in Prometheus")
-            return
-    # Merge YAML files
-    with open(prom_config, "r") as f:
-        prom_yaml = yaml.safe_load(f) or {}
-    with open(exporter_yaml, "r") as f:
-        exporter_yaml_content = yaml.safe_load(f) or {}
-
-    # Simple merge: add/replace scrape_configs
-    def merge_scrape_configs(base, overlay):
-        base_scrapes = base.get("scrape_configs", [])
-        overlay_scrapes = overlay.get("scrape_configs", [])
-        base["scrape_configs"] = base_scrapes + overlay_scrapes
-        return base
-
-    merged_yaml = merge_scrape_configs(prom_yaml, exporter_yaml_content)
-
-    # Replace instance_name placeholder
-    merged_str = yaml.safe_dump(merged_yaml, default_flow_style=False)
-    merged_str = merged_str.replace("instance_name", s.hostname)
-
-    # Write back to prom_config
-    ilib.file(
-        prom_config,
-        content=merged_str,
-        owner="root",
-        group="root",
-        mode="0644"
-    )
 
 def _configure_enroot_pyxis(s: InstallSettings) -> None:
     if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8):
