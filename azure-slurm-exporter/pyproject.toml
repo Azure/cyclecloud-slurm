@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azure-slurm-exporter"
+version = "0.1.0"
+description = "Prometheus exporter for Azure CycleCloud Slurm metrics"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "Azure CycleCloud Team" },
+]
+dependencies = [
+    "prometheus_client",
+    "aiohttp"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+azslurm-exporter = "exporter.main:main"
+
+[tool.setuptools.packages.find]
+include = ["exporter*"]
+
+[tool.setuptools.package-data]
+exporter = ["*.conf"]

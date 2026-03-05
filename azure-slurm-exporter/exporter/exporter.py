@@ -5,6 +5,7 @@ import signal
 import sys
 import time
 import os
+from importlib import resources
 from prometheus_client import CollectorRegistry, Metric, Counter, Gauge, Summary
 from abc import ABC, abstractmethod
 from functools import partial
@@ -187,8 +188,8 @@ class AzslurmCollector:
 
 
 async def main():
-    if os.path.exists("/opt/azurehpc/azslurm-exporter/exporter_logging.conf"):
-        logging.config.fileConfig("/opt/azurehpc/azslurm-exporter/exporter_logging.conf")
+    conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
+    logging.config.fileConfig(str(conf_file))
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
@@ -215,6 +216,3 @@ async def main():
         pass
     finally:
         await runner.cleanup()
-
-if __name__=="__main__":
-    asyncio.run(main())
