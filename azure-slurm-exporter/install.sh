@@ -32,29 +32,12 @@ setup_venv() {
     source $VENV/bin/activate
     set -e
 
-    # ensure wheel is installed
-    python3 -m pip install wheel
-    python3 -m pip install aiohttp
-
-    # upgrade venv with packages from intallation
-    python3 -m pip install --upgrade --no-deps packages/*
-
-    # Create exporter executable
-    cat > $VENV/bin/azslurm-exporter <<EOF
-#!$VENV/bin/python
-
-from exporter import main
-import asyncio
-asyncio.run(main())
-EOF
-
-
-    chmod +x $VENV/bin/azslurm-exporter
-    if [ ! -e ~/bin ]; then
-        mkdir ~/bin
+    if ! pip install --force-reinstall $PACKAGE; then
+        echo "ERROR: Failed to install $PACKAGE"
+        deactivate || true
+        exit 1
     fi
 
-    ln -sf $VENV/bin/azslurm-exporter ~/bin/
 }
 add_scraper() {
     # If az_exporter is already configured, do not add it again
@@ -83,10 +66,6 @@ EOF
     sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
 }
 
-setup_install_dir() {
-    mkdir -p $INSTALL_DIR/logs
-    cp exporter_logging.conf $INSTALL_DIR/
-}
 
 setup_azslurm_exporter() {
     cat > /etc/systemd/system/azslurm-exporter.service <<EOF
@@ -96,7 +75,7 @@ After=network.target
 
 [Service]
 ExecStart=$VENV/bin/azslurm-exporter
-Restart=on-failure
+Restart=always
 User=root
 Group=root
 Environment="PATH=/$VENV/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -108,46 +87,19 @@ EOF
     systemctl enable azslurm-exporter
 }
 
-require_root() {
-    if [ $(whoami) != root ]; then
-    echo "Please run as root"
-    exit 1
-    fi
-}
-
-parse_args_set_variables() {
-    export SCHEDULER=slurm
-    export VENV=/opt/azurehpc/azslurm-exporter/venv
-    export INSTALL_DIR=$(dirname $VENV)
-    # Set this globally before running main.
-    export PYTHON_PATH=$(find_python3)
-    export PATH=$PATH:/root/bin
-    export PROM_CONFIG=/opt/prometheus/prometheus.yml
-
-    while (( "$#" )); do
-        case "$1" in
-            --help)
-                echo "Usage: $0"
-                exit 0
-                ;;
-            -*|--*=)
-                echo "Unknown option $1" >&2
-                exit 1
-                ;;
-            *)
-                echo "Unknown option  $1" >&2
-                exit 1
-                ;;
-        esac
-    done
-}
-
 main() {
-    # create the venv and make sure azslurm-exporter is in the path
+    VERSION=0.1.0
+    PACKAGE=azure_slurm_exporter-$VERSION.tar.gz
+    SCHEDULER=slurm
+    VENV=/opt/azurehpc/azslurm-exporter/venv
+    INSTALL_DIR=$(dirname $VENV)
+    PATH=$PATH:/root/bin
+    PROM_CONFIG=/opt/prometheus/prometheus.yml
+
+    # create the venv and install azslurm-exporter
     setup_venv
-    setup_install_dir
     add_scraper
-    # setup the azslurm-exporter but do not start it.
+    # setup the azslurm-exporter systemd but do not start it.
     setup_azslurm_exporter
 }
 
@@ -158,7 +110,8 @@ require_root() {
     fi
 }
 
+# Set this globally before running main.
+PYTHON_PATH=$(find_python3)
 require_root
-parse_args_set_variables $@
 main
 echo Installation complete.
