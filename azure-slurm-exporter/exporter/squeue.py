@@ -117,6 +117,5 @@ class Squeue(BaseCollector):
         except Exception as e:
             log.error(e)
             return
-        output = self.parse_output(proc.stdout)
         #TODO: DO we need to lock this?
-        self.cached_output["squeue_metrics"] = output
+        self.cached_output["squeue_metrics"] = self.parse_output(proc.stdout)
