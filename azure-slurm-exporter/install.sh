@@ -39,8 +39,9 @@ setup_venv() {
     fi
 
 }
+
 add_scraper() {
-    # If az_exporter is already configured, do not add it again
+    # If azslurm_exporter is already configured, do not add it again
     if grep -q "azslurm_exporter" $PROM_CONFIG; then
         echo "AzSlurm Exporter is already configured in Prometheus"
         return 0
@@ -90,14 +91,12 @@ EOF
 main() {
     VERSION=0.1.0
     PACKAGE=azure_slurm_exporter-$VERSION.tar.gz
-    SCHEDULER=slurm
     VENV=/opt/azurehpc/azslurm-exporter/venv
-    INSTALL_DIR=$(dirname $VENV)
-    PATH=$PATH:/root/bin
     PROM_CONFIG=/opt/prometheus/prometheus.yml
 
     # create the venv and install azslurm-exporter
     setup_venv
+    #add azslurm-exporter scraper to prometheus.yml
     add_scraper
     # setup the azslurm-exporter systemd but do not start it.
     setup_azslurm_exporter

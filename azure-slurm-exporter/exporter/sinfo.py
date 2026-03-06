@@ -100,7 +100,6 @@ class Sinfo(BaseCollector):
         except Exception as e:
             log.error(e)
             return
-        output = self.parse_output(proc.stdout)
         #TODO: DO we need to lock this?
-        self.cached_output["sinfo_query"] = output
+        self.cached_output["sinfo_query"] = self.parse_output(proc.stdout)
 

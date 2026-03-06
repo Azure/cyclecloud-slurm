@@ -94,9 +94,8 @@ class Sacct(BaseCollector):
         - The end time is set to the current moment when the query is executed
         - After execution, starttime is updated to the current endtime for the next query iteration
         """
-        args = []
+        args = [self.binary_path]
         self.endtime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        args.append(self.binary_path)
         args.extend(self.default_options)
         args.extend(["--starttime", self.starttime, "--endtime", self.endtime])
         log.debug(f"running sacct query between {self.starttime} and {self.endtime}")
