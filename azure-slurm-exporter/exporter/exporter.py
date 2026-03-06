@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import logging
 import logging.config
 import signal
@@ -188,6 +189,11 @@ class AzslurmCollector:
 
 
 async def main():
+    parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
+    parser.add_argument("--port", type=int, default=9101, help="Port to expose metrics on (default: 9101)")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    args = parser.parse_args()
+
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
     logging.config.fileConfig(str(conf_file))
 
@@ -205,7 +211,7 @@ async def main():
         sys.exit(1)
 
     try:
-        runner = await collector.start_http_server(host="0.0.0.0", port=9101)
+        runner = await collector.start_http_server(host=args.host, port=args.port)
     except HTTPServerFailedException:
         sys.exit(1)
 
