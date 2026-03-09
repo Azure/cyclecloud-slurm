@@ -191,7 +191,7 @@ class AzslurmCollector:
 async def main():
     parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
     parser.add_argument("--port", type=int, default=9101, help="Port to expose metrics on (default: 9101)")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind to (default: 0.0.0.0)")
     args = parser.parse_args()
 
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
