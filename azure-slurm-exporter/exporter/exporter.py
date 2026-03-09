@@ -28,22 +28,22 @@ class BaseCollector(ABC):
     @abstractmethod
     async def start(self) -> None:
         """
-        Begin collecting metrics asynchronously and runs it at regular
-        intervals as defined by the configured downstream interval.
+        Start the periodic metrics collection loop for the collector to query data,
+        parse the output to create Prometheus formatted metrics, and cache the results at each interval. Decouples
+        each collector's collection cycle and the prometheus scrape
         """
         ...
 
     @abstractmethod
     def export_metrics(self) -> List[Union[Gauge,Counter,Summary]]:
         """
-        Return metrics in Prometheus-compatible format.
+        Return the current set of collected metrics for Prometheus to scrape.
         """
         ...
 
     async def run_command(self, *args, timeout=120,) -> CommandResult:
         """
-        Executes a command asynchronously in a subprocess, capturing both stdout
-        and stderr, with support for timeout handling.
+        Executes any command needed for metric collection asynchronously
         """
         start = time.monotonic()
         cmd_str = " ".join(str(a) for a in args)
@@ -64,14 +64,16 @@ class BaseCollector(ABC):
 
     def launch_task(self, func, interval) -> None:
         """
-        Launch an asynchronous task that executes a callable function at regular intervals.
+        Launch an asynchronous task that schedules a callable function
+        ie, the full collection cycle of querying, parsing and caching metrics,
+        to be run at regular intervals.
         """
 
         asyncio.create_task(self.__schedule(func, interval))
 
     async def __schedule(self, func, interval: int) -> None:
         """
-        Schedule a callable function to be executed periodically at specified intervals.
+        Schedule a callable function to periodically run at each interval
         """
         if callable(func):
             reponse = await func()
@@ -86,7 +88,8 @@ class AzslurmCollector:
 
     def initialize_collectors(self) -> None:
         """
-        Initialize and start all collectors concurrently.
+        Initialize and start all collectors concurrently to begin metric collection cycle
+        at each downstream interval.
         - Squeue: Collects job queue information
         - Sacct: Collects job accounting data
         - Sinfo: Collects node/partition
@@ -146,7 +149,7 @@ class AzslurmCollector:
 
     def export_metrics(self) -> List[Union[Gauge,Counter,Summary]]:
         """
-        Collect and aggregate metrics from all configured collectors.
+        Collect and aggregate cached metrics from all configured collectors to be exported.
         """
 
         metrics = []
@@ -156,7 +159,8 @@ class AzslurmCollector:
 
     def collect(self) -> Iterator[Metric]:
         """
-        Collect and yield Prometheus metrics every scrape interval
+        Collect and yield cached metrics in the format expected by the Prometheus client registry for each collector.
+        Called automatically by Prometheus on each scrape request.
         """
 
         metrics = self.export_metrics()
@@ -165,9 +169,8 @@ class AzslurmCollector:
 
     async def start_http_server(self, host:str, port:int) -> web.AppRunner:
         """
-        Initializes and starts an aiohttp web server that
-        exposes Prometheus metrics on the /metrics endpoint. The server listens on
-        the specified host and port.
+        Initializes and starts the aiohttp web server that exports Prometheus metrics from the collect() method
+        at each scrape request on the /metrics endpoint to be ingested by Prometheus. The server listens on the specified host and port.
         """
         try:
             registry = CollectorRegistry()

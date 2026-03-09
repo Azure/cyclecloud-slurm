@@ -42,7 +42,7 @@ class Squeue(BaseCollector):
 
     def initialize(self) -> None:
         """
-        Initialize the Squeue instance and validate the binary executable.
+        Validate that the squeue binary is available and executable to be used for metrics collection
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -50,28 +50,22 @@ class Squeue(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously and runs it at regular
-        intervals as defined by the configured downstream interval.
+        Start the periodic metrics collection loop for squeue to query the current queue's job state data,
+        parse the output to create Prometheus formatted job state Gauge metric, and cache the results at each interval.
         """
         self.launch_task(func=self.squeue_query, interval=self.interval)
 
     def export_metrics(self) -> List[Gauge]:
         """
-        Return metrics in Prometheus-compatible format from cache.
+        Return the most recently collected squeue metrics for Prometheus to scrape.
         """
         return self.cached_output["squeue_metrics"]
 
     def parse_output(self,stdout) -> List[Gauge]:
         """
         Parse the stdout from an squeue command and generates two Prometheus
-        Gauge metrics:
-
-        1. squeue_partition_jobs_state: Tracks the number of jobs in each state per partition
-            - Labels: partition, state
-
-        2. squeue_job_nodes_allocated: Tracks the number of nodes allocated to running jobs
-            - Labels: job_id, job_name, partition, state
-            - Only populated for jobs in "running" state
+        Gauge metrics that track the number of jobs currently in the queue in each state per partition
+        and track the number of nodes allocated to running jobs in the queue
         """
         squeue_partition_jobs_state = Gauge(
                 f"squeue_partition_jobs_state",
@@ -107,8 +101,9 @@ class Squeue(BaseCollector):
 
     async def squeue_query(self) -> None:
         """
-        Execute an squeue query asynchronously and cache the parsed result in prometheus
-        metrics format.
+        Run the squeue query with default options, parse the output to create two Prometheus Gauge metrics
+        that represent the current state of each job in the queue as well as the total nodes allocated to
+        any running job in the queue, and caches the results
         """
         args = [self.binary_path]
         args.extend(self.default_options)

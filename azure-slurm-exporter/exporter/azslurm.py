@@ -24,7 +24,7 @@ class Azslurm(BaseCollector):
 
     def initialize(self) -> None:
         """
-        Initialize the Azslurm instance by validating the binary
+        Validate that the azslurm binary is available and executable to be used for metrics collection.
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -32,21 +32,23 @@ class Azslurm(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously and runs it at regular
-        intervals as defined by the configured downstream interval.
+        Start the periodic metrics collection loop for azslurm to query partitions and limits data,
+        parse the output to create Prometheus formatted cluster capacity metrics, and cache the results at each interval.
         """
         self.launch_task(func=self.azslurm_query, interval=self.interval)
 
     def export_metrics(self) -> List[Gauge]:
         """
-        Return metrics in Prometheus-compatible format from cache.
+        Return the most recently collected azslurm metrics for Prometheus to scrape.
         """
         #TODO: DO we need to lock this?
         return self.cached_output["azslurm_metrics"]
 
     def parse_output(self, partitions_stdout, limits_stdout) -> None:
         """
-        Parse azslurm command stdout and return prometheus gauge for partition specs
+        Convert raw azslurm partitions and limits output into Prometheus metrics.
+        Combines partition node lists with per-VM-size availability limits
+        to produce a single gauge representing cluster capacity.
         """
         azslurm_partition_info = Gauge("azslurm_partition_info", "Partition specs for cluster and available nodecount for each partitions",
                                        labelnames=["partition", "nodelist", "vm_size", "azure_count"],
@@ -64,7 +66,7 @@ class Azslurm(BaseCollector):
 
     def _parse_partitions(self, stdout) -> dict:
         """
-        Parse azslurm partitions output into {nodearray: nodelist} map.
+        Map each partition (nodearray) to its associated node list.
         """
         node_list_map = {}
         partition_name = None
@@ -81,15 +83,15 @@ class Azslurm(BaseCollector):
 
     def _parse_limits(self, stdout):
         """
-        Parse azslurm limits JSON output into namedtuples.
+        Extract per-nodearray VM availability limits from azslurm limits output.
         """
         for entry in json.loads(stdout.decode()):
             yield self.limits_output._make(entry[f] for f in self.limits_default_fmt)
 
     async def azslurm_query(self) -> None:
         """
-        Query azslurm partitions and limits command and save parsed output in prometheus metrics
-        format to cache
+        Query azslurm partitions and limits command and cache parsed output as a single prometheus guage to represent
+        per vm-size cluster capicty.
         """
         args_partitions = [self.binary_path]
         args_limits = [self.binary_path]

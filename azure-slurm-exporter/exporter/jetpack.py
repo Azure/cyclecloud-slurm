@@ -20,7 +20,7 @@ class Jetpack(BaseCollector):
 
     def initialize(self) -> None:
         """
-        Initialize the Jetpack instance by validating the binary
+        Validate that the jetpack binary is available and executable to be used for metrics collection.
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -28,21 +28,21 @@ class Jetpack(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously and runs it at regular
-        intervals as defined by the configured downstream interval.
+        Start the periodic metrics collection loop for jetpack to query cluster region data,
+        parse the output to create Prometheus formatted cluster info metric, and cache the results at each interval.
         """
         self.launch_task(func=self.jetpack_query, interval=self.interval)
 
     def export_metrics(self) -> List[Gauge]:
         """
-        Return metrics in Prometheus-compatible format from cache.
+        Return the most recently collected jetpack metrics for Prometheus to scrape.
         """
         #TODO: DO we need to lock this?
         return self.cached_output["jetpack_metrics"]
 
     def parse_output(self, stdout) -> None:
         """
-        Parse jetpack command stdout and return prometheus gauge for cluster specs
+        Parse jetpack command stdout and return prometheus gauge for cluster info
         """
         jetpack_cluster_info = Gauge("jetpack_cluster_info", "Cluster Metadata",
                                        labelnames=["region"],
@@ -53,8 +53,8 @@ class Jetpack(BaseCollector):
 
     async def jetpack_query(self) -> None:
         """
-        Run jetpack query with default options and save parsed result in prometheus
-        metrics format to cache
+        Run jetpack query with default options to retreive the cluster region and cache the parsed result as a prometheus
+        metrics gauge representing cluster info
         """
         args = [self.binary_path]
         args.extend(self.default_options)

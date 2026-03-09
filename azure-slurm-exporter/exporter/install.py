@@ -16,7 +16,8 @@ class SystemdSetupException(Exception):
 
 def add_azslurm_exporter_scraper(prom_config: str) -> None:
     """
-    Add azslurm_exporter scrape config to Prometheus.
+    Add azslurm_exporter scrape config to prometheus.yml so Prometheus can scrape the azslurm_exporter server at
+    a given interval and ingest the metrics.
     """
 
     if not os.path.isfile(prom_config):
@@ -71,6 +72,10 @@ def add_azslurm_exporter_scraper(prom_config: str) -> None:
     log.info("Added azslurm_exporter scrape config to prometheus.yml")
 
 def setup_azslurm_exporter_systemd(venv: str) -> None:
+    """
+    Setup the azslurm-exporter.service to be run and managed by systemd
+    """
+
     service_path = "/etc/systemd/system/azslurm-exporter.service"
     service_content = f"""[Unit]
 Description=AzSlurm Exporter Daemon

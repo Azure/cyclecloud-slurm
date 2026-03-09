@@ -47,7 +47,8 @@ class Sacct(BaseCollector):
 
     def initialize(self) -> None:
         """
-        Initialize the Sacct instance by validating the binary and disabling created metrics.
+        Validate that the sacct binary is available and executable to be used for metrics collection and
+        disable Prometheus Counter created related metrics.
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -56,21 +57,22 @@ class Sacct(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously and runs it at regular
-        intervals as defined by the configured downstream interval.
+        Start the periodic metrics collection loop for sacct to query terminal job data (jobs that have either completed, failed, or cancelled for whatever reason),
+        parse the output to create Prometheus formatted terminal job Counter metric, and cache the results at each interval.
         """
         self.launch_task(func=self.sacct_query, interval=self.interval)
 
     def export_metrics(self) -> List[Counter]:
         """
-        Return metrics in Prometheus-compatible format.
+        Return the most recently collected sacct metrics for Prometheus to scrape.
         """
         #TODO: DO we need to lock this?
         return [self.sacct_terminal_jobs]
 
     def parse_output(self, stdout) -> None:
         """
-        Parse sacct command output and increment terminal job metrics.
+        Parse sacct command output and increment terminal jobs metric for each job in the output to describe total number of finished jobs by partition,
+        exit_code, reason, state, and nodelist.
         """
         lines = stdout.decode().strip().splitlines()
         log.debug(f"Number of jobs:{len(lines)}")
@@ -86,13 +88,12 @@ class Sacct(BaseCollector):
 
     async def sacct_query(self) -> None:
         """
-        Queries sacct filtering by a time window of size `interval`, which represents
-        the frequency at which queries are executed.
+        Run sacct query with default options and filtering by a time window of size `interval`, which represents
+        the frequency at which queries are executed, to only get the total # of jobs that finished (whether completed successfully,
+        failed, or cancelled) in that specific time window. Those outputted jobs are then parsed to increment the Prometheus terminal jobs
+        Counter metric. Time window then progresses by setting starttime to the current endtime so that in the next query we only increment unique jobs
+        that just finished in that updated window.
 
-        The time window progresses as follows:
-        - The start time of the current query is set to the end time of the previous query
-        - The end time is set to the current moment when the query is executed
-        - After execution, starttime is updated to the current endtime for the next query iteration
         """
         args = [self.binary_path]
         self.endtime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")

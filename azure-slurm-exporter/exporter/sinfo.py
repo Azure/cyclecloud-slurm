@@ -37,7 +37,7 @@ class Sinfo(BaseCollector):
 
     def initialize(self) -> None:
         """
-        Initialize the Sinfo object by validating the binary path.
+        Validate that the sinfo binary is available and executable to be used for metrics collection
         """
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
@@ -45,21 +45,22 @@ class Sinfo(BaseCollector):
 
     def start(self) -> None:
         """
-        Begin collecting metrics asynchronously and runs it at regular
-        intervals as defined by the configured downstream interval.
+        Start the periodic metrics collection loop for sinfo to query node state data
+        parse the output to create Prometheus formatted node state Gauge metric, and cache the results at each interval.
         """
         self.launch_task(func=self.sinfo_query, interval=self.interval)
 
     def export_metrics(self) -> List[Gauge]:
         """
-        Return metrics in Prometheus-compatible format from cache.
+        Return the most recently collected jetpack metrics for Prometheus to scrape.
         """
         return self.cached_output["sinfo_query"]
 
     def normalize_state(self, state) -> str:
         """
         Normalize SLURM node state by mapping state suffixes to their base states. If
-        node state has a suffix, then we set that node's state to the suffix state.
+        node state has a suffix, then we set that node's state as the suffix state to indicate the
+        actual operational status of the node
         """
         suffix = state[-1]
         if suffix in self.STATE_SUFFIXES:
@@ -69,8 +70,8 @@ class Sinfo(BaseCollector):
 
     def parse_output(self, stdout) -> List[Gauge]:
         """
-        Parse the output from the sinfo command and create a Gauge metric that track each nodelist's
-        state per partition.
+        Parse the output from the sinfo command and create a Gauge metric that tracks each nodelist's
+        state per partition as well as the reason they are in that state if any.
         """
         sinfo_partitions_nodes_state = Gauge(
                 f"sinfo_partition_nodes_state",
@@ -91,7 +92,8 @@ class Sinfo(BaseCollector):
 
     async def sinfo_query(self) -> None:
         """
-        Execute sinfo command asynchronously and cache the parsed output in prometheus metric format.
+        Run the sinfo query with default options, parse the output to create a Prometheus Gauge metric
+        that represents each nodelist and their current state, and cache the result
         """
         args = [self.binary_path]
         args.extend(self.default_options)
