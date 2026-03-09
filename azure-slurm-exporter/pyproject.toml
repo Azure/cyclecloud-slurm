@@ -13,16 +13,14 @@ authors = [
 ]
 dependencies = [
     "prometheus_client",
-    "aiohttp"
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
+    "aiohttp",
+    "pyyaml",
+    "pytest-asyncio"
 ]
 
 [project.scripts]
 azslurm-exporter = "exporter.main:main"
+azslurm-exporter-install = "exporter.install:main"
 
 [tool.setuptools.packages.find]
 include = ["exporter*"]

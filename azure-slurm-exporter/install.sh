@@ -38,54 +38,12 @@ setup_venv() {
         exit 1
     fi
 
-}
-
-add_scraper() {
-    # If azslurm_exporter is already configured, do not add it again
-    if grep -q "azslurm_exporter" $PROM_CONFIG; then
-        echo "AzSlurm Exporter is already configured in Prometheus"
-        return 0
+     if ! azslurm-exporter-install; then
+        echo "ERROR: Failed to run azslurm-exporter-install"
+        deactivate || true
+        exit 1
     fi
-    INSTANCE_NAME=$(hostname)
 
-    cat > azslurm-exporter.yml <<-EOF
-    scrape_configs:
-    - job_name: azslurm_exporter
-      static_configs:
-      - targets: ["instance_name:9101"]
-      relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-        regex: '([^:]+)(:[0-9]+)?'
-        replacement: '\${1}'
-EOF
-
-    yq eval-all '. as $item ireduce ({}; . *+ $item)' $PROM_CONFIG azslurm-exporter.yml > tmp.yml
-    mv -vf tmp.yml $PROM_CONFIG
-
-    # update the configuration file
-    sed -i "s/instance_name/$INSTANCE_NAME/g" $PROM_CONFIG
-}
-
-
-setup_azslurm_exporter() {
-    cat > /etc/systemd/system/azslurm-exporter.service <<EOF
-[Unit]
-Description=AzSlurm Exporter Daemon
-After=network.target
-
-[Service]
-ExecStart=$VENV/bin/azslurm-exporter
-Restart=always
-User=root
-Group=root
-Environment="PATH=/$VENV/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload
-    systemctl enable azslurm-exporter
 }
 
 main() {
@@ -96,10 +54,7 @@ main() {
 
     # create the venv and install azslurm-exporter
     setup_venv
-    #add azslurm-exporter scraper to prometheus.yml
-    add_scraper
-    # setup the azslurm-exporter systemd but do not start it.
-    setup_azslurm_exporter
+
 }
 
 require_root() {
