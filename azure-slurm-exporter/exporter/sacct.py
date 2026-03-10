@@ -11,6 +11,12 @@ class SacctNotAvailException(Exception):
     pass
 
 class Sacct(BaseCollector):
+    """
+    A collector that periodically queries SLURM sacct command within a sliding time window to
+    track job completions and their outcomes. It maps SLURM exit codes to human-readable
+    descriptions and exports a Prometheus Counter metric labeled by partition, exit code, reason, state,
+    and nodelist.
+    """
 
     SLURM_EXIT_CODE_MAPPING = {
             "0:0": "",

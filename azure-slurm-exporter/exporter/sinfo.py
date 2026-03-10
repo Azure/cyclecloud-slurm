@@ -11,6 +11,12 @@ class SinfoNotAvailException(Exception):
     pass
 
 class Sinfo(BaseCollector):
+    """
+    A collector that periodically queries SLURM sinfo command to collect node state information
+    across partitions, normalizes state values by mapping state suffixes to their operational meanings, and
+    parses the output into Prometheus Gauge metrics.
+    """
+
 
     # Suffix meanings from sinfo man page
     STATE_SUFFIXES = {

@@ -25,6 +25,14 @@ class HTTPServerFailedException(Exception):
     pass
 
 class BaseCollector(ABC):
+    """
+    Abstract base class for collecting metrics from SLURM.
+    This class provides the foundational structure for implementing metric collectors
+    that periodically gather data from SLURM systems, format them as Prometheus metrics,
+    and expose them for scraping. It handles asynchronous command execution and periodic
+    task scheduling to decouple individual collector cycles from Prometheus scrape intervals.
+    """
+
     @abstractmethod
     async def start(self) -> None:
         """
@@ -82,7 +90,14 @@ class BaseCollector(ABC):
         else:
             log.error(f"func {func.__name__} is not callable")
 
-class AzslurmCollector:
+class CompositeCollector:
+    """
+    A composite collector that aggregates metrics from multiple SLURM and Azure-specific data sources.
+    This class manages the initialization and coordination of multiple specialized collectors
+    (Squeue, Sacct, Sinfo, Azslurm, and Jetpack) that gather different types of metrics from
+    a SLURM cluster and Azure environment. It provides a unified interface for exporting
+    collected metrics to Prometheus.
+    """
     def __init__(self):
         self.collectors = []
 
@@ -147,15 +162,13 @@ class AzslurmCollector:
         for collector in self.collectors:
             collector.start()
 
-    def export_metrics(self) -> List[Union[Gauge,Counter,Summary]]:
+    def export_metrics(self) -> Iterator[Union[Gauge,Counter]]:
         """
         Collect and aggregate cached metrics from all configured collectors to be exported.
         """
 
-        metrics = []
         for collector in self.collectors:
-            metrics.extend(collector.export_metrics())
-        return metrics
+            yield from collector.export_metrics()
 
     def collect(self) -> Iterator[Metric]:
         """
@@ -163,8 +176,7 @@ class AzslurmCollector:
         Called automatically by Prometheus on each scrape request.
         """
 
-        metrics = self.export_metrics()
-        for metric in metrics:
+        for metric in self.export_metrics():
             yield from metric.collect()
 
     async def start_http_server(self, host:str, port:int) -> web.AppRunner:
@@ -206,13 +218,14 @@ async def main():
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop_event.set)
 
-    collector = AzslurmCollector()
+    collector = CompositeCollector()
 
     try:
         collector.initialize_collectors()
     except NoCollectorsFoundException:
         sys.exit(1)
 
+    runner = None
     try:
         runner = await collector.start_http_server(host=args.host, port=args.port)
     except HTTPServerFailedException:
@@ -224,4 +237,5 @@ async def main():
     except asyncio.CancelledError:
         pass
     finally:
-        await runner.cleanup()
+        if runner:
+            await runner.cleanup()

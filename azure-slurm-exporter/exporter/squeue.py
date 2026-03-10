@@ -29,7 +29,10 @@ class SqueueNotAvailException(Exception):
     pass
 
 class Squeue(BaseCollector):
-
+    """
+    A collector that periodically queries SLURM squeue command to gather job state information and node allocation
+    data from the job queue and parses the output into Prometheus Gauge metrics.
+    """
     def __init__(self, binary_path="/usr/bin/squeue", interval=60, timeout=30):
         self.binary_path = binary_path
         self.interval = interval

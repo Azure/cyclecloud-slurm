@@ -10,6 +10,11 @@ class JetpackNotAvailException(Exception):
     pass
 
 class Jetpack(BaseCollector):
+    """
+    A collector that queries the Jetpack binary to retrieve cluster metadata
+    and exports it as a Prometheus Gauge metrics.
+    """
+
 
     def __init__(self, binary_path="/opt/cycle/jetpack/bin/jetpack", interval=86400, timeout=120):
         self.binary_path = binary_path

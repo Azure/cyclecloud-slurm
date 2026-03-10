@@ -12,6 +12,10 @@ class AzslurmNotAvailException(Exception):
     pass
 
 class Azslurm(BaseCollector):
+    """
+    A collector that periodically queries the azslurm binary to retrieve partition and resource availability information,
+    and parses the output into Prometheus-compatible gauge metrics.
+    """
 
     def __init__(self, binary_path="/root/bin/azslurm", interval=300, timeout=120):
         self.binary_path = binary_path
