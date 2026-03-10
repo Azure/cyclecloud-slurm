@@ -92,7 +92,7 @@ class Squeue(BaseCollector):
                                                   job_name=row.name,
                                                   partition=row.partition,
                                                   state=row.state,
-                                                  nodelist=row.nodelist).set(float(row.nodes))
+                                                  nodelist=row.nodelist).set(int(row.nodes))
             key = (row.partition, row.state.lower())
             counts[key] = counts.get(key, 0) + 1
 
