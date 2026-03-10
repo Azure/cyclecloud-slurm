@@ -43,7 +43,7 @@ class TestSqueueParseOutput:
                         assert "job_id" in s.labels
                         assert "job_name" in s.labels
                         samples_by_keys[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"])] = s.value
-        assert samples_by_keys.get(("node[1-2]","partition1","RUNNING","12345", "job_name")) == 2
+        assert samples_by_keys.get(("node[1-2]","partition1","running","12345", "job_name")) == 2
         assert samples_by_keys.get(("partition1","running")) == 1
 
     def test_parse_output_multiple_states(self):
@@ -216,7 +216,7 @@ class TestSqueueQuery:
         for s in family[0].samples:
             samples_by_key[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"] )] = s.value
         assert samples_by_key.get(("batch","running")) == 1
-        assert samples_by_key.get(("node[1-2]","batch","RUNNING","12345","job1")) == 2
+        assert samples_by_key.get(("node[1-2]","batch","running","12345","job1")) == 2
 
 
     @pytest.mark.asyncio

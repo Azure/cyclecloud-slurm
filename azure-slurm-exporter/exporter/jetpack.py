@@ -45,7 +45,7 @@ class Jetpack(BaseCollector):
         #TODO: DO we need to lock this?
         return self.cached_output["jetpack_metrics"]
 
-    def parse_output(self, stdout) -> None:
+    def parse_output(self, stdout) -> List[Gauge]:
         """
         Parse jetpack command stdout and return prometheus gauge for cluster info
         """
@@ -65,7 +65,7 @@ class Jetpack(BaseCollector):
         args.extend(self.default_options)
 
         try:
-            proc = await self.run_command(timeout=self.timeout,*args)
+            proc = await self.run_command(timeout=self.timeout, *args)
         except Exception as e:
             log.error(e)
             return

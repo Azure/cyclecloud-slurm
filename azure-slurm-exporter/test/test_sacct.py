@@ -37,8 +37,8 @@ class TestSacctParseOutput:
                     assert "state" in s.labels
                     assert "nodelist" in s.labels
                     samples_by_keys[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["reason"], s.labels["exit_code"])] = s.value
-        assert samples_by_keys.get(("node1", "batch","COMPLETED","","0:0")) == 1
-        
+        assert samples_by_keys.get(("node1", "batch","completed","","0:0")) == 1
+
     def test_parse_output_multiple_states(self):
         sacct = Sacct()
         stdout = (
@@ -54,8 +54,8 @@ class TestSacctParseOutput:
                 all_samples.extend(family.samples)
 
         states = {s.labels["state"] for s in all_samples}
-        assert "COMPLETED" in states
-        assert "FAILED" in states
+        assert "completed" in states
+        assert "failed" in states
 
     def test_parse_output_empty_output(self):
         sacct = Sacct()
@@ -90,9 +90,9 @@ class TestSacctParseOutput:
                 for s in terminal_metric.samples
                 if "_total" in s.name
             }
-            assert samples_by_key.get(("node1","gpu", "COMPLETED")) == 1.0
-            assert samples_by_key.get(("node2","gpu", "COMPLETED")) == 1.0
-            assert samples_by_key.get(("node3","cpu", "FAILED")) == 1.0
+            assert samples_by_key.get(("node1","gpu", "completed")) == 1.0
+            assert samples_by_key.get(("node2","gpu", "completed")) == 1.0
+            assert samples_by_key.get(("node3","cpu", "failed")) == 1.0
 
 
 class TestSacctExportMetrics:
@@ -218,8 +218,8 @@ class TestSacctMetricValues:
                 for s in terminal_metric.samples
                 if "_total" in s.name
             }
-            assert samples_by_state.get("COMPLETED") == 50.0
-            assert samples_by_state.get("FAILED") == 50.0
+            assert samples_by_state.get("completed") == 50.0
+            assert samples_by_state.get("failed") == 50.0
 
 
 class TestSacctQuery:
@@ -237,8 +237,7 @@ class TestSacctQuery:
         (s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["reason"], s.labels["exit_code"]): s.value
         for s in metric[0].samples
         }
-        print(samples_by_key)
-        assert samples_by_key.get(("node1","batch","COMPLETED","","0:0")) == 1
+        assert samples_by_key.get(("node1","batch","completed","","0:0")) == 1
 
     @pytest.mark.asyncio
     async def test_sacct_query_exception(self):

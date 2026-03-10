@@ -34,7 +34,7 @@ class BaseCollector(ABC):
     """
 
     @abstractmethod
-    async def start(self) -> None:
+    def start(self) -> None:
         """
         Start the periodic metrics collection loop for the collector to query data,
         parse the output to create Prometheus formatted metrics, and cache the results at each interval. Decouples
@@ -84,7 +84,7 @@ class BaseCollector(ABC):
         Schedule a callable function to periodically run at each interval
         """
         if callable(func):
-            reponse = await func()
+            await func()
             loop = asyncio.get_running_loop()
             loop.call_later(interval, partial(self.launch_task, func, interval))
         else:
@@ -206,7 +206,7 @@ class CompositeCollector:
 async def main():
     parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
     parser.add_argument("--port", type=int, default=9101, help="Port to expose metrics on (default: 9101)")
-    parser.add_argument("--host", type=str, default="127.0.0.1", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     args = parser.parse_args()
 
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")

@@ -48,7 +48,7 @@ class Azslurm(BaseCollector):
         #TODO: DO we need to lock this?
         return self.cached_output["azslurm_metrics"]
 
-    def parse_output(self, partitions_stdout, limits_stdout) -> None:
+    def parse_output(self, partitions_stdout, limits_stdout) -> List[Gauge]:
         """
         Convert raw azslurm partitions and limits output into Prometheus metrics.
         Combines partition node lists with per-VM-size availability limits
@@ -103,8 +103,8 @@ class Azslurm(BaseCollector):
         args_limits.extend(["limits"])
 
         try:
-            proc_partitions = await self.run_command(timeout=self.timeout,*args_partitions)
-            proc_limits = await self.run_command(timeout=self.timeout,*args_limits)
+            proc_partitions = await self.run_command(timeout=self.timeout, *args_partitions)
+            proc_limits = await self.run_command(timeout=self.timeout, *args_limits)
         except Exception as e:
             log.error(e)
             return

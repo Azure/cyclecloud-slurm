@@ -89,7 +89,7 @@ class Sacct(BaseCollector):
                 partition=row.partition,
                 exit_code=row.exitcode,
                 reason=reason,
-                state=row.state,
+                state=row.state.lower(),
                 nodelist=row.nodelist).inc()
 
     async def sacct_query(self) -> None:
@@ -107,7 +107,7 @@ class Sacct(BaseCollector):
         args.extend(["--starttime", self.starttime, "--endtime", self.endtime])
         log.debug(f"running sacct query between {self.starttime} and {self.endtime}")
         try:
-            proc = await self.run_command(timeout=self.timeout,*args)
+            proc = await self.run_command(timeout=self.timeout, *args)
         except Exception as e:
             log.error(e)
             return

@@ -91,7 +91,7 @@ class Squeue(BaseCollector):
                 squeue_job_nodes_allocated.labels(job_id=row.jobid,
                                                   job_name=row.name,
                                                   partition=row.partition,
-                                                  state=row.state,
+                                                  state=row.state.lower(),
                                                   nodelist=row.nodelist).set(int(row.nodes))
             key = (row.partition, row.state.lower())
             counts[key] = counts.get(key, 0) + 1
@@ -111,7 +111,7 @@ class Squeue(BaseCollector):
         args = [self.binary_path]
         args.extend(self.default_options)
         try:
-            proc = await self.run_command(timeout=self.timeout,*args)
+            proc = await self.run_command(timeout=self.timeout, *args)
         except Exception as e:
             log.error(e)
             return

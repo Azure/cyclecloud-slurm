@@ -14,7 +14,11 @@ authors = [
 dependencies = [
     "prometheus_client",
     "aiohttp",
-    "pyyaml",
+    "pyyaml"
+]
+
+[project.optional-dependencies]
+test = [
     "pytest-asyncio"
 ]
 
