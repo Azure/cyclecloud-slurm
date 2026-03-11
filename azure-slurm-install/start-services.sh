@@ -143,7 +143,7 @@ reload_prom_config(){
         kill -HUP $PROM_PID
     else
         echo "Prometheus process not found, unable to reload configuration"
-    fi  
+    fi
 }
 
 run_slurm_exporter() {
@@ -160,7 +160,7 @@ run_slurm_exporter() {
         echo "This is not the primary scheduler, skipping slurm_exporter setup."
         return 0
     fi
-    
+
     SLURM_EXPORTER_PORT=9200
     SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
     # Try to get the token, retry up to 3 times
@@ -200,20 +200,20 @@ run_slurm_exporter() {
     fi
 
     reload_prom_config
-        
+
     sleep 20
     if curl -s http://localhost:${SLURM_EXPORTER_PORT}/metrics | grep -q "slurm_nodes_total"; then
         echo "Slurm Exporter metrics are available"
     else
         echo "Slurm Exporter metrics are not available"
         /opt/cycle/jetpack/bin/jetpack log "Slurm Exporter metrics are not available" --level=warn --priority=medium
-    fi 
+    fi
 }
 
 ensure_enroot_dir() {
     # In some cases /tmp or even ephemeral disks may clear on reboot.
-    # This ensures the directories are present. its a no-op if they
-    # are already present.
+    # This ensures the cyclecloud-slurm configured enroot scratch directory is present. its a no-op if it
+    # is already present or enroot scratch dir does not include /enroot/ path segment.
     #
     CONF=/etc/enroot/enroot.conf
 
@@ -222,21 +222,23 @@ ensure_enroot_dir() {
         return 0
     fi
 
-    # extract ENROOT_TEMP_PATH value
-    ENROOT_TEMP_PATH=$(awk '$1=="ENROOT_TEMP_PATH"{print $2}' "$CONF")
+    # extract ENROOT_RUNTIME_PATH value
+    ENROOT_RUNTIME_PATH=$(awk '$1=="ENROOT_RUNTIME_PATH"{print $2}' "$CONF")
 
-    # expand command substitutions like $(id -u) if present
-    ENROOT_TEMP_PATH=$(eval echo "$ENROOT_TEMP_PATH")
+    # get enroot scratch directory by grabbing last enroot parent dir from ENROOT_RUNTIME_PATH
+    BASE_DIR=$(echo "$ENROOT_RUNTIME_PATH" | sed -n 's|\(.*enroot\)/.*|\1|p')
 
-    # get base directory (two levels up)
-    BASE_DIR=$(dirname "$ENROOT_TEMP_PATH")
-
-    # create base dir and set perms
+    #no op if BASE_DIR is not defined ie ENROOT_RUNTIME_PATH does not include enroot parent dir
+    if [ -z "$BASE_DIR" ]; then
+        echo "Could not retrieve expected enroot scratch dir from ENROOT_RUNTIME_PATH, unable to ensure enroot scratch dir"
+        return 0
+    fi
+    # create enroot scratch dir and set perms
     mkdir -p "$BASE_DIR"
     chmod 1777 "$BASE_DIR"
 }
 
-{ 
+{
     if [ "$1" == "" ]; then
         echo "Usage: $0 [scheduler|execute|login]"
         exit 1
@@ -284,7 +286,7 @@ ensure_enroot_dir() {
 
     # lastly - the scheduler
     use_accounting=$(jetpack config slurm.accounting.enabled False)
-    if [ "$use_accounting" == "True" ]; then  
+    if [ "$use_accounting" == "True" ]; then
         run_slurmdbd
     else
         echo "Warning: slurm.accounting.enabled=${use_accounting}: skipping slurmdbd" >&2
