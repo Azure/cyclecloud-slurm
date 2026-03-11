@@ -226,7 +226,7 @@ ensure_enroot_dir() {
     ENROOT_RUNTIME_PATH=$(awk '$1=="ENROOT_RUNTIME_PATH"{print $2}' "$CONF")
 
     # get enroot scratch directory by grabbing last enroot parent dir from ENROOT_RUNTIME_PATH
-    BASE_DIR=$(echo "$ENROOT_RUNTIME_PATH" | sed -n 's|\(.*enroot\)/.*|\1|p')
+    BASE_DIR=$(echo "$ENROOT_RUNTIME_PATH" | sed -n 's|\(.*/enroot\)/.*|\1|p')
 
     #no op if BASE_DIR is not defined ie ENROOT_RUNTIME_PATH does not include enroot parent dir
     if [ -z "$BASE_DIR" ]; then
