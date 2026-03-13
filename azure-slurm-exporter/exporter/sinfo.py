@@ -58,7 +58,7 @@ class Sinfo(BaseCollector):
 
     def export_metrics(self) -> List[Gauge]:
         """
-        Return the most recently collected jetpack metrics for Prometheus to scrape.
+        Return the most recently collected sinfo metrics for Prometheus to scrape.
         """
         return self.cached_output["sinfo_query"]
 
@@ -108,6 +108,5 @@ class Sinfo(BaseCollector):
         except Exception as e:
             log.error(e)
             return
-        #TODO: DO we need to lock this?
         self.cached_output["sinfo_query"] = self.parse_output(proc.stdout)
 

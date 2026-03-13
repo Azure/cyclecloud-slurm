@@ -42,7 +42,6 @@ class Jetpack(BaseCollector):
         """
         Return the most recently collected jetpack metrics for Prometheus to scrape.
         """
-        #TODO: DO we need to lock this?
         return self.cached_output["jetpack_metrics"]
 
     def parse_output(self, stdout) -> List[Gauge]:

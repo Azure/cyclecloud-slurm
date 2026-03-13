@@ -32,6 +32,12 @@ class BaseCollector(ABC):
     and expose them for scraping. It handles asynchronous command execution and periodic
     task scheduling to decouple individual collector cycles from Prometheus scrape intervals.
     """
+    @abstractmethod
+    def initialize(self) -> None:
+        """
+        Validate that all dependencies required for this collector are available.
+        """
+    ...
 
     @abstractmethod
     def start(self) -> None:
@@ -157,7 +163,7 @@ class CompositeCollector:
             self.collectors.append(jetpack)
 
         if not self.collectors:
-            log.error("No collectors intialized")
+            log.error("No collectors initialized")
             raise NoCollectorsFoundException
         for collector in self.collectors:
             collector.start()

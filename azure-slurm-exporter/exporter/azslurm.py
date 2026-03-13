@@ -45,7 +45,6 @@ class Azslurm(BaseCollector):
         """
         Return the most recently collected azslurm metrics for Prometheus to scrape.
         """
-        #TODO: DO we need to lock this?
         return self.cached_output["azslurm_metrics"]
 
     def parse_output(self, partitions_stdout, limits_stdout) -> List[Gauge]:
@@ -94,8 +93,8 @@ class Azslurm(BaseCollector):
 
     async def azslurm_query(self) -> None:
         """
-        Query azslurm partitions and limits command and cache parsed output as a single prometheus guage to represent
-        per vm-size cluster capicty.
+        Query azslurm partitions and limits command and cache parsed output as a single prometheus gauge to represent
+        per vm-size cluster capacity.
         """
         args_partitions = [self.binary_path]
         args_limits = [self.binary_path]
