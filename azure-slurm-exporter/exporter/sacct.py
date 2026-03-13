@@ -72,7 +72,6 @@ class Sacct(BaseCollector):
         """
         Return the most recently collected sacct metrics for Prometheus to scrape.
         """
-        #TODO: DO we need to lock this?
         return [self.sacct_terminal_jobs]
 
     def parse_output(self, stdout) -> None:
