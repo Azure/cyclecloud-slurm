@@ -108,11 +108,25 @@ WantedBy=multi-user.target
         log.error("Failed to enable azslurm-exporter: %s", e.stderr)
         raise SystemdSetupException
 
+LOG_FILES = [
+    "/var/log/azslurm-exporter.log",
+    "/var/log/azslurm-exporter-install.log",
+]
+
+def create_log_files() -> None:
+    """Create the exporter log files with world-read/write permissions so any user can run the exporter."""
+    for log_file in LOG_FILES:
+        if not os.path.exists(log_file):
+            open(log_file, "a").close()
+        os.chmod(log_file, 0o666)
+        log.info("Created log file %s with rw-rw-rw- permissions", log_file)
+
 def main():
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
     logging.config.fileConfig(str(conf_file))
     venv = sys.prefix
     try:
+        create_log_files()
         setup_azslurm_exporter_systemd(venv=venv)
         add_azslurm_exporter_scraper("/opt/prometheus/prometheus.yml")
     except PrometheusNotFoundException:
