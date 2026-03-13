@@ -50,7 +50,6 @@ main() {
     VERSION=0.1.0
     PACKAGE=azure_slurm_exporter-$VERSION.tar.gz
     VENV=/opt/azurehpc/azslurm-exporter/venv
-    PROM_CONFIG=/opt/prometheus/prometheus.yml
 
     # create the venv and install azslurm-exporter
     setup_venv

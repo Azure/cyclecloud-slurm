@@ -1,3 +1,1 @@
-from .exporter import main
-
-__all__ = ["main"]
+# Empty — entry points are defined in pyproject.toml
