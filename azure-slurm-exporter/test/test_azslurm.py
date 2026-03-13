@@ -38,7 +38,7 @@ class TestAzslurm:
         assert result == {}
 
     def test_parse_limits(self, azslurm):
-        stdout = b'[{"nodearray":"na1","vm_size":"Standard_D2s_v3","available_count":"10","family_available_count":"15","regional_available_count":"20"}]'
+        stdout = b'[{"nodearray":"na1","vm_size":"Standard_D2s_v3","available_count":"10","family_available_count":"15","regional_available_count":"20","ncpus":2,"ngpus":0,"memgb":"memory::4.00g"}]'
         result = list(azslurm._parse_limits(stdout))
         assert len(result) == 1
         assert result[0].nodearray == "na1"
@@ -47,7 +47,7 @@ class TestAzslurm:
 
     def test_parse_output(self, azslurm):
         partitions_stdout = b"PartitionName=part1\nNodename=node[1-5]"
-        limits_stdout = b'[{"nodearray":"part1","vm_size":"Standard_D2s_v3","available_count":"10","family_available_count":"15","regional_available_count":"20"}]'
+        limits_stdout = b'[{"nodearray":"part1","vm_size":"Standard_D2s_v3","available_count":"10","family_available_count":"15","regional_available_count":"20","ncpus":2,"ngpus":0,"memgb":"memory::4.00g"}]'
 
         result = azslurm.parse_output(partitions_stdout, limits_stdout)
         assert len(result) == 1
@@ -55,11 +55,11 @@ class TestAzslurm:
         assert result[0].describe()[0].name == "azslurm_partition_info"
         metric = result[0].collect()
         samples_by_key = {
-                (s.labels['partition'],s.labels["vm_size"], s.labels["azure_count"], s.labels["nodelist"]): s.value
+                (s.labels['partition'],s.labels["vm_size"], s.labels["azure_count"], s.labels["nodelist"], s.labels["ncpus"], s.labels["ngpus"], s.labels["memory_gib"]): s.value
                 for s in metric[0].samples
         }
-        assert samples_by_key["part1","Standard_D2s_v3","15","node[1-5]"] == 10
-        
+        assert samples_by_key["part1","Standard_D2s_v3","15","node[1-5]","2","0","4.00"] == 10
+
     @patch.object(Azslurm, 'run_command', new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_azslurm_query_success(self, mock_run, azslurm):
@@ -69,7 +69,7 @@ class TestAzslurm:
 
         mock_run.side_effect = [
             MagicMock(stdout=b"PartitionName=part1\nNodename=node[1-5]"),
-            MagicMock(stdout=b'[{"nodearray":"part1","vm_size":"Standard_D2s_v3","available_count":"10","family_available_count":"15","regional_available_count":"20"}]')
+            MagicMock(stdout=b'[{"nodearray":"part1","vm_size":"Standard_D2s_v3","available_count":"10","family_available_count":"15","regional_available_count":"20","ncpus":2,"ngpus":0,"memgb":"memory::4.00g"}]')
         ]
 
         await azslurm.azslurm_query()
@@ -77,10 +77,10 @@ class TestAzslurm:
         assert azslurm.cached_output["azslurm_metrics"][0].describe()[0].name == "azslurm_partition_info"
         metric = azslurm.cached_output["azslurm_metrics"][0].collect()
         samples_by_key = {
-                (s.labels['partition'],s.labels["vm_size"], s.labels["azure_count"], s.labels["nodelist"]): s.value
+                (s.labels['partition'],s.labels["vm_size"], s.labels["azure_count"], s.labels["nodelist"], s.labels["ncpus"], s.labels["ngpus"], s.labels["memory_gib"]): s.value
                 for s in metric[0].samples
         }
-        assert samples_by_key["part1","Standard_D2s_v3","15","node[1-5]"] == 10
+        assert samples_by_key["part1","Standard_D2s_v3","15","node[1-5]","2","0","4.00"] == 10
 
     @patch.object(Azslurm, 'run_command', new_callable=AsyncMock)
     @pytest.mark.asyncio
