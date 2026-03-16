@@ -22,7 +22,7 @@ class TestSqueueInitialize:
 class TestSqueueParseOutput:
     def test_parse_output_running_job(self):
         squeue = Squeue()
-        stdout = b"12345|job_name|2|node[1-2]|partition1|RUNNING|2024-01-01T00:00:00|user1\n"
+        stdout = b"12345|job_name|2|node[1-2]|partition1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         samples_by_keys = {}
         metrics = squeue.export_metrics()
@@ -42,15 +42,16 @@ class TestSqueueParseOutput:
                         assert "nodelist" in s.labels
                         assert "job_id" in s.labels
                         assert "job_name" in s.labels
-                        samples_by_keys[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"])] = s.value
-        assert samples_by_keys.get(("node[1-2]","partition1","running","12345", "job_name")) == 2
+                        assert "start_time" in s.labels
+                        samples_by_keys[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"], s.labels["start_time"])] = s.value
+        assert samples_by_keys.get(("node[1-2]","partition1","running","12345", "job_name", "2024-01-01T00:00:01")) == 2
         assert samples_by_keys.get(("partition1","running")) == 1
 
     def test_parse_output_multiple_states(self):
         squeue = Squeue()
         stdout = (
-            b"12345|job1|2|node[1-2]|part1|RUNNING|2024-01-01T00:00:00|user1\n"
-            b"12346|job2|1||part1|PENDING|2024-01-01T00:01:00|user2\n"
+            b"12345|job1|2|node[1-2]|part1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
+            b"12346|job2|1||part1|PENDING|2024-01-01T00:01:00|N/A|user2\n"
         )
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         metrics = squeue.export_metrics()
@@ -80,9 +81,9 @@ class TestSqueueParseOutput:
     def test_parse_output_mixed_states(self):
         squeue = Squeue()
         stdout = (
-            b"1|job1|2|node1|p1|RUNNING|2024-01-01T00:00:00|u1\n"
-            b"2|job2|1|node2|p1|RUNNING|2024-01-01T00:01:00|u2\n"
-            b"3|job3|3||p2|PENDING|2024-01-01T00:02:00|u3\n"
+            b"1|job1|2|node1|p1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|u1\n"
+            b"2|job2|1|node2|p1|RUNNING|2024-01-01T00:01:00|2024-01-01T00:01:01|u2\n"
+            b"3|job3|3||p2|PENDING|2024-01-01T00:02:00|N/A|u3\n"
         )
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         metrics = squeue.export_metrics()
@@ -125,8 +126,8 @@ class TestSqueueExportMetrics:
     def test_export_metrics_cached(self):
         squeue = Squeue()
         stdout = (
-            b"100|myjob|4|node[1-4]|batch|RUNNING|2024-01-01T00:00:00|testuser\n"
-            b"101|myjob2|1||batch|PENDING|2024-01-01T00:01:00|testuser\n"
+            b"100|myjob|4|node[1-4]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|testuser\n"
+            b"101|myjob2|1||batch|PENDING|2024-01-01T00:01:00|N/A|testuser\n"
         )
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
 
@@ -138,7 +139,7 @@ class TestSqueueExportMetrics:
 
     def test_export_metrics_validates_gauge_type(self):
         squeue = Squeue()
-        stdout = b"12345|job1|2|node[1-2]|part1|RUNNING|2024-01-01T00:00:00|user1\n"
+        stdout = b"12345|job1|2|node[1-2]|part1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
 
         metrics = squeue.export_metrics()
@@ -151,7 +152,7 @@ class TestSqueueMetricValues:
 
     def test_single_running_job_values(self):
         squeue = Squeue()
-        stdout = b"500|training|8|gpu-node[1-8]|gpu|RUNNING|2024-06-15T10:00:00|researcher\n"
+        stdout = b"500|training|8|gpu-node[1-8]|gpu|RUNNING|2024-06-15T10:00:00|2024-06-15T10:00:01|researcher\n"
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         metrics = squeue.export_metrics()
 
@@ -177,7 +178,7 @@ class TestSqueueMetricValues:
         for i in range(100):
             state = b"RUNNING" if i % 2 == 0 else b"PENDING"
             nodelist = b"node1" if state == b"RUNNING" else b""
-            lines.append(b"%d|job%d|1|%s|batch|%s|2024-01-01T00:00:00|user\n" % (i, i, nodelist, state))
+            lines.append(b"%d|job%d|1|%s|batch|%s|2024-01-01T00:00:00|2024-01-01T00:00:01|user\n" % (i, i, nodelist, state))
         stdout = b"".join(lines)
 
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
@@ -202,7 +203,7 @@ class TestSqueueQuery:
     async def test_squeue_query_success(self):
         squeue = Squeue()
         mock_proc = AsyncMock()
-        mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|user1\n"
+        mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         samples_by_key = {}
         with patch.object(squeue, "run_command", return_value=mock_proc):
             await squeue.squeue_query()
@@ -214,16 +215,16 @@ class TestSqueueQuery:
         metric2 = squeue.cached_output["squeue_metrics"][1]
         family = metric2.collect()
         for s in family[0].samples:
-            samples_by_key[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"] )] = s.value
+            samples_by_key[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"], s.labels["start_time"])] = s.value
         assert samples_by_key.get(("batch","running")) == 1
-        assert samples_by_key.get(("node[1-2]","batch","running","12345","job1")) == 2
+        assert samples_by_key.get(("node[1-2]","batch","running","12345","job1","2024-01-01T00:00:01")) == 2
 
 
     @pytest.mark.asyncio
     async def test_squeue_query_caches_result(self):
         squeue = Squeue()
         mock_proc = AsyncMock()
-        mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|user1\n"
+        mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         mock_gauges = [MagicMock(spec=Gauge), MagicMock(spec=Gauge)]
 
         with patch.object(squeue, "run_command", return_value=mock_proc):

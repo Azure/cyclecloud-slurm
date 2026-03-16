@@ -38,8 +38,8 @@ class Squeue(BaseCollector):
         self.interval = interval
         self.timeout = timeout
         self.cached_output = {"squeue_metrics":[]}
-        self.default_output_fmt = f"%i|%j|%D|%N|%P|%T|%V|%u"
-        self.default_output_headers = "jobid,name,nodes,nodelist,partition,state,submit_time,user"
+        self.default_output_fmt = f"%i|%j|%D|%N|%P|%T|%V|%S|%u"
+        self.default_output_headers = "jobid,name,nodes,nodelist,partition,state,submit_time,start_time,user"
         self.squeue_output = namedtuple("squeue_output", self.default_output_headers)
         self.default_options = ["-h", "-o", self.default_output_fmt]
 
@@ -79,7 +79,7 @@ class Squeue(BaseCollector):
         squeue_job_nodes_allocated = Gauge(
             "squeue_job_nodes_allocated",
             "Number of nodes allocated to a running job",
-            labelnames=["job_id", "job_name", "partition", "state", "nodelist"], registry=None
+            labelnames=["job_id", "job_name", "partition", "state", "nodelist", "start_time"], registry=None
         )
         # number of jobs per state,partition key
         counts = {}
@@ -92,7 +92,8 @@ class Squeue(BaseCollector):
                                                   job_name=row.name,
                                                   partition=row.partition,
                                                   state=row.state.lower(),
-                                                  nodelist=row.nodelist).set(int(row.nodes))
+                                                  nodelist=row.nodelist,
+                                                  start_time=row.start_time).set(int(row.nodes))
             key = (row.partition, row.state.lower())
             counts[key] = counts.get(key, 0) + 1
 
