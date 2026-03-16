@@ -31,348 +31,6 @@
         "x": 0,
         "y": 0
       },
-      "id": 1040,
-      "panels": [],
-      "title": "Cluster Specs",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "uid": "${promDatasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 10,
-        "x": 0,
-        "y": 1
-      },
-      "id": 1041,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "11.6.9",
-      "targets": [
-        {
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "jetpack_cluster_info{cluster=\"$cluster\"}",
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Cluster Specs",
-      "transformations": [
-        {
-          "id": "labelsToFields",
-          "options": {
-            "keepLabels": [
-              "subscription",
-              "cluster",
-              "region"
-            ],
-            "mode": "rows"
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "label"
-              }
-            ]
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {},
-            "includeByName": {},
-            "indexByName": {},
-            "renameByName": {
-              "label": "Spec",
-              "value": "Value"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${promDatasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 10,
-        "y": 1
-      },
-      "id": 1042,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value_and_name",
-        "wideLayout": false
-      },
-      "pluginVersion": "11.6.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (partition)(scontrol_partition_nodes{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "{{partition}}",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (cluster)(sinfo_partition_nodes_state{cluster=\"$cluster\"})",
-          "hide": false,
-          "instant": false,
-          "interval": "",
-          "legendFormat": "Total Slurm Nodes",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (partition)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{partition}}",
-          "range": true,
-          "refId": "C"
-        }
-      ],
-      "title": "Total Nodes by Partition $partition",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${promDatasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": false,
-            "inspect": false,
-            "minWidth": 150
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 18,
-        "x": 0,
-        "y": 9
-      },
-      "id": 1043,
-      "options": {
-        "cellHeight": "lg",
-        "footer": {
-          "countRows": false,
-          "enablePagination": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "frameIndex": 1,
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "nodelist"
-          }
-        ]
-      },
-      "pluginVersion": "11.6.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "azslurm_partition_info{cluster=\"$cluster\",partition=~\"$partition\"}",
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
-        }
-      ],
-      "title": "Partition Specs",
-      "transformations": [
-        {
-          "id": "timeSeriesTable",
-          "options": {
-            "A": {
-              "stat": "lastNotNull",
-              "timeField": "Time"
-            }
-          }
-        },
-        {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "cluster": true,
-              "instance": true,
-              "job": true,
-              "physical_host": true,
-              "subscription": true
-            },
-            "includeByName": {},
-            "indexByName": {
-              "Trend #A": 9,
-              "__name__": 0,
-              "azure_count": 10,
-              "cluster": 1,
-              "instance": 2,
-              "job": 3,
-              "nodelist": 8,
-              "partition": 4,
-              "physical_host": 5,
-              "subscription": 6,
-              "vm_size": 7
-            },
-            "renameByName": {
-              "Metric": "",
-              "Trend #A": "Available Count",
-              "available_azure_quota": "Available Azure Quota",
-              "azure_count": "Available Azure Count",
-              "node_list": "Node List",
-              "partition": "Partition",
-              "vm_size": "VM Size"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 18
-      },
       "id": 1027,
       "panels": [],
       "title": "Cluster Overview for partion $partition",
@@ -389,6 +47,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "noValue": "No Jobs in the queue",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -506,7 +165,7 @@
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 19
+        "y": 1
       },
       "id": 2,
       "options": {
@@ -597,7 +256,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 1,
+            "fillOpacity": 5,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -622,6 +281,7 @@
             }
           },
           "mappings": [],
+          "noValue": "No Jobs submitted within time range",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -636,133 +296,6 @@
           }
         },
         "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Running Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Configuring Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Completed Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": ""
-            },
-            "properties": []
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Cancelled Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Node Failed Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Submitted Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Jobs in Queue"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",
@@ -835,6 +368,14 @@
                   "fixedColor": "text",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
               }
             ]
           }
@@ -844,7 +385,7 @@
         "h": 16,
         "w": 10,
         "x": 9,
-        "y": 19
+        "y": 1
       },
       "id": 1037,
       "options": {
@@ -891,7 +432,7 @@
           "refId": "A"
         }
       ],
-      "title": "Job Queue Overview",
+      "title": "Job Queue Overview by State",
       "type": "timeseries"
     },
     {
@@ -906,6 +447,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -929,7 +471,7 @@
         "h": 7,
         "w": 5,
         "x": 19,
-        "y": 19
+        "y": 1
       },
       "id": 1049,
       "options": {
@@ -957,7 +499,7 @@
             "uid": "${promDatasource}"
           },
           "editorMode": "code",
-          "expr": "(\r\n  sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"allocated|mixed|draining\"})\r\n  /\r\n  (\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\"})\r\n    -\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"powered_off\"})\r\n  )\r\n) * 100",
+          "expr": "(\r\n  (sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"allocated|mixed|draining\"}) or vector(0))\r\n  /\r\n  (\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\"})\r\n    -\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"powered_off\"})\r\n  )\r\n) * 100\r\n\r\n",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -980,6 +522,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1003,7 +546,7 @@
         "h": 7,
         "w": 5,
         "x": 19,
-        "y": 26
+        "y": 8
       },
       "id": 1050,
       "options": {
@@ -1031,7 +574,7 @@
             "uid": "${promDatasource}"
           },
           "editorMode": "code",
-          "expr": "(\r\n  sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"allocated|mixed|draining\"})\r\n  /\r\n  (\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\"})\r\n\r\n  )\r\n) * 100",
+          "expr": "(\r\n  (sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"allocated|mixed|draining\"}) or vector(0))\r\n  /\r\n  (\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\"})\r\n\r\n  )\r\n) * 100",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -1050,6 +593,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "fixedColor": "green",
             "mode": "thresholds"
           },
           "custom": {
@@ -1060,7 +604,19 @@
             "filterable": true,
             "inspect": false
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "No jobs are currently running "
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "noValue": "No jobs running within time range",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1074,24 +630,32 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": ""
+            },
+            "properties": []
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 27
+        "y": 9
       },
       "id": 1047,
       "options": {
         "cellHeight": "sm",
         "footer": {
-          "countRows": false,
+          "countRows": true,
           "fields": "",
           "reducer": [
-            "sum"
+            "count"
           ],
-          "show": false
+          "show": true
         },
         "frameIndex": 3,
         "showHeader": true,
@@ -1112,13 +676,13 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "topk(10,squeue_job_nodes_allocated{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "instant": true,
+          "instant": false,
           "legendFormat": "__auto",
-          "range": false,
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Current Running Jobs by Node Allocation",
+      "title": "Running Jobs by Node Allocation",
       "transformations": [
         {
           "id": "timeSeriesTable",
@@ -1174,29 +738,14 @@
               "viz": false
             }
           },
-          "fieldMinMax": false,
-          "mappings": []
+          "mappings": [],
+          "noValue": "No Jobs finished between the current time range"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "IDLE"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ALLOCATED"
+              "options": "Completed Jobs"
             },
             "properties": [
               {
@@ -1211,69 +760,41 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "DRAINING"
+              "options": "Failed Jobs"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "yellow",
+                  "fixedColor": "red",
                   "mode": "fixed"
                 }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": true,
+                    "title": "Failed Jobs in last 6 months",
+                    "url": "/d/cff0f6w0qqwaoa/failed-jobs-dashboard?orgId=1&from=${__from}&to=${__to}&timezone=browser&${promDatasource:queryparam}&${partition:queryparam}&${cluster:queryparam}&viewPanel=panel-1052"
+                  }
+                ]
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "DOWN"
+              "options": "Finished Jobs"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "dark-red",
+                  "fixedColor": "transparent",
                   "mode": "fixed"
                 }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "MAINTENANCE"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "super-light-red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "UNKNOWN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ff00f6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total"
-            },
-            "properties": [
+              },
               {
                 "id": "custom.hideFrom",
                 "value": {
@@ -1281,101 +802,170 @@
                   "tooltip": false,
                   "viz": true
                 }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "transparent",
-                  "mode": "fixed"
-                }
               }
             ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 5,
+        "x": 19,
+        "y": 15
+      },
+      "id": 1052,
+      "options": {
+        "displayLabels": [
+          "name",
+          "value",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
           },
+          "editorMode": "code",
+          "expr": "floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) !=0",
+          "hide": true,
+          "instant": false,
+          "legendFormat": "Failed Jobs",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"})[$__range:$__interval])) !=0",
+          "hide": true,
+          "instant": false,
+          "legendFormat": "Completed Jobs",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "expr": "floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"})[$__range:$__interval])) !=0",
+          "hide": true,
+          "instant": false,
+          "legendFormat": "Finished Jobs",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range))",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "Failed Jobs",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"} offset $__range))",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "Completed Jobs",
+          "range": false,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"} offset $__range))",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "Finished Jobs",
+          "range": false,
+          "refId": "D"
+        }
+      ],
+      "title": "Finished Jobs between $__from and $__to",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "POWERING UP"
+              "options": "Total"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
                   "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "POWERED DOWN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#767472",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "MIXED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "DRAIN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "DRAINED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "RESERVED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-blue",
                   "mode": "fixed"
                 }
               }
@@ -1455,6 +1045,63 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "idle"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "drained"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n/a"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": []
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "not_responding"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -1462,26 +1109,15 @@
         "h": 10,
         "w": 9,
         "x": 0,
-        "y": 35
+        "y": 17
       },
       "id": 1035,
       "options": {
-        "displayLabels": [
-          "percent",
-          "value",
-          "name"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "sortBy": "Value",
-          "sortDesc": true,
-          "values": [
-            "value"
-          ]
-        },
-        "pieType": "pie",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -1489,11 +1125,9 @@
           "fields": "",
           "values": false
         },
-        "tooltip": {
-          "hideZeros": true,
-          "mode": "multi",
-          "sort": "none"
-        }
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
       "pluginVersion": "11.6.9",
       "targets": [
@@ -1504,7 +1138,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (state)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"})",
+          "expr": "sum by (state)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\", state!=\"n/a\"})",
           "hide": false,
           "instant": true,
           "legendFormat": "{{state}}",
@@ -1527,7 +1161,7 @@
         }
       ],
       "title": "Live: Node status",
-      "type": "piechart"
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1584,261 +1218,6 @@
           }
         },
         "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "IDLE"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "ALLOCATED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "DRAINING"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "DOWN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "MAINTENANCE"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "super-light-red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "UNKNOWN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ff00f6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "TOTAL"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "transparent",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "POWERED DOWN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "UNRESPONSIVE"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "POWERED UP"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "POWERING UP"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "TOTAL"
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "MIXED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "DRAIN"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "DRAINED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "RESERVED"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-blue",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "FAIL"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",
@@ -1943,6 +1322,52 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "drained"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "powered_off"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "not_responding"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -1950,7 +1375,7 @@
         "h": 18,
         "w": 10,
         "x": 9,
-        "y": 35
+        "y": 17
       },
       "id": 1034,
       "options": {
@@ -2219,7 +1644,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 96
+                "value": 169
               }
             ]
           },
@@ -2246,6 +1671,13 @@
                 "value": 122
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": []
           }
         ]
       },
@@ -2253,7 +1685,7 @@
         "h": 8,
         "w": 9,
         "x": 0,
-        "y": 45
+        "y": 27
       },
       "id": 1051,
       "options": {
@@ -2344,12 +1776,114 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 35
       },
-      "id": 1044,
+      "id": 1040,
       "panels": [],
-      "title": "Total Finished Jobs for Partition $partition",
+      "title": "Cluster Specs",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 36
+      },
+      "id": 1041,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "jetpack_cluster_info{cluster=\"$cluster\"}",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Cluster Specs",
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "keepLabels": [
+              "subscription",
+              "cluster",
+              "region"
+            ],
+            "mode": "rows"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "label"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "label": "Spec",
+              "value": "Value"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
@@ -2359,187 +1893,33 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
-          "custom": {
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Running Jobs"
-            },
-            "properties": [
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
               {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Configuring Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-yellow",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Completed Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": ""
-            },
-            "properties": []
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Cancelled Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "semi-dark-orange",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Node Failed Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Total Finished Jobs"
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "transparent",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Failed Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "red",
-                  "mode": "fixed"
-                }
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "targetBlank": true,
-                    "title": "Failed Jobs in last 6 months",
-                    "url": "/d/cff0f6w0qqwaoa/failed-jobs-dashboard?orgId=1&from=${__from}&to=${__to}&timezone=browser&${promDatasource:queryparam}&${partition:queryparam}&${cluster:queryparam}&viewPanel=panel-1050"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Timed Out Jobs"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "yellow",
-                  "mode": "fixed"
-                }
+                "color": "green"
               }
             ]
           }
-        ]
+        },
+        "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 10,
-        "x": 0,
-        "y": 54
+        "h": 8,
+        "w": 8,
+        "x": 10,
+        "y": 36
       },
-      "id": 1039,
+      "id": 1042,
       "options": {
-        "displayLabels": [
-          "name",
-          "value"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "pie",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -2547,11 +1927,104 @@
           "fields": "",
           "values": false
         },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": false
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (cluster)(sinfo_partition_nodes_state{cluster=\"$cluster\"})",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Total Slurm Nodes",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (partition)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"})",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "{{partition}}",
+          "range": true,
+          "refId": "C"
         }
+      ],
+      "title": "Total Nodes by Partition $partition",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": false,
+            "inspect": false,
+            "minWidth": 150
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 18,
+        "x": 0,
+        "y": 44
+      },
+      "id": 1043,
+      "options": {
+        "cellHeight": "lg",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "nodelist"
+          }
+        ]
       },
       "pluginVersion": "11.6.9",
       "targets": [
@@ -2562,82 +2035,100 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sum by (state)(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"})",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "Completed Jobs",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (failed)(label_replace(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"},\"failed\",\"Failed Jobs\",\"\",\"\"))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "Failed Jobs",
-          "range": true,
-          "refId": "D"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (cluster)(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "Total Finished Jobs",
-          "range": true,
+          "expr": "azslurm_partition_info{cluster=\"$cluster\",partition=~\"$partition\"}",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum by (state)(increase(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"timeout\"}[$__range]))",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "sum(increase(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\", state=\"completed\"}[$__range]))",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "Total Finished Jobs",
-          "range": true,
-          "refId": "E"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"timeout\"}",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "F"
         }
       ],
-      "title": "Total Finished Jobs",
-      "type": "piechart"
+      "title": "Partition Specs",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {
+            "A": {
+              "stat": "lastNotNull",
+              "timeField": "Time"
+            }
+          }
+        },
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "cluster": true,
+              "instance": true,
+              "job": true,
+              "physical_host": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #A": 12,
+              "__name__": 0,
+              "azure_count": 13,
+              "cluster": 1,
+              "instance": 2,
+              "job": 3,
+              "memory_gib": 11,
+              "ncpus": 9,
+              "ngpus": 10,
+              "nodelist": 8,
+              "partition": 4,
+              "physical_host": 5,
+              "subscription": 6,
+              "vm_size": 7
+            },
+            "renameByName": {
+              "Metric": "",
+              "Trend #A": "Available Count",
+              "available_azure_quota": "Available Azure Quota",
+              "azure_count": "Available Azure Count",
+              "memory_gib": "Memory (GiB)",
+              "ncpus": "CPUs",
+              "ngpus": "GPUs",
+              "node_list": "Node List",
+              "partition": "Partition",
+              "vm_size": "VM Size"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 18,
+        "x": 0,
+        "y": 53
+      },
+      "id": 1053,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "## Disclaimer\n\n> **⚠️ Note:** Under heavy system load, dashboards may update more slowly. Displayed metrics may experience delays and should not be relied upon as a real-time source of truth during peak activity.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.9",
+      "title": "README",
+      "type": "text"
     }
   ],
   "preload": false,
@@ -2671,8 +2162,8 @@
       },
       {
         "current": {
-          "text": "Managed_Prometheus_ccw-mon-xfnnjso7smaw6",
-          "value": "ccw-mon-xfnnjso7smaw6"
+          "text": "Managed_Prometheus_ccw-mon-jwna6fuhty7ho",
+          "value": "ccw-mon-jwna6fuhty7ho"
         },
         "includeAll": false,
         "label": "Prometheus Data Source",
@@ -2686,20 +2177,22 @@
       {
         "current": {
           "text": "All",
-          "value": "$__all"
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${promDatasource}"
         },
-        "definition": "label_values(sinfo_partition_nodes_state, partition)",
+        "definition": "label_values(azslurm_partition_info, partition)",
         "includeAll": true,
         "multi": true,
         "name": "partition",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(sinfo_partition_nodes_state, partition)",
+          "query": "label_values(azslurm_partition_info, partition)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -2708,19 +2201,19 @@
       },
       {
         "current": {
-          "text": "azcyclecloudwesteu-rg/azslurm-exporter-34-copy",
-          "value": "azcyclecloudwesteu-rg/azslurm-exporter-34-copy"
+          "text": "azcyclecloudwesteu-rg/u24-rc",
+          "value": "azcyclecloudwesteu-rg/u24-rc"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${promDatasource}"
         },
-        "definition": "label_values(node_cpu_seconds_total, cluster)",
+        "definition": "label_values(jetpack_cluster_info, cluster)",
         "name": "cluster",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(node_cpu_seconds_total, cluster)",
+          "query": "label_values(jetpack_cluster_info, cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -2730,7 +2223,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},

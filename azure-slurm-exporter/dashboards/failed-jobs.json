@@ -57,6 +57,7 @@
             "minWidth": 150
           },
           "mappings": [],
+          "noValue": "No failed jobs within time range",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -78,7 +79,7 @@
         "x": 0,
         "y": 1
       },
-      "id": 1050,
+      "id": 1052,
       "options": {
         "cellHeight": "lg",
         "footer": {
@@ -103,14 +104,14 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\", state!=\"completed\"}",
+          "expr": "(floor(increase(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}[$__range])) != 0 and sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range) or (sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} unless sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)",
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
           "refId": "A"
         }
       ],
-      "title": "Failed Jobs by Exit Code",
+      "title": "Failed Jobs by Exit Code between $__from and $__to",
       "transformations": [
         {
           "id": "timeSeriesTable",
@@ -194,7 +195,7 @@
         "x": 0,
         "y": 12
       },
-      "id": 1051,
+      "id": 1053,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -220,20 +221,7 @@
             "uid": "${promDatasource}"
           },
           "editorMode": "code",
-          "expr": "sum(floor(increase(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"}[$__range])))",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\", state!=\"completed\"})",
+          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range))",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -241,7 +229,7 @@
           "refId": "B"
         }
       ],
-      "title": "Failed Jobs by Exit Code",
+      "title": "Total Failed Jobs between $__from and $__to",
       "type": "stat"
     }
   ],
@@ -276,8 +264,8 @@
       },
       {
         "current": {
-          "text": "Managed_Prometheus_ccw-mon-xfnnjso7smaw6",
-          "value": "ccw-mon-xfnnjso7smaw6"
+          "text": "Managed_Prometheus_ccw-mon-jwna6fuhty7ho",
+          "value": "ccw-mon-jwna6fuhty7ho"
         },
         "includeAll": false,
         "label": "Prometheus Data Source",
@@ -299,14 +287,14 @@
           "type": "prometheus",
           "uid": "${promDatasource}"
         },
-        "definition": "label_values(sinfo_partition_nodes_state, partition)",
+        "definition": "label_values(azslurm_partition_info, partition)",
         "includeAll": true,
         "multi": true,
         "name": "partition",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(sinfo_partition_nodes_state, partition)",
+          "query": "label_values(azslurm_partition_info, partition)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -315,19 +303,19 @@
       },
       {
         "current": {
-          "text": "azcyclecloudwesteu-rg/azslurm-exporter-34-copy",
-          "value": "azcyclecloudwesteu-rg/azslurm-exporter-34-copy"
+          "text": "azcyclecloudwesteu-rg/u24-rc",
+          "value": "azcyclecloudwesteu-rg/u24-rc"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "${promDatasource}"
         },
-        "definition": "label_values(node_cpu_seconds_total, cluster)",
+        "definition": "label_values(jetpack_cluster_info, cluster)",
         "name": "cluster",
         "options": [],
         "query": {
           "qryType": 5,
-          "query": "label_values(node_cpu_seconds_total, cluster)",
+          "query": "label_values(jetpack_cluster_info, cluster)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -337,7 +325,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
