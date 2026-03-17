@@ -64,9 +64,9 @@ class Azslurm(BaseCollector):
             azslurm_partition_info.labels(partition=row.nodearray,
                                         nodelist=nodelist,
                                         vm_size=row.vm_size,
-                                        azure_count=min(int(row.family_available_count), int(row.regional_available_count)),
-                                        ncpus=row.ncpus,
-                                        ngpus=row.ngpus,
+                                        azure_count=str(min(int(row.family_available_count), int(row.regional_available_count))),
+                                        ncpus=str(row.ncpus),
+                                        ngpus=str(row.ngpus),
                                         memory_gib=memory_gib
                                         ).set(int(row.available_count))
         return [azslurm_partition_info]
