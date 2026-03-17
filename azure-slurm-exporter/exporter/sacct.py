@@ -43,7 +43,7 @@ class Sacct(BaseCollector):
         self.interval = interval
         self.timeout = timeout
         self.sacct_terminal_jobs= Counter("sacct_terminal_jobs","Total Number of completed slurm jobs",
-                                    ["partition", "exit_code","reason","state", "nodelist"], registry=None)
+                                    ["partition", "exit_code","reason","state"], registry=None)
         self.default_output_fmt = "jobid,jobname,nodelist,nnodes,partition,exitcode,derivedexitcode,state,user,start,submit,end,reason"
         self.sacct_output = namedtuple("sacct_output", self.default_output_fmt)
         self.terminal_states = "completed,failed,cancelled,timeout,node_fail,preempted,out_of_memory,deadline,boot_fail"
@@ -88,8 +88,7 @@ class Sacct(BaseCollector):
                 partition=row.partition,
                 exit_code=row.exitcode,
                 reason=reason,
-                state=row.state.lower(),
-                nodelist=row.nodelist).inc()
+                state=row.state.lower()).inc()
 
     async def sacct_query(self) -> None:
         """
