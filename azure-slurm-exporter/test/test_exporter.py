@@ -1,9 +1,63 @@
 import pytest
 import asyncio
-import sys
-from unittest.mock import Mock, MagicMock, patch, AsyncMock, call
-from exporter.exporter import main, CompositeCollector, NoCollectorsFoundException, HTTPServerFailedException
-from prometheus_client import Gauge, Counter
+from unittest.mock import MagicMock, patch, AsyncMock, Mock
+from exporter.exporter import (
+    main, CompositeCollector, BaseCollector, NoCollectorsFoundException,
+    HTTPServerFailedException, CommandFailedException, CommandTimedOutException, CommandResult,
+)
+from prometheus_client import Gauge, Counter, Summary
+from typing import List, Union
+
+
+class ConcreteCollector(BaseCollector):
+    """Minimal concrete implementation of BaseCollector for testing."""
+    def initialize(self):
+        pass
+    def start(self):
+        pass
+    def export_metrics(self) -> List[Union[Gauge, Counter, Summary]]:
+        return []
+
+
+class TestRunCommand:
+    """Tests for BaseCollector.run_command()"""
+
+    @pytest.mark.asyncio
+    async def test_run_command_success(self):
+        collector = ConcreteCollector()
+        result = await collector.run_command("echo", "hello", timeout=10)
+        assert isinstance(result, CommandResult)
+        assert result.returncode == 0
+        assert b"hello" in result.stdout
+
+    @pytest.mark.asyncio
+    async def test_run_command_nonzero_exit_raises_command_failed(self):
+        collector = ConcreteCollector()
+        with pytest.raises(CommandFailedException) as exc_info:
+            await collector.run_command("false", timeout=10)
+        assert exc_info.value.returncode == 1
+
+    @pytest.mark.asyncio
+    async def test_run_command_timeout_raises_command_timed_out(self):
+        collector = ConcreteCollector()
+        with pytest.raises(CommandTimedOutException) as exc_info:
+            await collector.run_command("sleep", "60", timeout=1)
+        assert exc_info.value.timeout == 1
+
+    @pytest.mark.asyncio
+    async def test_run_command_captures_stderr(self):
+        collector = ConcreteCollector()
+        with pytest.raises(CommandFailedException) as exc_info:
+            await collector.run_command("bash", "-c", "echo error >&2; exit 1", timeout=10)
+        assert "error" in exc_info.value.stderr
+
+    @pytest.mark.asyncio
+    async def test_run_command_success_returns_stdout(self):
+        collector = ConcreteCollector()
+        result = await collector.run_command("echo", "test output", timeout=10)
+        assert result.stdout.strip() == b"test output"
+        assert result.returncode == 0
+
 
 class TestCompositeCollectorExportMetrics:
     """Tests for CompositeCollector.export_metrics()"""
@@ -117,7 +171,7 @@ class TestCompositeCollectorCollect:
         result = composite.collect()
         assert hasattr(result, '__iter__')
         assert hasattr(result, '__next__')
-        
+
 @pytest.mark.asyncio
 async def test_main_success():
     """Test main function successfully initializes and starts HTTP server"""
@@ -126,11 +180,11 @@ async def test_main_success():
     mock_collector.start_http_server = AsyncMock(return_value=mock_runner)
     mock_collector.initialize_collectors = Mock()
 
-    with patch('exporter.exporter.argparse.ArgumentParser') as mock_parser_class, \
-         patch('exporter.exporter.logging.config.fileConfig'), \
-         patch('exporter.exporter.CompositeCollector', return_value=mock_collector), \
-         patch('exporter.exporter.asyncio.get_running_loop') as mock_loop, \
-         patch('sys.argv', ['exporter.py', '--port', '9101', '--host', '127.0.0.1']):
+    with patch("exporter.exporter.argparse.ArgumentParser") as mock_parser_class, \
+         patch("exporter.exporter.logging.config.fileConfig"), \
+         patch("exporter.exporter.CompositeCollector", return_value=mock_collector), \
+         patch("exporter.exporter.asyncio.get_running_loop") as mock_loop, \
+         patch("sys.argv", ["exporter.py", "--port", "9101", "--host", "127.0.0.1"]):
 
         mock_loop_instance = MagicMock()
         mock_loop_instance.add_signal_handler = Mock()
@@ -140,16 +194,16 @@ async def test_main_success():
         mock_parser_class.return_value = mock_parser
         mock_args = MagicMock()
         mock_args.port = 9101
-        mock_args.host = '127.0.0.1'
+        mock_args.host = "127.0.0.1"
         mock_parser.parse_args.return_value = mock_args
 
         stop_event = asyncio.Event()
         stop_event.set()
-        with patch('exporter.exporter.asyncio.Event', return_value=stop_event):
+        with patch("exporter.exporter.asyncio.Event", return_value=stop_event):
             await main()
 
         mock_collector.initialize_collectors.assert_called_once()
-        mock_collector.start_http_server.assert_called_once_with(host='127.0.0.1', port=9101)
+        mock_collector.start_http_server.assert_called_once_with(host="127.0.0.1", port=9101)
         mock_runner.cleanup.assert_awaited_once()
 
 
@@ -161,13 +215,13 @@ async def test_main_no_collectors_found():
 
     stop_event = asyncio.Event()
     stop_event.set()
-    with patch('exporter.exporter.argparse.ArgumentParser'), \
-         patch('exporter.exporter.logging.config.fileConfig'), \
-         patch('exporter.exporter.CompositeCollector', return_value=mock_collector), \
-         patch('exporter.exporter.asyncio.get_running_loop'), \
-         patch('exporter.exporter.asyncio.Event', return_value=stop_event), \
-         patch('sys.argv', ['exporter.py']), \
-         patch('sys.exit') as mock_exit:
+    with patch("exporter.exporter.argparse.ArgumentParser"), \
+         patch("exporter.exporter.logging.config.fileConfig"), \
+         patch("exporter.exporter.CompositeCollector", return_value=mock_collector), \
+         patch("exporter.exporter.asyncio.get_running_loop"), \
+         patch("exporter.exporter.asyncio.Event", return_value=stop_event), \
+         patch("sys.argv", ["exporter.py"]), \
+         patch("sys.exit") as mock_exit:
 
         await main()
         mock_exit.assert_called_once_with(1)
@@ -182,13 +236,13 @@ async def test_main_http_server_failed():
 
     stop_event = asyncio.Event()
     stop_event.set()
-    with patch('exporter.exporter.argparse.ArgumentParser'), \
-         patch('exporter.exporter.logging.config.fileConfig'), \
-         patch('exporter.exporter.CompositeCollector', return_value=mock_collector), \
-         patch('exporter.exporter.asyncio.get_running_loop'), \
-         patch('exporter.exporter.asyncio.Event', return_value=stop_event), \
-         patch('sys.argv', ['exporter.py']), \
-         patch('sys.exit') as mock_exit:
+    with patch("exporter.exporter.argparse.ArgumentParser"), \
+         patch("exporter.exporter.logging.config.fileConfig"), \
+         patch("exporter.exporter.CompositeCollector", return_value=mock_collector), \
+         patch("exporter.exporter.asyncio.get_running_loop"), \
+         patch("exporter.exporter.asyncio.Event", return_value=stop_event), \
+         patch("sys.argv", ["exporter.py"]), \
+         patch("sys.exit") as mock_exit:
 
         await main()
         mock_exit.assert_called_once_with(1)
@@ -202,11 +256,11 @@ async def test_main_custom_port_and_host():
     mock_collector.start_http_server = AsyncMock(return_value=mock_runner)
     mock_collector.initialize_collectors = Mock()
 
-    with patch('exporter.exporter.argparse.ArgumentParser') as mock_parser_class, \
-         patch('exporter.exporter.logging.config.fileConfig'), \
-         patch('exporter.exporter.CompositeCollector', return_value=mock_collector), \
-         patch('exporter.exporter.asyncio.get_running_loop') as mock_loop, \
-         patch('sys.argv', ['exporter.py', '--port', '8080', '--host', '0.0.0.0']):
+    with patch("exporter.exporter.argparse.ArgumentParser") as mock_parser_class, \
+         patch("exporter.exporter.logging.config.fileConfig"), \
+         patch("exporter.exporter.CompositeCollector", return_value=mock_collector), \
+         patch("exporter.exporter.asyncio.get_running_loop") as mock_loop, \
+         patch("sys.argv", ["exporter.py", "--port", "8080", "--host", "0.0.0.0"]):
 
         mock_loop_instance = MagicMock()
         mock_loop_instance.add_signal_handler = Mock()
@@ -216,13 +270,13 @@ async def test_main_custom_port_and_host():
         mock_parser_class.return_value = mock_parser
         mock_args = MagicMock()
         mock_args.port = 8080
-        mock_args.host = '0.0.0.0'
+        mock_args.host = "0.0.0.0"
         mock_parser.parse_args.return_value = mock_args
 
         stop_event = asyncio.Event()
         stop_event.set()
-        with patch('exporter.exporter.asyncio.Event', return_value=stop_event):
+        with patch("exporter.exporter.asyncio.Event", return_value=stop_event):
             await main()
 
-        mock_collector.start_http_server.assert_called_once_with(host='0.0.0.0', port=8080)
+        mock_collector.start_http_server.assert_called_once_with(host="0.0.0.0", port=8080)
 

@@ -2,13 +2,14 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from prometheus_client import Gauge
 from exporter.sinfo import Sinfo, SinfoNotAvailException
-import logging
+from exporter.exporter import CommandFailedException, CommandTimedOutException
 
-class TestSinfo:
+
+class TestSinfoInitialize:
 
     @pytest.fixture
     def sinfo_collector(self):
-        """Create a Sinfo collector instance for testing"""
+        """Create a Sinfo collector instance for testing."""
         return Sinfo(binary_path="/usr/bin/sinfo", interval=30, timeout=15)
 
     @patch("exporter.util.is_file_binary")
@@ -24,6 +25,14 @@ class TestSinfo:
         mock_is_file_binary.return_value = False
         with pytest.raises(SinfoNotAvailException):
             sinfo_collector.initialize()
+
+
+class TestSinfoParseOutput:
+
+    @pytest.fixture
+    def sinfo_collector(self):
+        """Create a Sinfo collector instance for testing."""
+        return Sinfo(binary_path="/usr/bin/sinfo", interval=30, timeout=15)
 
     def test_normalize_state_with_suffix(self, sinfo_collector):
         """Test normalize_state removes suffix and returns mapped state"""
@@ -52,6 +61,7 @@ class TestSinfo:
         }
         assert samples_by_key["node[01-02]","partition1","idle","None"] == 2
         assert samples_by_key["node03","partition2","not_responding","down"] == 1
+
     def test_parse_output_empty(self, sinfo_collector):
         """Test parse_output with empty output"""
         stdout = b""
@@ -78,6 +88,14 @@ class TestSinfo:
         assert samples_by_key["node01","partition1","not_responding","reason"] == 1
         assert samples_by_key["node02","partition1","powered_off","None"] == 1
 
+
+class TestSinfoExportMetrics:
+
+    @pytest.fixture
+    def sinfo_collector(self):
+        """Create a Sinfo collector instance for testing."""
+        return Sinfo(binary_path="/usr/bin/sinfo", interval=30, timeout=15)
+
     def test_export_metrics(self, sinfo_collector):
         """Test export_metrics returns cached output"""
         mock_gauge = Mock(spec=Gauge)
@@ -87,17 +105,25 @@ class TestSinfo:
 
         assert result == [mock_gauge]
 
-    @pytest.mark.asyncio
-    async def test_sinfo_query_success(self, sinfo_collector):
-        """Test successful sinfo_query execution"""
-        mock_proc = Mock()
-        mock_proc.stdout = b"node01|1|partition1|None|idle"
 
-        sinfo_collector.run_command = AsyncMock(return_value=mock_proc)
+class TestSinfoQuery:
+
+    @pytest.fixture
+    def sinfo_collector(self):
+        """Create a Sinfo collector instance for testing."""
+        return Sinfo(binary_path="/usr/bin/sinfo", interval=30, timeout=15)
+
+    @pytest.mark.asyncio
+    @patch.object(Sinfo, "run_command", new_callable=AsyncMock)
+    async def test_sinfo_query_success(self, mock_run, sinfo_collector):
+        """Test successful sinfo_query execution"""
+        mock_proc = MagicMock()
+        mock_proc.stdout = b"node01|1|partition1|None|idle"
+        mock_run.return_value = mock_proc
 
         await sinfo_collector.sinfo_query()
 
-        sinfo_collector.run_command.assert_called_once()
+        mock_run.assert_called_once()
         assert len(sinfo_collector.cached_output["sinfo_query"]) == 1
         metric = sinfo_collector.cached_output["sinfo_query"][0].collect()
         samples_by_key = {
@@ -107,11 +133,34 @@ class TestSinfo:
         assert samples_by_key["node01","partition1","idle","None"] == 1
 
     @pytest.mark.asyncio
-    async def test_sinfo_query_exception(self, sinfo_collector):
-        """Test sinfo_query handles exceptions gracefully"""
-        sinfo_collector.run_command = AsyncMock(side_effect=Exception("Command failed"))
+    @patch.object(Sinfo, "run_command", new_callable=AsyncMock)
+    async def test_sinfo_query_exception(self, mock_run, sinfo_collector):
+        """Test sinfo_query handles command failure gracefully"""
+        mock_run.side_effect = CommandFailedException("sinfo", 1, "error")
 
         # Should not raise exception
         await sinfo_collector.sinfo_query()
 
         assert sinfo_collector.cached_output["sinfo_query"] == []
+
+    @pytest.mark.asyncio
+    @patch.object(Sinfo, "run_command", new_callable=AsyncMock)
+    async def test_sinfo_query_timeout(self, mock_run, sinfo_collector):
+        """Test sinfo_query handles timeout gracefully"""
+        sinfo_collector.cached_output["sinfo_query"] = ["Some original metric"]
+        mock_run.side_effect = CommandTimedOutException("sinfo", 15)
+
+        await sinfo_collector.sinfo_query()
+
+        assert sinfo_collector.cached_output["sinfo_query"] == ["Some original metric"]
+
+    @pytest.mark.asyncio
+    @patch.object(Sinfo, "run_command", new_callable=AsyncMock)
+    async def test_sinfo_query_nonzero_exit_preserves_cache(self, mock_run, sinfo_collector):
+        """Test sinfo_query preserves stale cache on non-zero exit"""
+        sinfo_collector.cached_output["sinfo_query"] = ["Some original metric"]
+        mock_run.side_effect = CommandFailedException("sinfo", 1, "slurm error")
+
+        await sinfo_collector.sinfo_query()
+
+        assert sinfo_collector.cached_output["sinfo_query"] == ["Some original metric"]

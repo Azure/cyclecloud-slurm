@@ -1,27 +1,40 @@
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from exporter.squeue import Squeue, SqueueNotAvailException
+from exporter.exporter import CommandFailedException, CommandTimedOutException
 from prometheus_client import Gauge
 
 
 class TestSqueueInitialize:
+
+    @pytest.fixture
+    def squeue(self):
+        """Create a Squeue collector instance for testing."""
+        return Squeue()
+
     @patch("exporter.util.is_file_binary")
-    def test_initialize_valid_binary(self, mock_is_binary):
+    def test_initialize_valid_binary(self, mock_is_binary, squeue):
+        """Test successful initialization when binary exists."""
         mock_is_binary.return_value = True
-        squeue = Squeue()
         squeue.initialize()
 
     @patch("exporter.util.is_file_binary")
-    def test_initialize_invalid_binary(self, mock_is_binary):
+    def test_initialize_invalid_binary(self, mock_is_binary, squeue):
+        """Test initialization fails when binary is not available."""
         mock_is_binary.return_value = False
-        squeue = Squeue()
         with pytest.raises(SqueueNotAvailException):
             squeue.initialize()
 
 
 class TestSqueueParseOutput:
-    def test_parse_output_running_job(self):
-        squeue = Squeue()
+
+    @pytest.fixture
+    def squeue(self):
+        """Create a Squeue collector instance for testing."""
+        return Squeue()
+
+    def test_parse_output_running_job(self, squeue):
+        """Test parse_output correctly parses a running job."""
         stdout = b"12345|job_name|2|node[1-2]|partition1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         samples_by_keys = {}
@@ -47,8 +60,8 @@ class TestSqueueParseOutput:
         assert samples_by_keys.get(("node[1-2]","partition1","running","12345", "job_name", "2024-01-01T00:00:01")) == 2
         assert samples_by_keys.get(("partition1","running")) == 1
 
-    def test_parse_output_multiple_states(self):
-        squeue = Squeue()
+    def test_parse_output_multiple_states(self, squeue):
+        """Test parse_output handles jobs with multiple states."""
         stdout = (
             b"12345|job1|2|node[1-2]|part1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
             b"12346|job2|1||part1|PENDING|2024-01-01T00:01:00|N/A|user2\n"
@@ -65,8 +78,8 @@ class TestSqueueParseOutput:
         assert "running" in states
         assert "pending" in states
 
-    def test_parse_output_empty_output(self):
-        squeue = Squeue()
+    def test_parse_output_empty_output(self, squeue):
+        """Test parse_output handles empty output."""
         stdout = b""
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
 
@@ -78,8 +91,8 @@ class TestSqueueParseOutput:
                 for sample in metric_family.samples:
                     assert sample.value == 0.0
 
-    def test_parse_output_mixed_states(self):
-        squeue = Squeue()
+    def test_parse_output_mixed_states(self, squeue):
+        """Test parse_output correctly counts jobs across partitions and states."""
         stdout = (
             b"1|job1|2|node1|p1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|u1\n"
             b"2|job2|1|node2|p1|RUNNING|2024-01-01T00:01:00|2024-01-01T00:01:01|u2\n"
@@ -118,13 +131,19 @@ class TestSqueueParseOutput:
 
 
 class TestSqueueExportMetrics:
-    def test_export_metrics_empty(self):
-        squeue = Squeue()
+
+    @pytest.fixture
+    def squeue(self):
+        """Create a Squeue collector instance for testing."""
+        return Squeue()
+
+    def test_export_metrics_empty(self, squeue):
+        """Test export_metrics returns empty list when no cached data."""
         metrics = squeue.export_metrics()
         assert metrics == []
 
-    def test_export_metrics_cached(self):
-        squeue = Squeue()
+    def test_export_metrics_cached(self, squeue):
+        """Test export_metrics returns consistent cached data."""
         stdout = (
             b"100|myjob|4|node[1-4]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|testuser\n"
             b"101|myjob2|1||batch|PENDING|2024-01-01T00:01:00|N/A|testuser\n"
@@ -137,8 +156,8 @@ class TestSqueueExportMetrics:
         metrics2 = squeue.export_metrics()
         assert metrics1 == metrics2
 
-    def test_export_metrics_validates_gauge_type(self):
-        squeue = Squeue()
+    def test_export_metrics_validates_gauge_type(self, squeue):
+        """Test export_metrics returns Gauge instances."""
         stdout = b"12345|job1|2|node[1-2]|part1|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
 
@@ -150,8 +169,13 @@ class TestSqueueExportMetrics:
 class TestSqueueMetricValues:
     """Validate exact metric values using prometheus_client sample inspection."""
 
-    def test_single_running_job_values(self):
-        squeue = Squeue()
+    @pytest.fixture
+    def squeue(self):
+        """Create a Squeue collector instance for testing."""
+        return Squeue()
+
+    def test_single_running_job_values(self, squeue):
+        """Test metric values for a single running job."""
         stdout = b"500|training|8|gpu-node[1-8]|gpu|RUNNING|2024-06-15T10:00:00|2024-06-15T10:00:01|researcher\n"
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         metrics = squeue.export_metrics()
@@ -162,8 +186,8 @@ class TestSqueueMetricValues:
                     assert isinstance(sample.value, (int, float))
                     assert sample.value >= 0
 
-    def test_no_jobs_all_zeros(self):
-        squeue = Squeue()
+    def test_no_jobs_all_zeros(self, squeue):
+        """Test all metric values are zero when no jobs exist."""
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(b"")
         metrics = squeue.export_metrics()
 
@@ -172,8 +196,8 @@ class TestSqueueMetricValues:
                 for sample in family.samples:
                     assert sample.value == 0.0
 
-    def test_large_job_count(self):
-        squeue = Squeue()
+    def test_large_job_count(self, squeue):
+        """Test metric values for a large number of jobs."""
         lines = []
         for i in range(100):
             state = b"RUNNING" if i % 2 == 0 else b"PENDING"
@@ -199,15 +223,22 @@ class TestSqueueMetricValues:
 
 
 class TestSqueueQuery:
+
+    @pytest.fixture
+    def squeue(self):
+        """Create a Squeue collector instance for testing."""
+        return Squeue()
+
     @pytest.mark.asyncio
-    async def test_squeue_query_success(self):
-        squeue = Squeue()
-        mock_proc = AsyncMock()
+    @patch.object(Squeue, "run_command", new_callable=AsyncMock)
+    async def test_squeue_query_success(self, mock_run, squeue):
+        """Test successful squeue query parses and caches metrics."""
+        mock_proc = MagicMock()
         mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
+        mock_run.return_value = mock_proc
         samples_by_key = {}
-        with patch.object(squeue, "run_command", return_value=mock_proc):
-            await squeue.squeue_query()
-            assert len(squeue.cached_output["squeue_metrics"]) == 2
+        await squeue.squeue_query()
+        assert len(squeue.cached_output["squeue_metrics"]) == 2
         metric1 = squeue.cached_output["squeue_metrics"][0]
         family = metric1.collect()
         for s in family[0].samples:
@@ -219,23 +250,41 @@ class TestSqueueQuery:
         assert samples_by_key.get(("batch","running")) == 1
         assert samples_by_key.get(("node[1-2]","batch","running","12345","job1","2024-01-01T00:00:01")) == 2
 
-
     @pytest.mark.asyncio
-    async def test_squeue_query_caches_result(self):
-        squeue = Squeue()
-        mock_proc = AsyncMock()
+    @patch.object(Squeue, "run_command", new_callable=AsyncMock)
+    async def test_squeue_query_caches_result(self, mock_run, squeue):
+        """Test squeue query caches parse_output result."""
+        mock_proc = MagicMock()
         mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
+        mock_run.return_value = mock_proc
         mock_gauges = [MagicMock(spec=Gauge), MagicMock(spec=Gauge)]
 
-        with patch.object(squeue, "run_command", return_value=mock_proc):
-            with patch.object(squeue, "parse_output", return_value=mock_gauges):
-                await squeue.squeue_query()
-                assert squeue.cached_output["squeue_metrics"] == mock_gauges
+        with patch.object(squeue, "parse_output", return_value=mock_gauges):
+            await squeue.squeue_query()
+            assert squeue.cached_output["squeue_metrics"] == mock_gauges
 
     @pytest.mark.asyncio
-    async def test_squeue_query_exception(self):
-        squeue = Squeue()
-        with patch.object(squeue, "run_command", side_effect=Exception("Command failed")):
-            with patch.object(squeue, "parse_output") as mock_parse:
-                await squeue.squeue_query()
-                mock_parse.assert_not_called()
+    @patch.object(Squeue, "run_command", new_callable=AsyncMock)
+    async def test_squeue_query_exception(self, mock_run, squeue):
+        """Test squeue query does not parse output on command failure."""
+        mock_run.side_effect = CommandFailedException("squeue", 1, "error")
+        with patch.object(squeue, "parse_output") as mock_parse:
+            await squeue.squeue_query()
+            mock_parse.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch.object(Squeue, "run_command", new_callable=AsyncMock)
+    async def test_squeue_query_timeout(self, mock_run, squeue):
+        """Test squeue query does not parse output on timeout."""
+        mock_run.side_effect = CommandTimedOutException("squeue", 30)
+        with patch.object(squeue, "parse_output") as mock_parse:
+            await squeue.squeue_query()
+            mock_parse.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch.object(Squeue, "run_command", new_callable=AsyncMock)
+    async def test_squeue_query_nonzero_exit_preserves_cache(self, mock_run, squeue):
+        """Test squeue query preserves empty cache on non-zero exit."""
+        mock_run.side_effect = CommandFailedException("squeue", 1, "slurm error")
+        await squeue.squeue_query()
+        assert squeue.cached_output["squeue_metrics"] == []
