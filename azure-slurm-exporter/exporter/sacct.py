@@ -105,7 +105,7 @@ class Sacct(BaseCollector):
         args.extend(["--starttime", self.starttime, "--endtime", self.endtime])
         log.debug(f"running sacct query between {self.starttime} and {self.endtime}")
         try:
-            proc = await self.run_command(timeout=self.timeout, *args)
+            proc = await self.run_command(*args, timeout=self.timeout)
         except Exception as e:
             log.error(e)
             return

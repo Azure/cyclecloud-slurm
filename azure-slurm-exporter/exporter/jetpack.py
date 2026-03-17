@@ -64,7 +64,7 @@ class Jetpack(BaseCollector):
         args.extend(self.default_options)
 
         try:
-            proc = await self.run_command(timeout=self.timeout, *args)
+            proc = await self.run_command(*args, timeout=self.timeout)
         except Exception as e:
             log.error(e)
             return

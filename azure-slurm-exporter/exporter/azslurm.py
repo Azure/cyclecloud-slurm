@@ -115,8 +115,8 @@ class Azslurm(BaseCollector):
         args_limits.extend(["limits"])
 
         try:
-            proc_partitions = await self.run_command(timeout=self.timeout, *args_partitions)
-            proc_limits = await self.run_command(timeout=self.timeout, *args_limits)
+            proc_partitions = await self.run_command(*args_partitions, timeout=self.timeout)
+            proc_limits = await self.run_command(*args_limits, timeout=self.timeout)
         except Exception as e:
             log.error(e)
             return
