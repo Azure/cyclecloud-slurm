@@ -33,7 +33,7 @@
       },
       "id": 1027,
       "panels": [],
-      "title": "Cluster Overview for partion $partition",
+      "title": "Cluster Overview for partition $partition",
       "type": "row"
     },
     {

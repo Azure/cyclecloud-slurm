@@ -112,7 +112,7 @@ class BaseCollector(ABC):
             loop = asyncio.get_running_loop()
             loop.call_later(interval, partial(self.launch_task, func, interval))
         else:
-            log.error(f"func {func.__name__} is not callable")
+            log.error(f"func {repr(func)} is not callable")
 
 class CompositeCollector:
     """

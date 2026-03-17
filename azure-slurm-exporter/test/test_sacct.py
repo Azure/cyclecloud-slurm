@@ -31,7 +31,10 @@ class TestSacctParseOutput:
     @pytest.fixture
     def sacct(self):
         """Create a Sacct collector instance for testing."""
-        return Sacct()
+        sacct = Sacct()
+        with patch("exporter.util.is_file_binary", return_value=True):
+            sacct.initialize()
+        return sacct
 
     def test_parse_output_single_completed_job(self, sacct):
         """Test parse_output handles a single completed job."""
@@ -111,7 +114,10 @@ class TestSacctExportMetrics:
     @pytest.fixture
     def sacct(self):
         """Create a Sacct collector instance for testing."""
-        return Sacct()
+        sacct = Sacct()
+        with patch("exporter.util.is_file_binary", return_value=True):
+            sacct.initialize()
+        return sacct
 
     def test_export_metrics_returns_counter(self, sacct):
         """Test export_metrics returns a Counter instance."""
@@ -134,7 +140,10 @@ class TestSacctExitCodeMapping:
     @pytest.fixture
     def sacct(self):
         """Create a Sacct collector instance for testing."""
-        return Sacct()
+        sacct = Sacct()
+        with patch("exporter.util.is_file_binary", return_value=True):
+            sacct.initialize()
+        return sacct
 
     def test_known_exit_codes(self, sacct):
         """Test known exit codes are mapped correctly."""
@@ -175,7 +184,10 @@ class TestSacctMetricValues:
     @pytest.fixture
     def sacct(self):
         """Create a Sacct collector instance for testing."""
-        return Sacct()
+        sacct = Sacct()
+        with patch("exporter.util.is_file_binary", return_value=True):
+            sacct.initialize()
+        return sacct
 
     def test_counter_increments(self, sacct):
         """Test counter increments for multiple completed jobs."""
@@ -257,6 +269,8 @@ class TestSacctQuery:
         """Create a Sacct instance with one successful query already executed,
         so the counter has a known baseline value of 1 for (node1, batch, completed, '', 0:0)."""
         sacct = Sacct()
+        with patch("exporter.util.is_file_binary", return_value=True):
+            sacct.initialize()
         mock_proc = MagicMock()
         mock_proc.stdout = b"1|job1|node1|1|batch|0:0|0:0|COMPLETED|u1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
         with patch.object(Sacct, "run_command", new_callable=AsyncMock, return_value=mock_proc):
