@@ -5,23 +5,6 @@ from dataclasses import dataclass, field
 import logging
 import exporter.util as util
 from typing import List
-# @dataclass
-# class SqueueMetrics:
-#     squeue_partition_jobs_state: GaugeMetricFamily = GaugeMetricFamily(
-#                 f"squeue_partition_jobs_state",
-#                 f"Number of jobs in a state per partition",
-#                 labels=['partition','state'],
-#             )
-
-#     squeue_job_nodes_allocated: GaugeMetricFamily = GaugeMetricFamily(
-#             "squeue_job_nodes_allocated",
-#             "Number of nodes allocated to a running job",
-#             labels=["job_id", "job_name", "partition", "state"],
-#         )
-
-#     def add(self, label: list, value):
-
-
 
 log = logging.getLogger(__name__)
 
