@@ -449,13 +449,13 @@ Log can be found under `/var/log/azslurm-exporter.log`
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `squeue_partition_jobs_state` | Gauge | `partition`, `state` | Number of jobs in each state per partition |
-| `squeue_job_nodes_allocated` | Gauge | `job_id`, `job_name`, `partition`, `state`, `nodelist` | Nodes allocated to each running job |
+| `squeue_job_nodes_allocated` | Gauge | `job_id`, `job_name`, `partition`, `state`, `nodelist`, `start_time` | Nodes allocated to each running job |
 
 **sacct metrics**
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
-| `sacct_terminal_jobs` | Counter | `partition`, `exit_code`, `reason`, `state`, `nodelist`| Cumulative count of completed/failed/cancelled jobs |
+| `sacct_terminal_jobs_total` | Counter | `partition`, `exit_code`, `reason`, `state`| Cumulative count of completed/failed/cancelled jobs |
 
 Terminal states tracked: `completed`, `failed`, `cancelled`, `timeout`, `node_fail`, `preempted`, `out_of_memory`, `deadline`, `boot_fail`. Exit codes are mapped to human-readable reasons (e.g. `137:0` → `SIGKILL - Force killed`).
 
