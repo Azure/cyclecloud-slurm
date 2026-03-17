@@ -83,6 +83,7 @@ class BaseCollector(ABC):
         try:
             async with asyncio.timeout(timeout):
                 stdout, stderr = await proc.communicate()
+        #TODO: Explore what metrics to export when commands error/time out, right now we export stale metrics
         except TimeoutError:
             proc.kill()
             await proc.wait()
