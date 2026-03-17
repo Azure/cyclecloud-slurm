@@ -71,7 +71,19 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reason"
+            },
+            "properties": [
+              {
+                "id": "noValue"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
@@ -174,6 +186,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "noValue": "No failed Jobs within time range",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -325,7 +338,7 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},

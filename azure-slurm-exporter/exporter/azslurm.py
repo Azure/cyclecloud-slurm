@@ -103,6 +103,7 @@ class Azslurm(BaseCollector):
             return memgb_str.split("::")[1].rstrip("g")
         except (IndexError, AttributeError):
             return "0"
+
     async def azslurm_query(self) -> None:
         """
         Query azslurm partitions and limits command and cache parsed output as a single prometheus gauge to represent
