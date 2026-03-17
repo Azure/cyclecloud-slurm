@@ -110,6 +110,7 @@ class Sacct(BaseCollector):
         except Exception as e:
             log.error(e)
             return
+        #if command raises an exception, starttime does not get updated and next interval still includes initial starttime
         self.starttime=self.endtime
         self.parse_output(proc.stdout)
 

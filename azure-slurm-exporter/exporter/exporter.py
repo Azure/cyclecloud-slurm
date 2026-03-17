@@ -24,6 +24,20 @@ class NoCollectorsFoundException(Exception):
 class HTTPServerFailedException(Exception):
     pass
 
+class CommandFailedException(Exception):
+    """Raised when a subprocess exits with a non-zero return code."""
+    def __init__(self, cmd: str, returncode: int, stderr: str):
+        self.cmd = cmd
+        self.returncode = returncode
+        self.stderr = stderr
+        super().__init__(f"Command '{cmd}' failed with exit code {returncode}: {stderr}")
+
+class CommandTimedOutException(Exception):
+    """Raised when a subprocess exceeds its timeout."""
+    def __init__(self, cmd: str, timeout: int):
+        self.cmd = cmd
+        self.timeout = timeout
+        super().__init__(f"Command '{cmd}' timed out after {timeout}s and was killed")
 class BaseCollector(ABC):
     """
     Abstract base class for collecting metrics from SLURM.
@@ -51,7 +65,11 @@ class BaseCollector(ABC):
     @abstractmethod
     def export_metrics(self) -> List[Union[Gauge,Counter,Summary]]:
         """
-        Return the current set of collected metrics for Prometheus to scrape.
+        Return the current set of collected metrics from each collector's cache
+        for Prometheus to scrape.
+        Note: No locking required for cached metrics because of
+        GIL and asynchronous functions running in one thread. This may change with future
+        Python versions.
         """
         ...
 
@@ -68,12 +86,11 @@ class BaseCollector(ABC):
         except TimeoutError:
             proc.kill()
             await proc.wait()
-            log.error("Command: %s timed out after %d seconds and was killed", cmd_str, timeout)
-            raise RuntimeError("Process timed out and was killed")
+            raise CommandTimedOutException(cmd_str, timeout)
         elapsed = time.monotonic() - start
         log.debug("Command: %s, Exit code: %d, Time Elapsed: %f", cmd_str, proc.returncode, elapsed)
-        if stderr:
-            log.warning("stderr:\n%s", stderr.decode())
+        if proc.returncode != 0:
+            raise CommandFailedException(cmd_str, proc.returncode, stderr.decode())
         return CommandResult(returncode=proc.returncode, stdout=stdout, stderr=stderr)
 
     def launch_task(self, func, interval) -> None:
