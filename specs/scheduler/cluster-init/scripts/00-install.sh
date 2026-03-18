@@ -140,9 +140,9 @@ tar xzf $autoscale_pkg
 cd azure-slurm
 AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
 
-if [ $monitoring_enabled == "True" ]; then
-    rm -rf $exporter_pkg
-    jetpack download --project $slurm_project_name $exporter_pkg
+if [ "$monitoring_enabled" = "True" ]; then
+    rm -f -- "$exporter_pkg"
+    jetpack download --project "$slurm_project_name" "$exporter_pkg"
     setup_exporter_venv
 fi
 
