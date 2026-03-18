@@ -1,0 +1,349 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "$$hashKey": "object:1345",
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Failed Jobs Overview",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1047,
+      "panels": [],
+      "title": "Failed Jobs",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false,
+            "minWidth": 150
+          },
+          "mappings": [],
+          "noValue": "No failed jobs within time range",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reason"
+            },
+            "properties": [
+              {
+                "id": "noValue"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 16,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1052,
+      "options": {
+        "cellHeight": "lg",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(floor(increase(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}[$__range])) != 0 and sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range) or (sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} unless sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Failed Jobs by Exit Code between $__from and $__to",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {}
+        },
+        {
+          "disabled": true,
+          "id": "labelsToFields",
+          "options": {
+            "keepLabels": [
+              "exit_code",
+              "partition",
+              "state"
+            ],
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "__name__": true,
+              "cluster": true,
+              "instance": true,
+              "job": true,
+              "physical_host": true,
+              "start_datetime hpc": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #A": 3,
+              "__name__": 0,
+              "cluster": 1,
+              "exit_code": 5,
+              "instance": 6,
+              "job": 7,
+              "partition": 2,
+              "physical_host": 8,
+              "start_datetime": 9,
+              "state": 4,
+              "subscription": 10
+            },
+            "renameByName": {
+              "Trend #A": "# of Failed Jobs"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "No failed Jobs within time range",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 16,
+        "x": 0,
+        "y": 12
+      },
+      "id": 1053,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Total Failed Jobs between $__from and $__to",
+      "type": "stat"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "cbbe2034-c78b-4e9b-89b4-8b78530247e5",
+          "value": "cbbe2034-c78b-4e9b-89b4-8b78530247e5"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${promDatasource}"
+        },
+        "definition": "label_values(jetpack_cluster_info,subscription)",
+        "includeAll": false,
+        "label": "Subscription",
+        "name": "Subscription",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(jetpack_cluster_info,subscription)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "Managed_Prometheus_ccw-mon-jwna6fuhty7ho",
+          "value": "ccw-mon-jwna6fuhty7ho"
+        },
+        "includeAll": false,
+        "label": "Prometheus Data Source",
+        "name": "promDatasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${promDatasource}"
+        },
+        "definition": "label_values(azslurm_partition_info, partition)",
+        "includeAll": true,
+        "multi": true,
+        "name": "partition",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(azslurm_partition_info, partition)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "azcyclecloudwesteu-rg/u24-rc",
+          "value": "azcyclecloudwesteu-rg/u24-rc"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${promDatasource}"
+        },
+        "definition": "label_values(jetpack_cluster_info, cluster)",
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(jetpack_cluster_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Failed Jobs Dashboard",
+  "uid": "cff0f6w0qqwaoa",
+  "version": 1
+}
