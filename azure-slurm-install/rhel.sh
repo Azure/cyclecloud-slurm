@@ -25,7 +25,7 @@ if [ ! -d "$ARTIFACTS_DIR" ]; then
     exit 1
 fi
 
-#Almalinux 8/9 and RHEL 8/9 both need epel-release to install libjwt for slurm packages 
+#Almalinux 8/9 and RHEL 8/9 both need epel-release to install libjwt for slurm packages
 enable_epel() {
     if ! rpm -qa | grep -q "^epel-release-"; then
         if [ "${OS_ID,,}" == "rhel" ]; then
@@ -122,13 +122,6 @@ done
 enable_epel
 rpm_pkg_install "$dependency_packages"
 rpm_pkg_install "$versioned_slurm_packages" "--disableexcludes slurm"
-
-# Install slurm_exporter container (will refactor this later)
-monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
-if [ "${SLURM_ROLE}" == "scheduler" ] && [ "$monitoring_enabled" == "True" ]; then
-    SLURM_EXPORTER_IMAGE_NAME="ghcr.io/slinkyproject/slurm-exporter:0.3.0"
-    docker pull $SLURM_EXPORTER_IMAGE_NAME
-fi
 
 # Install enroot package
 if [[ "$OS_VERSION" == "8" ]]; then

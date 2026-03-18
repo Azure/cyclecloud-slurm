@@ -36,3 +36,8 @@ cd $SOURCE/azure-slurm
 rm -f dist/*
 ./package.sh $LOCAL_SCALELIB
 mv dist/* ../blobs/
+
+cd $SOURCE/azure-slurm-exporter
+rm -f dist/*
+./package.sh
+mv dist/*.tar.gz ../blobs/
