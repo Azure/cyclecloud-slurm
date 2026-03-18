@@ -143,7 +143,7 @@ reload_prom_config(){
 }
 
 run_azslurm_exporter() {
-    # Run Slurm Exporter in a container
+    # Start Azslurm systemd
     if [[ "$role" != "scheduler" ]]; then
         echo "Slurm Exporter can only be run on the scheduler node, skipping setup."
         return 0
@@ -164,7 +164,7 @@ run_azslurm_exporter() {
     if [ $? != 0 ]; then
         echo Warning: azslurm-exporter failed to start! 1>&2
         /opt/cycle/jetpack/bin/jetpack log "azslurm-exporter failed to start" --level=warn --priority=medium
-        exit 0
+        return 0
     fi
 
     reload_prom_config
@@ -230,6 +230,8 @@ ensure_enroot_dir() {
         iters=$(( $iters - 1 ))
     done
 
+    monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
+
     # login nodes explicitly should _not_ have slurmd running.
     if [ $role == "login" ]; then
         reload_prom_config
@@ -262,7 +264,6 @@ ensure_enroot_dir() {
 
     run_slurmrestd
 
-    monitoring_enabled=$(/opt/cycle/jetpack/bin/jetpack config cyclecloud.monitoring.enabled False)
     if [[ "$monitoring_enabled" == "True" ]]; then
         run_azslurm_exporter
     fi

@@ -100,7 +100,13 @@ setup_exporter_venv() {
     VENV=/opt/azurehpc/azslurm-exporter/venv
     $PYTHON_BIN -c "import sys; sys.exit(0)" || (echo "$PYTHON_BIN is not a valid python3 executable. Please install python3.11 or higher." && exit 1)
     $PYTHON_BIN -m pip --version > /dev/null || $PYTHON_BIN -m ensurepip
-    $PYTHON_BIN -m venv $VENV
+
+    if [ ! -d "$VENV" ]; then
+        echo "Creating virtual environment at $VENV..."
+        $PYTHON_BIN -m venv
+    else
+        echo "Virtual environment already exists at $VENV_DIR"
+    fi
 
     set +e
     source $VENV/bin/activate
