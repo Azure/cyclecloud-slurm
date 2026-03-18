@@ -1,0 +1,1 @@
+# Empty — entry points are defined in pyproject.toml

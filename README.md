@@ -15,12 +15,14 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     7. [Slurm Job Accounting](#slurm-job-accounting)
         1. [Cost Reporting](#cost-reporting)
     8. [Topology](#topology)
-    9. [GB200/GB300 IMEX Support](#gb200gb300-imex-support) 
+    9. [GB200/GB300 IMEX Support](#gb200gb300-imex-support)
     10. [Setting KeepAlive in CycleCloud](#setting-keepalive)
     11. [Slurmrestd](#slurmrestd)
     12. [Node Health Checks](#node-health-checks)
     13. [Monitoring](#monitoring)
-        1. [Example Dashboards](#example-dashboards)
+        1. [AzSlurm Exporter](#azslurm-exporter)
+            1. [Exported Metrics](#exported-metrics)
+        2. [Example Dashboards](#example-dashboards)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
     1. [Supported OS and PMC Repos](#supported-os-and-pmc-repos)
@@ -40,27 +42,27 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
 
 ### Making Cluster Changes
 In CycleCloud, cluster changes can be made using the "Edit" dialog from the cluster page in the GUI or from the CycleCloud CLI.   Cluster topology changes, such as new partitions, generally require editing and re-importing the cluster template.   This can be applied to live, running clusters as well as terminated clusters.   It is also possible to import changes as a new Template for future cluster creation via the GUI.
- 
+
 When updating a running cluster, some changes may need to be applied directly on the running nodes.  Slurm clusters deployed by CycleCloud include a cli, available on the scheduler node, called `azslurm` which facilitates applying cluster configuration and scaling changes for running clusters.
- 
+
 After making any changes to the running cluster, run the following command as root on the Slurm scheduler node to rebuild the `azure.conf` and update the nodes in the cluster:
- 
+
 
 ```
       $ sudo -i
       # azslurm scale
 ```
 This should create the partitions with the correct number of nodes, the proper `gres.conf` and restart the `slurmctld`.
- 
+
 For changes that are not available via the cluster's "Edit" dialog in the GUI,  the cluster template must be customized. First, download a copy of the [Slurm cluster template](#templates/slurm.txt), if you do not have it. Then, to make template changes for a cluster you can perform the following commands using the cyclecloud cli.
 ```
 # First update a copy of the slurm template (shown as ./MODIFIED_SLURM.txt below)
- 
+
 cyclecloud export_parameters MY_CLUSTERNAME > ./MY_CLUSTERNAME.json
 cyclecloud import_cluster MY_CLUSTERNAME -c slurm -f ./MODIFIED_slurm.txt -p ./MY_CLUSTERNAME.json --force
 ```
 For a terminated cluster you can go ahead and start the cluster with all changes in effect.
- 
+
 **IMPORTANT: There is no need to terminate the cluster or scale down to apply changes.**
 
 To apply changes to a running/started cluster perform the following steps after you have completed the previous steps:
@@ -112,7 +114,7 @@ PartitionName=mydynamic Nodes=mydynamicns
 ```
 
 #### Using Dynamic Partitions to Autoscale
-By default, we define no nodes in the dynamic partition. 
+By default, we define no nodes in the dynamic partition.
 
 You can pre-create node records like so, which allows Slurm to autoscale them up.
 ```bash
@@ -170,7 +172,7 @@ To shutdown nodes, run `/opt/azurehpc/slurm/suspend_program.sh node_list` (e.g. 
 
 To start a cluster in this mode, simply add `SuspendTime=-1` to the additional slurm config in the template.
 
-To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `azslurm remove_nodes && azslurm scale`. 
+To switch a cluster to this mode, add `SuspendTime=-1` to the slurm.conf and run `scontrol reconfigure`. Then run `azslurm remove_nodes && azslurm scale`.
 
 ### Slurm Job Accounting
 
@@ -185,7 +187,7 @@ To setup job accounting, following fields are defined in the slurm cluster creat
 
 
 - *Database URL* - What this refers to is the "Database" URL, a DNS resolvable address (or an IP address) of where mysql database lives.
-- *Database Name* - This is the database name that the Slurm Cluster will use. If this is not defined, then this is "clustername-acct-db". 
+- *Database Name* - This is the database name that the Slurm Cluster will use. If this is not defined, then this is "clustername-acct-db".
                     Each cluster typically (when not defined) has its own database. This helps to not cause roll ups between starting clusters of different slurm versions.
 - *Database User* - This refers to the username slurmdbd will use to connect to MySQL Server.
 - *Database Password* - This refers to the password slurmdbd will use to connect to MySQL Server.
@@ -358,13 +360,13 @@ Cyclecloud Slurm clusters now include prolog and epilog scripts to enable and cl
         slurm.imex.enabled=True
                 or
         slurm.imex.enabled=False
-``` 
+```
 
 
 ### Setting KeepAlive
 Added in 4.0.5: If the KeepAlive attribute is set in the CycleCloud UI, then the azslurmd will add that node's name to the `SuspendExcNodes` attribute via scontrol. Note that it is required that `ReconfigFlags=KeepPowerSaveSettings` is set in the slurm.conf, as is the default as of 4.0.5. Once KeepALive is set back to false, `azslurmd` will then remove this node from `SuspendExcNodes`.
 
-If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.  
+If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.
 
 ### Slurmrestd
 As of version 4.0.5, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
@@ -432,7 +434,59 @@ To check if the configured exporters are exposing metrics, connect to a node and
 - For the DCGM Exporter : `curl -s http://localhost:9400/metrics` - only available on VM type with NVidia GPU
 - For the Slurm Exporter : `curl -s http://localhost:9200/metrics` - only available on the Slurm scheduler VM
 
+#### AzSlurm Exporter
+
+The AzSlurm Exporter is a lightweight, asynchronous Prometheus exporter that runs on the Slurm scheduler node as a systemd service and exposes Slurm cluster metrics on port `9101` at the `/metrics` endpoint. It periodically queries cluster available CLI tools (`squeue`, `sacct`, `sinfo`, `azslurm`, `jetpack`), parses their output, and publishes metrics in Prometheus format for ingestion by Azure Monitor or any Prometheus-compatible monitoring system.
+
+If a collector binary is unavailable, that collector is skipped with a warning. The exporter only exits if **no** collectors initialize successfully.
+
+Log can be found under `/var/log/azslurm-exporter.log`
+
+##### Exported Metrics
+
+**squeue metrics**
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `squeue_partition_jobs_state` | Gauge | `partition`, `state` | Number of jobs in each state per partition |
+| `squeue_job_nodes_allocated` | Gauge | `job_id`, `job_name`, `partition`, `state`, `nodelist`, `start_time` | Nodes allocated to each running job |
+
+**sacct metrics**
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `sacct_terminal_jobs_total` | Counter | `partition`, `exit_code`, `reason`, `state`| Cumulative count of completed/failed/cancelled jobs |
+
+Terminal states tracked: `completed`, `failed`, `cancelled`, `timeout`, `node_fail`, `preempted`, `out_of_memory`, `deadline`, `boot_fail`. Exit codes are mapped to human-readable reasons (e.g. `137:0` → `SIGKILL - Force killed`).
+
+**sinfo metrics**
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `sinfo_partition_nodes_state` | Gauge | `node_list`, `partition`, `state`, `reason` | Number of nodes in each state per partition |
+
+Node state suffixes (e.g. `*` = not responding, `~` = powered off, `#` = powering up) are normalized to descriptive state names.
+
+**azslurm metrics**
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `azslurm_partition_info` | Gauge | `partition`, `nodelist`, `vm_size`, `azure_count` | Available node count per partition. The gauge value is the `available_count` for the partition, and the `azure_count` label reflects the minimum of family and regional quota availability. |
+
+The `azslurm` collector queries `azslurm partitions` and `azslurm limits` to combine partition-to-nodelist mappings with Azure quota and VM availability information, providing visibility into how many nodes can actually be provisioned for each partition.
+
+**jetpack metrics**
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `jetpack_cluster_info` | Gauge | `region` | Cluster metadata exposing the Azure region where the cluster is deployed. Always set to `1` as an info-style metric. |
+
+The `jetpack` collector queries `jetpack config` to retrieve the Azure region from the VM's compute metadata. It runs infrequently (default: every 24 hours) since this value does not change during the lifetime of a cluster.
+
 #### Example Dashboards
+
+**AzSlurm Dashboard**
+![Alt](/images/azslurmexporterdash.png "Example AzSlurm Exporter Grafana Dashboard")
 
 **Slurm Dashboard**
 ![Alt](/images/slurmexporterdash.png "Example Slurm Exporter Grafana Dashboard")
@@ -538,7 +592,7 @@ Nov 18 17:51:58 rc403-hpc-1 slurmd[8046]: [2025-11-18T17:51:58.002] error: Secur
 
 For some regions and VM sizes, some subscriptions may report an incorrect number of GPUs. This value is controlled in `/opt/azurehpc/slurm/autoscale.json`
 
-The default definition looks like the following: 
+The default definition looks like the following:
 ```json
   "default_resources": [
     {
@@ -575,7 +629,7 @@ Slurm requires that you define the amount of free memory, after OS/Applications 
 
 To change this dampening, there are two options.
 1) You can define `slurm.dampen_memory=X` where X is an integer percentage (5 == 5%)
-2) Create a default_resource definition in the /opt/azurehpc/slurm/autoscale.json file. 
+2) Create a default_resource definition in the /opt/azurehpc/slurm/autoscale.json file.
   ```json
     "default_resources": [
     {
@@ -618,8 +672,8 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
 3. `cyclecloud_slurm.sh` no longer exists. Instead there is the azslurm cli, which can be run as root. `azslurm` uses autocomplete.
       ```bash
       [root@scheduler ~]# azslurm
-      usage: 
-      accounting_info      - 
+      usage:
+      accounting_info      -
       buckets              - Prints out autoscale bucket information, like limits etc
       config               - Writes the effective autoscale config, after any preprocessing, to stdout
       connect              - Tests connection to CycleCloud
@@ -627,7 +681,7 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
       default_output_columns - Output what are the default output columns for an optional command.
       initconfig           - Creates an initial autoscale config. Writes to stdout
       keep_alive           - Add, remeove or set which nodes should be prevented from being shutdown.
-      limits               - 
+      limits               -
       nodes                - Query nodes
       partitions           - Generates partition configuration
       refresh_autocomplete - Refreshes local autocomplete information for cluster specific resources and nodes.
@@ -635,7 +689,7 @@ This will change the behavior of the `azslurm return_to_idle` command that is, b
       resume               - Equivalent to ResumeProgram, starts and waits for a set of nodes.
       resume_fail          - Equivalent to SuspendFailProgram, shutsdown nodes
       retry_failed_nodes   - Retries all nodes in a failed state.
-      scale                - 
+      scale                -
       shell                - Interactive python shell with relevant objects in local scope. Use --script to run python scripts
       suspend              - Equivalent to SuspendProgram, shutsdown nodes
       topology             - Generates topology plugin configuration
