@@ -139,13 +139,13 @@ reload_prom_config(){
         kill -HUP $PROM_PID
     else
         echo "Prometheus process not found, unable to reload configuration"
-    fi
+    fi  
 }
 
 run_azslurm_exporter() {
-    # Start Azslurm systemd
+    # Start azslurm-exporter systemd
     if [[ "$role" != "scheduler" ]]; then
-        echo "Slurm Exporter can only be run on the scheduler node, skipping setup."
+        echo "AzSlurm Exporter can only be run on the scheduler node, skipping start."
         return 0
     fi
 
@@ -153,11 +153,9 @@ run_azslurm_exporter() {
     if [[ "$primary_scheduler" != "True" ]]; then
         #reloading prom config to get updated hostname for HA node
         reload_prom_config
-        echo "This is not the primary scheduler, skipping slurm_exporter setup."
+        echo "This is not the primary scheduler, skipping azslurm-exporter start."
         return 0
     fi
-
-    AZSLURM_EXPORTER_PORT=9101
 
     systemctl start azslurm-exporter
     systemctl status azslurm-exporter --no-pager > /dev/null
@@ -168,14 +166,14 @@ run_azslurm_exporter() {
     fi
 
     reload_prom_config
-
+        
     sleep 20
     if curl -s http://localhost:${AZSLURM_EXPORTER_PORT}/metrics | grep -q "azslurm_partition_info"; then
         echo "AzSlurm Exporter metrics are available"
     else
         echo "AzSlurm Exporter metrics are not available"
         /opt/cycle/jetpack/bin/jetpack log "AzSlurm Exporter metrics are not available" --level=warn --priority=medium
-    fi
+    fi 
 }
 
 ensure_enroot_dir() {
@@ -204,7 +202,7 @@ ensure_enroot_dir() {
     chmod 1777 "$BASE_DIR"
 }
 
-{
+{ 
     if [ "$1" == "" ]; then
         echo "Usage: $0 [scheduler|execute|login]"
         exit 1
@@ -254,7 +252,7 @@ ensure_enroot_dir() {
 
     # lastly - the scheduler
     use_accounting=$(jetpack config slurm.accounting.enabled False)
-    if [ "$use_accounting" == "True" ]; then
+    if [ "$use_accounting" == "True" ]; then  
         run_slurmdbd
     else
         echo "Warning: slurm.accounting.enabled=${use_accounting}: skipping slurmdbd" >&2

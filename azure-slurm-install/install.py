@@ -6,7 +6,6 @@ import os
 import re
 import subprocess
 import sys
-import yaml
 import installlib as ilib
 from typing import Dict, Optional
 
@@ -184,7 +183,7 @@ def check_libjwt(s: InstallSettings) -> None:
     if s.mode != "scheduler":
         logging.info("Running on non-scheduler node skipping libjwt check.")
         return
-
+    
     try:
         # Use grep to search ldconfig cache for jwt library
         result = subprocess.run(
@@ -237,13 +236,13 @@ def setup_users(s: InstallSettings) -> None:
         uid=s.munge_uid,
         gid=s.munge_gid,
     )
-
+    
     if s.platform_family == "suse":
         logging.warning("slurmrestd user configuration is not supported on SUSE platforms, skipping this step.")
         return
-
+    
     ilib.group(s.slurmrestd_grp, gid=s.slurmrestd_gid)
-
+    
     ilib.user(
         s.slurmrestd_user,
         comment="User to run slurmrestd",
@@ -504,7 +503,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
 
     if not os.path.exists(state_save_location):
         ilib.directory(state_save_location, owner=s.slurm_user, group=s.slurm_grp)
-
+    
     if not os.path.exists(f"{s.config_dir}/prolog.d"):
         ilib.directory(f"{s.config_dir}/prolog.d", owner=s.slurm_user, group=s.slurm_grp)
 
@@ -557,7 +556,7 @@ def _complete_install_primary(s: InstallSettings) -> None:
         group="root",
         mode="0755",
         )
-
+    
     ilib.copy_file(
         "imex_epilog.sh",
         f"{s.config_dir}/epilog.d/90-imex_epilog.sh",
@@ -845,11 +844,11 @@ def setup_slurmrestd(s: InstallSettings) -> None:
     if s.mode != "scheduler":
         logging.info("Running on non-scheduler node skipping this step.")
         return
-
+    
     if s.platform_family == "suse":
         logging.warning("slurmrestd configuration is not supported on SUSE platforms, skipping this step.")
         return
-
+        
     # Add slurmrestd to docker group
     try:
         ilib.group("docker", gid=None)
@@ -865,7 +864,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
         group=s.slurmrestd_grp,
         mode="0644",
     )
-
+    
     ilib.directory(
         "/var/spool/slurmrestd", owner=s.slurmrestd_user, group=s.slurmrestd_grp, mode=755
     )
@@ -942,7 +941,7 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
     # Determine scratch directory based on available mounts
     scratch_base_dir = _get_enroot_scratch_base_dir()
     enroot_scratch_dir = f"{scratch_base_dir}/enroot"
-
+    
     # Create the enroot directory
     ilib.directory(enroot_scratch_dir, owner="root", group="root", mode=755)
 
@@ -951,7 +950,7 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
     for subdir in subdirs:
         full_path = f"{enroot_scratch_dir}/{subdir}"
         ilib.directory(full_path, owner="root", group="root", mode=777)
-
+    
     ilib.template(
         f"/etc/enroot/enroot.conf",
         owner=s.slurm_user,
@@ -966,13 +965,13 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
     if s.mode == "execute":
         # Ensure hooks directory exists
         ilib.directory("/etc/enroot/hooks.d", owner="root", group="root", mode=755)
-
+        
         # Copy hook files
         hook_files = ["50-slurm-pmi.sh", "50-slurm-pytorch.sh"]
         for hook_file in hook_files:
             source_path = f"/usr/share/enroot/hooks.d/{hook_file}"
             dest_path = f"/etc/enroot/hooks.d/{hook_file}"
-
+            
             if os.path.exists(source_path):
                 ilib.copy_file(
                     source_path,
@@ -983,7 +982,7 @@ def _configure_enroot_pyxis(s: InstallSettings) -> None:
                 )
             else:
                 logging.warning(f"Hook file {source_path} not found, skipping")
-
+    
     # Create the pyxis.conf file with the required plugin configuration
     pyxis_config = f'required /opt/pyxis/spank_pyxis.so runtime_path={enroot_scratch_dir}/enroot-runtime'
     ilib.file(
@@ -1001,7 +1000,7 @@ def _update_prom_config(s: InstallSettings, prom_config: str, host_name: str) ->
     if not s.monitoring_enabled or not os.path.isfile(prom_config):
         logging.info("Monitoring is not enabled or prometheus config is not found, skipping Prometheus configuration update.")
         return
-
+    
     with open(prom_config, "r") as f:
         prom_content = f.read()
 
@@ -1020,7 +1019,7 @@ def _update_prom_config(s: InstallSettings, prom_config: str, host_name: str) ->
         group="root",
         mode="0644"
     )
-
+    
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
         return
@@ -1035,10 +1034,10 @@ def set_hostname(s: InstallSettings) -> None:
     ilib.set_hostname(
         new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
     )
-
+    
     #Update prom config with new hostname
     _update_prom_config(s, "/opt/prometheus/prometheus.yml", new_hostname)
-
+    
     if _is_at_least_ubuntu22() and s.ubuntu22_waagent_fix:
         logging.warning("Restarting systemd-networkd to fix waagent/hostname issue on Ubuntu 22.04." +
                         " To disable this, set slurm.ubuntu22_waagent_fix=false under this" +
@@ -1062,7 +1061,7 @@ def _is_at_least_ubuntu22() -> bool:
 
     if lsb_rel.get("ID") == "ubuntu" and lsb_rel.get("VERSION_ID", "") >= "22.04":
         return True
-
+    
     return False
 
 

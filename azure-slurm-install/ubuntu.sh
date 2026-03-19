@@ -19,7 +19,7 @@ dpkg_pkg_install() {
     local packages_to_install=""
     local packages_to_hold=""
     local pkg_names=$1
-
+    
     for pkg_name in $pkg_names; do
         # Check if it's a local .deb file
         if [[ "$pkg_name" == *.deb ]]; then
@@ -43,7 +43,7 @@ dpkg_pkg_install() {
             packages_to_hold="$packages_to_hold $base_pkg"
         fi
     done
-
+    
     if [ -n "$packages_to_install" ]; then
         echo "The following packages need to be installed: $packages_to_install"
         apt update

@@ -4,10 +4,7 @@ set -e
 do_install=$(jetpack config slurm.do_install True)
 install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.6.tar.gz)
 autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.6.tar.gz)
-monitoring_enabled=$(jetpack config cyclecloud.monitoring.enabled False)
-exporter_pkg=azure_slurm_exporter-0.1.0.tar.gz
 slurm_project_name=$(jetpack config slurm.project_name slurm)
-
 
 find_python3() {
     export PATH=$(echo $PATH | sed -e 's/\/opt\/cycle\/jetpack\/system\/embedded\/bin://g' | sed -e 's/:\/opt\/cycle\/jetpack\/system\/embedded\/bin//g')
@@ -18,13 +15,13 @@ find_python3() {
     for version in $( seq 11 20 ); do
         which python3.$version > /dev/null 2>/dev/null
         if [ $? == 0 ]; then
-            python3.$version -c "import yaml, venv"
+            python3.$version -c "import venv"
             if [ $? == 0 ]; then
                 # write to stdout the validated path
                 which python3.$version
                 return 0
             else
-                echo Warning: Found python3.$version but venv and/or yaml are not installed. 1>&2
+                echo Warning: Found python3.$version but venv is not installed. 1>&2
             fi
         fi
     done
@@ -53,31 +50,31 @@ install_python3() {
 
     if [ "$OS" == "almalinux" ]; then
         echo "Detected AlmaLinux. Installing Python 3.12..." >&2
-        yum install -y python3.12 python3.12-pyyaml
+        yum install -y python3.12
         PYTHON_BIN="/usr/bin/python3.12"
-
+        
     elif [ "$OS" == "ubuntu" ] && [ "$VERSION_ID" == "22.04" ]; then
         echo "Detected Ubuntu 22.04. Installing Python 3.11..." >&2
         apt update
         # We need python dev headers and systemd dev headers for same reaosn mentioned above.
-        apt install -y python3.11 python3.11-venv python3-yaml
+        apt install -y python3.11 python3.11-venv
         PYTHON_BIN="/usr/bin/python3.11"
-
+        
     elif [ "$OS" == "ubuntu" ] && [[ $VERSION =~ ^24\.* ]]; then
         echo "Detected Ubuntu 24. Installing Python 3.12..." >&2
         apt update
-        apt install -y python3.12 python3.12-venv python3-yaml
+        apt install -y python3.12 python3.12-venv
         PYTHON_BIN="/usr/bin/python3.12"
-
+    
     elif [ "$OS" == "rhel" ]; then
         echo "Detected RHEL, using system python3..." >&2
         PYTHON_BIN="/usr/bin/python3"
-
+    
     elif [ "$OS" == "sle_hpc" ]; then
         echo "Detected SUSE, installing Python 3.11..." >&2
-        zypper install -y python311 python311-virtualenv python311-PyYAML
+        zypper install -y python311 python311-virtualenv
         PYTHON_BIN="/usr/bin/python3.11"
-
+    
     else
         echo "Unsupported operating system: $OS $VERSION_ID" >&2
         exit 1
@@ -94,36 +91,6 @@ verify_python3_version() {
         exit 1
     fi
     echo "Verified $python_bin is >= 3.11 (found $actual_version)" >&2
-
-setup_exporter_venv() {
-
-    VENV=/opt/azurehpc/azslurm-exporter/venv
-    $PYTHON_BIN -c "import sys; sys.exit(0)" || (echo "$PYTHON_BIN is not a valid python3 executable. Please install python3.11 or higher." && exit 1)
-    $PYTHON_BIN -m pip --version > /dev/null || $PYTHON_BIN -m ensurepip
-
-    if [ ! -d "$VENV" ]; then
-        echo "Creating virtual environment at $VENV..."
-        $PYTHON_BIN -m venv
-    else
-        echo "Virtual environment already exists at $VENV_DIR"
-    fi
-
-    set +e
-    source $VENV/bin/activate
-    set -e
-
-    if ! pip install --force-reinstall $exporter_pkg; then
-        echo "ERROR: Failed to install $exporter_pkg"
-        deactivate || true
-        exit 1
-    fi
-
-     if ! azslurm-exporter-install; then
-        echo "ERROR: Failed to run azslurm-exporter-install"
-        deactivate || true
-        exit 1
-    fi
-
 }
 
 cd $CYCLECLOUD_HOME/system/bootstrap
@@ -145,11 +112,5 @@ jetpack download --project $slurm_project_name $autoscale_pkg
 tar xzf $autoscale_pkg
 cd azure-slurm
 AZSLURM_PYTHON_PATH=$PYTHON_BIN ./install.sh
-
-if [ "$monitoring_enabled" = "True" ]; then
-    rm -f -- "$exporter_pkg"
-    jetpack download --project "$slurm_project_name" "$exporter_pkg"
-    setup_exporter_venv
-fi
 
 echo "installation complete. Run start-services scheduler|execute|login to start the slurm services."

@@ -25,7 +25,7 @@ if [ ! -d "$ARTIFACTS_DIR" ]; then
     exit 1
 fi
 
-#Almalinux 8/9 and RHEL 8/9 both need epel-release to install libjwt for slurm packages
+#Almalinux 8/9 and RHEL 8/9 both need epel-release to install libjwt for slurm packages 
 enable_epel() {
     if ! rpm -qa | grep -q "^epel-release-"; then
         if [ "${OS_ID,,}" == "rhel" ]; then
