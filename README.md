@@ -22,6 +22,7 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     13. [Monitoring](#monitoring)
         1. [AzSlurm Exporter](#azslurm-exporter)
             1. [Exported Metrics](#exported-metrics)
+            2. [Configure Exporter Port](#configure-exporter-port)
         2. [Example Dashboards](#example-dashboards)
 2. [Supported Slurm and PMIX versions](#supported-slurm-and-pmix-versions)
 3. [Packaging](#packaging)
@@ -436,7 +437,7 @@ To check if the configured exporters are exposing metrics, connect to a node and
 
 #### AzSlurm Exporter
 
-The AzSlurm Exporter is a lightweight, asynchronous Prometheus exporter that runs on the Slurm scheduler node as a systemd service and exposes Slurm cluster metrics on port `9101` at the `/metrics` endpoint. It periodically queries cluster available CLI tools (`squeue`, `sacct`, `sinfo`, `azslurm`, `jetpack`), parses their output, and publishes metrics in Prometheus format for ingestion by Azure Monitor or any Prometheus-compatible monitoring system.
+The AzSlurm Exporter is a lightweight, asynchronous Prometheus exporter that runs on the Slurm scheduler node as a systemd service and exposes Slurm cluster metrics on default port `9101` at the `/metrics` endpoint. It periodically queries cluster available CLI tools (`squeue`, `sacct`, `sinfo`, `azslurm`, `jetpack`), parses their output, and publishes metrics in Prometheus format for ingestion by Azure Monitor or any Prometheus-compatible monitoring system.
 
 If a collector binary is unavailable, that collector is skipped with a warning. The exporter only exits if **no** collectors initialize successfully.
 
@@ -482,6 +483,16 @@ The `azslurm` collector queries `azslurm partitions` and `azslurm limits` to com
 | `jetpack_cluster_info` | Gauge | `region` | Cluster metadata exposing the Azure region where the cluster is deployed. Always set to `1` as an info-style metric. |
 
 The `jetpack` collector queries `jetpack config` to retrieve the Azure region from the VM's compute metadata. It runs infrequently (default: every 24 hours) since this value does not change during the lifetime of a cluster.
+
+##### Configure Exporter Port
+The azslurm-exporter port is fully configurable by running the following commands as root:
+
+```
+export AZSLURM_EXPORTER_PORT=<PORT>
+/opt/azurehpc/azslurm-exporter/venv/bin/azslurm-exporter-install
+systemctl restart azslurm-exporter
+
+```
 
 #### Example Dashboards
 
