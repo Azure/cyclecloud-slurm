@@ -7,6 +7,7 @@ import sys
 import time
 import exporter.util as util
 from importlib import resources
+from importlib.metadata import version, PackageNotFoundError
 from prometheus_client import CollectorRegistry, Metric, Counter, Gauge, Summary
 from abc import ABC, abstractmethod
 from functools import partial
@@ -17,6 +18,14 @@ from typing import Iterator, List, Union
 
 log = logging.getLogger()
 CommandResult = namedtuple("CommandResult", ["returncode", "stdout", "stderr"])
+
+# Cache version and service name at module load since they're static for the process lifetime
+try:
+    __version__ = version("azure-slurm-exporter")
+except PackageNotFoundError:
+    __version__ = "unknown"
+
+__service_name__ = "Azure SLURM Prometheus Exporter"
 
 class NoCollectorsFoundException(Exception):
     pass
@@ -213,6 +222,7 @@ class CompositeCollector:
             registry.register(self)
             app = web.Application()
             app.router.add_get("/metrics", make_aiohttp_handler(registry))
+            app.router.add_get("/", self._version_handler)
             runner = web.AppRunner(app)
             await runner.setup()
             site = web.TCPSite(runner, host, port)
@@ -226,16 +236,25 @@ class CompositeCollector:
             log.error("Unexpected error starting HTTP server: %s", e)
             raise HTTPServerFailedException
 
+    async def _version_handler(self, request: web.Request) -> web.Response:
+        """Handler for root endpoint that returns service name and version."""
+        version_info = {
+            "service": __service_name__,
+            "version": __version__
+        }
+        return web.json_response(version_info)
 
 async def main():
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
     logging.config.fileConfig(str(conf_file), disable_existing_loggers=False)
 
     default_port = util.validate_port(port_env_var="AZSLURM_EXPORTER_PORT", default_port=9101)
-    parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
+    parser = argparse.ArgumentParser(description=__service_name__)
     parser.add_argument("--port", type=int, default=default_port, help="Port to expose metrics on (default from AZSLURM_EXPORTER_PORT, or 9101 if unset or invalid)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     args = parser.parse_args()
+
+    log.info("Starting %s v%s", __service_name__, __version__)
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
