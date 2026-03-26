@@ -6,6 +6,7 @@ import logging.config
 import sys
 import subprocess
 import signal
+import exporter.util as util
 from importlib import resources
 
 log = logging.getLogger("installer")
@@ -155,23 +156,9 @@ def _reload_prometheus() -> None:
 def main():
     create_log_files()
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
-    logging.config.fileConfig(str(conf_file))
+    logging.config.fileConfig(str(conf_file), disable_existing_loggers=False)
     venv = sys.prefix
-    try:
-        raw_port = os.environ.get("AZSLURM_EXPORTER_PORT", 9101)
-        port = int(raw_port)
-        if not (1 <= port <= 65535):
-            log.warning(
-                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be between 1 and 65535. Defaulting to 9101",
-                raw_port,
-            )
-            port = 9101
-    except ValueError:
-        log.warning(
-                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be an integer between 1 and 65535. Defaulting to 9101",
-                raw_port,
-            )
-        port = 9101
+    port = util.validate_port(port_env_var="AZSLURM_EXPORTER_PORT", default_port=9101)
 
     try:
         setup_azslurm_exporter_systemd(venv=venv, port=port)

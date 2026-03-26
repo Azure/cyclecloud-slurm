@@ -5,7 +5,7 @@ import logging.config
 import signal
 import sys
 import time
-import os
+import exporter.util as util
 from importlib import resources
 from prometheus_client import CollectorRegistry, Metric, Counter, Gauge, Summary
 from abc import ABC, abstractmethod
@@ -229,23 +229,9 @@ class CompositeCollector:
 
 async def main():
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
-    logging.config.fileConfig(str(conf_file))
+    logging.config.fileConfig(str(conf_file), disable_existing_loggers=False)
 
-    try:
-        raw_port = os.environ.get("AZSLURM_EXPORTER_PORT", 9101)
-        default_port = int(raw_port)
-        if not (1 <= default_port <= 65535):
-            log.warning(
-                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be between 1 and 65535. Defaulting to 9101",
-                raw_port,
-            )
-            default_port = 9101
-    except ValueError:
-        log.warning(
-                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be an integer between 1 and 65535. Defaulting to 9101",
-                raw_port,
-            )
-        default_port = 9101
+    default_port = util.validate_port(port_env_var="AZSLURM_EXPORTER_PORT", default_port=9101)
     parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
     parser.add_argument("--port", type=int, default=default_port, help="Port to expose metrics on (default from AZSLURM_EXPORTER_PORT, or 9101 if unset or invalid)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
