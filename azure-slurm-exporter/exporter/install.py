@@ -156,7 +156,22 @@ def main():
     conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
     logging.config.fileConfig(str(conf_file))
     venv = sys.prefix
-    port = int(os.environ.get("AZSLURM_EXPORTER_PORT", 9101))
+    try:
+        raw_port = os.environ.get("AZSLURM_EXPORTER_PORT", 9101)
+        port = int(raw_port)
+        if not (1 <= port <= 65535):
+            log.warning(
+                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be between 1 and 65535. Defaulting to 9101",
+                raw_port,
+            )
+            port = 9101
+    except ValueError:
+        log.warning(
+                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be an integer between 1 and 65535. Defaulting to 9101",
+                raw_port,
+            )
+        port = 9101
+
     try:
         setup_azslurm_exporter_systemd(venv=venv, port=port)
         add_azslurm_exporter_scraper("/opt/prometheus/prometheus.yml", port=port)

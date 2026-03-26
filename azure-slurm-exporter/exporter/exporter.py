@@ -228,7 +228,21 @@ class CompositeCollector:
 
 
 async def main():
-    default_port = int(os.environ.get("AZSLURM_EXPORTER_PORT", 9101))
+    try:
+        raw_port = os.environ.get("AZSLURM_EXPORTER_PORT", 9101)
+        default_port = int(raw_port)
+        if not (1 <= default_port <= 65535):
+            log.warning(
+                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be between 1 and 65535. Defaulting to 9101",
+                raw_port,
+            )
+            default_port = 9101
+    except ValueError:
+        log.warning(
+                "Invalid AZSLURM_EXPORTER_PORT value '%s': must be an integer between 1 and 65535. Defaulting to 9101",
+                raw_port,
+            )
+        default_port = 9101
     parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
     parser.add_argument("--port", type=int, default=default_port, help="Port to expose metrics on (default: 9101, or AZSLURM_EXPORTER_PORT env var)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
