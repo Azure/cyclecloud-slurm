@@ -29,6 +29,9 @@ def add_azslurm_exporter_scraper(prom_config: str, port: int = 9101) -> None:
     with open(prom_config, "r") as f:
         prom_yaml = yaml.safe_load(f) or {}
 
+    # Keep a copy of the original for comparison
+    original_yaml = yaml.safe_load(yaml.safe_dump(prom_yaml))
+
     hostname = os.uname().nodename
 
     new_scrape = {
@@ -63,12 +66,13 @@ def add_azslurm_exporter_scraper(prom_config: str, port: int = 9101) -> None:
 
     prom_yaml["scrape_configs"] = scrape_configs
 
-    # Write back to prom_config
-    with open(prom_config, "w") as f:
-        yaml.safe_dump(prom_yaml, f, default_flow_style=False)
-
-    # Send SIGHUP to Prometheus to reload its configuration
-    _reload_prometheus()
+    # Only write and reload if configuration changed
+    if prom_yaml != original_yaml:
+        with open(prom_config, "w") as f:
+            yaml.safe_dump(prom_yaml, f, default_flow_style=False)
+        _reload_prometheus()
+    else:
+        log.info("Prometheus configuration unchanged, skipping reload")
 
 def setup_azslurm_exporter_systemd(venv: str, port: int = 9101) -> None:
     """
