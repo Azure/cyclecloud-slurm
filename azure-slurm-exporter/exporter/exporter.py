@@ -5,6 +5,7 @@ import logging.config
 import signal
 import sys
 import time
+import os
 from importlib import resources
 from prometheus_client import CollectorRegistry, Metric, Counter, Gauge, Summary
 from abc import ABC, abstractmethod
@@ -227,8 +228,9 @@ class CompositeCollector:
 
 
 async def main():
+    default_port = int(os.environ.get("AZSLURM_EXPORTER_PORT", 9101))
     parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
-    parser.add_argument("--port", type=int, default=9101, help="Port to expose metrics on (default: 9101)")
+    parser.add_argument("--port", type=int, default=default_port, help="Port to expose metrics on (default: 9101, or AZSLURM_EXPORTER_PORT env var)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     args = parser.parse_args()
 

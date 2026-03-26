@@ -81,7 +81,7 @@ Description=AzSlurm Exporter Daemon
 After=network.target
 
 [Service]
-ExecStart={venv}/bin/azslurm-exporter --port {port}
+ExecStart={venv}/bin/azslurm-exporter
 Restart=always
 User=root
 Group=root
