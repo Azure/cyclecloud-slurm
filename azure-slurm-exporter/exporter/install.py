@@ -1,4 +1,5 @@
 import yaml
+import copy
 import os
 import logging
 import logging.config
@@ -30,7 +31,7 @@ def add_azslurm_exporter_scraper(prom_config: str, port: int = 9101) -> None:
         prom_yaml = yaml.safe_load(f) or {}
 
     # Keep a copy of the original for comparison
-    original_yaml = yaml.safe_load(yaml.safe_dump(prom_yaml))
+    original_yaml = copy.deepcopy(prom_yaml)
 
     hostname = os.uname().nodename
 
