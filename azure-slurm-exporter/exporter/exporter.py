@@ -228,6 +228,9 @@ class CompositeCollector:
 
 
 async def main():
+    conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
+    logging.config.fileConfig(str(conf_file))
+
     try:
         raw_port = os.environ.get("AZSLURM_EXPORTER_PORT", 9101)
         default_port = int(raw_port)
@@ -244,12 +247,9 @@ async def main():
             )
         default_port = 9101
     parser = argparse.ArgumentParser(description="Azure Slurm Prometheus Exporter")
-    parser.add_argument("--port", type=int, default=default_port, help="Port to expose metrics on (default: 9101, or AZSLURM_EXPORTER_PORT env var)")
+    parser.add_argument("--port", type=int, default=default_port, help="Port to expose metrics on (default from AZSLURM_EXPORTER_PORT, or 9101 if unset or invalid)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     args = parser.parse_args()
-
-    conf_file = resources.files("exporter").joinpath("exporter_logging.conf")
-    logging.config.fileConfig(str(conf_file))
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
