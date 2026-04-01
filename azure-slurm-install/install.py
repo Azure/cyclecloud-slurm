@@ -92,6 +92,9 @@ class InstallSettings:
 
         self.monitoring_enabled: bool = config["cyclecloud"]["monitoring"].get("enabled", False)
 
+        # JWT authentication requires libjwt library to be installed
+        self.jwt_available: bool = False
+
         self.acct_enabled: bool = config["slurm"]["accounting"].get("enabled", False)
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
         self.acct_pass: Optional[str] = config["slurm"]["accounting"].get("password")
@@ -171,6 +174,46 @@ def setup_config_dir(s: InstallSettings) -> None:
 
 def _escape(s: str) -> str:
     return re.sub("[^a-zA-Z0-9-]", "-", s).lower()
+
+
+def check_libjwt(s: InstallSettings) -> None:
+    """
+    Detect if libjwt library is available by checking the dynamic linker cache.
+    Sets s.jwt_available based on the result.
+    """
+    if s.mode != "scheduler":
+        logging.info("Running on non-scheduler node skipping libjwt check.")
+        return
+    
+    try:
+        # Use grep to search ldconfig cache for jwt library
+        result = subprocess.run(
+            "ldconfig -p | grep libjwt",
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode == 0:
+            # Found libjwt - log the first match for debugging
+            first_match = result.stdout.splitlines()[0].strip() if result.stdout else "libjwt"
+            logging.info(f"Found libjwt in ldconfig cache: {first_match}")
+            s.jwt_available = True
+        else:
+            logging.info("libjwt not found in ldconfig cache")
+            s.jwt_available = False
+
+    except Exception as e:
+        logging.warning(f"Failed to query ldconfig for libjwt: {e}")
+        s.jwt_available = False
+    if not s.jwt_available:
+        logging.warning(
+            "libjwt library not found after package installation. "
+            "Slurm will use munge-only authentication."
+        )
+    else:
+        logging.info("libjwt library detected, JWT authentication will be configured.")
 
 
 def setup_users(s: InstallSettings) -> None:
@@ -393,9 +436,9 @@ AccountingStorageTRES=gres/gpu
                                   else "#StorageParameters=",
             "slurmver": s.slurmver,
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
-            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.monitoring_enabled else "",
-            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}" 
-                                if s.monitoring_enabled else ""
+            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.jwt_available else "",
+            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}"
+                                if s.jwt_available else ""
         },
     )
 
@@ -496,9 +539,9 @@ def _complete_install_primary(s: InstallSettings) -> None:
             "launch_parameters" : s.launch_parameters,
             "health_interval": health_interval,
             "health_program": health_program,
-            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.monitoring_enabled else "",
-            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}" 
-                                if s.monitoring_enabled else ""
+            "auth_alt_type": "AuthAltTypes=auth/jwt" if s.jwt_available else "",
+            "auth_alt_parameters": f"AuthAltParameters=jwt_key={s.jwt_key_path}"
+                                if s.jwt_available else ""
         },
     )
 
@@ -837,16 +880,24 @@ def setup_slurmrestd(s: InstallSettings) -> None:
         "/etc/systemd/system/slurmrestd.service.d", owner="root", group="root", mode=755
     )
 
+    # When libjwt is not available, unset SLURM_JWT to disable JWT authentication
+    jwt_env = "" if s.jwt_available else "UnsetEnvironment=SLURM_JWT"
+
     ilib.template(
         "/etc/systemd/system/slurmrestd.service.d/override.conf",
         source="templates/slurmrestd.override",
         owner="root",
         group="root",
         mode=644,
+        variables={
+            "jwt_env": jwt_env
+        },
     )
 
-    if s.monitoring_enabled:
+    if s.jwt_available:
         _configure_jwt_authentication(s)
+
+    if s.monitoring_enabled:
         _add_slurm_exporter_scraper(s, "/opt/prometheus/prometheus.yml", "templates/slurm_exporter.yml")
 
     ilib.enable_service("slurmrestd")
@@ -854,6 +905,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
 def _configure_jwt_authentication(s: InstallSettings) -> None:
     """
     Configure JWT authentication for Slurm.
+    This function is only called when libjwt is available on the system.
     """
     jwt_dir = os.path.dirname(s.jwt_key_path)
 
@@ -1139,6 +1191,9 @@ def main() -> None:
 
     # runs either rhel.sh or ubuntu.sh to install the packages
     run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
+
+    #check for libjwt to configure JWT auth for slurmrestd
+    check_libjwt(settings)
 
     # various permissions fixes
     fix_permissions(settings)

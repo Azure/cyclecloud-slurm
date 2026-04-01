@@ -369,7 +369,7 @@ Added in 4.0.5: If the KeepAlive attribute is set in the CycleCloud UI, then the
 If a node is added to `SuspendExcNodes` either via `azslurm keep_alive` or via the scontrol command, then `azslurmd` will not remove this node from the `SuspendExcNodes` if KeepAlive is false in CycleCloud. However, if the node is later set to KeepAlive as true in the UI then `azslurmd` will then remove it from `SuspendExcNodes` when the node is set back to KeepAlive is false.
 
 ### Slurmrestd
-As of version 4.0.5, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html).
+As of version 4.0.5, `slurmrestd` is automatically configured and started on the scheduler node and scheduler-ha node for all Slurm clusters. This REST API service provides programmatic access to Slurm functionality, allowing external applications and tools to interact with the cluster. For more information on the Slurm REST API, see the [official Slurm REST API documentation](https://slurm.schedmd.com/rest_api.html). Slurmrestd is configured with JWT authentication if the libjwt library is installed, otherwise it uses munge-only authentication. For more information on authentication refer to the [Security section](https://slurm.schedmd.com/rest.html#security) of the Slurm REST API documentation.
 
 ### Node Health Checks
 
