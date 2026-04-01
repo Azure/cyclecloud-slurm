@@ -32,7 +32,7 @@ rpm_check_pkg() {
     fi
 }
 
-dependency_packages="perl-Switch munge jq jansson-devel libjwt-devel binutils make wget gcc"
+dependency_packages="perl-Switch munge jq jansson-devel binutils make wget gcc"
 slurm_packages="slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd slurm-slurmrestd"
 execute_packages="slurm-slurmd"
