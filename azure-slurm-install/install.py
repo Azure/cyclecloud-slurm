@@ -131,7 +131,19 @@ class InstallSettings:
         )
         self.launch_parameters = config["slurm"].get("launch_parameters", "")
 
-        self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
+        secondary_scheduler = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_secondary_scheduler"))
+        tertiary_scheduler = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_tertiary_scheduler"))
+        primary_slurmdbd = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_slurmdbd_primary"))
+        secondary_slurmdbd = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_slurmdbd_secondary"))
+
+        self.secondary_scheduler_name = secondary_scheduler.name if secondary_scheduler else None
+        self.tertiary_scheduler_name = tertiary_scheduler.name if tertiary_scheduler else None
+        self.slurmdbd_primary_name = primary_slurmdbd.name if primary_slurmdbd else None
+        self.slurmdbd_secondary_name = secondary_slurmdbd.name if secondary_slurmdbd else None
+
+        if tertiary_scheduler:
+            assert secondary_scheduler, "Tertiary scheduler cannot be configured without a secondary scheduler"
+
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
         self.config_dir = f"/sched/{self.slurm_cluster_name}"
         # Leave the ability to disable this.
@@ -325,11 +337,6 @@ def _accounting_primary(s: InstallSettings) -> None:
     Only the primary scheduler should be creating files under
     {s.config_dir} for accounting.
     """
-
-    if s.secondary_scheduler_name:
-        secondary_scheduler = ilib.await_node_hostname(
-            s.config, s.secondary_scheduler_name
-        )
     if not s.acct_enabled:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
         ilib.file(
@@ -375,6 +382,14 @@ AccountingStorageTRES=gres/gpu
             group=s.slurm_grp,
             mode="0600",
         )
+    
+    dbdhost = s.hostname
+    if s.slurmdbd_primary_name:
+        dbdhost = ilib.await_node_hostname(s.config, s.slurmdbd_primary_name).hostname
+
+    backup_dbdhost = None
+    if s.slurmdbd_secondary_name:
+        backup_dbdhost = ilib.await_node_hostname(s.config, s.slurmdbd_secondary_name).hostname
 
     # Configure slurmdbd.conf
     ilib.template(
@@ -386,7 +401,7 @@ AccountingStorageTRES=gres/gpu
         variables={
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
-            "dbdhost": s.hostname,
+            "dbdhost": dbdhost,
             "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
             "storage_parameters": "StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem"
                                   if s.acct_cert_url
@@ -399,17 +414,19 @@ AccountingStorageTRES=gres/gpu
         },
     )
 
-    if s.secondary_scheduler_name:
+    if backup_dbdhost:
         ilib.append_file(
             f"{s.config_dir}/accounting.conf",
-            content=f"AccountingStorageBackupHost={secondary_scheduler.hostname}\n",
+            content=f"AccountingStorageBackupHost={backup_dbdhost}\n",
             comment_prefix="\n# Additional HA Storage Backup host -"
         )
         ilib.append_file(
             f"{s.config_dir}/slurmdbd.conf",
-            content=f"DbdBackupHost={secondary_scheduler.hostname}\n",
+            content=f"DbdBackupHost={backup_dbdhost}\n",
             comment_prefix="\n# Additional HA dbd host -"
         )
+    
+
 
 
 def _accounting_all(s: InstallSettings) -> None:
@@ -455,6 +472,11 @@ def _complete_install_primary(s: InstallSettings) -> None:
     if s.secondary_scheduler_name:
         secondary_scheduler = ilib.await_node_hostname(
             s.config, s.secondary_scheduler_name
+        )
+    tertiary_scheduler = None
+    if s.tertiary_scheduler_name:
+        tertiary_scheduler = ilib.await_node_hostname(
+            s.config, s.tertiary_scheduler_name
         )
 
     state_save_location = f"{s.config_dir}/spool/slurmctld"
@@ -528,6 +550,13 @@ def _complete_install_primary(s: InstallSettings) -> None:
             f"{s.config_dir}/slurm.conf",
             content=f"SlurmCtldHost={secondary_scheduler.hostname}({secondary_scheduler.private_ipv4})\n",
             comment_prefix="\n# Additional HA scheduler host -",
+        )
+    
+    if tertiary_scheduler:
+        ilib.append_file(
+            f"{s.config_dir}/slurm.conf",
+            content=f"SlurmCtldHost={tertiary_scheduler.hostname}({tertiary_scheduler.private_ipv4})\n",
+            comment_prefix="\n# Tertiary HA scheduler host -",
         )
 
     if not os.path.exists(f"{s.config_dir}/site_specific.conf"):
@@ -1155,7 +1184,7 @@ def main() -> None:
         )
         if settings.is_primary_scheduler == False:
             # This is the HA node.
-            logging.info(f"Secondary Scheduler {settings.secondary_scheduler_name} starting wait on primary to finish converging.")
+            logging.info(f"Backup Scheduler must wait for primary to finish converging.")
             ilib.await_node_converge(settings.config, "scheduler", timeout=600)
 
     if settings.mode == "execute":

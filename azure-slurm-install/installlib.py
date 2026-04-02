@@ -688,18 +688,44 @@ def get_ccnode(
     node_name: str,
     cluster_status_func: Callable[[Dict], Dict] = cluster_status,
 ) -> CCNode:
+    """Gets the CCNode object corresponding to node_name. See await_node_hostname for details on how node_name is matched to hostnames."""
+    ret = search_ccnode_single(config, lambda n: n.name == node_name, cluster_status_func=cluster_status_func)
+    if not ret:
+        raise RuntimeError(f"Could not find node with name {node_name} in cluster status")
+    return ret
+
+
+def search_ccnode_single(config: Dict, search_func: Callable[[CCNode], bool], cluster_status_func: Callable[[Dict], Dict] = cluster_status) -> Optional[CCNode]:
+    """Searches for a single node matching search_func and returns a CCNode object. Raises if not exactly one match is found."""
+    ret = search_ccnodes(config, search_func, cluster_status_func=cluster_status_func)
+    if len(ret) == 1:
+        return ret[0]
+    if len(ret) > 1:
+        raise RuntimeError(f"Multiple nodes found matching search criteria, this should not happen! Matches: {ret}")
+    return None
+
+
+def search_ccnodes(
+    config: Dict,
+    search_func: Callable[[CCNode], bool],
+    cluster_status_func: Callable[[Dict], Dict] = cluster_status,
+) -> List[CCNode]:
+    """Searches for nodes matching search_func and returns a list of CCNode objects."""
     status = cluster_status_func(config)
+    ret = []
     for node in status["nodes"]:
-        if node["Name"] == node_name:
-            return CCNode(
-                name=node["Name"],
-                nodearray_name=node["Template"],
-                hostname=node["Hostname"],
-                private_ipv4=node["PrivateIp"],
-                status=node["Status"],
-                software_configuration=node.get("Configuration") or {},
-            )
-    raise RuntimeError(f"Node {node_name} not found in cluster status!")
+        ccnode = CCNode(
+            name=node["Name"],
+            nodearray_name=node["Template"],
+            hostname=node["Hostname"],
+            private_ipv4=node["PrivateIp"],
+            status=node["Status"],
+            software_configuration=node.get("Configuration") or {},
+        )
+        if search_func(ccnode):
+            ret.append(ccnode)
+    return ret
+
 
 def is_mount_point(path: str) -> bool:
     """Check if a path is a mount point using mountpoint command"""
