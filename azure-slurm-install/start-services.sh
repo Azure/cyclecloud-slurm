@@ -7,17 +7,29 @@ run_slurmdbd_via_systemctl() {
     systemctl start slurmdbd
 
     # Verify slurmdbd is responding
+    omega=$(( $(date +%s) + 300 )) # wait up to 5 minutes for slurmdbd to start
     sleep 10
-    if ! sacctmgr ping > /dev/null 2>&1; then
+    while ! sacctmgr ping > /dev/null 2>&1; do
         echo "ERROR: slurmdbd started but is not responding to sacctmgr ping"
-        exit 2
-    fi
+        if [ $(date +%s) -gt $omega ]; then
+            echo "FATAL: slurmdbd failed to start within 5 minutes!" 1>&2
+            echo "Here are the last 100 lines of slurmdbd.log" 1>&2
+            tail -n 100 /var/log/slurmdbd/slurmdbd.log 1>&2
+            exit 2
+        fi
+        systemctl status slurmdbd --no-pager
+        if [ $? != 0 ]; then
+            echo "slurmdbd service is not active, attempting to restart..."
+            systemctl restart slurmdbd
+        fi
+        sleep 60
+    done
     echo "slurmdbd is running and responding to ping"
 }
 
 run_slurmdbd() {
 
-    if [[ $(jetpack config slurm.is_primary_scheduler True) == "False" ]]; then
+    if [[ $(jetpack config slurm.is_primary_slurmdbd False) == "False" ]]; then
         run_slurmdbd_via_systemctl
         return
     fi
@@ -283,11 +295,11 @@ ensure_enroot_dir() {
     fi
 
     # lastly - the scheduler
-    use_accounting=$(jetpack config slurm.accounting.enabled False)
-    if [ "$use_accounting" == "True" ]; then  
+    install_slurmdbd=$(jetpack config slurm.install_slurmdbd True)
+    if [ "$install_slurmdbd" == "True" ]; then  
         run_slurmdbd
     else
-        echo "Warning: slurm.accounting.enabled=${use_accounting}: skipping slurmdbd" >&2
+        echo "Warning: slurm.install_slurmdbd=${install_slurmdbd}: skipping slurmdbd" >&2
     fi
 
     run_slurmctld

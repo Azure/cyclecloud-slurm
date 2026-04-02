@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import yaml
 import installlib as ilib
 from typing import Dict, Optional
@@ -134,8 +135,22 @@ class InstallSettings:
         )
         self.launch_parameters = config["slurm"].get("launch_parameters", "")
 
-        self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
-        self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
+        primary_scheduler = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_primary_scheduler"))
+        secondary_scheduler = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_secondary_scheduler"))
+        tertiary_scheduler = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_tertiary_scheduler"))
+        primary_slurmdbd = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_primary_slurmdbd"))
+        secondary_slurmdbd = ilib.search_ccnode_single(config, lambda n: n.software_configuration.get("slurm", {}).get("is_secondary_slurmdbd"))
+
+        self.primary_scheduler_name = primary_scheduler.name if primary_scheduler else None
+        self.secondary_scheduler_name = secondary_scheduler.name if secondary_scheduler else None
+        self.tertiary_scheduler_name = tertiary_scheduler.name if tertiary_scheduler else None
+        self.slurmdbd_primary_name = primary_slurmdbd.name if primary_slurmdbd else None
+        self.slurmdbd_secondary_name = secondary_slurmdbd.name if secondary_slurmdbd else None
+
+        if tertiary_scheduler:
+            assert secondary_scheduler, "Tertiary scheduler cannot be configured without a secondary scheduler"
+
+        self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", secondary_scheduler is None and tertiary_scheduler is None)
         self.config_dir = f"/sched/{self.slurm_cluster_name}"
         # Leave the ability to disable this.
         self.ubuntu22_waagent_fix = config["slurm"].get("ubuntu22_waagent_fix", True)
@@ -331,7 +346,7 @@ def munge_key(s: InstallSettings) -> None:
         "/etc/munge", owner=s.munge_user, group=s.munge_grp, mode=700, recursive=True
     )
 
-    if s.mode == "scheduler" and not os.path.exists(f"{s.config_dir}/munge.key"):
+    if s.mode == "scheduler" and s.is_primary_scheduler and not os.path.exists(f"{s.config_dir}/munge.key"):
         # TODO only should do this on the primary
         # we should skip this for secondary HA nodes
         with open("/dev/urandom", "rb") as fr:
@@ -343,15 +358,20 @@ def munge_key(s: InstallSettings) -> None:
             content=buf,
             owner=s.munge_user,
             group=s.munge_grp,
-            mode=700,
+            mode="700",
         )
+
+    omega = time.time() + 300  # wait up to 5 minutes for the munge key to be created by the primary scheduler
+    while not os.path.exists(f"{s.config_dir}/munge.key") and time.time() < omega:
+        logging.info(f"Waiting for munge key to be created at {s.config_dir}/munge.key")
+        time.sleep(5)
 
     ilib.copy_file(
         f"{s.config_dir}/munge.key",
         "/etc/munge/munge.key",
         owner=s.munge_user,
         group=s.munge_grp,
-        mode="0600",
+        mode="0600"
     )
 
 
@@ -368,11 +388,6 @@ def _accounting_primary(s: InstallSettings) -> None:
     Only the primary scheduler should be creating files under
     {s.config_dir} for accounting.
     """
-
-    if s.secondary_scheduler_name:
-        secondary_scheduler = ilib.await_node_hostname(
-            s.config, s.secondary_scheduler_name
-        )
     if not s.acct_enabled:
         logging.info("slurm.accounting.enabled is false, skipping this step.")
         ilib.file(
@@ -382,14 +397,14 @@ def _accounting_primary(s: InstallSettings) -> None:
             content="AccountingStorageType=accounting_storage/none",
         )
         return
-
+    slurmdbd_primary_hostname = ilib.await_node_hostname(s.config, s.slurmdbd_primary_name).hostname
     ilib.file(
         f"{s.config_dir}/accounting.conf",
         owner=s.slurm_user,
         group=s.slurm_grp,
         content=f"""
 AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageHost={s.hostname}
+AccountingStorageHost={slurmdbd_primary_hostname}
 AccountingStorageTRES=gres/gpu
 """,
     )
@@ -429,7 +444,7 @@ AccountingStorageTRES=gres/gpu
         variables={
             "accountdb": s.acct_url or "localhost",
             "dbuser": s.acct_user or "root",
-            "dbdhost": s.hostname,
+            "dbdhost": slurmdbd_primary_hostname,
             "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
             "storage_parameters": "StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem"
                                   if s.acct_cert_url
@@ -442,17 +457,20 @@ AccountingStorageTRES=gres/gpu
         },
     )
 
-    if s.secondary_scheduler_name:
+    if s.slurmdbd_secondary_name:
+        slurmdbd_secondary_hostname = ilib.await_node_hostname(s.config, s.slurmdbd_secondary_name).hostname
         ilib.append_file(
             f"{s.config_dir}/accounting.conf",
-            content=f"AccountingStorageBackupHost={secondary_scheduler.hostname}\n",
+            content=f"AccountingStorageBackupHost={slurmdbd_secondary_hostname}\n",
             comment_prefix="\n# Additional HA Storage Backup host -"
         )
         ilib.append_file(
             f"{s.config_dir}/slurmdbd.conf",
-            content=f"DbdBackupHost={secondary_scheduler.hostname}\n",
+            content=f"DbdBackupHost={slurmdbd_secondary_hostname}\n",
             comment_prefix="\n# Additional HA dbd host -"
         )
+    
+
 
 
 def _accounting_all(s: InstallSettings) -> None:
@@ -498,6 +516,11 @@ def _complete_install_primary(s: InstallSettings) -> None:
     if s.secondary_scheduler_name:
         secondary_scheduler = ilib.await_node_hostname(
             s.config, s.secondary_scheduler_name
+        )
+    tertiary_scheduler = None
+    if s.tertiary_scheduler_name:
+        tertiary_scheduler = ilib.await_node_hostname(
+            s.config, s.tertiary_scheduler_name
         )
 
     state_save_location = f"{s.config_dir}/spool/slurmctld"
@@ -571,6 +594,13 @@ def _complete_install_primary(s: InstallSettings) -> None:
             f"{s.config_dir}/slurm.conf",
             content=f"SlurmCtldHost={secondary_scheduler.hostname}({secondary_scheduler.private_ipv4})\n",
             comment_prefix="\n# Additional HA scheduler host -",
+        )
+    
+    if tertiary_scheduler:
+        ilib.append_file(
+            f"{s.config_dir}/slurm.conf",
+            content=f"SlurmCtldHost={tertiary_scheduler.hostname}({tertiary_scheduler.private_ipv4})\n",
+            comment_prefix="\n# Tertiary HA scheduler host -",
         )
 
     if not os.path.exists(f"{s.config_dir}/site_specific.conf"):
@@ -1071,18 +1101,17 @@ def _update_prom_config(s: InstallSettings, prom_config: str, host_name: str) ->
     
 def set_hostname(s: InstallSettings) -> None:
     if not s.use_nodename_as_hostname:
-        return
-
-    if s.is_primary_scheduler:
+        logging.info("Not using node name as hostname, skipping hostname configuration.")
         return
 
     new_hostname = s.node_name.lower()
     if s.mode != "execute" and not new_hostname.startswith(s.node_name_prefix):
         new_hostname = f"{s.node_name_prefix}{new_hostname}"
-
+    logging.info(f"Setting hostname to {new_hostname}")
     ilib.set_hostname(
         new_hostname, s.platform_family, s.ensure_waagent_monitor_hostname
     )
+    s.hostname = new_hostname
     
     #Update prom config with new hostname
     _update_prom_config(s, "/opt/prometheus/prometheus.yml", new_hostname)
@@ -1210,8 +1239,10 @@ def main() -> None:
         )
         if settings.is_primary_scheduler == False:
             # This is the HA node.
-            logging.info(f"Secondary Scheduler {settings.secondary_scheduler_name} starting wait on primary to finish converging.")
-            ilib.await_node_converge(settings.config, "scheduler", timeout=600)
+            logging.info(f"Backup Scheduler must wait for primary to finish converging.")
+            if settings.primary_scheduler_name:
+                logging.info(f"Waiting for primary scheduler is {settings.primary_scheduler_name} to converge before finishing installation.")
+                ilib.await_node_converge(settings.config, settings.primary_scheduler_name, timeout=600)
 
     if settings.mode == "execute":
         setup_slurmd(settings)
