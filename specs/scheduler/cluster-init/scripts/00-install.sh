@@ -15,7 +15,7 @@ find_python3() {
     for version in $( seq 11 20 ); do
         which python3.$version > /dev/null 2>/dev/null
         if [ $? == 0 ]; then
-            python3.$version -m "import yaml, venv"
+            python3.$version -c "import yaml, venv"
             if [ $? == 0 ]; then
                 # write to stdout the validated path
                 which python3.$version
@@ -82,9 +82,21 @@ install_python3() {
     export PYTHON_BIN
 }
 
+verify_python3_version() {
+    python_bin=$1
+    actual_version=$($python_bin --version | awk '{print $2}')
+    minor_version=$(echo "$actual_version" | cut -d. -f2)
+    if [ -z "$minor_version" ] || [ "$minor_version" -lt 11 ]; then
+        echo "ERROR: Python >= 3.11 is required, but $python_bin is version $actual_version" >&2
+        exit 1
+    fi
+    echo "Verified $python_bin is >= 3.11 (found $actual_version)" >&2
+}
+
 cd $CYCLECLOUD_HOME/system/bootstrap
 
 install_python3
+verify_python3_version "$PYTHON_BIN"
 
 if [ $do_install == "True" ]; then
     rm -rf azure-slurm-install
