@@ -1,3 +1,4 @@
 [Service]
 AmbientCapabilities=CAP_SETGID
 CapabilityBoundingSet=CAP_SETGID
+{jwt_env}
