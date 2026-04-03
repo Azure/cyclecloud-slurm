@@ -498,6 +498,12 @@ systemctl restart azslurm-exporter
 
 **AzSlurm Dashboard**
 ![Alt](/images/azslurmexporterdash.png "Example AzSlurm Exporter Grafana Dashboard")
+To add the AzSlurm Exporter Dashboards to an existing Azure Managed Grafana instance run these commands
+```
+git clone https://github.com/Azure/cyclecloud-slurm.git
+cd cyclecloud-slurm/azure-slurm-exporter
+./add_dashboards.sh <resource group name> <grafana name>
+```
 
 **GPU Device View Dashboard**
 ![Alt](/images/dcgmdash.png "Example DCGM Exporter Grafana Dashboard")
