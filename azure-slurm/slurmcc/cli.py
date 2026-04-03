@@ -129,6 +129,26 @@ class SlurmCLI(CommonCLI):
     ) -> None:
         assert False
 
+    @disablecommand
+    def restart_nodes(
+        self,
+        config: Dict,
+        hostnames: List[str],
+        node_names: List[str],
+    ) -> None:
+        """Hidden - use 'azslurm restart' instead"""
+        assert False
+
+    @disablecommand
+    def reimage_nodes(
+        self,
+        config: Dict,
+        hostnames: List[str],
+        node_names: List[str],
+    ) -> None:
+        """Hidden - use 'azslurm reimage' instead"""
+        assert False
+
     def _add_completion_data(self, completion_json: Dict) -> None:
         node_names = slutil.check_output(["sinfo", "-N", "-h", "-o", "%N"]).splitlines(
             keepends=False
@@ -363,6 +383,36 @@ class SlurmCLI(CommonCLI):
         """
         node_mgr = self._node_mgr(config, self._driver(config))
         self._shutdown(config, node_list=node_list, node_mgr=node_mgr)
+
+    def restart_parser(self, parser: ArgumentParser) -> None:
+        """Parser for Slurm-specific restart command"""
+        parser.set_defaults(read_only=False)
+        parser.add_argument(
+            "-n", "--node-list", type=hostlist, required=True,
+            help="Comma-separated list or hostlist expression of nodes to restart"
+        ).completer = self._slurm_node_name_completer  # type: ignore
+
+    def restart(self, config: Dict, node_list: List[str]) -> None:
+        """
+        Restart nodes via CycleCloud API.
+        """
+        # Call the parent class method with converted arguments
+        super().restart_nodes(config=config, hostnames=[], node_names=node_list)
+
+    def reimage_parser(self, parser: ArgumentParser) -> None:
+        """Parser for Slurm-specific reimage command"""
+        parser.set_defaults(read_only=False)
+        parser.add_argument(
+            "-n", "--node-list", type=hostlist, required=True,
+            help="Comma-separated list or hostlist expression of nodes to reimage"
+        ).completer = self._slurm_node_name_completer  # type: ignore
+
+    def reimage(self, config: Dict, node_list: List[str]) -> None:
+        """
+        Reimage nodes via CycleCloud API.
+        """
+        # Call the parent class method with converted arguments
+        super().reimage_nodes(config=config, hostnames=[], node_names=node_list)
 
     def return_to_idle_parser(self, parser: ArgumentParser) -> None:
         parser.set_defaults(read_only=False)
