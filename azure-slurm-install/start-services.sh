@@ -166,7 +166,9 @@ run_azslurm_exporter() {
     fi
 
     reload_prom_config
-        
+
+    # Get the port from the systemd service environment
+    AZSLURM_EXPORTER_PORT=$(systemctl show azslurm-exporter --property=Environment | grep -oP 'AZSLURM_EXPORTER_PORT=\K[0-9]+')
     sleep 20
     if curl -s http://localhost:${AZSLURM_EXPORTER_PORT}/metrics | grep -q "azslurm_partition_info"; then
         echo "AzSlurm Exporter metrics are available"
