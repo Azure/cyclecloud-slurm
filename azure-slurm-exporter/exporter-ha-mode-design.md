@@ -41,17 +41,6 @@
         - 1x load on system
         - even if azslurm-exporter crashes it will load last counter data
         - backup will load last counter data at failover
-
-**Sacct state saving**
-    - Save initial starttime if save state file doesnt exist
-        - Pros:
-            - If exporter stops/crashes next time it starts it will take in the initial starttime in the first collection and pull in all the data.
-            - No data lost
-        - Cons:
-            - First collection interval could become very big and then having all that data becomes useless because then it looks like that x amount of jobs finished in a short time frame.
-
-
-
 **Failover Detection**:
 - SlurmctldPrimaryOnProg, SlurmctldPrimaryOffProg
     - Pros:
