@@ -42,6 +42,16 @@
         - even if azslurm-exporter crashes it will load last counter data
         - backup will load last counter data at failover
 
+**Sacct state saving**
+    - Save initial starttime if save state file doesnt exist
+        - Pros:
+            - If exporter stops/crashes next time it starts it will take in the initial starttime in the first collection and pull in all the data.
+            - No data lost
+        - Cons:
+            - First collection interval could become very big and then having all that data becomes useless because then it looks like that x amount of jobs finished in a short time frame.
+
+
+
 **Failover Detection**:
 - SlurmctldPrimaryOnProg, SlurmctldPrimaryOffProg
     - Pros:
@@ -83,9 +93,52 @@
         - can't figure out when primary relinqueshes control in logs if it goes down
         - slow
 
+- strigger
+    - Start exporter with these
+    ```
+    --backup_slurmctld_assumed_control
+    --primary_slurmctld_resumed_control
+    ```
+
+    - Stop Exporter with these
+
+    ```
+    --primary_slurmctld_failure
+    --backup_slurmctld_failure
+    ```
+    - Pros:
+        - Slurm handles failover detection, we only start/stop exporter
+    - Cons:
+        - No flag to stop exporter on backup if primary resumes control
+
+- Combination of strigger AND SlurmctldPrimaryOnProg, SlurmctldPrimaryOffProg
+    - Start exporter with strigger
+    - Stop exporter with strigger failure flags AND SlurmctldPrimaryOffProg.
+
+    - Pros:
+        - Slurm handles transitions
+        - Exporter starts only for one controller so no
+        - Combination allows for both fail over as well as fail back
+        - No code changes as we use all slurm hooks
+    - Cons:
+        - Would still need to save state of job history somehow.
+
+
+
+
 ## Design Decisions
 
+### Proposal #2:
+Exporter runs on only one node at a time
+    - Set striggers to stop exporter when slurmctld fails on either backup or primary
+    - Set striggers to start exporter when backup assumes control or primary resumes control
+    - Use SlurmctldPrimaryOffProg to stop exporter when backup goes back to standby
 
+We save starttime of first sacct collection so that when backup starts we use that starttime to pull in all finished jobs in that window. If primary resumes control again we use that starttime again for the first collection.
+
+
+
+### Proposal #1:
 Exporter Runs on both nodes:
  - When exporter detects it is not the active controller it will run in idle mode -- no collecting or exporting
  - When exporter detects it is the active controller it will run in active mode -- collecting and exporting
@@ -116,7 +169,85 @@ collect function will now export metrics only from active collectors list
 
 Prometheus is configured on both nodes and will ingest from both exporters but exporters will be the one limiting metrics
 
-## Abstract Proposal:
+## Abstract Proposal #2
+```
+class Sacct(Base Collector):
+    Update initalize() method for sacct:
+    → Set starttime from state save file during initialization if exists, if not set it as now - 1 hour
+    → If state save doesnt exist save current startttime to state save
+    → Use atomic write (temp file + rename)
+    File location:
+    /sched/{cluster_name}/spool/slurmctld/sacct_exporter_starttime
+        "starttime": "2026-04-14T16:47:00"
+```
+Hooks:
+- /etc/slurm/hooks/controller_lost_control.sh #systemctl stop azslurm-exporter
+- /etc/slurm/hooks/controller_assume_control.sh #systemctl start azslurm-exporter
+
+Primary loses control (failover)
+```
+strigger --set --flags=PERM \
+  --primary_slurmctld_failure \
+  --program=/etc/slurm/hooks/controller_lost_control.sh
+
+strigger --set --flags=PERM \
+  --backup_slurmctld_assumed_control \
+  --program=/etc/slurm/hooks/controller_assume_control.sh
+
+SlurmctldPrimaryOffProg=/etc/slurm/hooks/controller_lost_control.sh
+SlurmctldPrimaryOnProg=/etc/slurm/hooks/controller_assume_control.sh
+```
+
+Backup loses control (failback)
+```
+strigger --set --flags=PERM \
+  --primary_slurmctld_resumed_control \
+  --program=/etc/slurm/hooks/controller_assume_control.sh
+
+SlurmctldPrimaryOffProg=/etc/slurm/hooks/controller_lost_control.sh
+SlurmctldPrimaryOnProg=/etc/slurm/hooks/controller_assume_control.sh
+```
+**Full flow for primary controller:**
+
+```
+STARTUP primary controller:
+  └─ azslurm-exporter started
+  └─ Save initial starttime to state save file
+       ↓
+FAILOVER EVENT:
+  └─ PRIMARY crashes
+  └─ strigger will stop azslurm-exporter
+       ↓
+NORMAL OPERATION (inactive):
+  └─ azslurm-exporter is stopped
+       ↓
+FAILBACK EVENT:
+  └─ Original PRIMARY recovers
+  └─ strigger + SlurmctldPrimaryOnProg will start azslurm-exporter
+  └─ starttime will be loaded in and first sacct collection will start from there
+
+```
+
+**Full flow for backup controller:**
+
+```
+STARTUP backup controller:
+  └─ azslurm-exporter not started
+       ↓
+FAILOVER EVENT:
+  └─ PRIMARY crashes
+  └─ strigger + SlurmctldPrimaryOnProg will start azslurm-exporter
+  └─ starttime will be loaded in and first sacct collection will start from there
+       ↓
+NORMAL OPERATION (active):
+  └─ All collectors running and exporting
+       ↓
+FAILBACK EVENT:
+  └─ Original PRIMARY recovers
+  └─ SlurmctldPrimaryOffProg will stop azslurm-exporter
+```
+
+## Abstract Proposal #1:
 
 ```
 class ControllerRoleChecker():
@@ -137,10 +268,13 @@ class Sacct(Base Collector):
 ```
 ```
 class BaseCollector(ABC):
+    Update launch_task() method:
+    → return task from asyncio.create_task()
     New Methods:
     stop()
     → Cancel collection task
 
+```
 ```
 Current CompositeCollector intialize_collectors method:
     1. Initialize all collectors (Squeue, Sacct, Sinfo, Azslurm, Jetpack)
@@ -200,36 +334,6 @@ collect() method:
     will now only export from _active_collectors list
 ```
 
-**Full flow for backup controller:**
-
-```
-STARTUP backup controller:
-  └─ Collectors initialized but NOT started
-  └─ _monitor_role_transitions() launched
-       ↓
-       Polling every 30s...
-       ↓
-FAILOVER EVENT:
-  └─ PRIMARY crashes
-  └─ _monitor_role_transitions() detects: previous=False, current=True
-  └─ Calls _start_all_collectors()
-       ├─ Sacct loads state (counters at 1234)
-       ├─ All collectors start
-       └─ Metric collection begins
-       ↓
-NORMAL OPERATION (active):
-  └─ All collectors running
-  └─ _monitor_role_transitions() keeps polling (no change detected)
-       ↓
-FAILBACK EVENT:
-  └─ Original PRIMARY recovers
-  └─ _monitor_role_transitions() detects: previous=True, current=False
-  └─ Calls _stop_all_collectors()
-       ├─ All async tasks cancelled
-       ├─ Collection stops
-```
-
-
 **Full flow for primary controller:**
 
 ```
@@ -260,4 +364,32 @@ FAILBACK EVENT:
         └─ Metric collection begins
 ```
 
+**Full flow for backup controller:**
+
+```
+STARTUP backup controller:
+  └─ Collectors initialized but NOT started
+  └─ _monitor_role_transitions() launched
+       ↓
+       Polling every 30s...
+       ↓
+FAILOVER EVENT:
+  └─ PRIMARY crashes
+  └─ _monitor_role_transitions() detects: previous=False, current=True
+  └─ Calls _start_all_collectors()
+       ├─ Sacct loads state (counters at 1234)
+       ├─ All collectors start
+       └─ Metric collection begins
+       ↓
+NORMAL OPERATION (active):
+  └─ All collectors running
+  └─ _monitor_role_transitions() keeps polling (no change detected)
+       ↓
+FAILBACK EVENT:
+  └─ Original PRIMARY recovers
+  └─ _monitor_role_transitions() detects: previous=True, current=False
+  └─ Calls _stop_all_collectors()
+       ├─ All async tasks cancelled
+       ├─ Collection stops
+```
 
