@@ -511,7 +511,7 @@ systemctl restart azslurm-exporter
 
 
 ## Supported Slurm and PMIX versions
-The current slurm version supported is `25.05.5` which is compiled with PMIX version `4.2.9`.
+The current slurm version supported is `25.11.4` which is compiled with PMIX version `4.2.9`.
 ## Packaging
 Slurm and PMIX packages are fetched and downloaded exclusively from packages.microsoft.com.
 ### Supported OS and PMC Repos
@@ -534,7 +534,7 @@ The following table describes the Slurm-specific configuration options you can t
 
 | Slurm specific configuration options | Description |
 | ------------------------------------ | ----------- |
-| slurm.version                        | Default: `25.05.5`. Sets the version of Slurm to install and run.  |
+| slurm.version                        | Default: `25.11.4`. Sets the version of Slurm to install and run.  |
 | slurm.insiders                        | Default: `false`. Setting that controls whethere slurm is installed from pmc stable repo or pmc insiders repo. Set to `true` to install from insiders repo.  |
 | slurm.autoscale                      | Default: `false`. A per-nodearray setting that controls whether Slurm automatically stops and starts nodes in this node array. |
 | slurm.hpc                            | Default: `true`. A per-nodearray setting that controls whether nodes in the node array are in the same placement group. Primarily used for node arrays that use VM families with InfiniBand. It only applies when `slurm.autoscale` is set to `true`. |
