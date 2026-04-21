@@ -516,12 +516,15 @@ def _complete_install_primary(s: InstallSettings) -> None:
     health_interval = 0
     health_program = '""'
     if s.enable_healthchecks:
-        # Run background checks every 1 minute
-        health_interval = 60
-        health_program = f"{s.config_dir}/health.sh"
-        epilog_program = f"{s.config_dir}/epilog.d/10-health_epilog.sh"
-        ilib.copy_file("/etc/healthagent/health.sh.example", health_program, owner="root", group="root", mode=755)
-        ilib.copy_file("/etc/healthagent/epilog.sh.example", epilog_program, owner="root", group="root", mode=755)
+        if not os.path.exists("/etc/healthagent"):
+            logging.warning("/etc/healthagent directory does not exist, skipping health check script configuration")
+        else:
+            # Run background checks every 1 minute
+            health_interval = 60
+            health_program = f"{s.config_dir}/health.sh"
+            epilog_program = f"{s.config_dir}/epilog.d/10-health_epilog.sh"
+            ilib.copy_file("/etc/healthagent/health.sh.example", health_program, owner="root", group="root", mode=755)
+            ilib.copy_file("/etc/healthagent/epilog.sh.example", epilog_program, owner="root", group="root", mode=755)
 
     ilib.template(
         f"{s.config_dir}/slurm.conf",
