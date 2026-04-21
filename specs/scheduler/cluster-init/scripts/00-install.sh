@@ -74,7 +74,11 @@ install_python3() {
         echo "Detected SUSE, installing Python 3.11..." >&2
         zypper install -y python311 python311-virtualenv python311-PyYAML
         PYTHON_BIN="/usr/bin/python3.11"
-    
+
+    elif [ "$OS" == "rocky" ]; then
+        echo "Detected RockyLinux, Installing Python 3.12..." >&2
+        yum install -y python3.12 python3.12-pyyaml
+        PYTHON_BIN="/usr/bin/python3.12"
     else
         echo "Unsupported operating system: $OS $VERSION_ID" >&2
         exit 1

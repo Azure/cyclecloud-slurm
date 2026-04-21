@@ -25,7 +25,7 @@ if [ ! -d "$ARTIFACTS_DIR" ]; then
     exit 1
 fi
 
-#Almalinux 8/9 and RHEL 8/9 both need epel-release to install libjwt for slurm packages 
+#Almalinux 8/9, RHEL 8/9 and RockyLinux 8/9 both need epel-release to install libjwt for slurm packages
 enable_epel() {
     if ! rpm -qa | grep -q "^epel-release-"; then
         if [ "${OS_ID,,}" == "rhel" ]; then
@@ -34,12 +34,12 @@ enable_epel() {
             yum -y install epel-release
         fi
     fi
-    if [ "${OS_ID}" == "almalinux" ]; then
+    if [ "${OS_ID}" != "rhel" ]; then
         if [ "$OS_VERSION" == "8" ]; then
-            # Enable powertools repo for AlmaLinux 8 (needed for perl-Switch package)
+            # Enable powertools repo for AlmaLinux 8 and RockyLinux 8 (needed for perl-Switch package)
                 yum config-manager --set-enabled powertools
         else
-            # Enable crb repo for AlmaLinux 9 (needed for perl-Switch package)
+            # Enable crb repo for AlmaLinux 9 and RockyLinux 9(needed for perl-Switch package)
                 yum config-manager --set-enabled crb
         fi
     fi
