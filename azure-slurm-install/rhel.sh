@@ -34,12 +34,12 @@ enable_epel() {
             yum -y install epel-release
         fi
     fi
-    if [ "${OS_ID}" != "rhel" ]; then
+    if [[ "${OS_ID}" == "almalinux" || "${OS_ID}" == "rocky" ]]; then
         if [ "$OS_VERSION" == "8" ]; then
             # Enable powertools repo for AlmaLinux 8 and RockyLinux 8 (needed for perl-Switch package)
                 yum config-manager --set-enabled powertools
         else
-            # Enable crb repo for AlmaLinux 9 and RockyLinux 9(needed for perl-Switch package)
+            # Enable crb repo for AlmaLinux 9 and RockyLinux 9 (needed for perl-Switch package)
                 yum config-manager --set-enabled crb
         fi
     fi
