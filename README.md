@@ -532,7 +532,7 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 Currently, Cyclecloud does build and package slurm for AzureLinux3 but we do not have a PMC repo to publish to. Due to this, Cyclecloud only supports custom azlinux 3.0 images with slurm packages pre-installed. All nodes must use an image with the following packages pre installed:
 `perl-Switch munge jq jansson-devel binutils make wget gcc slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs`
 
-Additionally, only scheduler nodes must use an image with the the following packages also installed: `slurm-slurmctld slurm-slurmdbd slurm-slurmrestd` and only execute nodes must use an image with the following packages also installed: `slurm-slurmd`
+Additionally, only scheduler nodes must use an image with the following packages also installed: `slurm-slurmctld slurm-slurmdbd slurm-slurmrestd` and only execute nodes must use an image with the following packages also installed: `slurm-slurmd`
 
 ## Slurm-Template configuration reference
 
