@@ -71,7 +71,8 @@ install_python3() {
         PYTHON_BIN="/usr/bin/python3"
     
     elif [ "$OS" == "azurelinux" ]; then
-        echo "Detected AzureLinux, using system python3..." >&2
+        echo "Detected AzureLinux. Installing Python 3.12..." >&2
+        tdnf install -y python3 pyyaml
         PYTHON_BIN="/usr/bin/python3"
     
     elif [ "$OS" == "sle_hpc" ]; then
