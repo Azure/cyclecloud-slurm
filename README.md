@@ -528,7 +528,7 @@ Slurm and PMIX packages are fetched and downloaded exclusively from packages.mic
 
 **Note: CycleCloud also supports SLES 15 HPC, however we can only install the version supported by SLES HPC's zypper repos. At the time of this release, that is 23.02.7. Due to limited support, slurmrestd, monitoring, and background healthchecks are disabled for SUSE operting systems.**
 
-#### Azlinux 3.0 Support
+#### AzureLinux 3.0 Support
 Currently, Cyclecloud does build and package slurm for AzureLinux3 but we do not have a PMC repo to publish to. Due to this, Cyclecloud only supports custom azlinux 3.0 images with slurm packages pre-installed. All nodes must use an image with the following packages pre installed:
 `perl-Switch munge jq jansson-devel binutils make wget gcc slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs`
 
