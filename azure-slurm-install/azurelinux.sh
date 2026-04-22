@@ -6,10 +6,6 @@ set -e
 INSTALLED_FILE=/etc/azslurm-bins.installed
 SLURM_ROLE=$1
 SLURM_VERSION=$2
-OS_VERSION=$(cat /etc/os-release  | grep VERSION_ID | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
-OS_ID=$(cat /etc/os-release  | grep ^ID= | cut -d= -f2 | cut -d\" -f2 | cut -d. -f1)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ARTIFACTS_DIR="$SCRIPT_DIR/artifacts"
 
 rpm_check_pkg() {
     local packages_to_install=""
