@@ -824,7 +824,7 @@ def setup_slurmd(s: InstallSettings) -> None:
             slurmd_config = slurmd_config + " -b"
 
     ilib.file(
-        "/etc/sysconfig/slurmd" if s.platform_family == "rhel" else "/etc/default/slurmd",
+        "/etc/sysconfig/slurmd" if s.platform_family in ["rhel", "azurelinux"] else "/etc/default/slurmd",
         content=slurmd_config,
         owner=s.slurm_user,
         group=s.slurm_grp,
@@ -862,7 +862,7 @@ def setup_slurmrestd(s: InstallSettings) -> None:
     openapi_flag = "" if s.acct_enabled else " -s openapi/slurmctld"
     slurmrestd_config = f"SLURMRESTD_OPTIONS=\"-u slurmrestd -g slurmrestd{openapi_flag}\"\nSLURMRESTD_LISTEN=:6820,unix:/var/spool/slurmrestd/slurmrestd.socket"
     ilib.file(
-        "/etc/sysconfig/slurmrestd" if s.platform_family == "rhel" else "/etc/default/slurmrestd",
+        "/etc/sysconfig/slurmrestd" if s.platform_family in ["rhel", "azurelinux"] else "/etc/default/slurmrestd",
         content=slurmrestd_config,
         owner=s.slurmrestd_user,
         group=s.slurmrestd_grp,
@@ -975,7 +975,7 @@ def _add_slurm_exporter_scraper(s: InstallSettings, prom_config: str, exporter_y
     )
 
 def _configure_enroot_pyxis(s: InstallSettings) -> None:
-    if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8):
+    if s.platform_family == "suse" or (s.platform_family == "rhel" and s.major_version != 8) or s.platform_family == "azurelinux":
         logging.warning("Enroot is only supported on Ubuntu and RHEL/AlmaLinux 8. Skipping enroot configuration.")
         return
 
@@ -1145,7 +1145,8 @@ def detect_platform() -> str:
         "rhel": "rhel",
         "suse": "suse",
         "sles": "suse",
-        "sle_hpc": "suse"
+        "sle_hpc": "suse",
+        "azurelinux": "azurelinux"
     }
     try:
         with open("/etc/os-release") as f:
@@ -1169,7 +1170,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse", "debian"], required=False
+        "--platform", default=detect_platform(), choices=["rhel", "ubuntu", "suse", "debian", "azurelinux"], required=False
     )
     parser.add_argument(
         "--mode", default="scheduler", choices=["scheduler", "execute", "login"]
@@ -1191,7 +1192,7 @@ def main() -> None:
     # create the munge key and/or copy it to /etc/munge/
     munge_key(settings)
 
-    # runs either rhel.sh or ubuntu.sh to install the packages
+    # runs either rhel.sh, ubuntu.sh, or azurelinux.sh to install packages or verify the packages are installed
     run_installer(settings, os.path.abspath(f"{args.platform}.sh"), args.mode)
 
     #check for libjwt to configure JWT auth for slurmrestd
