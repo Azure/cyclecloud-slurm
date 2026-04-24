@@ -630,15 +630,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": ""
-            },
-            "properties": []
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -655,7 +647,7 @@
           "reducer": [
             "count"
           ],
-          "show": true
+          "show": false
         },
         "frameIndex": 3,
         "showHeader": true,
@@ -689,6 +681,17 @@
           "options": {}
         },
         {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Number of Allocated Nodes"
+              }
+            ]
+          }
+        },
+        {
           "id": "organize",
           "options": {
             "excludeByName": {
@@ -696,6 +699,7 @@
               "cluster": true,
               "instance": true,
               "job": true,
+              "microsoft.amwresourceid": true,
               "physical_host": true,
               "state": true,
               "subscription": true
@@ -705,17 +709,6 @@
             "renameByName": {
               "Trend #A": "Number of Allocated Nodes"
             }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "Number of Allocated Nodes"
-              }
-            ]
           }
         }
       ],
@@ -776,7 +769,7 @@
                   {
                     "targetBlank": true,
                     "title": "Failed Jobs in last 6 months",
-                    "url": "/d/cff0f6w0qqwaoa/failed-jobs-dashboard?orgId=1&from=${__from}&to=${__to}&timezone=browser&${promDatasource:queryparam}&${partition:queryparam}&${cluster:queryparam}&viewPanel=panel-1052"
+                    "url": "/d/cff0f6w0qqwaoa/failed-jobs-dashboard?orgId=1&from=${__from}&to=${__to}&timezone=browser&${promDatasource:queryparam}&${partition:queryparam}&${cluster:queryparam}&viewPanel=panel-1054"
                   }
                 ]
               }
@@ -813,7 +806,7 @@
         "x": 19,
         "y": 15
       },
-      "id": 1052,
+      "id": 1055,
       "options": {
         "displayLabels": [
           "name",
@@ -850,48 +843,8 @@
             "uid": "${promDatasource}"
           },
           "editorMode": "code",
-          "expr": "floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) !=0",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "Failed Jobs",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
           "exemplar": false,
-          "expr": "floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"})[$__range:$__interval])) !=0",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "Completed Jobs",
-          "range": true,
-          "refId": "E"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"})[$__range:$__interval])) !=0",
-          "hide": true,
-          "instant": false,
-          "legendFormat": "Finished Jobs",
-          "range": true,
-          "refId": "F"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range))",
+          "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} or vector(0))[$__range:$__interval]\r\n))",
           "hide": false,
           "instant": true,
           "legendFormat": "Failed Jobs",
@@ -905,7 +858,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"} offset $__range))",
+          "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"} or vector(0))[$__range:$__interval]\r\n))",
           "hide": false,
           "instant": true,
           "legendFormat": "Completed Jobs",
@@ -919,9 +872,10 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"} offset $__range))",
+          "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"} or vector(0))[$__range:$__interval]\r\n))",
           "hide": false,
           "instant": true,
+          "interval": "",
           "legendFormat": "Finished Jobs",
           "range": false,
           "refId": "D"
@@ -1744,6 +1698,7 @@
               "cluster": true,
               "instance": true,
               "job": true,
+              "microsoft.amwresourceid": true,
               "physical_host": true,
               "subscription": true
             },
@@ -2068,6 +2023,7 @@
               "cluster": true,
               "instance": true,
               "job": true,
+              "microsoft.amwresourceid": true,
               "physical_host": true,
               "subscription": true
             },
@@ -2123,7 +2079,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "## Disclaimer\n\n> **⚠️ Note:** Under heavy system load, dashboards may update more slowly. Displayed metrics may experience delays and should not be relied upon as a real-time source of truth during peak activity.",
+        "content": "## Disclaimer\n\n> **⚠️ Note:** Under heavy system load, dashboards may update more slowly. Displayed metrics may experience delays and should not be relied upon as a real-time source of truth during peak activity. Gaps in the dashboard may be seen when azslurm-exporter is down or when slurmctld is down.",
         "mode": "markdown"
       },
       "pluginVersion": "11.6.9",
@@ -2229,6 +2185,6 @@
   "timepicker": {},
   "timezone": "",
   "title": "AzSlurm Dashboard",
-  "uid": "aff0elgh9i0hsa",
+  "uid": "dfjzrqhfl8c1sc",
   "version": 1
 }

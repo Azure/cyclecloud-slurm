@@ -91,17 +91,17 @@
         "x": 0,
         "y": 1
       },
-      "id": 1052,
+      "id": 1054,
       "options": {
         "cellHeight": "lg",
         "footer": {
-          "countRows": false,
+          "countRows": true,
           "enablePagination": false,
           "fields": "",
           "reducer": [
-            "sum"
+            "count"
           ],
-          "show": false
+          "show": true
         },
         "frameIndex": 1,
         "showHeader": true,
@@ -116,21 +116,25 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(floor(increase(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}[$__range])) != 0 and sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range) or (sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} unless sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)",
-          "instant": true,
+          "expr": "sacct_failed_jobs{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset -5m",
+          "hide": false,
+          "instant": false,
           "legendFormat": "__auto",
-          "range": false,
-          "refId": "A"
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "Failed Jobs by Exit Code between $__from and $__to",
+      "title": "Failed Jobs between $__from and $__to",
       "transformations": [
         {
           "id": "timeSeriesTable",
-          "options": {}
+          "options": {
+            "B": {
+              "stat": "lastNotNull"
+            }
+          }
         },
         {
-          "disabled": true,
           "id": "labelsToFields",
           "options": {
             "keepLabels": [
@@ -145,27 +149,37 @@
           "id": "organize",
           "options": {
             "excludeByName": {
+              "Trend #B": true,
               "__name__": true,
               "cluster": true,
+              "endtime": true,
               "instance": true,
               "job": true,
+              "microsoft.amwresourceid": true,
               "physical_host": true,
               "start_datetime hpc": true,
+              "starttime": true,
               "subscription": true
             },
             "includeByName": {},
             "indexByName": {
-              "Trend #A": 3,
+              "Trend #B": 16,
               "__name__": 0,
               "cluster": 1,
-              "exit_code": 5,
-              "instance": 6,
-              "job": 7,
+              "endtime": 13,
+              "exit_code": 7,
+              "instance": 8,
+              "job": 9,
+              "jobid": 3,
+              "jobname": 4,
+              "microsoft.amwresourceid": 14,
+              "nodelist": 5,
               "partition": 2,
-              "physical_host": 8,
-              "start_datetime": 9,
-              "state": 4,
-              "subscription": 10
+              "physical_host": 10,
+              "reason": 15,
+              "starttime": 12,
+              "state": 6,
+              "subscription": 11
             },
             "renameByName": {
               "Trend #A": "# of Failed Jobs"
@@ -174,76 +188,6 @@
         }
       ],
       "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${promDatasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "noValue": "No failed Jobs within time range",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 16,
-        "x": 0,
-        "y": 12
-      },
-      "id": 1053,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.6.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "expr": "(floor(increase(sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"})[$__range:$__interval])) != 0 and sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range)) or (sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"}) unless sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset $__range))",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Total Failed Jobs between $__from and $__to",
-      "type": "stat"
     }
   ],
   "preload": false,
