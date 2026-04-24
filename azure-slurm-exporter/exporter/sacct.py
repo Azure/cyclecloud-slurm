@@ -1,10 +1,10 @@
 from .exporter import BaseCollector
 from collections import namedtuple
-from prometheus_client import Counter, disable_created_metrics
-from datetime import datetime, timedelta
+from prometheus_client import Counter, disable_created_metrics, Gauge
+from datetime import datetime
 import logging
 import exporter.util as util
-from typing import List
+from typing import List, Union
 log = logging.getLogger(__name__)
 
 class SacctNotAvailException(Exception):
@@ -37,7 +37,7 @@ class Sacct(BaseCollector):
             "153:0": "SIGXFSZ - File size limit",
         }
 
-    def __init__(self, binary_path="/usr/bin/sacct", interval=300, timeout=120):
+    def __init__(self, binary_path="/usr/bin/sacct", interval=300, timeout=120, starttime=None):
         self.binary_path = binary_path
         self.interval = interval
         self.timeout = timeout
@@ -46,9 +46,10 @@ class Sacct(BaseCollector):
         self.default_output_fmt = "jobid,jobname,nodelist,nnodes,partition,exitcode,derivedexitcode,state,user,start,submit,end,reason"
         self.sacct_output = namedtuple("sacct_output", self.default_output_fmt)
         self.terminal_states = "completed,failed,cancelled,timeout,node_fail,preempted,out_of_memory,deadline,boot_fail"
-        self.starttime = (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        self.starttime = starttime if starttime is not None else datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         self.endtime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         self.default_options = ["-P" ,"-n", "-o", self.default_output_fmt, "-s", self.terminal_states, "--allocations" ]
+        self.cached_output={"sacct_metrics":[]}
 
     def initialize(self) -> None:
         """
@@ -67,17 +68,20 @@ class Sacct(BaseCollector):
         """
         self.launch_task(func=self.sacct_query, interval=self.interval)
 
-    def export_metrics(self) -> List[Counter]:
+    def export_metrics(self) -> List[Union[Counter,Gauge]]:
         """
         Return the most recently collected sacct metrics for Prometheus to scrape.
         """
-        return [self.sacct_terminal_jobs]
+        return self.cached_output["sacct_metrics"]
 
-    def parse_output(self, stdout) -> None:
+    def parse_output(self, stdout) -> List[Union[Counter,Gauge]]:
         """
         Parse sacct command output and increment terminal jobs metric for each job in the output to describe total number of finished jobs by partition,
-        exit_code, reason, and state.
+        exit_code, reason, and state as well as return failed jobs gauge describing each job that failed within the time interval of the query.
         """
+        sacct_failed_jobs = Gauge("sacct_failed_jobs","Number of failed slurm jobs in an interval",
+                                    ["jobid","jobname","nodelist","partition", "exit_code","reason","state", "starttime","endtime"], registry=None)
+
         lines = stdout.decode().strip().splitlines()
         log.debug(f"Number of jobs:{len(lines)}")
         lines_iter = (line.split("|") for line in lines)
@@ -88,6 +92,21 @@ class Sacct(BaseCollector):
                 exit_code=row.exitcode,
                 reason=reason,
                 state=row.state.lower()).inc()
+
+            if row.state.lower() != "completed":
+                sacct_failed_jobs.labels(
+                    jobid=row.jobid,
+                    jobname=row.jobname,
+                    nodelist=row.nodelist,
+                    partition=row.partition,
+                    exit_code=row.exitcode,
+                    reason=reason,
+                    state=row.state.lower(),
+                    starttime=self.starttime,
+                    endtime=self.endtime).set(1)
+
+
+        return [self.sacct_terminal_jobs, sacct_failed_jobs]
 
     async def sacct_query(self) -> None:
         """
@@ -105,7 +124,7 @@ class Sacct(BaseCollector):
         log.debug(f"running sacct query between {self.starttime} and {self.endtime}")
         try:
             proc = await self.run_command(*args, timeout=self.timeout)
-            self.parse_output(proc.stdout)
+            self.cached_output["sacct_metrics"] = self.parse_output(proc.stdout)
         except Exception as e:
             log.error(e)
             return

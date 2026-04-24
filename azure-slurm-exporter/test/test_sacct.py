@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from exporter.sacct import Sacct, SacctNotAvailException
 from exporter.exporter import CommandFailedException, CommandTimedOutException
-from prometheus_client import Counter
+from prometheus_client import Counter, Gauge
 
 
 class TestSacctInitialize:
@@ -39,10 +39,10 @@ class TestSacctParseOutput:
     def test_parse_output_single_completed_job(self, sacct):
         """Test parse_output handles a single completed job."""
         stdout = b"1001|myjob|node1|1|batch|0:0|0:0|COMPLETED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         samples_by_keys = {}
         metrics = sacct.export_metrics()
-        assert len(metrics) == 1
+        assert len(metrics) == 2
 
         for metric in metrics:
             for family in metric.collect():
@@ -60,7 +60,7 @@ class TestSacctParseOutput:
             b"1001|job1|node1|1|batch|0:0|0:0|COMPLETED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
             b"1002|job2|node2|1|batch|137:0|0:0|FAILED|user2|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
         )
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         all_samples = []
@@ -74,9 +74,8 @@ class TestSacctParseOutput:
 
     def test_parse_output_empty_output(self, sacct):
         """Test parse_output handles empty output."""
-        sacct.parse_output(b"")
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(b"")
         metrics = sacct.export_metrics()
-
         # Counter should have no samples when no jobs parsed
         for metric in metrics:
             for family in metric.collect():
@@ -90,7 +89,7 @@ class TestSacctParseOutput:
             b"2|job2|node2|1|gpu|0:0|0:0|COMPLETED|u2|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
             b"3|job3|node3|1|cpu|1:0|0:0|FAILED|u3|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
         )
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         terminal_metric = None
@@ -120,15 +119,17 @@ class TestSacctExportMetrics:
         return sacct
 
     def test_export_metrics_returns_counter(self, sacct):
-        """Test export_metrics returns a Counter instance."""
+        """Test export_metrics returns a Counter and Gauge instance."""
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(b"")
         metrics = sacct.export_metrics()
-        assert len(metrics) == 1
+        assert len(metrics) == 2
         assert isinstance(metrics[0], Counter)
+        assert isinstance(metrics[1], Gauge)
 
     def test_export_metrics_same_reference(self, sacct):
         """Test export_metrics returns consistent references."""
         stdout = b"1001|job1|node1|1|batch|0:0|0:0|COMPLETED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
 
         metrics1 = sacct.export_metrics()
         metrics2 = sacct.export_metrics()
@@ -156,7 +157,7 @@ class TestSacctExitCodeMapping:
     def test_exit_code_mapped_to_reason_label(self, sacct):
         """Test exit code is mapped to the reason label in metrics."""
         stdout = b"1001|job1|node1|1|batch|137:0|0:0|FAILED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         for metric in metrics:
@@ -168,7 +169,7 @@ class TestSacctExitCodeMapping:
     def test_unknown_exit_code_defaults_to_empty(self, sacct):
         """Test unknown exit code defaults to empty reason."""
         stdout = b"1001|job1|node1|1|batch|99:0|0:0|FAILED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         for metric in metrics:
@@ -196,7 +197,7 @@ class TestSacctMetricValues:
             b"2|job2|node1|1|batch|0:0|0:0|COMPLETED|u2|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
             b"3|job3|node1|1|batch|0:0|0:0|COMPLETED|u3|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
         )
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         for metric in metrics:
@@ -210,8 +211,8 @@ class TestSacctMetricValues:
         batch1 = b"1|job1|node1|1|batch|0:0|0:0|COMPLETED|u1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
         batch2 = b"2|job2|node1|1|batch|0:0|0:0|COMPLETED|u2|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
 
-        sacct.parse_output(batch1)
-        sacct.parse_output(batch2)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(batch1)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(batch2)
         metrics = sacct.export_metrics()
 
         for metric in metrics:
@@ -223,7 +224,7 @@ class TestSacctMetricValues:
     def test_all_values_non_negative(self, sacct):
         """Test all metric values are non-negative."""
         stdout = b"1|job1|node1|1|batch|0:0|0:0|COMPLETED|u1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         for metric in metrics:
@@ -243,7 +244,7 @@ class TestSacctMetricValues:
                 % (i, i, exit_code, state)
             )
         stdout = b"".join(lines)
-        sacct.parse_output(stdout)
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         metrics = sacct.export_metrics()
 
         terminal_metric = None
