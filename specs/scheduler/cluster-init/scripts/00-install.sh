@@ -6,8 +6,8 @@ SPEC_FILE_ROOT="$script_dir/../files"
 source "$SPEC_FILE_ROOT/common.sh"
 
 do_install=$(jetpack config slurm.do_install True)
-install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.6.tar.gz)
-autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.6.tar.gz)
+install_pkg=$(jetpack config slurm.install_pkg azure-slurm-install-pkg-4.0.7.tar.gz)
+autoscale_pkg=$(jetpack config slurm.autoscale_pkg azure-slurm-pkg-4.0.7.tar.gz)
 slurm_project_name=$(jetpack config slurm.project_name slurm)
 
 cd $CYCLECLOUD_HOME/system/bootstrap
