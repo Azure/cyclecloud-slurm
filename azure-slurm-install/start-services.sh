@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+set -o pipefail
 
 run_slurmdbd_via_systemctl() {
 
@@ -268,4 +269,6 @@ ensure_enroot_dir() {
         run_azslurm_exporter
     fi
 
+    echo "Successfully started all relevant slurm services"
+    
 } 2>&1 | tee -a /var/log/azure-slurm-install.log
