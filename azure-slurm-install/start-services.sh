@@ -180,8 +180,9 @@ run_azslurm_exporter() {
 
 ensure_enroot_dir() {
     # In some cases /tmp or even ephemeral disks may clear on reboot.
-    # This ensures the cyclecloud-slurm configured enroot scratch directory is present. its a no-op if it
-    # is already present or enroot scratch dir is not defined in conf file
+    # This ensures the cyclecloud-slurm-configured enroot scratch directory is present.
+    # It's a no-op if the directory is already present or if the enroot scratch dir is
+    # not defined in the config file.
     #
     CONF=/etc/enroot/enroot.conf
 
