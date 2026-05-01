@@ -559,7 +559,7 @@ The following table describes the Slurm-specific configuration options you can t
 | slurm.accounting.storageloc                       | Optional when `slurm.accounting.enabled = true`. Database name to store slurm accounting records  |
 | slurm.accounting.user                       | Required when `slurm.accounting.enabled = true`. User for Slurm DBD admin  |
 | slurm.accounting.password                       | Required when `slurm.accounting.enabled = true`. Password for Slurm DBD admin  |
-| slurm.accounting.certificate_url                       | Required when `slurm.accounting.enabled = true`. Url to fetch SSL Certificate for authentication to DB. Use AzureCA.pem (embedded) for use with deprecated MariaDB instances. |
+| slurm.accounting.certificate                      | Optional user specified SSL certificate for DB Authentication. Default is combined SSL certs for Azure Database for MySQL Server |
 | slurm.additional.config                      | Any additional lines to add to slurm.conf |
 | slurm.ha_enabled                       | Default: `false`. Setting to deploy with an additional HA node |
 | slurm.launch_parameters                       | Default: `use_interactive_step`. Deploy Slurm with Launch Parameters (comma delimited) |

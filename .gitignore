@@ -345,4 +345,4 @@ azure-slurm-install/dist
 azure-slurm-install/docker/
 .DS_Store
 .build.log
-azure-slurm-install/AzureCA.pem
+azure-slurm-install/AzureCA*.pem

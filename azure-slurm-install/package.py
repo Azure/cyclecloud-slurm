@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tarfile
 import requests
+import tempfile
 from typing import Optional
 
 def execute() -> None:
@@ -58,6 +59,54 @@ def execute() -> None:
         with open(path, "rb") as fr:
             tf.addfile(tarinfo, fr)
 
+    def _create_combined_certs() -> None:
+        """
+        Download and combine three SSL certificates required for Azure MySQL:
+        1. DigiCert Global Root CA
+        2. DigiCert Global Root G2
+        3. Microsoft RSA Root Certificate Authority 2017 (converted from DER to PEM)
+        """
+        cert_urls = {
+            "digicert_root_ca": "https://cacerts.digicert.com/DigiCertGlobalRootCA.crt.pem",
+            "digicert_root_g2": "https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem",
+            "microsoft_rsa_2017": "https://www.microsoft.com/pkiops/certs/Microsoft%20RSA%20Root%20Certificate%20Authority%202017.crt"
+        }
+
+        combined_pem = ""
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Download DigiCert Global Root CA
+            digicert_ca_path = os.path.join(tmpdir, "DigiCertGlobalRootCA.crt.pem")
+            _download(cert_urls["digicert_root_ca"], digicert_ca_path)
+            with open(digicert_ca_path, "r") as f:
+                combined_pem += f.read() + "\n"
+
+            # Download DigiCert Global Root G2
+            digicert_g2_path = os.path.join(tmpdir, "DigiCertGlobalRootG2.crt.pem")
+            _download(cert_urls["digicert_root_g2"], digicert_g2_path)
+            with open(digicert_g2_path, "r") as f:
+                combined_pem += f.read() + "\n"
+
+            # Download Microsoft RSA 2017 (DER format)
+            microsoft_der_path = os.path.join(tmpdir, "MicrosoftRSA2017.crt")
+            _download(cert_urls["microsoft_rsa_2017"], microsoft_der_path)
+
+            # Convert DER to PEM
+            microsoft_pem_path = os.path.join(tmpdir, "MicrosoftRSA2017.pem")
+            subprocess.check_call([
+                "openssl", "x509",
+                "-inform", "DER",
+                "-in", microsoft_der_path,
+                "-out", microsoft_pem_path
+            ])
+            with open(microsoft_pem_path, "r") as f:
+                combined_pem += f.read() + "\n"
+        cert_name = f"AzureCA_{version}.pem"
+        # Write combined certificates to AzureCA_{version}.pem
+        with open(cert_name, "w") as f:
+            f.write(combined_pem)
+        _add(cert_name,cert_name)
+
     #Download EPEL
     for ver in ["8", "9"]:
         url = f"https://dl.fedoraproject.org/pub/epel/epel-release-latest-{ver}.noarch.rpm"
@@ -95,6 +144,7 @@ def execute() -> None:
     _download(pyxis_url, pyxis_dest)
     _add(pyxis_dest, pyxis_dest)
 
+    _create_combined_certs()
     _add("install.sh", "install.sh", mode=os.stat("install.sh")[0])
     _add("install_logging.conf", "conf/install_logging.conf")
     _add("installlib.py", "installlib.py")
@@ -108,7 +158,6 @@ def execute() -> None:
     _add("azurelinux.sh", "azurelinux.sh", 600)
     _add("imex_prolog.sh", "imex_prolog.sh", 600)
     _add("imex_epilog.sh", "imex_epilog.sh", 600)
-    _add("AzureCA.pem", "AzureCA.pem")
     _add("suse.sh", "suse.sh", 600)
     _add("start-services.sh", "start-services.sh", 555)
     _add("capture_logs.sh", "capture_logs.sh", 755)

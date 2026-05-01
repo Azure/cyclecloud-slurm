@@ -9,9 +9,8 @@ import sys
 import installlib as ilib
 from typing import Dict, Optional
 
-# Legacy: used for connecting to Azure MariaDB, which is deprecated.
-LOCAL_AZURE_CA_PEM = "AzureCA.pem"
-
+# Combined Certs needed to connect to Azure Database for MySQL Server
+COMBINED_CERTS = "AzureCA_4.0.8.pem"
 
 class InstallSettings:
     def __init__(self, config: Dict, platform_family: str, mode: str) -> None:
@@ -98,8 +97,9 @@ class InstallSettings:
         self.acct_user: Optional[str] = config["slurm"]["accounting"].get("user")
         self.acct_pass: Optional[str] = config["slurm"]["accounting"].get("password")
         self.acct_url: Optional[str] = config["slurm"]["accounting"].get("url")
-        self.acct_cert_url: Optional[str] = config["slurm"]["accounting"].get("certificate_url")
+        self.custom_acct_cert: Optional[str] = config["slurm"]["accounting"].get("certificate")
         self.acct_storageloc :Optional[str] = config["slurm"]["accounting"].get("storageloc")
+        self.acct_cert_filename = "CustomCA.pem" if self.custom_acct_cert else COMBINED_CERTS
 
         self.use_nodename_as_hostname = config["slurm"].get(
             "use_nodename_as_hostname", False
@@ -393,30 +393,25 @@ AccountingStorageTRES=gres/gpu
 """,
     )
 
-    # Previously this was required when connecting to any Azure MariaDB instance.
-    # Which is why we shipped with LOCAL_AZURE_CA_PEM.
-    if s.acct_cert_url and s.acct_cert_url != LOCAL_AZURE_CA_PEM:
-        logging.info(f"Downloading {s.acct_cert_url} to {s.config_dir}/AzureCA.pem")
-        subprocess.check_call(
-            [
-                "wget",
-                "-O",
-                f"{s.config_dir}/AzureCA.pem",
-                s.acct_cert_url,
-            ]
-        )
-        ilib.chown(
-            f"{s.config_dir}/AzureCA.pem", owner=s.slurm_user, group=s.slurm_grp
-        )
-        ilib.chmod(f"{s.config_dir}/AzureCA.pem", mode="0600")
-    elif s.acct_cert_url and s.acct_cert_url == LOCAL_AZURE_CA_PEM:
-        ilib.copy_file(
-            LOCAL_AZURE_CA_PEM,
-            f"{s.config_dir}/AzureCA.pem",
+    # Always copy the bundled certificate
+    ilib.copy_file(
+        COMBINED_CERTS,
+        f"{s.config_dir}/{COMBINED_CERTS}",
+        owner=s.slurm_user,
+        group=s.slurm_grp,
+        mode="0600",
+    )
+    #Install custom SSL cert if specified
+    if s.custom_acct_cert:
+        cert_path = f"{s.config_dir}/{s.acct_cert_filename}"
+        logging.info(f"Saving custom SSL cert to {cert_path}")
+        ilib.file(
+            cert_path,
             owner=s.slurm_user,
             group=s.slurm_grp,
             mode="0600",
-        )
+            content=s.custom_acct_cert,
+            )
 
     # Configure slurmdbd.conf
     ilib.template(
@@ -430,9 +425,7 @@ AccountingStorageTRES=gres/gpu
             "dbuser": s.acct_user or "root",
             "dbdhost": s.hostname,
             "storagepass": f"StoragePass={s.acct_pass}" if s.acct_pass else "#StoragePass=",
-            "storage_parameters": "StorageParameters=SSL_CA=/etc/slurm/AzureCA.pem"
-                                  if s.acct_cert_url
-                                  else "#StorageParameters=",
+            "storage_parameters": f"StorageParameters=SSL_CA=/etc/slurm/{s.acct_cert_filename}",
             "slurmver": s.slurmver,
             "storageloc": s.acct_storageloc or f"{s.slurm_db_cluster_name}_acct_db",
             "auth_alt_type": "AuthAltTypes=auth/jwt" if s.jwt_available else "",
@@ -458,16 +451,21 @@ def _accounting_all(s: InstallSettings) -> None:
     """
     Perform linking and enabling of slurmdbd
     """
-    # This used to be required for all installations, but it is
-    # now optional, so only create the link if required.
-    original_azure_ca_pem = f"{s.config_dir}/AzureCA.pem"
+    # Always link the bundled certificate to /etc/slurm in addition to user specified custom SSL certificate
     ilib.link(
-        f"{s.config_dir}/AzureCA.pem",
-        "/etc/slurm/AzureCA.pem",
+        f"{s.config_dir}/{COMBINED_CERTS}",
+        f"/etc/slurm/{COMBINED_CERTS}",
         owner=s.slurm_user,
         group=s.slurm_grp,
     )
 
+    if s.custom_acct_cert:
+        ilib.link(
+            f"{s.config_dir}/{s.acct_cert_filename}",
+            f"/etc/slurm/{s.acct_cert_filename}",
+            owner=s.slurm_user,
+            group=s.slurm_grp,
+        )
     # Link shared slurmdbd.conf to real config file location
     ilib.link(
         f"{s.config_dir}/slurmdbd.conf",

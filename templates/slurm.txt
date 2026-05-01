@@ -38,7 +38,7 @@ Autoscale = $Autoscale
         slurm.accounting.url = $configuration_slurm_accounting_url
         slurm.accounting.user = $configuration_slurm_accounting_user
         slurm.accounting.password = $configuration_slurm_accounting_password
-        slurm.accounting.certificate_url = $configuration_slurm_accounting_certificate_url
+        slurm.accounting.certificate = $configuration_slurm_accounting_custom_certificate
         slurm.accounting.storageloc = $configuration_slurm_accounting_storageloc
         slurm.additional.config = $additional_slurm_config
         slurm.ha_enabled = $configuration_slurm_ha_enabled
@@ -799,15 +799,20 @@ Order = 20
         ParameterType = Password
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
 
-        [[[parameter configuration_slurm_accounting_certificate_url]]]
-        Label = SSL Certificate URL
-        Description = URL to fetch SSL certificate for authentication to DB. Use AzureCA.pem (embedded) for use with deprecated MariaDB instances.
+        [[[parameter configuration_slurm_accounting_custom_certificate_enabled]]]
+        Label = Custom SSL Certificate
+        Description = Enable to add custom SSL Certificate for DB Authentication. Default installs combined certs needed for Azure Database for MySQL.
+        DefaultValue = false
+        Widget.Plugin = pico.form.BooleanCheckBox
+        Widget.Label = Use custom SSL certificate for connecting to DB
         Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-        ParameterType = StringList
-        Config.Plugin = pico.form.Dropdown
-        Config.FreeForm = true
-        Config.Entries := {[Value=""], [Value="AzureCA.pem"]}
-        DefaultValue = ""
+
+        [[[parameter configuration_slurm_accounting_custom_certificate]]]
+        Label = Custom SSL Certificate for DB Authentication
+        Description = Content of Custom SSL Certificate for DB Authentication
+        Conditions.Excluded := configuration_slurm_accounting_enabled isnt true || configuration_slurm_accounting_custom_certificate_enabled isnt true
+        Conditions.Required := configuration_slurm_accounting_custom_certificate_enabled is true
+        ParameterType = Text
 
         [[[parameter EnableTerminateNotification]]]
         Label = Enable Termination notifications
