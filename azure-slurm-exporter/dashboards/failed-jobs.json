@@ -207,7 +207,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**NOTE**: Failed Jobs dashboard requires slurm accounting to be enabled in cluster. Dashboard will not populate if accounting is disabled.",
+        "content": "**NOTE**: Failed Jobs dashboard requires Slurm accounting to be enabled in the cluster. Dashboard will not populate if accounting is disabled.",
         "mode": "markdown"
       },
       "pluginVersion": "11.6.9",
