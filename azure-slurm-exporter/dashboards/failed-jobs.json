@@ -188,6 +188,32 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 16,
+        "x": 0,
+        "y": 12
+      },
+      "id": 1055,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**NOTE**: Failed Jobs dashboard requires slurm accounting to be enabled in cluster. Dashboard will not populate if accounting is disabled.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.9",
+      "title": "",
+      "transparent": true,
+      "type": "text"
     }
   ],
   "preload": false,
