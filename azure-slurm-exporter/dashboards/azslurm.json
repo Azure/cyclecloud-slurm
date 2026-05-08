@@ -1386,7 +1386,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "**Note:** Finished Jobs panel requires slurm accounting to be enabled in cluster. Panel will not populate if accounting is disabled.",
+        "content": "**Note:** Finished Jobs panel requires Slurm accounting to be enabled in the cluster. Panel will not populate if accounting is disabled.",
         "mode": "markdown"
       },
       "pluginVersion": "11.6.9",
