@@ -192,13 +192,13 @@ To setup job accounting, following fields are defined in the slurm cluster creat
                     Each cluster typically (when not defined) has its own database. This helps to not cause roll ups between starting clusters of different slurm versions.
 - *Database User* - This refers to the username slurmdbd will use to connect to MySQL Server.
 - *Database Password* - This refers to the password slurmdbd will use to connect to MySQL Server.
-- *SSL Certificate URL* - If mysql connection requires SSL then this URL is used to provide certificate URL.
+- *Custom SSL Certificate* - Enable this toggle if the database connection requires a custom SSL certificate.  By default, the following certificates are configured for Azure Database for MySQL Flexible Server as a combined CA bundle.
+  - https://cacerts.digicert.com/DigiCertGlobalRootCA.crt.pem
+  - https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem
+  - https://www.microsoft.com/pkiops/certs/Microsoft%20RSA%20Root%20Certificate%20Authority%202017.crt
 
-***For connecting with MySql Flex, enter the following URL for SSL certificate***:
+- *Custom SSL Certificate for DB Authentication* - Paste the PEM contents of the custom SSL certificate into this field.
 
-```
-https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem
-```
 
 ***Do Note: When deleting clusters, their corresponding databases in MySql are not deleted. User is responsible for archiving/purging their databases and manage their mysql costs.***
 
