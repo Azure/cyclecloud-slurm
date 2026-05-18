@@ -127,7 +127,7 @@ class CompositeCollector:
     """
     A composite collector that aggregates metrics from multiple SLURM and Azure-specific data sources.
     This class manages the initialization and coordination of multiple specialized collectors
-    (Squeue, Sacct, Sinfo, Azslurm, and Jetpack) that gather different types of metrics from
+    (Squeue, Sacct, Sinfo, Sdiag, Azslurm, and Jetpack) that gather different types of metrics from
     a SLURM cluster and Azure environment. It provides a unified interface for exporting
     collected metrics to Prometheus.
     """
@@ -140,7 +140,8 @@ class CompositeCollector:
         at each downstream interval.
         - Squeue: Collects job queue information
         - Sacct: Collects job accounting data
-        - Sinfo: Collects node/partition
+        - Sinfo: Collects node/partition information
+        - Sdiag: Collects scheduler diagnostic information
         - Azslurm: Collects partition specs
         - Jetpack: Collects cluster specs
         """
@@ -170,6 +171,15 @@ class CompositeCollector:
             log.warning("sinfo is not available, disabling sinfo metrics")
         else:
             self.collectors.append(sinfo)
+
+        try:
+            from exporter.sdiag import Sdiag, SdiagNotAvailException
+            sdiag = Sdiag()
+            sdiag.initialize()
+        except SdiagNotAvailException:
+            log.warning("sdiag is not available, disabling sdiag metrics")
+        else:
+            self.collectors.append(sdiag)
 
         try:
             from exporter.azslurm import Azslurm, AzslurmNotAvailException
