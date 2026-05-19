@@ -7,13 +7,28 @@ run_slurmdbd_via_systemctl() {
     echo "Starting slurmdbd via systemctl..."
     systemctl start slurmdbd
 
-    # Verify slurmdbd is responding
-    sleep 10
-    if ! sacctmgr ping > /dev/null 2>&1; then
-        echo "ERROR: slurmdbd started but is not responding to sacctmgr ping"
+    # Verify slurmdbd is responding with retry logic
+    attempts=3
+    delay=5
+    ping_rc=1
+    set +e
+    for (( i=1; i<=attempts; i++ )); do
+        echo $i/$attempts sleeping $delay seconds before running sacctmgr ping
+        sleep $delay
+        sacctmgr ping > /dev/null 2>&1
+        ping_rc=$?
+        if [ "$ping_rc" -eq 0 ]; then
+            echo "slurmdbd is running and responding to ping"
+            set -e
+            return 0
+        fi
+    done
+    set -e
+
+    if [ "$ping_rc" -ne 0 ]; then
+        echo "ERROR: slurmdbd started but is not responding to sacctmgr ping after $attempts attempts"
         exit 2
     fi
-    echo "slurmdbd is running and responding to ping"
 }
 
 run_slurmdbd() {
