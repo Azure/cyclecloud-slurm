@@ -69,7 +69,12 @@ def resume(
             constraints, node_count=1, allow_existing=False
         )
         if len(result.nodes) != 1:
-            raise RuntimeError()
+            reasons = "; ".join(result.reasons) if getattr(result, "reasons", None) else "no reason reported by node manager"
+            raise AzureSlurmError(
+                f"Failed to allocate node {name} in bucket {bucket.bucket_id} "
+                f"(partition={partition.name}): expected 1 node, got {len(result.nodes)}. "
+                f"Reasons: {reasons}"
+            )
         result.nodes[0].name_format = name
         nodes.extend(result.nodes)
 
