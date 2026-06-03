@@ -133,6 +133,7 @@ class InstallSettings:
         )
         self.launch_parameters = config["slurm"].get("launch_parameters", "")
 
+        self.primary_scheduler_name = config["slurm"].get("primary_scheduler_name") or "scheduler"
         self.secondary_scheduler_name = config["slurm"].get("secondary_scheduler_name")
         self.is_primary_scheduler = config["slurm"].get("is_primary_scheduler", self.mode == "scheduler")
         self.config_dir = f"/sched/{self.slurm_cluster_name}"
@@ -1164,7 +1165,7 @@ def main() -> None:
         if settings.is_primary_scheduler == False:
             # This is the HA node.
             logging.info(f"Secondary Scheduler {settings.secondary_scheduler_name} starting wait on primary to finish converging.")
-            ilib.await_node_converge(settings.config, "scheduler", timeout=600)
+            ilib.await_node_converge(settings.config, settings.primary_scheduler_name, timeout=600)
 
     if settings.mode == "execute":
         setup_slurmd(settings)
