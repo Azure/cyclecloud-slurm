@@ -27,7 +27,7 @@ fi
 
 #Almalinux 8/9, RHEL 8/9 and RockyLinux 8/9 both need epel-release to install libjwt for slurm packages
 enable_epel() {
-    if ! rpm -qa | grep -q "^epel-release-"; then
+    if ! rpm -q epel-release >/dev/null 2>&1; then
         if [ "${OS_ID,,}" == "rhel" ]; then
             yum -y install $ARTIFACTS_DIR/epel-release-latest-${OS_VERSION}.noarch.rpm
         else
@@ -56,7 +56,15 @@ rpm_pkg_install() {
             # Extract package name from .rpm filename
             base_pkg=$(basename "$pkg_name" | sed 's/-[0-9]*\.el.*$//')
         fi
-        if ! rpm -qa | grep -q "^${base_pkg}-"; then
+        # If pkg_name uses a trailing "*" to express an acceptable version prefix, ensure the installed package version matches that prefix.
+        query_pkg=${base_pkg%-[0-9]*\*}
+        if [[ "$pkg_name" == *\** ]]; then
+            expected_prefix=${base_pkg%\*}
+            installed_ver=$(rpm -q "$query_pkg" --qf '%{NAME}-%{VERSION}-%{RELEASE}\n' 2>/dev/null || true)
+            if [[ "$installed_ver" != ${expected_prefix}* ]]; then
+                packages_to_install="$packages_to_install $pkg_name"
+            fi
+        elif ! rpm -q "$query_pkg" >/dev/null 2>&1; then
             packages_to_install="$packages_to_install $pkg_name"
         fi
     done
@@ -70,7 +78,7 @@ rpm_pkg_install() {
     fi
 }
 
-dependency_packages="perl-Switch munge jq jansson-devel libjwt-devel binutils make wget gcc"
+dependency_packages="perl-Switch munge jq jansson-devel libjwt-devel binutils make wget gcc sqlite"
 slurm_packages="slurm slurm-libpmi slurm-devel slurm-pam_slurm slurm-perlapi slurm-torque slurm-openlava slurm-example-configs slurm-contribs"
 sched_packages="slurm-slurmctld slurm-slurmdbd slurm-slurmrestd"
 execute_packages="slurm-slurmd"
