@@ -437,7 +437,7 @@ To check if the configured exporters are exposing metrics, connect to a node and
 
 #### AzSlurm Exporter
 
-The AzSlurm Exporter is a lightweight, asynchronous Prometheus exporter that runs on the Slurm scheduler node as a systemd service and exposes Slurm cluster metrics on default port `9101` at the `/metrics` endpoint. It periodically queries cluster available CLI tools (`squeue`, `sacct`, `sinfo`, `azslurm`, `jetpack`), parses their output, and publishes metrics in Prometheus format for ingestion by Azure Monitor or any Prometheus-compatible monitoring system.
+The AzSlurm Exporter is a lightweight, asynchronous Prometheus exporter that runs on the Slurm scheduler node as a systemd service and exposes Slurm cluster metrics on default port `9101` at the `/metrics` endpoint. It periodically queries cluster available CLI tools (`squeue`, `sacct`, `sinfo`, `sdiag`, `azslurm`, `jetpack`), parses their output, and publishes metrics in Prometheus format for ingestion by Azure Monitor or any Prometheus-compatible monitoring system.
 
 If a collector binary is unavailable, that collector is skipped with a warning. The exporter only exits if **no** collectors initialize successfully.
 
@@ -467,6 +467,18 @@ Terminal states tracked: `completed`, `failed`, `cancelled`, `timeout`, `node_fa
 | `sinfo_partition_nodes_state` | Gauge | `node_list`, `partition`, `state`, `reason` | Number of nodes in each state per partition |
 
 Node state suffixes (e.g. `*` = not responding, `~` = powered off, `#` = powering up) are normalized to descriptive state names.
+
+**sdiag metrics**
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `sdiag_server_thread_count` | Gauge | | Number of server threads currently active in slurmctld |
+| `sdiag_agent_queue_size` | Gauge | | Number of outgoing RPC requests queued for compute nodes |
+| `sdiag_dbd_agent_queue_size` | Gauge | | Number of messages queued for Slurm database daemon |
+| `sdiag_main_cycle_time_us` | Gauge | `type` | Main scheduling cycle time in microseconds (type: last, max, mean) |
+| `sdiag_main_mean_depth_cycle` | Gauge | | Mean number of jobs examined per scheduling cycle |
+
+The `sdiag` collector provides essential scheduler health metrics for monitoring cluster performance and identifying potential issues. It queries `sdiag --json` at 300-second intervals (default) to minimize scheduler overhead.
 
 **azslurm metrics**
 
