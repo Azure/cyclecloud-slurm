@@ -9,17 +9,18 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     1. [Making Cluster Changes](#making-cluster-changes)
     2. [No longer pre-creating execute nodes](#no-longer-pre-creating-execute-nodes)
     3. [Creating additional partitions](#creating-additional-partitions)
-    4. [Dynamic Partitions](#dynamic-partitions)
-    5. [Using Dynamic Partitions to Autoscale](#using-dynamic-partitions-to-autoscale)
-    6. [Manual scaling](#manual-scaling)
-    7. [Slurm Job Accounting](#slurm-job-accounting)
+    4. [Custom Partition name](#custom-partition-name)
+    5. [Dynamic Partitions](#dynamic-partitions)
+    6. [Using Dynamic Partitions to Autoscale](#using-dynamic-partitions-to-autoscale)
+    7. [Manual scaling](#manual-scaling)
+    8. [Slurm Job Accounting](#slurm-job-accounting)
         1. [Cost Reporting](#cost-reporting)
-    8. [Topology](#topology)
-    9. [GB200/GB300 IMEX Support](#gb200gb300-imex-support)
-    10. [Setting KeepAlive in CycleCloud](#setting-keepalive)
-    11. [Slurmrestd](#slurmrestd)
-    12. [Node Health Checks](#node-health-checks)
-    13. [Monitoring](#monitoring)
+    9. [Topology](#topology)
+    10. [GB200/GB300 IMEX Support](#gb200gb300-imex-support)
+    11. [Setting KeepAlive in CycleCloud](#setting-keepalive)
+    12. [Slurmrestd](#slurmrestd)
+    13. [Node Health Checks](#node-health-checks)
+    14. [Monitoring](#monitoring)
         1. [AzSlurm Exporter](#azslurm-exporter)
             1. [Exported Metrics](#exported-metrics)
             2. [Configure Exporter Port](#configure-exporter-port)
@@ -93,6 +94,14 @@ The default template that ships with Azure CycleCloud has four partitions (`hpc`
 
 # Any new parameters [SpecialGPUMachineType, MaxSpecialGPUCoreCount] should be added n the [[parameters]] section
 
+```
+
+### Custom Partition name
+If the naming convention for the actual nodearray is not identical to the desired partition name, you can simply override this with the `slurm.partition` configuration option.
+```ini
+  [[nodearray my_custom_name]]
+    [[[configuration]]]
+    slurm.partition = my-custom-name
 ```
 
 ### Dynamic Partitions
