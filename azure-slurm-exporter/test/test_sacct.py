@@ -41,8 +41,9 @@ class TestSacctParseOutput:
         stdout = b"1001|myjob|node1|1|batch|0:0|0:0|COMPLETED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
         sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         samples_by_keys = {}
+        completed_samples_by_jobid = {}
         metrics = sacct.export_metrics()
-        assert len(metrics) == 2
+        assert len(metrics) == 3
 
         for metric in metrics:
             for family in metric.collect():
@@ -51,8 +52,12 @@ class TestSacctParseOutput:
                     assert "exit_code" in s.labels
                     assert "reason" in s.labels
                     assert "state" in s.labels
-                    samples_by_keys[(s.labels["partition"], s.labels["state"], s.labels["reason"], s.labels["exit_code"])] = s.value
+                    if family.name == "sacct_completed_jobs":
+                        completed_samples_by_jobid[s.labels["jobid"]] = s.value
+                    elif family.name == "sacct_terminal_jobs":
+                        samples_by_keys[(s.labels["partition"], s.labels["state"], s.labels["reason"], s.labels["exit_code"])] = s.value
         assert samples_by_keys.get(("batch","completed","","0:0")) == 1
+        assert completed_samples_by_jobid.get("1001") == 1
 
     def test_parse_output_multiple_states(self, sacct):
         """Test parse_output handles jobs with multiple states."""
@@ -119,12 +124,16 @@ class TestSacctExportMetrics:
         return sacct
 
     def test_export_metrics_returns_counter(self, sacct):
-        """Test export_metrics returns a Counter and Gauge instance."""
+        """Test export_metrics returns a Counter and the failed/completed Gauges."""
         sacct.cached_output["sacct_metrics"] = sacct.parse_output(b"")
         metrics = sacct.export_metrics()
-        assert len(metrics) == 2
+        assert len(metrics) == 3
         assert isinstance(metrics[0], Counter)
         assert isinstance(metrics[1], Gauge)
+        assert isinstance(metrics[2], Gauge)
+        family_names = {f.name for m in metrics for f in m.collect()}
+        assert "sacct_failed_jobs" in family_names
+        assert "sacct_completed_jobs" in family_names
 
     def test_export_metrics_same_reference(self, sacct):
         """Test export_metrics returns consistent references."""
