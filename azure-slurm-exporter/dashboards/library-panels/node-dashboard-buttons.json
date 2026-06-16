@@ -1,0 +1,32 @@
+{
+  "uid": "cfo8upic84lxce",
+  "name": "Node Dashboard buttons",
+  "kind": 1,
+  "model": {
+    "description": "",
+    "fieldConfig": {
+      "defaults": {},
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 3,
+      "w": 12,
+      "x": 12,
+      "y": 0
+    },
+    "id": 1061,
+    "options": {
+      "code": {
+        "language": "plaintext",
+        "showLineNumbers": false,
+        "showMiniMap": false
+      },
+      "content": "<div style=\"display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; justify-content: center\">\n\n    <a href=\"/d/cfo1ecfa0xr7ka/cluster-nodearray-level-dashboard?orgId=1&${__url_time_range}&${cluster:queryparam}&${instance:queryparam}&${cpu:queryparam}&${gpu:queryparam}&${nodearray:queryparam}\" \n     style=\"\n       padding: 12px 24px;\n       background: #3b3f45;\n       color: white;\n       border-radius: 8px;\n       text-decoration: none;\n       font-weight: 500;\n       box-shadow: 0 2px 6px rgba(0,0,0,0.2);\n       transition: all 0.2s ease;\n     \">\n    Cluster Health Metrics\n  </a>\n  <a href=\"/d/cfo8q764mf8qoa/gpu-device-metrics-dashboard?orgId=1&${__url_time_range}&${cluster:queryparam}&${instance:queryparam}&${cpu:queryparam}&${gpu:queryparam}&${nodearray:queryparam}\" \n     style=\"\n       padding: 12px 24px;\n       background: #3b3f45;\n       color: white;\n       border-radius: 8px;\n       text-decoration: none;\n       font-weight: 500;\n       box-shadow: 0 2px 6px rgba(0,0,0,0.2);\n       transition: all 0.2s ease;\n     \">\n    GPU Health Metrics\n  </a>\n\n  <a href=\"/d/cfo8sjwnbuv40c/node-level-health-dashboard?orgId=1&${__url_time_range}&${cluster:queryparam}&${instance:queryparam}&${cpu:queryparam}&${gpu:queryparam}&${nodearray:queryparam}\" \n     style=\"\n       padding: 12px 24px;\n       background: #3b3f45;\n       color: white;\n       border-radius: 8px;\n       text-decoration: none;\n       font-weight: 500;\n       box-shadow: 0 2px 6px rgba(0,0,0,0.2);\n       transition: all 0.2s ease;\n     \">\n    Node Health Metrics\n  </a>\n\n</div>",
+      "mode": "html"
+    },
+    "pluginVersion": "11.6.9",
+    "title": "",
+    "transparent": true,
+    "type": "text"
+  }
+}

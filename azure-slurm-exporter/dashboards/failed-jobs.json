@@ -24,12 +24,42 @@
   "links": [],
   "panels": [
     {
+      "gridPos": {
+        "h": 3,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1056,
+      "libraryPanel": {
+        "name": "Azslurm Dashboard Buttons",
+        "uid": "efoq5r3c8tzb4e"
+      },
+      "title": "",
+      "type": "library-panel-ref"
+    },
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 1058,
+      "libraryPanel": {
+        "name": "Node Dashboard buttons",
+        "uid": "cfo8upic84lxce"
+      },
+      "title": "",
+      "type": "library-panel-ref"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 3
       },
       "id": 1047,
       "panels": [],
@@ -87,21 +117,21 @@
       },
       "gridPos": {
         "h": 11,
-        "w": 16,
+        "w": 24,
         "x": 0,
-        "y": 1
+        "y": 4
       },
       "id": 1054,
       "options": {
-        "cellHeight": "lg",
+        "cellHeight": "sm",
         "footer": {
           "countRows": true,
-          "enablePagination": false,
+          "enablePagination": true,
           "fields": "",
           "reducer": [
             "count"
           ],
-          "show": true
+          "show": false
         },
         "frameIndex": 1,
         "showHeader": true,
@@ -156,6 +186,7 @@
               "instance": true,
               "job": true,
               "microsoft.amwresourceid": true,
+              "nodearray": true,
               "physical_host": true,
               "start_datetime hpc": true,
               "starttime": true,
@@ -170,11 +201,12 @@
               "exit_code": 7,
               "instance": 8,
               "job": 9,
-              "jobid": 3,
-              "jobname": 4,
+              "jobid": 2,
+              "jobname": 3,
               "microsoft.amwresourceid": 14,
+              "nodearray": 17,
               "nodelist": 5,
-              "partition": 2,
+              "partition": 4,
               "physical_host": 10,
               "reason": 15,
               "starttime": 12,
@@ -198,7 +230,7 @@
         "h": 2,
         "w": 16,
         "x": 0,
-        "y": 12
+        "y": 15
       },
       "id": 1055,
       "options": {
@@ -214,6 +246,21 @@
       "title": "",
       "transparent": true,
       "type": "text"
+    },
+    {
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 1057,
+      "libraryPanel": {
+        "name": "Azslurm Dashboard README",
+        "uid": "bfoq4o6ke718gf"
+      },
+      "title": "README",
+      "type": "library-panel-ref"
     }
   ],
   "preload": false,

@@ -1,0 +1,1030 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "$$hashKey": "object:1345",
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Slurm Cluster Running Jobs, Failed Jobs, Node Status and Partition Specs Dashboard",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 13,
+        "x": 0,
+        "y": 0
+      },
+      "id": null,
+      "libraryPanel": {
+        "name": "Azslurm Dashboard Buttons",
+        "uid": "efoq5r3c8tzb4e"
+      },
+      "title": "",
+      "type": "library-panel-ref"
+    },
+    {
+      "gridPos": {
+        "h": 3,
+        "w": 11,
+        "x": 13,
+        "y": 0
+      },
+      "id": null,
+      "libraryPanel": {
+        "name": "Node Dashboard buttons",
+        "uid": "cfo8upic84lxce"
+      },
+      "title": "",
+      "type": "library-panel-ref"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 1040,
+      "panels": [],
+      "title": "Extra Cluster Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "null+nan",
+                "result": {
+                  "index": 0,
+                  "text": "No jobs are currently running "
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "noValue": "No jobs running within time range",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 1047,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": true,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": false
+        },
+        "frameIndex": 3,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Number of Allocated Nodes"
+          }
+        ]
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "topk(10,squeue_job_nodes_allocated{cluster=\"$cluster\",partition=~\"$partition\"})",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Running Jobs between ${__from} and ${__to}",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {}
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "Number of Allocated Nodes"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "__name__": true,
+              "cluster": true,
+              "instance": true,
+              "job": true,
+              "microsoft.amwresourceid": true,
+              "nodearray": true,
+              "physical_host": true,
+              "state": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #A": 14,
+              "__name__": 0,
+              "cluster": 1,
+              "instance": 2,
+              "job": 3,
+              "job_id": 4,
+              "job_name": 5,
+              "microsoft.amwresourceid": 6,
+              "nodearray": 7,
+              "nodelist": 9,
+              "partition": 8,
+              "physical_host": 10,
+              "start_time": 11,
+              "state": 12,
+              "subscription": 13
+            },
+            "renameByName": {
+              "Trend #A": "Number of Allocated Nodes"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false,
+            "minWidth": 150
+          },
+          "mappings": [],
+          "noValue": "No failed jobs within time range",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reason"
+            },
+            "properties": [
+              {
+                "id": "noValue"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 1064,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": true,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "count"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sacct_failed_jobs{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset -5m",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Failed Jobs between $__from and $__to",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {
+            "B": {
+              "stat": "lastNotNull"
+            }
+          }
+        },
+        {
+          "id": "labelsToFields",
+          "options": {
+            "keepLabels": [
+              "exit_code",
+              "partition",
+              "state"
+            ],
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Trend #B": true,
+              "__name__": true,
+              "cluster": true,
+              "endtime": true,
+              "instance": true,
+              "job": true,
+              "microsoft.amwresourceid": true,
+              "nodearray": true,
+              "physical_host": true,
+              "start_datetime hpc": true,
+              "starttime": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #B": 16,
+              "__name__": 0,
+              "cluster": 1,
+              "endtime": 13,
+              "exit_code": 7,
+              "instance": 8,
+              "job": 9,
+              "jobid": 2,
+              "jobname": 3,
+              "microsoft.amwresourceid": 14,
+              "nodearray": 17,
+              "nodelist": 5,
+              "partition": 4,
+              "physical_host": 10,
+              "reason": 15,
+              "starttime": 12,
+              "state": 6,
+              "subscription": 11
+            },
+            "renameByName": {
+              "Trend #A": "# of Failed Jobs"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "IDLE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "ALLOCATED"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DRAINING"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DOWN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MAINTENANCE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "UNKNOWN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ff00f6",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TOTAL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "transparent",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "POWERING UP"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "POWERED DOWN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#767472",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MIXED"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DRAIN"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "partition"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 219
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "nodelist"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 229
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reason"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 311
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_list"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 452
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 245
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": []
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 1065,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 2,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "node_list"
+          }
+        ]
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"}",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Nodelist by State",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {}
+        },
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "__name__": true,
+              "cluster": true,
+              "instance": true,
+              "job": true,
+              "microsoft.amwresourceid": true,
+              "nodearray": true,
+              "physical_host": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #A": 10,
+              "__name__": 1,
+              "cluster": 2,
+              "instance": 3,
+              "job": 4,
+              "node_list": 6,
+              "partition": 5,
+              "physical_host": 7,
+              "reason": 8,
+              "state": 0,
+              "subscription": 9
+            },
+            "renameByName": {
+              "Trend #A": "count",
+              "Trend #B": "count"
+            }
+          }
+        },
+        {
+          "id": "configFromData",
+          "options": {
+            "applyTo": {
+              "id": "byName"
+            },
+            "configRefId": "B",
+            "mappings": [
+              {
+                "fieldName": "node_list",
+                "handlerKey": "unit",
+                "reducerId": "first"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${promDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": false,
+            "inspect": false,
+            "minWidth": 150
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 1043,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "nodelist"
+          }
+        ]
+      },
+      "pluginVersion": "11.6.9",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${promDatasource}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "azslurm_partition_info{cluster=\"$cluster\",partition=~\"$partition\"}",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Partition Specs",
+      "transformations": [
+        {
+          "id": "timeSeriesTable",
+          "options": {
+            "A": {
+              "stat": "lastNotNull",
+              "timeField": "Time"
+            }
+          }
+        },
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "cluster": true,
+              "instance": true,
+              "job": true,
+              "microsoft.amwresourceid": true,
+              "nodearray": true,
+              "physical_host": true,
+              "subscription": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Trend #A": 12,
+              "__name__": 0,
+              "azure_count": 13,
+              "cluster": 1,
+              "instance": 2,
+              "job": 3,
+              "memory_gib": 11,
+              "ncpus": 9,
+              "ngpus": 10,
+              "nodelist": 8,
+              "partition": 4,
+              "physical_host": 5,
+              "subscription": 6,
+              "vm_size": 7
+            },
+            "renameByName": {
+              "Metric": "",
+              "Trend #A": "Available Count",
+              "available_azure_quota": "Available Azure Quota",
+              "azure_count": "Available Azure Count",
+              "memory_gib": "Memory (GiB)",
+              "ncpus": "CPUs",
+              "ngpus": "GPUs",
+              "node_list": "Node List",
+              "partition": "Partition",
+              "vm_size": "VM Size"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 1063,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "**Note:** Failed Jobs panel requires Slurm accounting to be enabled in the cluster. Panel will not populate if accounting is disabled.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.6.9",
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 1053,
+      "libraryPanel": {
+        "name": "Azslurm Dashboard README",
+        "uid": "bfoq4o6ke718gf"
+      },
+      "title": "README",
+      "type": "library-panel-ref"
+    }
+  ],
+  "preload": false,
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "cbbe2034-c78b-4e9b-89b4-8b78530247e5",
+          "value": "cbbe2034-c78b-4e9b-89b4-8b78530247e5"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${promDatasource}"
+        },
+        "definition": "label_values(jetpack_cluster_info,subscription)",
+        "includeAll": false,
+        "label": "Subscription",
+        "name": "Subscription",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(jetpack_cluster_info,subscription)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "Managed_Prometheus_ccw-mon-xfnnjso7smaw6",
+          "value": "ccw-mon-xfnnjso7smaw6"
+        },
+        "includeAll": false,
+        "label": "Prometheus Data Source",
+        "name": "promDatasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${promDatasource}"
+        },
+        "definition": "label_values(azslurm_partition_info, partition)",
+        "includeAll": true,
+        "multi": true,
+        "name": "partition",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(azslurm_partition_info, partition)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "azcyclecloudwesteu-rg/mon-test",
+          "value": "azcyclecloudwesteu-rg/mon-test"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${promDatasource}"
+        },
+        "definition": "label_values(jetpack_cluster_info, cluster)",
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "qryType": 5,
+          "query": "label_values(jetpack_cluster_info, cluster)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "AzSlurm Extra Details Dashboard",
+  "uid": "afoq4ywq4lj40f",
+  "version": 1
+}
