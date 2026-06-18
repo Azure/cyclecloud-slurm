@@ -83,17 +83,25 @@ if [[ "$INSIDERS" == "True" ]]; then
     REPO_GROUP="insiders"
 fi
 
-if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
-    # microsoft-prod no longer installs GPG key in /etc/apt/trusted.gpg.d
-    # so we need to use signed-by instead to specify the key for Ubuntu 24.04 onwards
-    echo "deb [arch=$arch signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/repos/$REPO/ $REPO_GROUP main" > /etc/apt/sources.list.d/slurm.list
-else
-    if [ "$arch" == "arm64" ]; then
+if [ "$arch" == "arm64" ] && [[ ! $UBUNTU_VERSION =~ ^24\.* ]]; then
         echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
         exit 1
-    fi
-    echo "deb [arch=$arch] https://packages.microsoft.com/repos/$REPO/ $REPO_GROUP main" > /etc/apt/sources.list.d/slurm.list
 fi
+
+# Ensure the Microsoft GPG key is at the path expected by signed-by.
+# HPC images ship the key in /etc/apt/trusted.gpg.d/ rather than /usr/share/keyrings/.
+# Marketplace / CIS-hardened images may not have it at all, so download it.
+if [ ! -f /usr/share/keyrings/microsoft-prod.gpg ]; then
+    if [ -f /etc/apt/trusted.gpg.d/microsoft-prod.gpg ]; then
+        cp -p /etc/apt/trusted.gpg.d/microsoft-prod.gpg /usr/share/keyrings/microsoft-prod.gpg
+    else
+        curl -sSfL -O https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb
+        dpkg -i packages-microsoft-prod.deb
+        rm packages-microsoft-prod.deb
+    fi
+fi
+
+echo "deb [arch=$arch signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/repos/$REPO/ $REPO_GROUP main" > /etc/apt/sources.list.d/slurm.list
 
 echo "\
 Package: slurm, slurm-*
@@ -103,14 +111,6 @@ Pin-Priority: 990
 Package: slurm, slurm-*
 Pin: origin *ubuntu.com*
 Pin-Priority: -1" > /etc/apt/preferences.d/slurm-repository-pin-990
-
-## This package is pre-installed in all hpc images used by cyclecloud, but if customer wants to
-## use generic ubuntu marketplace image then this package sets up the right gpg keys for PMC.
-if [ ! -e /etc/apt/sources.list.d/microsoft-prod.list ]; then
-    curl -sSL -O https://packages.microsoft.com/config/ubuntu/$UBUNTU_VERSION/packages-microsoft-prod.deb
-    dpkg -i packages-microsoft-prod.deb
-    rm packages-microsoft-prod.deb
-fi
 
 slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-sview"
 sched_packages="slurm-smd-slurmctld slurm-smd-slurmdbd slurm-smd-slurmrestd"
