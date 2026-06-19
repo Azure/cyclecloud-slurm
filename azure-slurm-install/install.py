@@ -307,7 +307,7 @@ def fix_permissions(s: InstallSettings) -> None:
     )
 
     ilib.directory(
-        "/run/munge", owner=s.munge_user, group=s.munge_grp, mode=755, recursive=True
+        "/run/munge", owner=s.munge_user, group=s.munge_grp, mode=755
     )
 
     ilib.directory(f"{s.config_dir}/munge", owner=s.munge_user, group=s.munge_grp, mode=700)
