@@ -67,12 +67,22 @@ fi
 escaped_cluster_name=$(python3 -c "import re; print(re.sub('[^a-zA-Z0-9-]', '-', '$CLUSTER_NAME').lower())")
 
 config_dir=/sched/$escaped_cluster_name
-azslurm initconfig --username $USERNAME \
-                --password $PASSWORD \
-                --url      $URL \
-                --cluster-name $CLUSTER_NAME\
-                --config-dir $config_dir \
-                --accounting-subscription-id $ACCOUNTING_SUBSCRIPTION_ID \
+tmp_autoscale_json=$(mktemp "$INSTALL_DIR/.autoscale.json.XXXXXX")
+cleanup() {
+    rm -f "$tmp_autoscale_json"
+}
+trap cleanup EXIT
+
+# Ensure the generated credential file is never world-readable while being created.
+( umask 077
+azslurm initconfig --username "$USERNAME" \
+                --password "$PASSWORD" \
+                --url "$URL" \
+                --cluster-name "$CLUSTER_NAME" \
+                --config-dir "$config_dir" \
+                --accounting-subscription-id "$ACCOUNTING_SUBSCRIPTION_ID" \
                 --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
-                --cost-cache-root $INSTALL_DIR/.cache \
-                > $INSTALL_DIR/autoscale.json
+                --cost-cache-root "$INSTALL_DIR/.cache" \
+                > "$tmp_autoscale_json" )
+
+install -o root -g root -m 600 "$tmp_autoscale_json" "$INSTALL_DIR/autoscale.json"
