@@ -74,8 +74,7 @@ cleanup() {
 trap cleanup EXIT
 
 # Ensure the generated credential file is never world-readable while being created.
-orig_umask=$(umask)
-umask 077
+( umask 077
 azslurm initconfig --username "$USERNAME" \
                 --password "$PASSWORD" \
                 --url "$URL" \
@@ -84,7 +83,6 @@ azslurm initconfig --username "$USERNAME" \
                 --accounting-subscription-id "$ACCOUNTING_SUBSCRIPTION_ID" \
                 --default-resource '{"select": {}, "name": "slurm_gpus", "value": "node.gpu_count"}' \
                 --cost-cache-root "$INSTALL_DIR/.cache" \
-                > "$tmp_autoscale_json"
-umask "$orig_umask"
+                > "$tmp_autoscale_json" )
 
 install -m 600 "$tmp_autoscale_json" "$INSTALL_DIR/autoscale.json"
