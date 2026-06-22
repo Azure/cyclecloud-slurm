@@ -9,7 +9,7 @@ SPEC_FILE_ROOT="$script_dir/../files"
 source "$SPEC_FILE_ROOT/common.sh"
 
 monitoring_enabled=$(jetpack config cyclecloud.monitoring.enabled False)
-exporter_pkg=azure_slurm_exporter-0.1.0.tar.gz
+exporter_pkg=azure_slurm_exporter-0.2.0.tar.gz
 slurm_project_name=$(jetpack config slurm.project_name slurm)
 VENV=/opt/azurehpc/slurm/venv
 
