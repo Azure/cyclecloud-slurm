@@ -39,7 +39,7 @@ from . import cost
 from . import topology
 
 
-VERSION = "4.0.8"
+VERSION = "4.0.9"
 
 
 def csv_list(x: str) -> List[str]:

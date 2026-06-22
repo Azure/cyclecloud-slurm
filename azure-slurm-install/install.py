@@ -10,7 +10,7 @@ import installlib as ilib
 from typing import Dict, Optional
 
 # Combined Certs needed to connect to Azure Database for MySQL Server
-COMBINED_CERTS = "AzureCA_4.0.8.pem"
+COMBINED_CERTS = "AzureCA_4.0.9.pem"
 
 class InstallSettings:
     def __init__(self, config: Dict, platform_family: str, mode: str) -> None:

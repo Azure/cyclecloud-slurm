@@ -1,6 +1,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
-default[:slurm][:autoscale_version] = "4.0.8"
+default[:slurm][:autoscale_version] = "4.0.9"
 default[:slurm][:version] = "23.11.9-1"
 default[:slurm][:user][:name] = 'slurm'
 default[:slurm][:cyclecloud_api] = "cyclecloud_api-8.4.1-py2.py3-none-any.whl"
@@ -36,7 +36,7 @@ end
 default[:munge][:user][:name] = 'munge'
 default[:munge][:user][:uid] = 11101
 default[:munge][:user][:gid] = 11101
-# Time between a suspend call and when that node can be used again - i.e. 10 minutes to shutdown 
+# Time between a suspend call and when that node can be used again - i.e. 10 minutes to shutdown
 default[:slurm][:suspend_timeout] = 600
 # Boot timeout
 default[:slurm][:resume_timeout] = 1800
