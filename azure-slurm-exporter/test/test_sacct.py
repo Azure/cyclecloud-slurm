@@ -43,7 +43,7 @@ class TestSacctParseOutput:
         samples_by_keys = {}
         completed_samples_by_jobid = {}
         metrics = sacct.export_metrics()
-        assert len(metrics) == 3
+        assert len(metrics) == 2
 
         for metric in metrics:
             for family in metric.collect():
@@ -52,7 +52,7 @@ class TestSacctParseOutput:
                     assert "exit_code" in s.labels
                     assert "reason" in s.labels
                     assert "state" in s.labels
-                    if family.name == "sacct_completed_jobs":
+                    if family.name == "sacct_jobs":
                         completed_samples_by_jobid[s.labels["jobid"]] = s.value
                     elif family.name == "sacct_terminal_jobs":
                         samples_by_keys[(s.labels["partition"], s.labels["state"], s.labels["reason"], s.labels["exit_code"])] = s.value
@@ -124,16 +124,14 @@ class TestSacctExportMetrics:
         return sacct
 
     def test_export_metrics_returns_counter(self, sacct):
-        """Test export_metrics returns a Counter and the failed/completed Gauges."""
+        """Test export_metrics returns terminal counter and per-job gauge metrics."""
         sacct.cached_output["sacct_metrics"] = sacct.parse_output(b"")
         metrics = sacct.export_metrics()
-        assert len(metrics) == 3
+        assert len(metrics) == 2
         assert isinstance(metrics[0], Counter)
         assert isinstance(metrics[1], Gauge)
-        assert isinstance(metrics[2], Gauge)
         family_names = {f.name for m in metrics for f in m.collect()}
-        assert "sacct_failed_jobs" in family_names
-        assert "sacct_completed_jobs" in family_names
+        assert "sacct_jobs" in family_names
 
     def test_export_metrics_same_reference(self, sacct):
         """Test export_metrics returns consistent references."""

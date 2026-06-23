@@ -116,7 +116,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "sacct_failed_jobs{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset -5m",
+          "expr": "sacct_jobs{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset -5m",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",

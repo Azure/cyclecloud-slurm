@@ -77,11 +77,9 @@ class Sacct(BaseCollector):
     def parse_output(self, stdout) -> List[Union[Counter,Gauge]]:
         """
         Parse sacct command output and increment terminal jobs metric for each job in the output to describe total number of finished jobs by partition,
-        exit_code, reason, and state as well as return failed and completed jobs gauges describing each job that failed and completed within the time interval of the query.
+        exit_code, reason, and state as well as return terminal jobs gauges describing each job that failed and completed within the time interval of the query.
         """
-        sacct_failed_jobs = Gauge("sacct_failed_jobs","Per-job indicator for failed terminal jobs in the query interval (value is always `1`)",
-                                    ["jobid","jobname","nodelist","partition", "exit_code","reason","state", "starttime","endtime"], registry=None)
-        sacct_completed_jobs = Gauge("sacct_completed_jobs","Per-job indicator for completed terminal jobs in the query interval (value is always `1`)",
+        sacct_jobs = Gauge("sacct_jobs","Per-job indicator for all terminal jobs in the query interval (value is always `1`)",
                                     ["jobid","jobname","nodelist","partition", "exit_code","reason","state", "starttime","endtime"], registry=None)
 
         lines = stdout.decode().strip().splitlines()
@@ -95,31 +93,19 @@ class Sacct(BaseCollector):
                 reason=reason,
                 state=row.state.lower()).inc()
 
-            if row.state.lower() != "completed":
-                sacct_failed_jobs.labels(
-                    jobid=row.jobid,
-                    jobname=row.jobname,
-                    nodelist=row.nodelist,
-                    partition=row.partition,
-                    exit_code=row.exitcode,
-                    reason=reason,
-                    state=row.state.lower(),
-                    starttime=row.start,
-                    endtime=row.end).set(1)
-            else:
-                sacct_completed_jobs.labels(
-                    jobid=row.jobid,
-                    jobname=row.jobname,
-                    nodelist=row.nodelist,
-                    partition=row.partition,
-                    exit_code=row.exitcode,
-                    reason=reason,
-                    state=row.state.lower(),
-                    starttime=row.start,
-                    endtime=row.end).set(1)
+            sacct_jobs.labels(
+                jobid=row.jobid,
+                jobname=row.jobname,
+                nodelist=row.nodelist,
+                partition=row.partition,
+                exit_code=row.exitcode,
+                reason=reason,
+                state=row.state.lower(),
+                starttime=row.start,
+                endtime=row.end).set(1)
 
 
-        return [self.sacct_terminal_jobs, sacct_failed_jobs, sacct_completed_jobs]
+        return [self.sacct_terminal_jobs, sacct_jobs]
 
     async def sacct_query(self) -> None:
         """
