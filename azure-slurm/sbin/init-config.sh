@@ -85,4 +85,4 @@ azslurm initconfig --username "$USERNAME" \
                 --cost-cache-root "$INSTALL_DIR/.cache" \
                 > "$tmp_autoscale_json" )
 
-install -o slurm -g slurm -m 600 "$tmp_autoscale_json" "$INSTALL_DIR/autoscale.json"
+install -o root -g root -m 600 "$tmp_autoscale_json" "$INSTALL_DIR/autoscale.json"
