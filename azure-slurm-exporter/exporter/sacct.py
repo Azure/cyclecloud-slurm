@@ -46,6 +46,8 @@ class Sacct(BaseCollector):
         self.default_output_fmt = "jobid,jobname,nodelist,nnodes,partition,exitcode,derivedexitcode,state,user,start,submit,end,reason"
         self.sacct_output = namedtuple("sacct_output", self.default_output_fmt)
         self.terminal_states = "completed,failed,cancelled,timeout,node_fail,preempted,out_of_memory,deadline,boot_fail"
+        self.failed_states = "failed,node_fail,out_of_memory,boot_fail"
+        self.cardinality_bound = 20
         self.starttime = starttime if starttime is not None else datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         self.endtime = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         self.default_options = ["-P" ,"-n", "-o", self.default_output_fmt, "-s", self.terminal_states, "--allocations" ]
@@ -74,14 +76,51 @@ class Sacct(BaseCollector):
         """
         return self.cached_output["sacct_metrics"]
 
+    def _node_count(self, row) -> int:
+        """Number of nodes allocated to a job, used to rank failed jobs. Defaults to 0 when unparseable."""
+        try:
+            return int(row.nnodes)
+        except (ValueError, TypeError):
+            return 0
+
     def parse_output(self, stdout) -> List[Union[Counter,Gauge]]:
         """
-        Parse sacct command output and increment terminal jobs metric for each job in the output to describe total number of finished jobs by partition,
-        exit_code, reason, and state as well as return failed jobs gauge describing each job that failed within the time interval of the query.
+        Parse sacct output into a terminal jobs counter covering every finished job and a per-job
+        gauge for failed jobs.
+
+        TODO: ###### MUST REMOVE ASAP ######.
+        This is a hack to mathematically bound the failed jobs exported. Any job can finish in a
+        non-COMPLETED state, so the "failed" set is otherwise unbounded. To bound it:
+        1) The failed jobs gauge is restricted to genuine failure states (self.failed_states). When more
+           failed jobs than the bound are present, the jobs allocated the most nodes are kept, since larger
+           failures consume the most resources and are the most useful to drill into.
+        2) The failed jobs exported per interval is capped at self.cardinality_bound. Upper bounds below
+           assume cardinality_bound = 20 and interval = 5 minutes.
+
+           Each job is one unique series keyed by 3 cardinality-exploding labels: jobid, jobname, nodelist.
+           The rest (partition, exit_code, reason, state) are low-cardinality. starttime/endtime are the
+           collector's query-window bounds (one value per interval, shared by all jobs).
+           NOTE: the original intent of the developer seems to be to emit the job's own start/end timestamps but instead they are emitting
+            Query window's starttime and endtime. 
+            Doing the correct thing would actually add 2 more exploding labels. We intentionally are choosing to KEEP THIS BUG.
+
+           Series index: <= 20 new series every 5 minutes. A series stays "active" only while ingested in
+               the last ~12 hours, bounding active series from this gauge to 20 * (12h / 5min) = 2,880 per
+               12-hour window.
+           Inverted label index: <= 3 exploding labels * 20 jobs + 2 unique timestamps (query window timestamps) = 62 new index entries every 5 minutes,
+               i.e. 62 * 144 = 8928 within the 12-hour active window.
+
+        Both series and their label-index entries are retained in the metrics backend for up to 18 months
+        with no way to purge. This bounds the 12-hour active-series window, but long-term storage still grows
+        unbounded, capped only by the rolling 18-month retention. Source: https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/service-limits#prometheus-metrics
+        ## TODO: This entire section NEEDS TO BE GONE BY NEXT RELEASE.
         """
-        sacct_failed_jobs = Gauge("sacct_failed_jobs","Number of failed slurm jobs in an interval",
+        sacct_failed_jobs = Gauge("sacct_failed_jobs",
+                                    f"Per-job indicator (value is always 1) for up to {self.cardinality_bound} failed jobs (ranked by node count) in the query interval",
                                     ["jobid","jobname","nodelist","partition", "exit_code","reason","state", "starttime","endtime"], registry=None)
 
+        failed_states = set(self.failed_states.split(","))
+        failed_rows = []
         lines = stdout.decode().strip().splitlines()
         log.debug(f"Number of jobs:{len(lines)}")
         lines_iter = (line.split("|") for line in lines)
@@ -93,18 +132,23 @@ class Sacct(BaseCollector):
                 reason=reason,
                 state=row.state.lower()).inc()
 
-            if row.state.lower() != "completed":
-                sacct_failed_jobs.labels(
-                    jobid=row.jobid,
-                    jobname=row.jobname,
-                    nodelist=row.nodelist,
-                    partition=row.partition,
-                    exit_code=row.exitcode,
-                    reason=reason,
-                    state=row.state.lower(),
-                    starttime=self.starttime,
-                    endtime=self.endtime).set(1)
+            if row.state.lower() in failed_states:
+                failed_rows.append(row)
 
+        top_failed_rows = sorted(failed_rows, key=self._node_count, reverse=True)[:self.cardinality_bound]
+        log.debug(f"Number of failed jobs: {len(failed_rows)}, exporting top {len(top_failed_rows)} by node count")
+        for row in top_failed_rows:
+            reason = self.SLURM_EXIT_CODE_MAPPING.get(row.exitcode, "")
+            sacct_failed_jobs.labels(
+                jobid=row.jobid,
+                jobname=row.jobname,
+                nodelist=row.nodelist,
+                partition=row.partition,
+                exit_code=row.exitcode,
+                reason=reason,
+                state=row.state.lower(),
+                starttime=self.starttime,
+                endtime=self.endtime).set(1)
 
         return [self.sacct_terminal_jobs, sacct_failed_jobs]
 

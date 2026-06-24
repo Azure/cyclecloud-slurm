@@ -82,6 +82,66 @@ class TestSacctParseOutput:
                 for sample in family.samples:
                     assert sample.value == 0.0
 
+    @staticmethod
+    def _failed_gauge_samples(metrics):
+        """Collect all samples belonging to the sacct_failed_jobs gauge."""
+        return [
+            s
+            for metric in metrics
+            for family in metric.collect()
+            if family.name == "sacct_failed_jobs"
+            for s in family.samples
+        ]
+
+    def test_failed_gauge_only_includes_failure_states(self, sacct):
+        """Only genuine failure states are exported per-job; cancelled/timeout are counted but not in the gauge."""
+        stdout = (
+            b"1|job1|node1|1|batch|0:0|0:0|CANCELLED|u1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+            b"2|job2|node2|1|batch|1:0|0:0|TIMEOUT|u2|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+            b"3|job3|node3|1|batch|1:0|0:0|FAILED|u3|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+            b"4|job4|node4|1|batch|0:125|0:0|OUT_OF_MEMORY|u4|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+        )
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
+        metrics = sacct.export_metrics()
+        exported_states = {s.labels["state"] for s in self._failed_gauge_samples(metrics)}
+        assert exported_states == {"failed", "out_of_memory"}
+
+    def test_failed_gauge_capped_at_cardinality_bound(self, sacct):
+        """No more than cardinality_bound failed jobs are exported in a single interval."""
+        sacct.cardinality_bound = 20
+        lines = [
+            b"%d|job%d|node%d|1|batch|1:0|0:0|FAILED|user|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+            % (i, i, i)
+            for i in range(50)
+        ]
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(b"".join(lines))
+        metrics = sacct.export_metrics()
+        assert len(self._failed_gauge_samples(metrics)) == 20
+
+    def test_failed_gauge_keeps_top_jobs_by_node_count(self, sacct):
+        """When over the bound, the failed jobs allocated the most nodes are kept."""
+        sacct.cardinality_bound = 2
+        stdout = (
+            b"1|small|node1|1|batch|1:0|0:0|FAILED|u|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+            b"2|big|node[1-10]|10|batch|1:0|0:0|FAILED|u|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+            b"3|medium|node[1-5]|5|batch|1:0|0:0|FAILED|u|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+        )
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
+        metrics = sacct.export_metrics()
+        exported_jobids = {s.labels["jobid"] for s in self._failed_gauge_samples(metrics)}
+        assert exported_jobids == {"2", "3"}
+
+    def test_failed_gauge_uses_query_window_timestamps(self, sacct):
+        """starttime/endtime are the collector's query window, not the job's start/end (intentional)."""
+        sacct.starttime = "2024-01-01T00:00:00"
+        sacct.endtime = "2024-01-01T00:05:00"
+        stdout = b"1001|job1|node1|1|batch|1:0|0:0|FAILED|user1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"
+        sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
+        samples = self._failed_gauge_samples(sacct.export_metrics())
+        assert len(samples) == 1
+        assert samples[0].labels["starttime"] == "2024-01-01T00:00:00"
+        assert samples[0].labels["endtime"] == "2024-01-01T00:05:00"
+
     def test_parse_output_mixed_partitions(self, sacct):
         """Test parse_output correctly counts jobs across partitions."""
         stdout = (

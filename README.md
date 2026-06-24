@@ -478,7 +478,7 @@ Log can be found under `/var/log/azslurm-exporter.log`
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `sacct_terminal_jobs_total` | Counter | `partition`, `exit_code`, `reason`, `state`| Cumulative count of completed/failed/cancelled jobs |
-| `sacct_failed_jobs` | Gauge | `jobid`, `jobname`, `nodelist`, `partition`, `exit_code`, `reason`, `state`, `starttime`, `endtime` | Per-job indicator for all non-completed terminal jobs in the query interval (value is always `1`) |
+| `sacct_failed_jobs` | Gauge | `jobid`, `jobname`, `nodelist`, `partition`, `exit_code`, `reason`, `state`, `starttime`, `endtime` | Per-job indicator (value is always `1`) for failed jobs in the query interval. Restricted to genuine failure states (`failed`, `node_fail`, `out_of_memory`, `boot_fail`) and capped at `cardinality_bound` (default 20) series per interval, keeping the highest node-count jobs, to bound metrics-backend cardinality. `starttime`/`endtime` are the query window. |
 
 Terminal states tracked: `completed`, `failed`, `cancelled`, `timeout`, `node_fail`, `preempted`, `out_of_memory`, `deadline`, `boot_fail`. Exit codes are mapped to human-readable reasons (e.g. `137:0` → `SIGKILL - Force killed`).
 
