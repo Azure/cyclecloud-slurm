@@ -85,4 +85,6 @@ azslurm initconfig --username "$USERNAME" \
                 --cost-cache-root "$INSTALL_DIR/.cache" \
                 > "$tmp_autoscale_json" )
 
-install -o slurm -g slurm -m 600 "$tmp_autoscale_json" "$INSTALL_DIR/autoscale.json"
+slurm_username=$(/opt/cycle/jetpack/bin/jetpack config slurm.user.name slurm)
+slurm_groupname=$(/opt/cycle/jetpack/bin/jetpack config slurm.group.name slurm)
+install -o "$slurm_username" -g "$slurm_groupname" -m 600 "$tmp_autoscale_json" "$INSTALL_DIR/autoscale.json"
