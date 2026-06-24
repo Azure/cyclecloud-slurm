@@ -28,7 +28,10 @@ fi
 if [ -d "$LIBRARY_PANEL_FOLDER" ] && ls "$LIBRARY_PANEL_FOLDER"/*.json > /dev/null 2>&1; then
   GRAFANA_ENDPOINT=$(az grafana show -n $GRAFANA_NAME -g $RESOURCE_GROUP_NAME --query properties.endpoint -o tsv | tr -d '\r\n')
   for panel_file in "$LIBRARY_PANEL_FOLDER"/*.json; do
-    import_library_panel "$panel_file"
+    if ! import_library_panel "$panel_file"; then
+      echo "Failed to import library panel: $panel_file" >&2
+      exit 1
+    fi
   done
 fi
 
