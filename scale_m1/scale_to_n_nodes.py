@@ -27,6 +27,12 @@ from slurmcc.topology import output_block_nodelist
 from slurmcc import util as slutil
 
 
+# Number of nodes in a single rack. Racks are the unit of physical provisioning
+# for gb200/gb300 (gbx00) clusters; users may size requests in racks instead of
+# raw node counts.
+NODES_PER_RACK = 18
+
+
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging with both console and rotating file handlers."""
     logger = logging.getLogger()
@@ -199,9 +205,9 @@ class NodeScaler:
         self.reservation_name = reservation_name
         self.partition, self.reserved_nodes = parse_reservation(reservation_name, slurm_commands)
 
-    def round_up_to_multiple_of_18(self, number: int) -> int:
-        """Round up to nearest multiple of 18."""
-        return math.ceil(number / 18) * 18
+    def round_up_to_rack(self, number: int) -> int:
+        """Round up to the nearest whole rack (multiple of NODES_PER_RACK)."""
+        return math.ceil(number / NODES_PER_RACK) * NODES_PER_RACK
 
     def validate_nodes(self) -> None:
         cmd = f"sinfo -p {self.partition} -t powering_down,powering_up -h -o '%N'"
@@ -235,8 +241,8 @@ class NodeScaler:
             log.warning(f"No need to create any nodes {node_count} {len(current_healthy_set)}")
             return ""
 
-        # we need a multiple of 18 total nodes to be powered up (after considering powered and unhealthy)
-        new_powered_up_target = self.round_up_to_multiple_of_18(currently_powered_up_nodes + new_healthy_delta)
+        # we need a whole number of racks powered up (after considering powered and unhealthy)
+        new_powered_up_target = self.round_up_to_rack(currently_powered_up_nodes + new_healthy_delta)
         power_up_delta = new_powered_up_target - currently_powered_up_nodes
 
         # we can only power up reserved and powered down nodes
@@ -598,7 +604,65 @@ def parse_reservation(reservation_name: str, slurm_commands: SlurmCommands) -> T
     return partition, sorted_nodes(slurm_commands.show_hostnames(reserved_nodes_str))
 
 
-def main() -> None:
+def add_target_args(sub: argparse.ArgumentParser) -> None:
+    """Add the mutually exclusive node-count vs rack-count target args.
+
+    Exactly one of -n/--target-count or --racks must be supplied.
+    """
+    group = sub.add_mutually_exclusive_group(required=True)
+    group.add_argument('-n', '--target-count', type=int, default=None,
+                       help='Target number of nodes')
+    group.add_argument('--racks', type=int, default=None,
+                       help=f'Target number of racks (1 rack = {NODES_PER_RACK} nodes)')
+
+
+def resolve_target_count(args: argparse.Namespace) -> int:
+    """Resolve the effective target node count from --target-count or --racks.
+
+    Exits with a non-zero status if the resolved count is not a positive int.
+    """
+    if getattr(args, 'racks', None) is not None:
+        if args.racks <= 0:
+            log.error("Racks must be positive")
+            sys.exit(1)
+        return args.racks * NODES_PER_RACK
+    if args.target_count is None or args.target_count <= 0:
+        log.error("Target count must be positive")
+        sys.exit(1)
+    return args.target_count
+
+
+def resolve_overprovision(args: argparse.Namespace) -> int:
+    """Resolve the effective overprovision node count for power_up.
+
+    Supports --overprovision (nodes) or --overprovision-racks (racks). When
+    neither is supplied the overprovision buffer defaults to 0.
+    """
+    if getattr(args, 'overprovision_racks', None) is not None:
+        if args.overprovision_racks < 0:
+            log.error("Overprovision racks must be non-negative")
+            sys.exit(1)
+        return args.overprovision_racks * NODES_PER_RACK
+    overprovision = getattr(args, 'overprovision', None)
+    if overprovision is None:
+        return 0
+    if overprovision < 0:
+        log.error("Overprovision must be non-negative")
+        sys.exit(1)
+    return overprovision
+
+
+def mock_available() -> bool:
+    """Return True if the test-only `mock` module can be imported.
+
+    `mock.py` is a test fixture that ships only in the source tree, not in the
+    installed package, so the --mock option is hidden in production.
+    """
+    import importlib.util
+    return importlib.util.find_spec("mock") is not None
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description='Scale SLURM cluster to exactly N nodes with topology optimization.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -627,17 +691,18 @@ Examples:
 
     prune = subparser.add_parser("prune")
     prune.set_defaults(cmd="prune", overprovision=0, mock_topology=False, timeout=1800)
-    prune.add_argument('-n', '--target-count', type=int, required=True,
-                        help='Target number of nodes')
+    add_target_args(prune)
     prune.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
     prune.add_argument('--reservation', required=False, help="Optional: use an existing reservation",
                         default="scale_m1")
+    if mock_available():
+        prune.add_argument('--mock', dest='mock_topology', action='store_true',
+                        help='Use mock topology instead of querying the cluster (test only)')
     
     prune_now = subparser.add_parser("prune_now")
     prune_now.set_defaults(cmd="prune_now", overprovision=0, mock_topology=False, timeout=1800)
-    prune_now.add_argument('-n', '--target-count', type=int, required=True,
-                        help='Target number of nodes')
+    add_target_args(prune_now)
     prune_now.add_argument('--verbose', '-v', action='store_true',
                         help='Enable verbose logging')
     prune_now.add_argument('--reservation', required=False, help="Optional: use an existing reservation",
@@ -645,11 +710,13 @@ Examples:
     
     power_up = subparser.add_parser("power_up")
     power_up.set_defaults(cmd="power_up")
-    
-    power_up.add_argument('-n', '--target-count', type=int, required=True,
-                        help='Target number of nodes')
-    power_up.add_argument('-b', '--overprovision', type=int, required=True,
-                        help='Number of additional nodes to overprovision')
+    add_target_args(power_up)
+    overprovision_group = power_up.add_mutually_exclusive_group(required=False)
+    overprovision_group.add_argument('-b', '--overprovision', type=int, default=None,
+                        help='Number of additional nodes to overprovision (default: 0)')
+    overprovision_group.add_argument('--overprovision-racks', type=int, default=None,
+                        dest='overprovision_racks',
+                        help=f'Number of additional racks to overprovision (1 rack = {NODES_PER_RACK} nodes)')
     power_up.add_argument('--reservation', required=False, help="Optional: use an existing reservation",
                         default="scale_m1")
     power_up.add_argument('--verbose', '-v', action='store_true',
@@ -657,6 +724,11 @@ Examples:
     power_up.add_argument('--mock-topology', '-m', action='store_true',
                         help='Enable mock topology for testing')
 
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
 
     args = parser.parse_args()
 
@@ -671,14 +743,9 @@ Examples:
         create_reservation(args.reservation, args.partition, slurm_commands, args.filter_states)
         return
     
-    # Validate arguments
-    if args.target_count <= 0:
-        log.error("Target count must be positive")
-        sys.exit(1)
-
-    if args.overprovision < 0:
-        log.error("Overprovision must be non-negative")
-        sys.exit(1)
+    # Resolve racks/nodes inputs into effective node counts.
+    args.target_count = resolve_target_count(args)
+    args.overprovision = resolve_overprovision(args)
 
     azslurm_topology: AzslurmTopology
     if args.mock_topology:
