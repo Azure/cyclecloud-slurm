@@ -166,7 +166,11 @@ def execute() -> None:
     _add("sbin/suspend_program.sh", "sbin/suspend_program.sh")
     _add("sbin/get_acct_info.sh", "sbin/get_acct_info.sh")
     _add("logging.conf", "conf/logging.conf")
-    
+    # scale_m1 is the InterconnectGroups (gbx00) scaling tool. It is a sibling
+    # project of azure-slurm and ships only its runtime entrypoint (mock.py is
+    # test-only and intentionally excluded). It runs under the azure-slurm venv.
+    _add("scale_m1/scale_to_n_nodes.py", "../scale_m1/scale_to_n_nodes.py", mode=0o100755)
+
 
 
 if __name__ == "__main__":

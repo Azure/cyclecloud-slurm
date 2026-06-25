@@ -16,12 +16,13 @@ Slurm is a highly configurable open source workload manager. See the [Slurm proj
     8. [Slurm Job Accounting](#slurm-job-accounting)
         1. [Cost Reporting](#cost-reporting)
     9. [Topology](#topology)
-    10. [GB200/GB300 IMEX Support](#gb200gb300-imex-support)
-    11. [Setting KeepAlive in CycleCloud](#setting-keepalive)
-    12. [Custom Scheduler Names With High-Availability](#custom-scheduler-names-with-high-availability)
-    13. [Slurmrestd](#slurmrestd)
-    14. [Node Health Checks](#node-health-checks)
-    15. [Monitoring](#monitoring)
+    10. [Scaling with scale_m1 (GB200/GB300)](#scaling-with-scale_m1-gb200gb300)
+    11. [GB200/GB300 IMEX Support](#gb200gb300-imex-support)
+    12. [Setting KeepAlive in CycleCloud](#setting-keepalive)
+    13. [Custom Scheduler Names With High-Availability](#custom-scheduler-names-with-high-availability)
+    14. [Slurmrestd](#slurmrestd)
+    15. [Node Health Checks](#node-health-checks)
+    16. [Monitoring](#monitoring)
         1. [AzSlurm Exporter](#azslurm-exporter)
             1. [Exported Metrics](#exported-metrics)
             2. [Configure Exporter Port](#configure-exporter-port)
@@ -362,6 +363,108 @@ BlockName=block4 Nodes=ccw-1-3-gpu-5,ccw-1-3-gpu-17,ccw-1-3-gpu-254,ccw-1-3-gpu-
 BlockSizes=5
 ```
 This either prints out the topology in slurm topology format or creates an output file with the topology.
+
+
+### Scaling with scale_m1 (GB200/GB300)
+`scale_m1` is the InterconnectGroups Milestone 1 (M1) scaling tool for GB200/GB300 (gbx00) clusters. It scales a Slurm partition to an exact size while pruning the generated topology so that only fully populated racks are kept. It is essentially `azslurm scale` specialized for rack-aligned gbx00 hardware.
+
+It is installed on the scheduler node automatically by the azure-slurm installer (alongside `azslurm`) and runs under the same virtual environment at `/opt/azurehpc/slurm/venv`. It is not installed on execute nodes. Logs are written to `/opt/azurehpc/slurm/logs/scale_m1.log`.
+
+#### Required slurm.conf settings
+To use GB200/GB300, the block topology plugin must be enabled and the gbx00 partition must be excluded from auto-suspend:
+
+```
+TopologyParam=BlockAsNodeRank
+TopologyPlugin=topology/block
+# exclude any partition that uses gbx00
+SuspendExcParts=gpu
+```
+
+**Do not** add these lines to the template's **Slurm Configuration** parameter (`additional_slurm_config` / `AdditionalSlurmConfig`). `TopologyPlugin=topology/block` requires a populated `topology.conf` to exist before `slurmctld` starts; applying it at cluster creation, before any nodes are scaled and the topology is generated, prevents `slurmctld` from starting.
+
+Instead, apply them manually on the scheduler **after** the nodes are scaled and the block topology file is in place. Add the lines to `/etc/slurm/site_specific.conf` (which is included by `slurm.conf`) and run `scontrol reconfigure`. Replace `gpu` in `SuspendExcParts` with the name of the partition that uses gbx00 nodes if it differs. The full ordering is shown in the workflow below.
+
+#### Workflow
+With the cluster running and an SSH session open on the scheduler node, the end-to-end process is:
+
+1. **Scale the partition** to the target size — reserve the nodes, then power up to the target.
+2. **Generate the block topology and put it in place** at `/sched/<clustername>/topology.conf`.
+3. **Enable the block topology plugin** by adding the required settings to `/etc/slurm/site_specific.conf`, then run `scontrol reconfigure`.
+4. **Release the ready nodes** from the reservation so jobs can be scheduled on them.
+
+When releasing nodes in the final step, remove only the nodes that are powered up and ready to run jobs. Leave all powered-off or unhealthy nodes in the reservation, and do **not** delete the reservation — deleting it would also release the not-yet-ready nodes back to the cluster.
+
+```bash
+# 1. Ensure that Slurm will not suspend these nodes by adding the following line the following lines to /etc/slurm/site_specific.conf (included by slurm.conf):
+# SuspendExcParts=gpu
+$EDITOR /etc/slurm/site_specific.conf
+#Apply the configuration
+scontrol reconfigure
+
+# 2. Reserve the partition's nodes under the scale_m1 reservation
+scale_m1 create_reservation -p gpu
+
+# 3. Power up 28 racks (504 nodes) to the target size
+scale_m1 power_up --racks 28
+
+# 4. Generate the block topology for the partition (--block_size 18 = one rack per block)
+azslurm topology -n --block --block_size 18 -p gpu > topology.conf
+
+# 5. Review topology.conf, then copy it into place.
+#    For a cluster named "ccw":
+cp topology.conf /sched/ccw/topology.conf
+
+# 6. Enable the block topology plugin adding the the following lines to /etc/slurm/site_specific.conf (the same file as step 1)
+#    
+#      TopologyParam=BlockAsNodeRank
+#      TopologyPlugin=topology/block
+$EDITOR /etc/slurm/site_specific.conf
+#Apply the configuration
+scontrol reconfigure
+
+# 7. Remove only the powered-up, ready nodes from the reservation so workloads can run on them.
+#    Leave all powered-off or unhealthy nodes in the reservation; do not delete the reservation.
+#    Update the reservation so it contains only the nodes that are NOT yet ready. For example,
+#    if ccw-1-3-gpu-[1-3] are still powering up or unhealthy, keep just those reserved:
+scontrol update ReservationName=scale_m1 Nodes=ccw-1-3-gpu-[1-3]
+```
+
+#### Overprovisioning to absorb unhealthy hardware (advanced)
+In rare cases you may want to power up extra nodes so that unhealthy hardware can be discarded while still reaching the target size. `power_up` accepts an overprovision buffer, and `prune` / `prune_now` then trim back to the target, keeping only fully populated racks:
+
+```bash
+# Power up 28 racks plus a 6-rack (108-node) buffer to absorb unhealthy hardware
+scale_m1 power_up --racks 28 --overprovision-racks 6
+
+# Prune back to 28 racks. `prune` prints the nodes to terminate; `prune_now` also terminates them
+scale_m1 prune --racks 28 > to_terminate.txt
+scale_m1 prune_now --racks 28
+```
+
+After pruning to the target size, continue with the topology generation, configuration, and reservation steps from the workflow above.
+
+#### Subcommands
+| Subcommand | Purpose |
+| --- | --- |
+| `create_reservation` | Create the `scale_m1` reservation over reservable nodes in a partition. |
+| `power_up` | Power up nodes to reach the target size (plus an optional overprovision buffer). |
+| `prune` | Print the list of nodes to terminate to reach the target size. |
+| `prune_now` | Prune to the target size and terminate the excess nodes. |
+
+#### Sizing by racks or nodes
+`power_up`, `prune`, and `prune_now` accept the target size as either nodes or racks. One rack is 18 nodes, so `--racks N` is equivalent to `--target-count (N * 18)`:
+
+- `-n` / `--target-count <nodes>` — target an exact node count.
+- `--racks <racks>` — target a whole number of racks (1 rack = 18 nodes).
+
+`--target-count` and `--racks` are mutually exclusive; exactly one must be supplied, and the count must be positive.
+
+`power_up` additionally accepts an overprovision buffer, expressed in nodes or racks. The buffer defaults to 0 when omitted:
+
+- `-b` / `--overprovision <nodes>` — overprovision an exact number of extra nodes.
+- `--overprovision-racks <racks>` — overprovision a whole number of extra racks.
+
+`--overprovision` and `--overprovision-racks` are mutually exclusive and must be non-negative.
 
 
 ### GB200/GB300 IMEX Support

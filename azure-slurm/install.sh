@@ -116,6 +116,23 @@ setup_install_dir() {
     chmod +x $INSTALL_DIR/*.sh
 }
 
+setup_scale_m1() {
+    # scale_m1 is the InterconnectGroups (gbx00) scaling tool. It is installed on
+    # the scheduler exactly like azslurm: a venv-resident executable wired to the
+    # venv python (so it can import slurmcc) plus a ~/bin symlink. It is
+    # intentionally NOT installed on execute nodes. Re-running install.sh
+    # re-installs it cleanly (install -m and ln -sf are idempotent).
+    if [ ! -f scale_m1/scale_to_n_nodes.py ]; then
+        echo "scale_m1 entrypoint not found in package; skipping scale_m1 install." >&2
+        return 0
+    fi
+    install -m 0755 scale_m1/scale_to_n_nodes.py $VENV/bin/scale_m1
+    if [ ! -e ~/bin ]; then
+        mkdir ~/bin
+    fi
+    ln -sf $VENV/bin/scale_m1 ~/bin/
+}
+
 init_azslurm_config() {
     which jetpack || (echo "Jetpack is not installed. Please run this from a CycleCloud node, or pass in --no-jetpack if you intend to install this outside of CycleCloud provisioned nodes." && exit 1)
 
@@ -198,6 +215,8 @@ main() {
     setup_venv
     # setup the install dir - logs and logging.conf, some permissions.
     setup_install_dir
+    # install the scale_m1 (gbx00) scaling tool on the scheduler, like azslurm.
+    setup_scale_m1
     # setup the azslurmd but do not start it.
     setup_azslurmd
     # If there is no jetpack, we have to stop here.
