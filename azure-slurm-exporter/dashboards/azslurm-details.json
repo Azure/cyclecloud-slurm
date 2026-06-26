@@ -16,7 +16,7 @@
       }
     ]
   },
-  "description": "Slurm Cluster Running Jobs, Failed Jobs, Node Status and Partition Specs Dashboard",
+  "description": "Slurm Cluster Nodelist and Partition Specs Dashboard",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 2,
@@ -65,308 +65,6 @@
       "panels": [],
       "title": "Extra Cluster Details",
       "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${promDatasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "green",
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true,
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "options": {
-                "match": "null+nan",
-                "result": {
-                  "index": 0,
-                  "text": "No jobs are currently running "
-                }
-              },
-              "type": "special"
-            }
-          ],
-          "noValue": "No jobs running within time range",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 4
-      },
-      "id": 1047,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": true,
-          "enablePagination": true,
-          "fields": "",
-          "reducer": [
-            "count"
-          ],
-          "show": false
-        },
-        "frameIndex": 3,
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "Number of Allocated Nodes"
-          }
-        ]
-      },
-      "pluginVersion": "11.6.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "topk(10,squeue_job_nodes_allocated{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Running Jobs between ${__from} and ${__to}",
-      "transformations": [
-        {
-          "id": "timeSeriesTable",
-          "options": {}
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "Number of Allocated Nodes"
-              }
-            ]
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "__name__": true,
-              "cluster": true,
-              "instance": true,
-              "job": true,
-              "microsoft.amwresourceid": true,
-              "nodearray": true,
-              "physical_host": true,
-              "state": true,
-              "subscription": true
-            },
-            "includeByName": {},
-            "indexByName": {
-              "Trend #A": 14,
-              "__name__": 0,
-              "cluster": 1,
-              "instance": 2,
-              "job": 3,
-              "job_id": 4,
-              "job_name": 5,
-              "microsoft.amwresourceid": 6,
-              "nodearray": 7,
-              "nodelist": 9,
-              "partition": 8,
-              "physical_host": 10,
-              "start_time": 11,
-              "state": 12,
-              "subscription": 13
-            },
-            "renameByName": {
-              "Trend #A": "Number of Allocated Nodes"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${promDatasource}"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true,
-            "inspect": false,
-            "minWidth": 150
-          },
-          "mappings": [],
-          "noValue": "No failed jobs within time range",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "reason"
-            },
-            "properties": [
-              {
-                "id": "noValue"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 14
-      },
-      "id": 1064,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": true,
-          "enablePagination": true,
-          "fields": "",
-          "reducer": [
-            "count"
-          ],
-          "show": false
-        },
-        "frameIndex": 1,
-        "showHeader": true,
-        "sortBy": []
-      },
-      "pluginVersion": "11.6.9",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${promDatasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "sacct_failed_jobs{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} offset -5m",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "B"
-        }
-      ],
-      "title": "Failed Jobs between $__from and $__to",
-      "transformations": [
-        {
-          "id": "timeSeriesTable",
-          "options": {
-            "B": {
-              "stat": "lastNotNull"
-            }
-          }
-        },
-        {
-          "id": "labelsToFields",
-          "options": {
-            "keepLabels": [
-              "exit_code",
-              "partition",
-              "state"
-            ],
-            "mode": "columns"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Trend #B": true,
-              "__name__": true,
-              "cluster": true,
-              "endtime": true,
-              "instance": true,
-              "job": true,
-              "microsoft.amwresourceid": true,
-              "nodearray": true,
-              "physical_host": true,
-              "start_datetime hpc": true,
-              "starttime": true,
-              "subscription": true
-            },
-            "includeByName": {},
-            "indexByName": {
-              "Trend #B": 16,
-              "__name__": 0,
-              "cluster": 1,
-              "endtime": 13,
-              "exit_code": 7,
-              "instance": 8,
-              "job": 9,
-              "jobid": 2,
-              "jobname": 3,
-              "microsoft.amwresourceid": 14,
-              "nodearray": 17,
-              "nodelist": 5,
-              "partition": 4,
-              "physical_host": 10,
-              "reason": 15,
-              "starttime": 12,
-              "state": 6,
-              "subscription": 11
-            },
-            "renameByName": {
-              "Trend #A": "# of Failed Jobs"
-            }
-          }
-        }
-      ],
-      "type": "table"
     },
     {
       "datasource": {
@@ -639,7 +337,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 4
       },
       "id": 1065,
       "options": {
@@ -781,7 +479,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 33
+        "y": 12
       },
       "id": 1043,
       "options": {
@@ -886,37 +584,11 @@
       "type": "table"
     },
     {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 2,
-        "w": 24,
-        "x": 0,
-        "y": 40
-      },
-      "id": 1063,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "**Note:** Failed Jobs panel requires Slurm accounting to be enabled in the cluster. Panel will not populate if accounting is disabled.",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.6.9",
-      "title": "",
-      "transparent": true,
-      "type": "text"
-    },
-    {
       "gridPos": {
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 19
       },
       "id": 1053,
       "libraryPanel": {
