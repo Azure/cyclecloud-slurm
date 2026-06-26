@@ -521,8 +521,10 @@ def _complete_install_primary(s: InstallSettings) -> None:
             health_interval = 60
             health_program = f"{s.config_dir}/health.sh"
             epilog_program = f"{s.config_dir}/epilog.d/10-health_epilog.sh"
+            prolog_program = f"{s.config_dir}/prolog.d/10-health_prolog.sh"
             ilib.copy_file("/etc/healthagent/health.sh.example", health_program, owner="root", group="root", mode=755)
             ilib.copy_file("/etc/healthagent/epilog.sh.example", epilog_program, owner="root", group="root", mode=755)
+            ilib.copy_file("/etc/healthagent/prolog.sh.example", prolog_program, owner="root", group="root", mode=755)
 
     ilib.template(
         f"{s.config_dir}/slurm.conf",
