@@ -12,8 +12,8 @@ class SqueueNotAvailException(Exception):
 
 class Squeue(BaseCollector):
     """
-    A collector that periodically queries SLURM squeue command to gather job state information and node allocation
-    data from the job queue and parses the output into Prometheus Gauge metrics.
+    A collector that periodically queries SLURM squeue command to gather job state
+    information from the job queue and parses the output into a Prometheus Gauge metric.
     """
     def __init__(self, binary_path="/usr/bin/squeue", interval=60, timeout=30):
         self.binary_path = binary_path
@@ -48,34 +48,20 @@ class Squeue(BaseCollector):
 
     def parse_output(self,stdout) -> List[Gauge]:
         """
-        Parse the stdout from an squeue command and generates two Prometheus
-        Gauge metrics that track the number of jobs currently in the queue in each state per partition
-        and track the number of nodes allocated to running jobs in the queue
+        Parse the stdout from an squeue command and generate a Prometheus
+        Gauge metric that tracks the number of jobs currently in each state per partition.
         """
         squeue_partition_jobs_state = Gauge(
                 f"squeue_partition_jobs_state",
                 f"Number of jobs in a state per partition",
                 labelnames=['partition','state'], registry=None
             )
-
-        squeue_job_nodes_allocated = Gauge(
-            "squeue_job_nodes_allocated",
-            "Number of nodes allocated to a running job",
-            labelnames=["job_id", "job_name", "partition", "state", "nodelist", "start_time"], registry=None
-        )
         # number of jobs per state,partition key
         counts = {}
         lines = stdout.decode().strip().splitlines()
         lines_iter = (line.split("|") for line in lines)
 
         for row in map(self.squeue_output._make, lines_iter):
-            if row.state.lower() == "running":
-                squeue_job_nodes_allocated.labels(job_id=row.jobid,
-                                                  job_name=row.name,
-                                                  partition=row.partition,
-                                                  state=row.state.lower(),
-                                                  nodelist=row.nodelist,
-                                                  start_time=row.start_time).set(int(row.nodes))
             key = (row.partition, row.state.lower())
             counts[key] = counts.get(key, 0) + 1
 
@@ -83,13 +69,13 @@ class Squeue(BaseCollector):
             squeue_partition_jobs_state.labels(partition=partition,
                                                    state=state).set(count)
 
-        return [squeue_partition_jobs_state, squeue_job_nodes_allocated]
+        return [squeue_partition_jobs_state]
 
     async def squeue_query(self) -> None:
         """
-        Run the squeue query with default options, parse the output to create two Prometheus Gauge metrics
-        that represent the current state of each job in the queue as well as the total nodes allocated to
-        any running job in the queue, and caches the results
+        Run the squeue query with default options, parse the output to create the
+        Prometheus Gauge metric that represents job counts by partition and state,
+        and cache the results.
         """
         args = [self.binary_path]
         args.extend(self.default_options)

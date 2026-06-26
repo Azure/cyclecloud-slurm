@@ -603,16 +603,6 @@
                   "fixedColor": "orange",
                   "mode": "fixed"
                 }
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "targetBlank": false,
-                    "title": "Failed Jobs in last 6 months",
-                    "url": "/d/cff0f6w0qqwaoa/failed-jobs-dashboard?orgId=1&${__url_time_range}&${partition:queryparam}&${cluster:queryparam}&${instance:queryparam}&${cpu:queryparam}&${gpu:queryparam}&${nodearray:queryparam}"
-                  }
-                ]
               }
             ]
           },

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from exporter.sacct import Sacct, SacctNotAvailException
 from exporter.exporter import CommandFailedException, CommandTimedOutException
-from prometheus_client import Counter, Gauge
+from prometheus_client import Counter
 
 
 class TestSacctInitialize:
@@ -42,7 +42,7 @@ class TestSacctParseOutput:
         sacct.cached_output["sacct_metrics"] = sacct.parse_output(stdout)
         samples_by_keys = {}
         metrics = sacct.export_metrics()
-        assert len(metrics) == 2
+        assert len(metrics) == 1
 
         for metric in metrics:
             for family in metric.collect():
@@ -119,12 +119,11 @@ class TestSacctExportMetrics:
         return sacct
 
     def test_export_metrics_returns_counter(self, sacct):
-        """Test export_metrics returns a Counter and Gauge instance."""
+        """Test export_metrics returns only Counter instances."""
         sacct.cached_output["sacct_metrics"] = sacct.parse_output(b"")
         metrics = sacct.export_metrics()
-        assert len(metrics) == 2
+        assert len(metrics) == 1
         assert isinstance(metrics[0], Counter)
-        assert isinstance(metrics[1], Gauge)
 
     def test_export_metrics_same_reference(self, sacct):
         """Test export_metrics returns consistent references."""
