@@ -1,10 +1,10 @@
 from .exporter import BaseCollector
 from collections import namedtuple
-from prometheus_client import Counter, disable_created_metrics, Gauge
+from prometheus_client import Counter, disable_created_metrics
 from datetime import datetime
 import logging
 import exporter.util as util
-from typing import List, Union
+from typing import List
 log = logging.getLogger(__name__)
 
 class SacctNotAvailException(Exception):
@@ -68,20 +68,17 @@ class Sacct(BaseCollector):
         """
         self.launch_task(func=self.sacct_query, interval=self.interval)
 
-    def export_metrics(self) -> List[Union[Counter,Gauge]]:
+    def export_metrics(self) -> List[Counter]:
         """
         Return the most recently collected sacct metrics for Prometheus to scrape.
         """
         return self.cached_output["sacct_metrics"]
 
-    def parse_output(self, stdout) -> List[Union[Counter,Gauge]]:
+    def parse_output(self, stdout) -> List[Counter]:
         """
         Parse sacct command output and increment terminal jobs metric for each job in the output to describe total number of finished jobs by partition,
-        exit_code, reason, and state as well as return failed jobs gauge describing each job that failed within the time interval of the query.
+        exit_code, reason, and state.
         """
-        sacct_failed_jobs = Gauge("sacct_failed_jobs","Number of failed slurm jobs in an interval",
-                                    ["jobid","jobname","nodelist","partition", "exit_code","reason","state", "starttime","endtime"], registry=None)
-
         lines = stdout.decode().strip().splitlines()
         log.debug(f"Number of jobs:{len(lines)}")
         lines_iter = (line.split("|") for line in lines)
@@ -93,20 +90,7 @@ class Sacct(BaseCollector):
                 reason=reason,
                 state=row.state.lower()).inc()
 
-            if row.state.lower() != "completed":
-                sacct_failed_jobs.labels(
-                    jobid=row.jobid,
-                    jobname=row.jobname,
-                    nodelist=row.nodelist,
-                    partition=row.partition,
-                    exit_code=row.exitcode,
-                    reason=reason,
-                    state=row.state.lower(),
-                    starttime=self.starttime,
-                    endtime=self.endtime).set(1)
-
-
-        return [self.sacct_terminal_jobs, sacct_failed_jobs]
+        return [self.sacct_terminal_jobs]
 
     async def sacct_query(self) -> None:
         """
