@@ -574,7 +574,6 @@ Log can be found under `/var/log/azslurm-exporter.log`
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `squeue_partition_jobs_state` | Gauge | `partition`, `state` | Number of jobs in each state per partition |
-| `squeue_job_nodes_allocated` | Gauge | `job_id`, `job_name`, `partition`, `state`, `nodelist`, `start_time` | Nodes allocated to each running job |
 
 **sacct metrics**
 

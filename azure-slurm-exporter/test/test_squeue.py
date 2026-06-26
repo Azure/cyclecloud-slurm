@@ -39,6 +39,7 @@ class TestSqueueParseOutput:
         squeue.cached_output["squeue_metrics"] = squeue.parse_output(stdout)
         samples_by_keys = {}
         metrics = squeue.export_metrics()
+        assert len(metrics) == 1
 
         # Validate partition job state metric
         for metric in metrics:
@@ -48,16 +49,6 @@ class TestSqueueParseOutput:
                         assert "partition" in s.labels
                         assert "state" in s.labels
                         samples_by_keys[(s.labels["partition"], s.labels["state"])] = s.value
-                elif metric_family.name == "squeue_job_nodes_allocated":
-                    for s in metric_family.samples:
-                        assert "partition" in s.labels
-                        assert "state" in s.labels
-                        assert "nodelist" in s.labels
-                        assert "job_id" in s.labels
-                        assert "job_name" in s.labels
-                        assert "start_time" in s.labels
-                        samples_by_keys[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"], s.labels["start_time"])] = s.value
-        assert samples_by_keys.get(("node[1-2]","partition1","running","12345", "job_name", "2024-01-01T00:00:01")) == 2
         assert samples_by_keys.get(("partition1","running")) == 1
 
     def test_parse_output_multiple_states(self, squeue):
@@ -103,13 +94,10 @@ class TestSqueueParseOutput:
 
         # Find the partition jobs state metric
         partition_metric = None
-        job_nodes_metric = None
         for metric in metrics:
             for metric_family in metric.collect():
                 if "partition_jobs_state" in metric_family.name:
                     partition_metric = metric_family
-                elif "job_nodes_allocated" in metric_family.name:
-                    job_nodes_metric = metric_family
 
         # Validate partition job counts
         if partition_metric:
@@ -119,15 +107,6 @@ class TestSqueueParseOutput:
             }
             assert samples_by_key.get(("p1", "running")) == 2
             assert samples_by_key.get(("p2", "pending")) == 1
-
-        # Validate node allocations for running jobs
-        if job_nodes_metric:
-            samples_by_job = {
-                s.labels["job_id"]: s.value
-                for s in job_nodes_metric.samples
-            }
-            assert samples_by_job.get("1") == 2
-            assert samples_by_job.get("2") == 1
 
 
 class TestSqueueExportMetrics:
@@ -238,17 +217,12 @@ class TestSqueueQuery:
         mock_run.return_value = mock_proc
         samples_by_key = {}
         await squeue.squeue_query()
-        assert len(squeue.cached_output["squeue_metrics"]) == 2
+        assert len(squeue.cached_output["squeue_metrics"]) == 1
         metric1 = squeue.cached_output["squeue_metrics"][0]
         family = metric1.collect()
         for s in family[0].samples:
             samples_by_key[(s.labels["partition"], s.labels["state"])] = s.value
-        metric2 = squeue.cached_output["squeue_metrics"][1]
-        family = metric2.collect()
-        for s in family[0].samples:
-            samples_by_key[(s.labels['nodelist'],s.labels["partition"], s.labels["state"], s.labels["job_id"], s.labels["job_name"], s.labels["start_time"])] = s.value
         assert samples_by_key.get(("batch","running")) == 1
-        assert samples_by_key.get(("node[1-2]","batch","running","12345","job1","2024-01-01T00:00:01")) == 2
 
     @pytest.mark.asyncio
     @patch.object(Squeue, "run_command", new_callable=AsyncMock)
@@ -257,7 +231,7 @@ class TestSqueueQuery:
         mock_proc = MagicMock()
         mock_proc.stdout = b"12345|job1|2|node[1-2]|batch|RUNNING|2024-01-01T00:00:00|2024-01-01T00:00:01|user1\n"
         mock_run.return_value = mock_proc
-        mock_gauges = [MagicMock(spec=Gauge), MagicMock(spec=Gauge)]
+        mock_gauges = [MagicMock(spec=Gauge)]
 
         with patch.object(squeue, "parse_output", return_value=mock_gauges):
             await squeue.squeue_query()
