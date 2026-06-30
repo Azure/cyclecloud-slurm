@@ -12,16 +12,30 @@ class TestSacctInitialize:
         """Create a Sacct collector instance for testing."""
         return Sacct()
 
+    @patch("exporter.sacct.subprocess.run")
     @patch("exporter.util.is_file_binary")
-    def test_initialize_valid_binary(self, mock_is_binary, sacct):
+    def test_initialize_valid_binary(self, mock_is_binary, mock_subprocess_run, sacct):
         """Test successful initialization when binary exists."""
         mock_is_binary.return_value = True
+        mock_subprocess_run.return_value = MagicMock(stdout="", stderr="")
         sacct.initialize()
 
     @patch("exporter.util.is_file_binary")
     def test_initialize_invalid_binary(self, mock_is_binary, sacct):
         """Test initialization fails when binary is not available."""
         mock_is_binary.return_value = False
+        with pytest.raises(SacctNotAvailException):
+            sacct.initialize()
+
+    @patch("exporter.sacct.subprocess.run")
+    @patch("exporter.util.is_file_binary")
+    def test_initialize_accounting_disabled(self, mock_is_binary, mock_subprocess_run, sacct):
+        """Test initialization fails when sacct reports accounting storage is disabled."""
+        mock_is_binary.return_value = True
+        mock_subprocess_run.return_value = MagicMock(
+            stdout="",
+            stderr="slurm_load_jobs error: Slurm accounting storage is disabled",
+        )
         with pytest.raises(SacctNotAvailException):
             sacct.initialize()
 
@@ -32,7 +46,7 @@ class TestSacctParseOutput:
     def sacct(self):
         """Create a Sacct collector instance for testing."""
         sacct = Sacct()
-        with patch("exporter.util.is_file_binary", return_value=True):
+        with patch("exporter.util.is_file_binary", return_value=True), patch("exporter.sacct.subprocess.run", return_value=MagicMock(stdout="", stderr="")):
             sacct.initialize()
         return sacct
 
@@ -114,7 +128,7 @@ class TestSacctExportMetrics:
     def sacct(self):
         """Create a Sacct collector instance for testing."""
         sacct = Sacct()
-        with patch("exporter.util.is_file_binary", return_value=True):
+        with patch("exporter.util.is_file_binary", return_value=True), patch("exporter.sacct.subprocess.run", return_value=MagicMock(stdout="", stderr="")):
             sacct.initialize()
         return sacct
 
@@ -141,7 +155,7 @@ class TestSacctExitCodeMapping:
     def sacct(self):
         """Create a Sacct collector instance for testing."""
         sacct = Sacct()
-        with patch("exporter.util.is_file_binary", return_value=True):
+        with patch("exporter.util.is_file_binary", return_value=True), patch("exporter.sacct.subprocess.run", return_value=MagicMock(stdout="", stderr="")):
             sacct.initialize()
         return sacct
 
@@ -185,7 +199,7 @@ class TestSacctMetricValues:
     def sacct(self):
         """Create a Sacct collector instance for testing."""
         sacct = Sacct()
-        with patch("exporter.util.is_file_binary", return_value=True):
+        with patch("exporter.util.is_file_binary", return_value=True), patch("exporter.sacct.subprocess.run", return_value=MagicMock(stdout="", stderr="")):
             sacct.initialize()
         return sacct
 
@@ -269,7 +283,7 @@ class TestSacctQuery:
         """Create a Sacct instance with one successful query already executed,
         so the counter has a known baseline value of 1 for (node1, batch, completed, '', 0:0)."""
         sacct = Sacct()
-        with patch("exporter.util.is_file_binary", return_value=True):
+        with patch("exporter.util.is_file_binary", return_value=True), patch("exporter.sacct.subprocess.run", return_value=MagicMock(stdout="", stderr="")):
             sacct.initialize()
         mock_proc = MagicMock()
         mock_proc.stdout = b"1|job1|node1|1|batch|0:0|0:0|COMPLETED|u1|2024-01-01T10:00:00|2024-01-01T09:00:00|2024-01-01T11:00:00|None\n"

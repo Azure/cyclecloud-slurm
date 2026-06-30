@@ -3,6 +3,7 @@ from collections import namedtuple
 from prometheus_client import Counter, disable_created_metrics
 from datetime import datetime
 import logging
+import subprocess
 import exporter.util as util
 from typing import List
 log = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ class Sacct(BaseCollector):
             "153:0": "SIGXFSZ - File size limit",
         }
 
+    ACCOUNTING_DISABLED_MSG = "Slurm accounting storage is disabled"
+
     def __init__(self, binary_path="/usr/bin/sacct", interval=300, timeout=120, starttime=None):
         self.binary_path = binary_path
         self.interval = interval
@@ -59,6 +62,24 @@ class Sacct(BaseCollector):
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
             raise SacctNotAvailException
+
+        # Preflight sacct to detect disabled accounting before enabling this collector.
+        try:
+            proc = subprocess.run(
+                [self.binary_path, "-n", "--starttime", "now", "--endtime", "now"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+                timeout=min(self.timeout, 10),
+            )
+        except Exception as e:
+            log.warning("sacct preflight failed: %s", e)
+        else:
+            if self.ACCOUNTING_DISABLED_MSG in (proc.stderr or "") or self.ACCOUNTING_DISABLED_MSG in (proc.stdout or ""):
+                log.warning(self.ACCOUNTING_DISABLED_MSG)
+                raise SacctNotAvailException
+
         disable_created_metrics()
 
     def start(self) -> None:
