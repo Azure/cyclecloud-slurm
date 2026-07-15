@@ -1,5 +1,6 @@
 import os
 import logging
+import subprocess
 
 log = logging.getLogger(__name__)
 
@@ -30,3 +31,37 @@ def validate_port(port_env_var: str, default_port: int) -> int:
         port = default_port
 
     return port
+
+def get_scontrol_config_value(key: str, timeout: int = 10) -> str:
+    """Run "scontrol show config" and return the value for a config key."""
+    try:
+        proc = subprocess.run(
+            ["scontrol", "show", "config"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except Exception as e:
+        log.warning("Failed to read scontrol config for %s: %s", key, e)
+        return ""
+
+    if proc.returncode != 0:
+        log.warning(
+            "scontrol show config failed (rc=%s) while reading %s: %s",
+            proc.returncode,
+            key,
+            (proc.stderr or "").strip(),
+        )
+        return ""
+
+    for line in (proc.stdout or "").splitlines():
+        stripped = line.strip()
+        if "=" not in stripped:
+            continue
+        lhs, rhs = stripped.split("=", 1)
+        if lhs.strip() == key:
+            return rhs.strip()
+
+    return ""

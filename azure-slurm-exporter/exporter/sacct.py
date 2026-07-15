@@ -37,6 +37,9 @@ class Sacct(BaseCollector):
             "153:0": "SIGXFSZ - File size limit",
         }
 
+    ACCOUNTING_STORAGE_TYPE_KEY = "AccountingStorageType"
+    ACCOUNTING_STORAGE_DISABLED_VALUES = {"(null)", "accounting_storage/none"}
+
     def __init__(self, binary_path="/usr/bin/sacct", interval=300, timeout=120, starttime=None):
         self.binary_path = binary_path
         self.interval = interval
@@ -59,6 +62,15 @@ class Sacct(BaseCollector):
         if not util.is_file_binary(self.binary_path):
             log.error(f"{self.binary_path} is not a file or not executable")
             raise SacctNotAvailException
+
+        storage_type = util.get_scontrol_config_value(
+            self.ACCOUNTING_STORAGE_TYPE_KEY,
+            timeout=min(self.timeout, 10),
+        )
+        if storage_type and storage_type.lower() in self.ACCOUNTING_STORAGE_DISABLED_VALUES:
+            log.warning("Slurm accounting is disabled")
+            raise SacctNotAvailException
+
         disable_created_metrics()
 
     def start(self) -> None:
