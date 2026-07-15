@@ -33,9 +33,7 @@ def validate_port(port_env_var: str, default_port: int) -> int:
     return port
 
 def get_scontrol_config_value(key: str, timeout: int = 10) -> str:
-    """
-    Run "scontrol show config" and return the value for a config key.
-    """
+    """Run "scontrol show config" and return the value for a config key."""
     try:
         proc = subprocess.run(
             ["scontrol", "show", "config"],
@@ -49,10 +47,21 @@ def get_scontrol_config_value(key: str, timeout: int = 10) -> str:
         log.warning("Failed to read scontrol config for %s: %s", key, e)
         return ""
 
+    if proc.returncode != 0:
+        log.warning(
+            "scontrol show config failed (rc=%s) while reading %s: %s",
+            proc.returncode,
+            key,
+            (proc.stderr or "").strip(),
+        )
+        return ""
+
     for line in (proc.stdout or "").splitlines():
         stripped = line.strip()
-        if stripped.startswith(key) and "=" in stripped:
-            _, value = stripped.split("=", 1)
-            return value.strip()
+        if "=" not in stripped:
+            continue
+        lhs, rhs = stripped.split("=", 1)
+        if lhs.strip() == key:
+            return rhs.strip()
 
     return ""
