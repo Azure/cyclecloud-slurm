@@ -865,42 +865,42 @@ Order = 20
         Label = Scheduler OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.ubuntu22
+        DefaultValue = cycle.image.ubuntu24
         Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter LoginImageName]]]
         Label = Login Node OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.ubuntu22
+        DefaultValue = cycle.image.ubuntu24
         Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter HPCImageName]]]
         Label = HPC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.ubuntu22
+        DefaultValue = cycle.image.ubuntu24
         Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter HTCImageName]]]
         Label = HTC OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.ubuntu22
+        DefaultValue = cycle.image.ubuntu24
         Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter GPUImageName]]]
         Label = GPU OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.ubuntu22
+        DefaultValue = cycle.image.ubuntu24
         Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter DynamicImageName]]]
         Label = Dynamic OS
         ParameterType = Cloud.Image
         Config.OS = linux
-        DefaultValue = cycle.image.ubuntu22
+        DefaultValue = cycle.image.ubuntu24
         Config.Filter := Package in {"cycle.image.ubuntu24", "cycle.image.ubuntu22", "cycle.image.sles15-hpc", "almalinux8", "almalinux9"}
 
         [[[parameter SchedulerClusterInitSpecs]]]
