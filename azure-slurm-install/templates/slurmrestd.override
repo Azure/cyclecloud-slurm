@@ -1,4 +1,6 @@
 [Service]
-AmbientCapabilities=CAP_SETGID
-CapabilityBoundingSet=CAP_SETGID
+AmbientCapabilities=CAP_SETUID CAP_SETGID
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID
+ExecStart=
+ExecStart=/usr/sbin/slurmrestd $SLURMRESTD_OPTIONS $SLURMRESTD_LISTEN
 {jwt_env}
