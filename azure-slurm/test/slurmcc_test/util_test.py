@@ -1,6 +1,6 @@
-from slurmcc.util import to_hostlist, get_sort_key_func, run, _show_nodes, set_slurm_cli, _from_hostlist, _to_hostlist
+from slurmcc.util import NativeSlurmCLIImpl, to_hostlist, get_sort_key_func, run, _show_nodes, set_slurm_cli, _from_hostlist, _to_hostlist
 from slurmcc_test.testutil import MockNativeSlurmCLI
-from typing import List
+from typing import Any, Dict, List
 import subprocess
 
 def scontrol_func(args: List[str], retry: bool = True) -> str:
@@ -50,6 +50,37 @@ def test_run_function() -> None:
         out=run(['touch', '/root/.test'])
     except subprocess.CalledProcessError as e:
         assert out.returncode != 0
+
+
+def test_srun_does_not_interpolate_node_names(monkeypatch: Any) -> None:
+    captured: Dict[str, Any] = {}
+
+    def fake_run(args: List[str], **kwargs: Any) -> subprocess.CompletedProcess:
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("slurmcc.util.subprocesslib.run", fake_run)
+    malicious_node = "victim;touch$IFS/tmp/S02_PWNED;#"
+
+    NativeSlurmCLIImpl().srun(
+        ["benign1", malicious_node],
+        "echo 'hello world'",
+        timeout=2,
+        shell=True,
+        partition="gpu",
+        gpus=None,
+    )
+
+    assert captured["args"][0:5] == [
+        "srun",
+        "-p",
+        "gpu",
+        "-w",
+        f"benign1,{malicious_node}",
+    ]
+    assert captured["args"][-3:] == ["bash", "-c", "echo 'hello world'"]
+    assert captured["kwargs"]["shell"] is False
 
 
 def test_show_nodes() -> None:

@@ -2,6 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 import os
 import random
+import shlex
 import subprocess as subprocesslib
 import tempfile
 import sys
@@ -56,22 +57,24 @@ class NativeSlurmCLIImpl(NativeSlurmCLI):
                 args = []
                 args.append("srun")
                 if partition:
-                    args.append(f"-p {partition}")
-                args.append(f"-w {','.join(hostlist)}")
+                    args.extend(["-p", partition])
+                args.extend(["-w", ",".join(hostlist)])
                 if gpus:
                     args.append(f"--gpus={gpus}")
                 args.append(f"--error={temp_file_path}")
                 #adding deadline timeout 1 minute more than the srun timeout to avoid deadline timeout before srun can finish running
                 args.append(f"--deadline=now+{timeout+1}minute")
                 args.append(f"--time={timeout}")
-                command = f"bash -c '{user_command}'" if shell else user_command
-                args.append(command)
-                srun_command = " ".join(args)
+                if shell:
+                    args.extend(["bash", "-c", user_command])
+                else:
+                    args.extend(shlex.split(user_command))
+                srun_command = args
                 logging.debug(srun_command)
                 #subprocess timeout is in seconds, so we need to convert the timeout to seconds
                 #add 3 minutes to it so it doesnt timeout before the srun command can kill the job from its own timeout
                 subp_timeout=timeout*60+180
-                result = subprocesslib.run(srun_command, check=True, timeout=subp_timeout, shell=True,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
+                result = subprocesslib.run(srun_command, check=True, timeout=subp_timeout, shell=False,stdout=subprocesslib.PIPE, stderr=subprocesslib.PIPE, universal_newlines=True)
                 return SrunOutput(returncode=result.returncode, stdout=result.stdout, stderr=None)
             except subprocesslib.CalledProcessError as e:
                 logging.error(f"Command: {srun_command} failed with return code {e.returncode}")
