@@ -648,7 +648,21 @@ cd cyclecloud-slurm/azure-slurm-exporter
 
 
 ## Supported Slurm and PMIX versions
-The current slurm version supported is `25.11.5` which is compiled with PMIX version `4.2.9`.
+The current slurm version supported is `26.05.4` which is compiled with PMIX version `4.2.9`.
+
+### Upgrading existing clusters to Slurm 26.05.4
+
+Slurm 26.05.4 is a major-version upgrade with the following compatibility and configuration changes:
+
+- Direct upgrades are supported only from Slurm 25.11, 25.05, and 24.11. Clusters on an older release must upgrade through intermediate supported releases. Upgrading outside this compatibility window can kill running jobs and lose job accounting data.
+- Starting the 26.05 daemons updates controller state files and, when accounting is enabled, the accounting database schema. Downgrading after that point is not supported without restoring the pre-upgrade `StateSaveLocation` and accounting database backups.
+- Partition settings `ExclusiveUser` and `ExclusiveTopo` have been replaced by `Exclusive=USER` and `Exclusive=TOPO`. Update custom `slurm.conf` content before upgrading.
+- `SchedulerParameters=enable_job_state_cache` has been removed and must be deleted from custom configuration.
+- The Slurm C API changed to use `slurm_step_id_t` in APIs that previously accepted a job ID, and the `cgroup/v2` hierarchy is now keyed by SLUID rather than job ID. Rebuild locally compiled Slurm plugins and update tools that inspect cgroup paths.
+- Slurm REST API v0.0.45 was added and v0.0.42 is deprecated for removal in Slurm 26.11. Validate clients that consume `slurmrestd` or command JSON/YAML output before upgrading production clusters.
+
+Back up `StateSaveLocation`, `/etc/slurm`, and the accounting database before upgrading. Upgrade components in this order: `slurmdbd`, `slurmctld`, `slurmd`, then login-node clients and custom plugins. See the [Slurm 26.05 release notes](https://slurm.schedmd.com/archive/slurm-26.05.4/release_notes.html) and [upgrade guide](https://slurm.schedmd.com/archive/slurm-26.05.4/upgrades.html) for the complete procedure.
+
 ## Packaging
 Slurm and PMIX packages are fetched and downloaded exclusively from packages.microsoft.com.
 ### Supported OS and PMC Repos
@@ -679,7 +693,7 @@ The following table describes the Slurm-specific configuration options you can t
 
 | Slurm specific configuration options | Description |
 | ------------------------------------ | ----------- |
-| slurm.version                        | Default: `25.11.5`. Sets the version of Slurm to install and run.  |
+| slurm.version                        | Default: `26.05.4`. Sets the version of Slurm to install and run.  |
 | slurm.insiders                        | Default: `false`. Setting that controls whethere slurm is installed from pmc stable repo or pmc insiders repo. Set to `true` to install from insiders repo.  |
 | slurm.autoscale                      | Default: `false`. A per-nodearray setting that controls whether Slurm automatically stops and starts nodes in this node array. |
 | slurm.hpc                            | Default: `true`. A per-nodearray setting that controls whether nodes in the node array are in the same placement group. Primarily used for node arrays that use VM families with InfiniBand. It only applies when `slurm.autoscale` is set to `true`. |
