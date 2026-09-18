@@ -26,6 +26,7 @@ from hpc.autoscale.clilib import main as clilibmain
 from hpc.autoscale.job.demandprinter import OutputFormat
 from hpc.autoscale.job.driver import SchedulerDriver
 from hpc.autoscale.node.node import Node
+from hpc.autoscale.node.nodehistory import NodeHistory, NullNodeHistory
 from hpc.autoscale.node.nodemanager import NodeManager
 from hpc.autoscale.results import ShutdownResult
 
@@ -106,6 +107,9 @@ class SlurmDriver(GenericDriver):
                 "max_placement_groups"
             ] = max_pgs
         super().preprocess_node_mgr(config, node_mgr)
+    
+    def new_node_history(self, config: Dict) -> NodeHistory:
+        return NullNodeHistory()
 
 
 class SlurmCLI(CommonCLI):
