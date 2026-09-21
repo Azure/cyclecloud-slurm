@@ -81,6 +81,7 @@ Autoscale = $Autoscale
         type = $NFSType
         mountpoint = /shared
         export_path = ${ifThenElse(NFSType == "lustre", strcat("tcp:/lustrefs", NFSSharedExportPath), NFSSharedExportPath)}
+        node_name = scheduler
         address = $NFSAddress
         options = $NFSSharedMountOptions
 
@@ -88,6 +89,7 @@ Autoscale = $Autoscale
         type = $NFSSchedType
         mountpoint = /sched        
         export_path = ${ifThenElse(NFSSchedType == "lustre", strcat("tcp:/lustrefs", NFSSchedExportPath), NFSSchedExportPath)}
+        node_name = scheduler
         address = ${ifThenElse(UseBuiltinSched && !configuration_slurm_ha_enabled, undefined, NFSSchedAddress)}
         options = $NFSSchedMountOptions
 
