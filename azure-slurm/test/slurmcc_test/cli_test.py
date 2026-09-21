@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from hpc.autoscale.hpctypes import Memory
 from hpc.autoscale.node.bucket import NodeBucket, NodeDefinition
+from hpc.autoscale.node.nodehistory import NullNodeHistory
 from hpc.autoscale.results import ShutdownResult
 
 from slurmcc import cli, util
@@ -288,3 +289,7 @@ def test_return_to_idle() -> None:
     config["slurm"] = {"return_to_idle": True}
     node_mgr.expect("htc-2")
     run_test()
+
+
+def test_use_null_nodehistory() -> None:
+    assert isinstance(cli.SlurmDriver().new_node_history({}), NullNodeHistory)
