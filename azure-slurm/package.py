@@ -11,8 +11,8 @@ from argparse import Namespace
 from subprocess import check_call
 from typing import Dict, List, Optional
 
-SCALELIB_VERSION = "1.0.10"
-CYCLECLOUD_API_VERSION = "8.8.3"
+SCALELIB_VERSION = "1.0.12"
+CYCLECLOUD_API_VERSION = "8.9.3"
 
 
 def build_sdist() -> str:
@@ -41,7 +41,7 @@ def get_cycle_libs(args: Namespace) -> List[str]:
     scalelib_url = "https://github.com/Azure/cyclecloud-scalelib/archive/refs/tags/{}.tar.gz".format(
         SCALELIB_VERSION
     )
-    
+
     cyclecloud_api_url = f"https://github.com/Azure/cyclecloud-scalelib/releases/download/{SCALELIB_VERSION}/cyclecloud_api-{CYCLECLOUD_API_VERSION}-py2.py3-none-any.whl"
     to_download = {
         scalelib_file: (args.scalelib, scalelib_url),
@@ -141,7 +141,7 @@ def execute() -> None:
         by_package[package].append(fil)
 
     for package, fils in by_package.items():
-        
+
         if len(fils) > 1:
             print("WARNING: Ignoring duplicate package found:", package, fils)
             assert False
