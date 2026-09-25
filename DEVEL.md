@@ -1,5 +1,24 @@
 # Quick Start
 
+## Ubuntu 26.04 Validation
+
+Ubuntu 26.04 uses PMIx v5 packages and the `slurm-ubuntu-resolute` repository.
+Until that repository is published, stage the custom Slurm DEBs and the matching
+`pmix`, `pmix-hwloc`, and `pmix-libevent` DEBs in one directory on each node before
+Slurm installation. Set `slurm.package_dir` in the node configuration to that
+absolute path and set `slurm.version` to the exact Slurm build version.
+This skips PMC Slurm repository setup, installs the local packages with their
+dependencies, and rejects missing or ambiguous package selections.
+
+On Ubuntu 26.04, Enroot verification uses `gnudd` from `gnu-coreutils` because
+the bundled extractor fails with uutils `dd`. The system `dd` remains unchanged.
+
+Use a Ubuntu 26.04 HPC gallery image ID for the scheduler and compute image
+parameters in a test cluster or CycleCloud Workspace for Slurm. Do not substitute
+the Ubuntu 24.04 repository or assume a U26 Marketplace SKU is published.
+Keep the test cluster isolated and validate installation, `srun --mpi=list`, a
+two-node job, and a PMIx v5 MPI job before changing production defaults.
+
 ```
 CODE_DIR=~/code  # or where ever you wish to develop this
 cd $CODE_DIR
