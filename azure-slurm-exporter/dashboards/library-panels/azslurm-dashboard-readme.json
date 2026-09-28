@@ -18,6 +18,6 @@
       "content": "## Disclaimer\n\n> **\u26a0\ufe0f Note:** Under heavy system load, dashboards may update more slowly. Displayed metrics may experience delays and should not be relied upon as a real-time source of truth during peak activity. Gaps in the dashboard may be seen when azslurm-exporter is down or when slurmctld is down.",
       "mode": "markdown"
     },
-    "pluginVersion": "11.6.9"
+    "pluginVersion": "12.4.6"
   }
 }
