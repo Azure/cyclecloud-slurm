@@ -93,14 +93,12 @@ INSIDERS=$(/opt/cycle/jetpack/bin/jetpack config slurm.insiders False)
 if [[ "$INSIDERS" == "True" ]]; then
     REPO_GROUP="insiders"
 fi
-SLURM_PACKAGE_DIR=$(/opt/cycle/jetpack/bin/jetpack config slurm.package_dir '')
 
 if [ "$arch" == "arm64" ] && [[ $UBUNTU_VERSION < "24.04" ]]; then
         echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
         exit 1
 fi
 
-if [[ -z "$SLURM_PACKAGE_DIR" ]]; then
 # Ensure the Microsoft GPG key is at the path expected by signed-by.
 # HPC images ship the key in /etc/apt/trusted.gpg.d/ rather than /usr/share/keyrings/.
 # Marketplace / CIS-hardened images may not have it at all, so download it.
@@ -124,7 +122,6 @@ Pin-Priority: 990
 Package: slurm, slurm-*
 Pin: origin *ubuntu.com*
 Pin-Priority: -1" > /etc/apt/preferences.d/slurm-repository-pin-990
-fi
 
 slurm_packages="slurm-smd slurm-smd-client slurm-smd-dev slurm-smd-libnss-slurm slurm-smd-libpam-slurm-adopt slurm-smd-sview"
 sched_packages="slurm-smd-slurmctld slurm-smd-slurmdbd slurm-smd-slurmrestd"
@@ -144,23 +141,10 @@ fi
 # Combine dependency packages and versioned SLURM packages
 all_packages="$dependency_packages"
 
-if [[ -n "$SLURM_PACKAGE_DIR" ]]; then
-    SLURM_PACKAGE_DIR=$(realpath "$SLURM_PACKAGE_DIR")
-    for pkg in pmix pmix-hwloc pmix-libevent $all_slurm_packages; do
-        version_pattern="${SLURM_VERSION}*"
-        if [[ "$pkg" == pmix* ]]; then version_pattern='*'; fi
-        candidates=("$SLURM_PACKAGE_DIR/${pkg}_"$version_pattern"_${arch}.deb")
-        if [[ ${#candidates[@]} != 1 || ! -f "${candidates[0]}" ]]; then
-            echo "Expected one $pkg package for $arch in $SLURM_PACKAGE_DIR" >&2
-            exit 1
-        fi
-        all_packages="$all_packages ${candidates[0]}"
-    done
-else
-    for pkg in $all_slurm_packages; do
-        all_packages="$all_packages ${pkg}=${SLURM_VERSION}*"
-    done
-fi
+# Add version suffix to all slurm packages
+for pkg in $all_slurm_packages; do
+    all_packages="$all_packages ${pkg}=${SLURM_VERSION}*"
+done
 
 # Install all packages using the unified function
 dpkg_pkg_install "$all_packages"
