@@ -25,6 +25,8 @@ dpkg_pkg_install() {
         if [[ "$pkg_name" == *.deb ]]; then
             local base_pkg=$(dpkg-deb -f "$pkg_name" Package)
             local package_version=$(dpkg-deb -f "$pkg_name" Version)
+            # Skip only an exact installed version, including the package release.
+            # db:Status-Status still reports installed for held packages.
             if [[ "$(dpkg-query -W -f='${db:Status-Status} ${Version}' "$base_pkg" 2>/dev/null || true)" != "installed $package_version" ]]; then
                 packages_to_install="$packages_to_install $pkg_name"
                 packages_to_hold="$packages_to_hold $base_pkg"
