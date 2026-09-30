@@ -132,7 +132,7 @@ setup(
     },
     install_requires=[
         "typing_extensions==3.7.4.3",
-        "zipp==3.19.1"
+        "zipp==4.1.0"
     ],
     tests_require=["pytest==3.2.3"],
     cmdclass={"test": PyTest, "format": Formatter, "types": TypeChecking},
