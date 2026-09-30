@@ -65,7 +65,7 @@ class InstallSettings:
         self.slurm_db_cluster_name = re.sub(r'-', '_', self.slurm_cluster_name)
 
         self.node_name = config["node_name"]
-        self.hostname = config["hostname"]
+        self.hostname = os.uname().nodename
         self.ipv4 = config["ipaddress"]
         self.slurmver = config["slurm"]["version"]
         self.vm_size = config["azure"]["metadata"]["compute"]["vmSize"]
