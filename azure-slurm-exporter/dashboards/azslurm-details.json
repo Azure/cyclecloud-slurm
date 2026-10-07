@@ -20,7 +20,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 2,
-  "id": null,
   "links": [],
   "panels": [
     {
@@ -68,6 +67,273 @@
     },
     {
       "datasource": {
+        "type": "mysql",
+        "uid": "${mysqlDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": [
+                "countAll"
+              ]
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "noValue": "No current running jobs",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "noValue"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 1068,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "state"
+          }
+        ]
+      },
+      "pluginVersion": "12.4.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${mysqlDatasource}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    j.id_job as \"jobid\",\r\n    j.job_name,\r\n    j.`partition`,\r\n    a.`user` as \"user\",\r\n    j.nodelist,\r\n    j.nodes_alloc,\r\n    j.cpus_req,\r\n    CASE (j.state & 0xff)\r\n        WHEN 0 THEN 'PENDING'\r\n        WHEN 1 THEN 'RUNNING'\r\n        WHEN 2 THEN 'SUSPENDED'\r\n        WHEN 3 THEN 'COMPLETED'\r\n        WHEN 4 THEN 'CANCELLED'\r\n        WHEN 5 THEN 'FAILED'\r\n        WHEN 6 THEN 'TIMEOUT'\r\n        WHEN 7 THEN 'NODE_FAIL'\r\n        WHEN 8 THEN 'PREEMPTED'\r\n        WHEN 9 THEN 'BOOT_FAIL'\r\n        WHEN 10 THEN 'DEADLINE'\r\n        WHEN 11 THEN 'OUT_OF_MEMORY'\r\n        ELSE 'UNKNOWN'\r\n    END as \"state\",\r\n   \r\n    FROM_UNIXTIME(j.time_submit) as \"submit_time\",\r\n    FROM_UNIXTIME(j.time_start) as \"start_time\"\r\nFROM \r\n    ${cluster_db}.`${slurm_cluster}_job_table` j\r\nLEFT JOIN \r\n    ${cluster_db}.`${slurm_cluster}_assoc_table` a ON j.id_assoc = a.id_assoc\r\nWHERE \r\n    (j.state & 0xff) = 1\r\n    AND $__unixEpochFilter(j.time_start)\r\n    AND j.`partition` IN (${partition:singlequote})\r\nORDER BY \r\n    j.time_start DESC\r\nLIMIT 1000",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time_start",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Current Running Jobs between $__from and $__to",
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {}
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "mysql",
+        "uid": "${mysqlDatasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "footer": {
+              "reducers": [
+                "countAll"
+              ]
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "noValue": "No Finished Jobs within time range",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "noValue"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "id": 1069,
+      "options": {
+        "cellHeight": "sm",
+        "frameIndex": 1,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "state"
+          }
+        ]
+      },
+      "pluginVersion": "12.4.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${mysqlDatasource}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    j.id_job as \"jobid\",\r\n    j.job_name,\r\n    j.`partition`,\r\n    a.`user` as \"user\",\r\n    j.nodelist,\r\n    j.nodes_alloc,\r\n    j.cpus_req,\r\n    CASE (j.state & 0xff)\r\n        WHEN 0 THEN 'PENDING'\r\n        WHEN 1 THEN 'RUNNING'\r\n        WHEN 2 THEN 'SUSPENDED'\r\n        WHEN 3 THEN 'COMPLETED'\r\n        WHEN 4 THEN 'CANCELLED'\r\n        WHEN 5 THEN 'FAILED'\r\n        WHEN 6 THEN 'TIMEOUT'\r\n        WHEN 7 THEN 'NODE_FAIL'\r\n        WHEN 8 THEN 'PREEMPTED'\r\n        WHEN 9 THEN 'BOOT_FAIL'\r\n        WHEN 10 THEN 'DEADLINE'\r\n        WHEN 11 THEN 'OUT_OF_MEMORY'\r\n        ELSE 'UNKNOWN'\r\n    END as \"state\",\r\n    CONCAT((j.exit_code >> 8) & 0xff, ':', j.exit_code & 0xff) as \"exit_code\",\r\n    CASE CONCAT((j.exit_code >> 8) & 0xff, ':', j.exit_code & 0xff)\r\n        WHEN '0:0' THEN ' '\r\n        WHEN '1:0' THEN 'General failure'\r\n        WHEN '2:0' THEN 'Misuse of shell built-in'\r\n        WHEN '125:0' THEN 'Slurm Out of Memory Error'\r\n        WHEN '126:0' THEN 'Command invoked cannot execute'\r\n        WHEN '127:0' THEN 'Command not found'\r\n        WHEN '128:0' THEN 'Invalid argument to exit'\r\n        WHEN '129:0' THEN 'SIGHUP'\r\n        WHEN '130:0' THEN 'SIGINT - Ctrl+C'\r\n        WHEN '131:0' THEN 'SIGQUIT'\r\n        WHEN '134:0' THEN 'SIGABRT'\r\n        WHEN '137:0' THEN 'SIGKILL - Force killed'\r\n        WHEN '139:0' THEN 'SIGSEGV - Segfault'\r\n        WHEN '141:0' THEN 'SIGPIPE'\r\n        WHEN '143:0' THEN 'SIGTERM - Terminated'\r\n        WHEN '152:0' THEN 'SIGXCPU - CPU limit'\r\n        WHEN '153:0' THEN 'SIGXFSZ - File size limit'\r\n        ELSE ''\r\n    END as \"reason\",\r\n    FROM_UNIXTIME(j.time_submit) as \"submit_time\",\r\n    FROM_UNIXTIME(j.time_start) as \"start_time\",\r\n    FROM_UNIXTIME(j.time_end) as \"end_time\"\r\nFROM \r\n    ${cluster_db}.`${slurm_cluster}_job_table` j\r\nLEFT JOIN \r\n    ${cluster_db}.`${slurm_cluster}_assoc_table` a ON j.id_assoc = a.id_assoc\r\nWHERE \r\n    $__unixEpochFilter(j.time_end)\r\n    AND j.`partition` IN (${partition:singlequote})\r\nORDER BY \r\n    j.time_end DESC\r\nLIMIT 1000",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "time_start",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "mysql",
+            "uid": "${mysqlDatasource}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    j.id_job as \"jobid\",\r\n    j.job_name,\r\n    j.`partition`,\r\n    a.`user` as \"user\",\r\n    j.account as \"account\",\r\n    j.nodelist,\r\n    j.nodes_alloc,\r\n    j.cpus_req,\r\n    CASE (j.state & 0xff)\r\n        WHEN 0 THEN 'PENDING'\r\n        WHEN 1 THEN 'RUNNING'\r\n        WHEN 2 THEN 'SUSPENDED'\r\n        WHEN 3 THEN 'COMPLETED'\r\n        WHEN 4 THEN 'CANCELLED'\r\n        WHEN 5 THEN 'FAILED'\r\n        WHEN 6 THEN 'TIMEOUT'\r\n        WHEN 7 THEN 'NODE_FAIL'\r\n        WHEN 8 THEN 'PREEMPTED'\r\n        WHEN 9 THEN 'BOOT_FAIL'\r\n        WHEN 10 THEN 'DEADLINE'\r\n        WHEN 11 THEN 'OUT_OF_MEMORY'\r\n        ELSE 'UNKNOWN'\r\n    END as \"state\",\r\n    CONCAT((j.exit_code >> 8) & 0xff, ':', j.exit_code & 0xff) as \"exit_code\",\r\n    CASE CONCAT((j.exit_code >> 8) & 0xff, ':', j.exit_code & 0xff)\r\n        WHEN '0:0' THEN ''\r\n        WHEN '1:0' THEN 'General failure'\r\n        WHEN '2:0' THEN 'Misuse of shell built-in'\r\n        WHEN '125:0' THEN 'Slurm Out of Memory Error'\r\n        WHEN '126:0' THEN 'Command invoked cannot execute'\r\n        WHEN '127:0' THEN 'Command not found'\r\n        WHEN '128:0' THEN 'Invalid argument to exit'\r\n        WHEN '129:0' THEN 'SIGHUP'\r\n        WHEN '130:0' THEN 'SIGINT - Ctrl+C'\r\n        WHEN '131:0' THEN 'SIGQUIT'\r\n        WHEN '134:0' THEN 'SIGABRT'\r\n        WHEN '137:0' THEN 'SIGKILL - Force killed'\r\n        WHEN '139:0' THEN 'SIGSEGV - Segfault'\r\n        WHEN '141:0' THEN 'SIGPIPE'\r\n        WHEN '143:0' THEN 'SIGTERM - Terminated'\r\n        WHEN '152:0' THEN 'SIGXCPU - CPU limit'\r\n        WHEN '153:0' THEN 'SIGXFSZ - File size limit'\r\n        ELSE ''\r\n    END as \"reason\",\r\n    FROM_UNIXTIME(j.time_submit) as \"submit_time\",\r\n    FROM_UNIXTIME(j.time_start) as \"start_time\",\r\n    FROM_UNIXTIME(NULLIF(j.time_end, 0)) as \"end_time\"\r\nFROM \r\n    ${cluster_db}.`${slurm_cluster}_job_table` j\r\nLEFT JOIN \r\n    ${cluster_db}.`${slurm_cluster}_assoc_table` a ON j.id_assoc = a.id_assoc\r\nWHERE \r\n    $__unixEpochFilter(j.time_start)\r\n    AND j.`partition` IN (${partition:singlequote})\r\nORDER BY \r\n    j.time_start DESC\r\nLIMIT 1000",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Job History between $__from and $__to",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "user": false
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {}
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
         "type": "prometheus",
         "uid": "${promDatasource}"
       },
@@ -82,6 +348,9 @@
               "type": "auto"
             },
             "filterable": true,
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "fieldMinMax": false,
@@ -90,7 +359,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -337,19 +607,11 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 26
       },
       "id": 1065,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "frameIndex": 2,
         "showHeader": true,
         "sortBy": [
@@ -359,7 +621,7 @@
           }
         ]
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -369,7 +631,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"}",
-          "hide": false,
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -456,6 +717,9 @@
               "type": "auto"
             },
             "filterable": false,
+            "footer": {
+              "reducers": []
+            },
             "inspect": false,
             "minWidth": 150
           },
@@ -464,7 +728,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": 0
               },
               {
                 "color": "red",
@@ -479,20 +744,12 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 34
       },
       "id": 1043,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "enablePagination": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
+        "enablePagination": false,
         "frameIndex": 1,
         "showHeader": true,
         "sortBy": [
@@ -502,7 +759,7 @@
           }
         ]
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -588,7 +845,7 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 41
       },
       "id": 1053,
       "libraryPanel": {
@@ -601,7 +858,7 @@
   ],
   "preload": false,
   "refresh": "5s",
-  "schemaVersion": 41,
+  "schemaVersion": 42,
   "tags": [],
   "templating": {
     "list": [
@@ -626,6 +883,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
@@ -665,6 +923,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
@@ -686,6 +945,126 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "mon-test",
+          "value": "mon-test"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "${mysqlDatasource}"
+        },
+        "definition": "SELECT SUBSTRING_INDEX('$cluster', '/', -1)",
+        "hide": 2,
+        "name": "slurm_cluster",
+        "options": [],
+        "query": {
+          "azureLogAnalytics": {
+            "query": "",
+            "resources": []
+          },
+          "dataset": "mon_test_acct_db",
+          "editorMode": "code",
+          "format": "table",
+          "query": "SELECT SUBSTRING_INDEX('$cluster', '/', -1)",
+          "queryType": "Azure Log Analytics",
+          "rawQuery": true,
+          "rawSql": "SELECT SUBSTRING_INDEX('$cluster', '/', -1)",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [
+                  {
+                    "name": "name",
+                    "type": "functionParameter"
+                  }
+                ],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "subscription": "CBBE2034-C78B-4E9B-89B4-8B78530247E5",
+          "table": "cluster_table"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "server815599260.mysql.database.azure.com",
+          "value": "bfvgzn7os86psa"
+        },
+        "label": "MySQL Datasource",
+        "name": "mysqlDatasource",
+        "options": [],
+        "query": "mysql",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "text": "mon_test_acct_db",
+          "value": "mon_test_acct_db"
+        },
+        "datasource": {
+          "type": "mysql",
+          "uid": "${mysqlDatasource}"
+        },
+        "definition": "SELECT CONCAT(REPLACE(SUBSTRING_INDEX('$cluster', '/', -1), '-', '_'), '_acct_db')",
+        "hide": 2,
+        "label": "Cluster database",
+        "name": "cluster_db",
+        "options": [],
+        "query": {
+          "azureLogAnalytics": {
+            "query": "",
+            "resources": []
+          },
+          "editorMode": "code",
+          "format": "table",
+          "query": "SELECT CONCAT(REPLACE(SUBSTRING_INDEX('$cluster', '/', -1), '-', '_'), '_acct_db')",
+          "queryType": "Azure Log Analytics",
+          "rawQuery": true,
+          "rawSql": "SELECT CONCAT(REPLACE(SUBSTRING_INDEX('$cluster', '/', -1), '-', '_'), '_acct_db')",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "subscription": "CBBE2034-C78B-4E9B-89B4-8B78530247E5"
+        },
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       }
     ]
