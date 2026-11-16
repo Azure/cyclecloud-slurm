@@ -26,20 +26,17 @@ class MockSyncNodes(allocation.SyncNodes):
         return super().sync_nodes(slurm_nodes, cyclecloud_nodes)
 
 
-def setup():
-    slutil.TEST_MODE = True
+@pytest.fixture
+def suspend_exc_serializer(tmp_path):
+    return allocation.SuspendExcNodesSerializer(str(tmp_path / "keep_alive.conf"))
 
 
-def teardown():
-    slutil.TEST_MODE = False
-
-
-def test_basic_resume() -> None:
+def test_basic_resume(suspend_exc_serializer) -> None:
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
     partitions = fetch_partitions(node_mgr)
     native_cli = testutil.make_native_cli()
-    node_list = allocation.SlurmNodes(["hpc-1", "hpc-2", "htc-1"])
+    node_list = ["hpc-1", "hpc-2", "htc-1"]
 
     bootup_result = allocation.resume(testutil.CONFIG, node_mgr, node_list, partitions)
     assert bootup_result
@@ -59,33 +56,33 @@ def test_basic_resume() -> None:
     assert 3 == len(get_latest_nodes())
 
     sync_nodes = MockSyncNodes()
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
+    slurm_nodes = allocation.SlurmNodes(suspend_exc_serializer)
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
     assert len(ready) == 0
 
     bindings.assign_ip(["hpc-2", "htc-1"])
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
     assert len(ready) == 0
     assert native_cli.slurm_nodes["hpc-2"]["NodeAddr"] == "hpc-2"
-    assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "10.1.0.3"
+    assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "htc-1"
 
     bindings.update_state("Ready", ["hpc-2"])
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
     assert ["hpc-2"] == [n.name for n in ready]
 
     bindings.update_state("Ready", ["hpc-1", "htc-1"])
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
-    # hpc-1 should not be ready - it still has no ip address
-    assert ["hpc-2", "htc-1"] == [n.name for n in ready]
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
+    # Readiness follows CycleCloud state, not IP assignment.
+    assert node_list == [n.name for n in ready]
 
     bindings.assign_ip(["hpc-1"])
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
-    # hpc-1 should not be ready - it still has no ip address
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
     assert list(node_list) == [n.name for n in ready]
 
 
 def test_mixed_resume_names() -> None:
     node_mgr = testutil.make_test_node_manager()
-    node_list = allocation.SlurmNodes(["hpc-4", "hpc-20"])
+    node_list = ["hpc-4", "hpc-20"]
     partitions = fetch_partitions(node_mgr)
 
     bootup_result = allocation.resume(testutil.CONFIG, node_mgr, node_list, partitions)
@@ -96,11 +93,10 @@ def test_mixed_resume_names() -> None:
 
 
 @pytest.fixture(autouse=True)
-def mock_is_slurmctld_up() -> None:
-    implementation = slutil.is_slurmctld_up
-    slutil.is_slurmctld_up = lambda: True
-    yield
-    slutil.is_slurmctld_up = implementation
+def mock_is_slurmctld_up(monkeypatch) -> None:
+    monkeypatch.setattr(slutil, "is_slurmctld_up", lambda: True)
+    monkeypatch.setattr(slutil, "TEST_MODE", True)
+    monkeypatch.setattr(slutil, "SLURM_CLI", testutil.MockNativeSlurmCLI())
 
 
 def test_resume_dynamic_by_feature() -> None:
@@ -141,10 +137,10 @@ def test_resume_dynamic_by_feature() -> None:
     assert 2 == len(result.nodes)
 
 
-def test_failure_mode() -> None:
+def test_failure_mode(suspend_exc_serializer) -> None:
     node_mgr = testutil.make_test_node_manager()
     bindings: MockClusterBinding = node_mgr.cluster_bindings  # type: ignore
-    node_list = allocation.SlurmNodes(["hpc-1", "hpc-2", "htc-1"])
+    node_list = ["hpc-1", "hpc-2", "htc-1"]
     partitions = fetch_partitions(node_mgr)
     native_cli = testutil.make_native_cli()
 
@@ -159,30 +155,33 @@ def test_failure_mode() -> None:
         return new_node_mgr.get_nodes()
 
     sync_nodes = MockSyncNodes()
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
+    slurm_nodes = allocation.SlurmNodes(suspend_exc_serializer)
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
     assert len(ready) == 0
 
     bindings.assign_ip(node_list)
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
 
-    assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "10.1.0.4"
+    assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "htc-1"
 
-    # make sure new IPs are assigned - cyclecloud often does this
+    # IP changes are left to node registration, not daemon convergence.
     bindings.assign_ip(["htc-1"])
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
-    assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "10.1.0.5"
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
+    assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "htc-1"
 
-    # make sure we unassign the IP for a failed node
+    # A CycleCloud health failure must not take a joined Slurm node down.
     bindings.update_state("Failed", ["htc-1"])
-    states, ready = sync_nodes.sync_nodes(node_list, get_latest_nodes())
+    states, ready = sync_nodes.sync_nodes(slurm_nodes, get_latest_nodes())
     assert native_cli.slurm_nodes["htc-1"]["NodeAddr"] == "htc-1", states
+    assert native_cli.slurm_nodes["htc-1"]["State"] == "idle"
+    assert not ready
 
 
-def test_keep_alive() -> None:
+def test_keep_alive(suspend_exc_serializer) -> None:
     native_cli = testutil.make_native_cli()
     # add the node outside of azslurmd
     native_cli.scontrol(["update", "suspendexcnodes+=htc-1"])
-    sn = allocation.SlurmNodes([], slutil.get_current_suspend_exc_nodes())
+    sn = allocation.SlurmNodes(suspend_exc_serializer)
     
     # node is in suspend_exc and remains there, even if we try to remove it
     assert sn.is_suspend_exc("htc-1")
