@@ -14,6 +14,19 @@ cd cyclecloud-slurm
 docker-package.sh ../cyclecloud-scalelib
 ```
 
+## Local Python Tests
+
+Install `uv` and ensure `openssl` is on PATH for the installer TLS tests.
+
+Run all three local test suites:
+
+```bash
+./test_cyclecloud_slurm.sh
+```
+
+The script installs the test and runtime dependencies with `uv pip`, including the
+CycleCloud scalelib and API releases from GitHub.
+
 ## New Slurm Versions
 1. Add a record to slurm/install/slurm_supported_version.py:SUPPORTED_VERSIONS
     Currently it looks like

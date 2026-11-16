@@ -7,7 +7,6 @@ import os
 import pwd
 import re
 import shutil
-from ssl import SSLContext
 import ssl
 import subprocess
 import tempfile
@@ -564,7 +563,21 @@ def cluster_status(config: Dict) -> Dict:
     urlbase = cc_config["web_server"].rstrip("/")
     username = cc_config["username"]
     password = cc_config["password"]
-    context = SSLContext(ssl.PROTOCOL_TLSv1_2)
+    cert = cc_config.get("cert")
+    if cert is not None:
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cadata=cert)
+        context.verify_mode = ssl.CERT_REQUIRED
+        # note: clusters often operate in virtual networks without DNS.
+        context.check_hostname = False
+    else:
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        skip_ssl_validation = config["cyclecloud"].get("skip_ssl_validation", False)
+        if skip_ssl_validation:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.options |= ssl.OP_NO_COMPRESSION
+
     cluster_name = urllib.parse.quote(config["cyclecloud"]["cluster"]["name"])
     url = f"{urlbase}/clusters/{cluster_name}/nodes"
 

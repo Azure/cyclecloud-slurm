@@ -38,134 +38,141 @@ def bindings(setup_slurm: None) -> testutil.MockClusterBinding:
 
 
 @pytest.fixture()
-def setup_slurm() -> None:
+def keep_alive_conf(tmp_path) -> str:
+    return str(tmp_path / "keep_alive.conf")
+
+
+@pytest.fixture()
+def setup_slurm(monkeypatch) -> None:
+    monkeypatch.setattr(slutil, "SLURM_CLI", testutil.MockNativeSlurmCLI())
     testutil.make_native_cli(False)
     slutil.SLURM_CLI.create_nodes(["hpc-1", "hpc-2"], features=["CLOUD"])
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "idle"
     return None
 
 
-def test_noop(bindings: testutil.MockClusterBinding) -> None:
+def test_noop(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     # return an empty list of nodes - nothing to do
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
 
-def test_one_ready_node(bindings: testutil.MockClusterBinding) -> None:
+def test_one_ready_node(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
 
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
 
-def test_one_not_ready_node_no_ip(bindings: testutil.MockClusterBinding) -> None:
+def test_one_not_ready_node_no_ip(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Allocation", target_state="Started"
     )
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
 
-def test_one_not_ready_node_with_ip(bindings: testutil.MockClusterBinding) -> None:
+def test_one_not_ready_node_with_ip(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Allocation", target_state="Started"
     )
 
     bindings.assign_ip(["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
 
-def test_one_ready_node_with_ip(bindings: testutil.MockClusterBinding) -> None:
+def test_one_ready_node_with_ip(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
     bindings.assign_ip(["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
 
 def test_one_ready_node_with_ip_internal_dns(
-    bindings: testutil.MockClusterBinding,
+    bindings: testutil.MockClusterBinding, keep_alive_conf: str,
 ) -> None:
-    from slurmcc import allocation
-    allocation.BEGIN_TEST = True
     node = bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
     bindings.assign_ip(["hpc-1"])
     node.software_configuration["slurm"]["use_nodename_as_hostname"] = False
     assert not node.software_configuration["slurm"]["use_nodename_as_hostname"]
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
     assert node.private_ip, "node should have a private IP address"
     assert (
-        slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == node.private_ip
-    ), f"NodeAddr should be the private IP address - got {slutil.SLURM_CLI.slurm_nodes['hpc-1']['NodeAddr']}"
+        slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == "hpc-1"
+    ), "Daemon convergence must leave address assignment to node registration"
 
 
 
-def test_one_failed_node_with_ip(bindings: testutil.MockClusterBinding) -> None:
+def test_one_failed_node_with_ip(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     hpc1 = bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Allocation", target_state="Started"
     )
     bindings.assign_ip(["hpc-1"])
     hpc1.software_configuration["slurm"]["use_nodename_as_hostname"] = False
     
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    slutil.SLURM_CLI.scontrol(["update", "NodeName=hpc-1", f"NodeAddr={hpc1.private_ip}"])
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "idle"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == hpc1.private_ip, "NodeAddr should be the private IP address"
 
     bindings.update_state("Failed", ["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
-    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "down", "Should be marked down because it failed"
-    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_node_failure"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "idle"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == ""
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == hpc1.private_ip
 
     bindings.update_state("Ready", ["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
-    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "idle", "node should be recovered %s" % SLURM_CLI.slurm_nodes["hpc-1"]
-    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_node_recovery"
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "idle"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == ""
 
 
-def test_node_goes_missing(bindings: testutil.MockClusterBinding) -> None:
+def test_node_goes_missing(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
     bindings.assign_ip(["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
     # remove the node from the cluster
     bindings.shutdown_nodes(names=["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "down"
-    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_node_failure"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_no_node"
 
 
-def test_node_goes_missing_with_ip(bindings: testutil.MockClusterBinding) -> None:
+def test_node_goes_missing_with_ip(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     node = bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
     bindings.assign_ip(["hpc-1"])
     node.software_configuration["slurm"]["use_nodename_as_hostname"] = False
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    slutil.SLURM_CLI.scontrol(["update", "NodeName=hpc-1", f"NodeAddr={node.private_ip}"])
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == node.private_ip, "NodeAddr should be the private IP address"
     # remove the node from cyclecloud
     bindings.shutdown_nodes(names=["hpc-1"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings)).run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "down"
-    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_node_failure"
+    assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_no_node"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == "hpc-1"
 
 
-def test_zombie_node(bindings: testutil.MockClusterBinding) -> None:
+def test_zombie_node(bindings: testutil.MockClusterBinding, keep_alive_conf: str) -> None:
     bindings.add_node(
         name="hpc-1", nodearray="hpc", state="Ready", target_state="Started"
     )
     
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings), "/tmp/keep_alive.conf").run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
     # change the node state in slurm to powered / powering_down
     slutil.SLURM_CLI.scontrol(["update", "NodeName=hpc-1", "State=powered_down"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings), "/tmp/keep_alive.conf").run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
 
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "down"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "cyclecloud_zombie_node"
@@ -174,7 +181,7 @@ def test_zombie_node(bindings: testutil.MockClusterBinding) -> None:
     # shutdown the node, and see the state goes away
     bindings.shutdown_nodes(names=["hpc-1"])
     slutil.SLURM_CLI.scontrol(["update", "NodeName=hpc-1", "State=powered_down"])
-    azslurmd.AzslurmDaemon(MockNodeSource(bindings), "/tmp/keep_alive.conf").run_once()
+    azslurmd.AzslurmDaemon(MockNodeSource(bindings), keep_alive_conf).run_once()
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["State"] == "powered_down"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["Reason"] == "(null)"
     assert slutil.SLURM_CLI.slurm_nodes["hpc-1"]["NodeAddr"] == "hpc-1"

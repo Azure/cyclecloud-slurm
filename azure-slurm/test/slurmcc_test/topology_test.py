@@ -139,14 +139,13 @@ def run_command(cmd,shell=True):
         out=None
     return OutputContainer(out)
 
-def setup():
-    """
-    Creates the directory 'test/slurmcc_test/topology_test_output' if it does not already exist.
+@pytest.fixture(autouse=True)
+def setup_topology(monkeypatch, tmp_path):
+    monkeypatch.setattr(sys.modules[__name__], "TESTDIR", str(tmp_path))
+    monkeypatch.setattr(slutil, "run", run_command)
+    monkeypatch.setattr(slutil, "srun", run_parallel_cmd)
 
-    This function ensures that the directory structure is created, including any necessary parent directories.
-    If the directory already exists, no exception is raised.
-    """
-    Path("test/slurmcc_test/topology_test_output").mkdir(parents=True, exist_ok=True)
+
 def test_get_hostnames():
     """
     Test the get_hostnames method of the Topology class.
@@ -167,7 +166,6 @@ def test_get_hostnames():
     Raises:
         AssertionError: If the retrieved hostnames do not match the expected hostnames.
     """
-    slutil.run=run_command
     test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.get_hostnames()
     result=test_obj.hosts
@@ -189,7 +187,6 @@ def test_get_os_name():
     4. Call the get_os_name method of the Topology object.
     5. Assert that the result is 'ubuntu'.
     """
-    slutil.srun=run_parallel_cmd
     test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     result=test_obj.get_os_name()
@@ -227,7 +224,6 @@ def test_check_sharp_hello():
     Returns:
         None
     """
-    slutil.srun=run_parallel_cmd
     test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     test_obj.sharp_cmd_path="/opt/hpcx-v2.18-gcc-mlnx_ofed-ubuntu22.04-cuda12-x86_64/"
@@ -252,7 +248,6 @@ def test_check_ibstatus():
     Returns:
         None
     """
-    slutil.srun=run_parallel_cmd
     test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     result=test_obj.check_ibstatus()
@@ -275,7 +270,6 @@ def test_retrieve_guids():
     Raises:
         AssertionError: If the contents of the output GUIDs file do not match the expected GUIDs.
     """
-    slutil.srun=run_parallel_cmd
     test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     with open('test/slurmcc_test/topology_test_input/guid_hostnames.txt','r', encoding='utf-8') as file:
         test_obj.hosts= file.read().splitlines()
@@ -301,7 +295,6 @@ def test_generate_topo_file():
         AssertionError: If the generated topology file content does not match the
                         expected content.
     """
-    slutil.srun=run_parallel_cmd
     test_obj   = Topology("hpc",None,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.hosts=['node1']
     test_obj.generate_topo_file()
@@ -326,12 +319,10 @@ def test_run_fabric():
     Raises:
         AssertionError: If the generated output does not match the expected output.
     """
-    slutil.srun=run_parallel_cmd
-    slutil.run=run_command
-    output= 'test/slurmcc_test/topology_test_output/slurm_topology_2.txt'
+    output= f'{TESTDIR}/slurm_topology_2.txt'
     test_obj   = Topology("hpc",output,TopologyInput.FABRIC,TopologyType.TREE,TESTDIR)
     test_obj.run()
-    with open('test/slurmcc_test/topology_test_output/slurm_topology_2.txt','r', encoding='utf-8') as file:
+    with open(output,'r', encoding='utf-8') as file:
         result= file.read()
     with open('test/slurmcc_test/topology_test_input/slurm_topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
@@ -352,9 +343,7 @@ def test_run_nvlink():
     Raises:
         AssertionError: If the generated output does not match the expected output.
     """
-    slutil.srun=run_parallel_cmd
-    slutil.run=run_command
-    output= 'test/slurmcc_test/topology_test_output/slurm_block_topology.txt'
+    output= f'{TESTDIR}/slurm_block_topology.txt'
     test_obj   = Topology("hpc",output,TopologyInput.NVLINK,TopologyType.BLOCK,TESTDIR)
     def fake_run_get_rack_id_command_1(*args, **kwargs):
         output=[]
@@ -363,13 +352,13 @@ def test_run_nvlink():
             for line in lines:
                 host= line.split(':')[0]
                 uuid= line.split(':')[1].strip()
-                output.append(ParallelOutputContainer([uuid],"",0,host))
+                output.append(ParallelOutputContainer([f"{uuid}_0"],"",0,host))
         return output
     test_obj._run_get_rack_id_command = fake_run_get_rack_id_command_1
     test_obj.run()
     racks=test_obj.run_nvlink()
     content = test_obj.write_block_topology(racks)
-    with open('test/slurmcc_test/topology_test_output/slurm_block_topology.txt','r', encoding='utf-8') as file:
+    with open(output,'r', encoding='utf-8') as file:
         result= file.read()
     with open('test/slurmcc_test/topology_test_input/block_topology.txt','r', encoding='utf-8') as file:
         actual= file.read()
@@ -443,6 +432,7 @@ class DummyHostOut:
     def __init__(self, host, stdout):
         self.host = host
         self.stdout = stdout
+        self.stderr = []
 
 def make_host_out(host, lines):
     return DummyHostOut(host, lines)
@@ -450,36 +440,36 @@ def make_host_out(host, lines):
 def test_get_rack_id_success(monkeypatch):
     # Simulate _run_get_rack_id_command returning host outputs with rack IDs
     outputs = [
-        make_host_out("node1", ["uuidA"]),
-        make_host_out("node2", ["uuidB"]),
-        make_host_out("node3", ["uuidA"]),
+        make_host_out("node1", ["uuidA_0"]),
+        make_host_out("node2", ["uuidB_1"]),
+        make_host_out("node3", ["uuidA_0"]),
     ]
-    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
     monkeypatch.setattr(topo, "_run_get_rack_id_command", lambda: outputs)
     result = topo.get_rack_id()
-    assert result == {"node1": "uuidA", "node2": "uuidB", "node3": "uuidA"}
+    assert result == {"node1": "uuidA_0", "node2": "uuidB_1", "node3": "uuidA_0"}
 
 def test_get_rack_id_strip_and_multiple_lines(monkeypatch):
     # Simulate multiple lines per host
     outputs = [
-        make_host_out("node1", ["uuidA", "uuidA2"]),
-        make_host_out("node2", ["uuidB"]),
+        make_host_out("node1", [" uuidA 0 ", " uuidA2 1 "]),
+        make_host_out("node2", ["uuidB_0"]),
     ]
-    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
     monkeypatch.setattr(topo, "_run_get_rack_id_command", lambda: outputs)
     result = topo.get_rack_id()
     # Only the last line for each host will be kept due to overwrite
-    assert result == {"node1": "uuidA2", "node2": "uuidB"}
+    assert result == {"node1": "uuidA2_1", "node2": "uuidB_0"}
 
 def test_get_rack_id_empty(monkeypatch):
     outputs = []
-    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
     monkeypatch.setattr(topo, "_run_get_rack_id_command", lambda: outputs)
     result = topo.get_rack_id()
     assert result == {}
 
 def test_get_rack_id_exception(monkeypatch):
-    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
     def raise_exc():
         raise Exception("fail")
     monkeypatch.setattr(topo, "_run_get_rack_id_command", raise_exc)
@@ -487,14 +477,12 @@ def test_get_rack_id_exception(monkeypatch):
         topo.get_rack_id()
 
 def test_get_rack_id_timeout(monkeypatch):
-    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, "testdir")
+    topo = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR)
     def raise_timeout():
         raise TimeoutError("timeout")
     monkeypatch.setattr(topo, "_run_get_rack_id_command", raise_timeout)
     with pytest.raises(SystemExit):
         topo.get_rack_id()
-
-TESTDIR = "test/slurmcc_test/topology_test_output"
 
 @pytest.mark.parametrize(
     "block_size,host_dict,expected_lines,should_exit",
@@ -525,7 +513,7 @@ TESTDIR = "test/slurmcc_test/topology_test_output"
                 "rackB": ["node3", "node4", "node5"],
             },
             [
-                "# Warning: Block 1 has less than 3 nodes, commenting out",
+                "# Warning: Block 2 has less than 3 nodes, commenting out",
                 "#BlockName=block_rackA Nodes=node1,node2",
                 "BlockName=block_rackB Nodes=node3,node4,node5",
                 "BlockSizes=3",
@@ -540,9 +528,9 @@ TESTDIR = "test/slurmcc_test/topology_test_output"
                 "rackB": ["node2", "node3"],
             },
             [
-                "# Warning: Block 1 has less than 5 nodes, commenting out",
-                "#BlockName=block_rackA Nodes=node1",
                 "# Warning: Block 2 has less than 5 nodes, commenting out",
+                "#BlockName=block_rackA Nodes=node1",
+                "# Warning: Block 1 has less than 5 nodes, commenting out",
                 "#BlockName=block_rackB Nodes=node2,node3",
                 "BlockSizes=5",
             ],
@@ -569,7 +557,7 @@ def test_write_block_topology_cases(monkeypatch, block_size, host_dict, expected
         assert result.strip().endswith(f"BlockSizes={block_size}")
 
 def test_write_block_topology_order_and_indexing():
-    # Ensure block indices increment in insertion order
+    # Equal-sized blocks use group ID as a stable tiebreaker.
     host_dict = {"rackA": ["n1"], "rackB": ["n2"], "rackC": ["n3"]}
     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=2)
     result = test_obj.write_block_topology(host_dict)
@@ -603,7 +591,7 @@ def test_write_block_topology_multiple_blocks_mixed_sizes():
     test_obj = Topology("hpc", None, TopologyInput.NVLINK, TopologyType.BLOCK, TESTDIR, block_size=3)
     result = test_obj.write_block_topology(host_dict)
     assert "BlockName=block_rackA Nodes=node1,node2,node3" in result
-    assert "# Warning: Block 2 has less than 3 nodes, commenting out" in result
+    assert "# Warning: Block 3 has less than 3 nodes, commenting out" in result
     assert "#BlockName=block_rackB Nodes=node4" in result
     assert "BlockName=block_rackC Nodes=node5,node6,node7" in result
 
@@ -693,23 +681,19 @@ def test_output_block_nodelist_json_file(block_topology_file):
     assert len(blocks) == 3
     assert any(b['blockname'] == 'block1' for b in blocks)
 
-def test_output_block_nodelist_table_output(block_topology_str, capsys):
+def test_output_block_nodelist_table_output(block_topology_str):
     """
-    Test that output_block_nodelist prints the correct table output to stdout.
+    Test that output_block_nodelist returns the formatted table.
     """
-    output_block_nodelist(block_topology_str, table=True)
-    captured = capsys.readouterr()
-    out = captured[0] if isinstance(captured, tuple) else captured.out
+    out = output_block_nodelist(block_topology_str, table=True)
     assert "Block Name" in out
     assert "block1" in out
     assert "node1" in out
     assert "Total blocks: 3" in out
     assert "Total nodes: 6" in out
 
-def test_output_block_nodelist_table_output_file(block_topology_file, capsys):
-    output_block_nodelist(block_topology_file, table=True)
-    captured = capsys.readouterr()
-    out = captured[0] if isinstance(captured, tuple) else captured.out
+def test_output_block_nodelist_table_output_file(block_topology_file):
+    out = output_block_nodelist(block_topology_file, table=True)
     assert "Block Name" in out
     assert "block2" in out
     assert "node4" in out
@@ -726,12 +710,10 @@ def test_output_block_nodelist_invalid_format():
     with pytest.raises(ValueError):
         output_block_nodelist("This is not a block topology", table=False)
 
-def test_output_block_nodelist_long_nodes_truncation(capsys):
+def test_output_block_nodelist_long_nodes_truncation():
     long_nodes = ",".join([f"node{i}" for i in range(20)])
     content = f"BlockName=blockX Nodes={long_nodes}"
-    output_block_nodelist(content, table=True)
-    captured = capsys.readouterr()
-    out = captured[0] if isinstance(captured, tuple) else captured.out
+    out = output_block_nodelist(content, table=True)
     # Should be truncated with "..."
     assert "..." in out
 

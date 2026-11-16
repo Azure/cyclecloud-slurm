@@ -2,6 +2,8 @@ from slurmcc.util import to_hostlist, get_sort_key_func, run, _show_nodes, set_s
 from slurmcc_test.testutil import MockNativeSlurmCLI
 from typing import List
 import subprocess
+import sys
+import pytest
 
 def scontrol_func(args: List[str], retry: bool = True) -> str:
     if len(args) < 2:
@@ -39,17 +41,18 @@ def test_to_hostlist() -> None:
     assert "name-1,dyn" == to_hostlist(["dyn","name-1"], scontrol_func)
 
 def test_run_function() -> None:
-    out = run(['ls', '-l'], shell=True)
+    out = run("echo slurm-test", shell=True)
     assert out.returncode == 0
+    assert out.stdout.strip() == "slurm-test"
 
-    out = run(['cat', '/proc/loadavg'], shell=False)
+    out = run([sys.executable, "-c", "print('slurm-test')"], shell=False)
     assert out.returncode == 0
+    assert out.stdout.strip() == "slurm-test"
 
-    # test case for permissions errors
-    try:
-        out=run(['touch', '/root/.test'])
-    except subprocess.CalledProcessError as e:
-        assert out.returncode != 0
+    with pytest.raises(subprocess.CalledProcessError) as exc_info:
+        run([sys.executable, "-c", "import sys; sys.stderr.write('failed'); sys.exit(7)"])
+    assert exc_info.value.returncode == 7
+    assert exc_info.value.stderr == "failed"
 
 
 def test_show_nodes() -> None:
