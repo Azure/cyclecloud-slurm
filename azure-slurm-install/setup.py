@@ -134,7 +134,7 @@ setup(
         "typing_extensions==3.7.4.3",
         "zipp==3.19.1"
     ],
-    tests_require=["pytest==3.2.3"],
+    tests_require=["pytest==9.0.3"],
     cmdclass={"test": PyTest, "format": Formatter, "types": TypeChecking},
     url="http://www.cyclecomputing.com",
     maintainer="Cycle Computing",
