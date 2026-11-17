@@ -67,7 +67,7 @@ if command -v docker; then
   runtime_args=
 elif command -v podman; then
   runtime=podman
-  runtime_args="--privileged"
+  runtime_args="--privileged --userns=keep-id"
 else
   echo "`docker` or `podman` binary not found. Install docker or podman to build RPMs with this script"
   exit 1
@@ -77,7 +77,7 @@ fi
   delete_existing_blobs
   # allows caching
   $runtime build -t azslurm_build:latest -f util/Dockerfile .
-  $runtime run -v $(pwd):${local_azslurm} $runtime_args $extra_args -ti azslurm_build:latest /bin/bash ${local_azslurm}/util/build.sh $local_scalelib
+  $runtime run --user "$(id -u):$(id -g)" -v $(pwd):${local_azslurm} $runtime_args $extra_args -ti azslurm_build:latest /bin/bash ${local_azslurm}/util/build.sh $local_scalelib
 } &> $log_file
 
 # Call the function to print the branch and the last commit
