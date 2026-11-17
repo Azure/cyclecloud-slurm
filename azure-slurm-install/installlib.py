@@ -4,10 +4,10 @@ from hashlib import md5
 import json
 import logging
 import os
+import platform
 import pwd
 import re
 import shutil
-from ssl import SSLContext
 import ssl
 import subprocess
 import tempfile
@@ -64,6 +64,22 @@ def time() -> float:
 def sleep(n: float) -> None:
     return _CLOCK.sleep(n)
 
+def is_windows() -> bool:
+    return platform.system().lower().startswith("win")
+
+def jetpack_home() -> str:
+    """ Returns the home/root directory where Jetpack is installed """
+    if is_windows():
+        return "C:\\cycle\\jetpack"
+    else:
+        return "/opt/cycle/jetpack"
+
+def get_connection_config():
+    connection_config = os.path.join(jetpack_home(), 'config', 'connection.json')
+    if not os.path.exists(connection_config):
+        return {}
+    with open(connection_config) as f:
+        return json.load(f)
 
 def blob_download(filename: str, project: str, node: Dict) -> str:
 
@@ -560,11 +576,32 @@ def cluster_status(config: Dict) -> Dict:
     if config.get("mock_provider"):
         return config["mock_provider"]["nodes"]
 
-    cc_config = config["cyclecloud"]["config"]
-    urlbase = cc_config["web_server"].rstrip("/")
-    username = cc_config["username"]
-    password = cc_config["password"]
-    context = SSLContext(ssl.PROTOCOL_TLSv1_2)
+    cc_config = get_connection_config()
+    if cc_config:
+        urlbase = cc_config["url"].rstrip("/")
+        username = cc_config["username"]
+        password = cc_config["password"]
+        cert = cc_config.get("cert")
+    else:
+        cc_config = config["cyclecloud"]["config"]
+        urlbase = cc_config["web_server"].rstrip("/")
+        username = cc_config["username"]
+        password = cc_config["password"]
+        cert = None
+    if cert is not None:
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cadata=cert)
+        context.verify_mode = ssl.CERT_REQUIRED
+        # note: clusters often operate in virtual networks without DNS.
+        context.check_hostname = False
+    else:
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        skip_ssl_validation = config["cyclecloud"].get("skip_ssl_validation", False)
+        if skip_ssl_validation:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.options |= ssl.OP_NO_COMPRESSION
+
     cluster_name = urllib.parse.quote(config["cyclecloud"]["cluster"]["name"])
     url = f"{urlbase}/clusters/{cluster_name}/nodes"
 

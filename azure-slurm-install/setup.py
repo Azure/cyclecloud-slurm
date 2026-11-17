@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 from setuptools.command.test import Command
 from setuptools.command.test import test as TestCommand  # noqa: N812
 
-__version__ = "4.0.11"
+__version__ = "4.0.12"
 CWD = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -134,7 +134,7 @@ setup(
         "typing_extensions==3.7.4.3",
         "zipp==3.19.1"
     ],
-    tests_require=["pytest==3.2.3"],
+    tests_require=["pytest==9.2.0"],
     cmdclass={"test": PyTest, "format": Formatter, "types": TypeChecking},
     url="http://www.cyclecomputing.com",
     maintainer="Cycle Computing",
