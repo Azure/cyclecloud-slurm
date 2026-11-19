@@ -771,12 +771,8 @@ Order = 20
         DefaultValue = false
         Widget.Plugin = pico.form.BooleanCheckBox
         Widget.Label = Configure Slurm job accounting
-
-	[[[parameter slurm_database_warning]]]
-	HideLabel = true
-	Config.Plugin = pico.widget.HtmlTemplateWidget
-	Conditions.Excluded := configuration_slurm_accounting_enabled isnt true
-	Config.Template := "<table role=\"presentation\"><tr><td> <b>Note: Checking this box will create persistent databases and tables in SQL DB provided. Deleting this cluster will not automatically delete those databases. User is responsible for periodically purging/archiving their slurm databases to maintain costs.</b></td></tr></table>"
+        Widget.WarnOnCheck = true
+        Widget.Warning = Note: Checking this box will create persistent databases and tables in SQL DB provided. Deleting this cluster will not automatically delete those databases. User is responsible for periodically purging/archiving their slurm databases to maintain costs.
 
         [[[parameter configuration_slurm_accounting_url]]]
         Label = Database URL
