@@ -20,13 +20,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 2,
-  "id": null,
   "links": [],
   "panels": [
     {
       "gridPos": {
         "h": 3,
-        "w": 12,
+        "w": 13,
         "x": 0,
         "y": 0
       },
@@ -41,8 +40,8 @@
     {
       "gridPos": {
         "h": 3,
-        "w": 12,
-        "x": 12,
+        "w": 11,
+        "x": 13,
         "y": 0
       },
       "id": null,
@@ -216,7 +215,7 @@
         "textMode": "auto",
         "wideLayout": false
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -226,7 +225,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sum(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\", state=\"pending\"} or vector(0))",
-          "hide": false,
           "instant": true,
           "legendFormat": "pending",
           "range": false,
@@ -240,7 +238,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sum by (state)(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\", state!=\"pending\"})",
-          "hide": false,
           "instant": true,
           "legendFormat": "{{state}}",
           "range": false,
@@ -254,7 +251,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sum(label_replace(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\"}, \"total\", \"Submitted Jobs\", \"\", \"\") or vector(0))",
-          "hide": false,
           "instant": true,
           "legendFormat": "Submitted Jobs",
           "range": false,
@@ -480,7 +476,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -490,7 +486,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sum by (state)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\", state!=\"n/a\"})",
-          "hide": false,
           "instant": true,
           "legendFormat": "{{state}}",
           "range": false,
@@ -504,7 +499,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sum by (cluster)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "hide": false,
           "instant": true,
           "legendFormat": "Total",
           "range": false,
@@ -548,6 +542,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -650,7 +645,7 @@
                 "id": "custom.hideFrom",
                 "value": {
                   "legend": false,
-                  "tooltip": false,
+                  "tooltip": true,
                   "viz": true
                 }
               }
@@ -682,7 +677,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -691,7 +686,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (state)(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\", state!=\"pending\"})",
-          "hide": false,
           "instant": false,
           "legendFormat": "{{state}}",
           "range": true,
@@ -704,7 +698,6 @@
           },
           "editorMode": "code",
           "expr": "sum(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\", state=\"pending\"} or vector(0))",
-          "hide": false,
           "instant": false,
           "legendFormat": "pending",
           "range": true,
@@ -717,7 +710,6 @@
           },
           "editorMode": "code",
           "expr": "sum(label_replace(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\"}, \"total\", \"Submitted Jobs\", \"\", \"\") or vector(0))",
-          "hide": false,
           "instant": false,
           "legendFormat": "submitted",
           "range": true,
@@ -761,6 +753,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -912,7 +905,7 @@
                 "id": "custom.hideFrom",
                 "value": {
                   "legend": false,
-                  "tooltip": false,
+                  "tooltip": true,
                   "viz": true
                 }
               }
@@ -959,7 +952,7 @@
           "sort": "asc"
         }
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -968,7 +961,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (state)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "hide": false,
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -1065,7 +1057,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -1145,6 +1137,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
@@ -1184,6 +1177,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
@@ -1205,6 +1199,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       }
     ]

@@ -20,13 +20,12 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 2,
-  "id": null,
   "links": [],
   "panels": [
     {
       "gridPos": {
         "h": 3,
-        "w": 12,
+        "w": 13,
         "x": 0,
         "y": 0
       },
@@ -41,8 +40,8 @@
     {
       "gridPos": {
         "h": 3,
-        "w": 12,
-        "x": 12,
+        "w": 11,
+        "x": 13,
         "y": 0
       },
       "id": null,
@@ -302,7 +301,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -312,7 +311,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sdiag_main_cycle_time_us{type=\"mean\",cluster=\"$cluster\"}",
-          "hide": false,
           "instant": true,
           "legendFormat": "Mean Scheduler Cycle (µs)",
           "range": false,
@@ -326,7 +324,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sdiag_main_mean_depth_cycle{cluster=\"$cluster\"}",
-          "hide": false,
           "instant": true,
           "legendFormat": "Mean Depth Cycle",
           "range": false,
@@ -353,7 +350,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sdiag_agent_queue_size{cluster=\"$cluster\"}",
-          "hide": false,
           "instant": true,
           "legendFormat": "Agent Queue",
           "range": false,
@@ -367,7 +363,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sdiag_dbd_agent_queue_size{cluster=\"$cluster\"}",
-          "hide": false,
           "instant": true,
           "legendFormat": "DBD Queue",
           "range": false,
@@ -381,7 +376,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sum(squeue_partition_jobs_state{cluster=\"$cluster\",partition=~\"$partition\", state=\"pending\"} or vector(0))",
-          "hide": false,
           "instant": true,
           "legendFormat": "Queue Pressure",
           "range": false,
@@ -395,7 +389,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} or vector(0))[24h:$__interval]\r\n))",
-          "hide": false,
           "instant": true,
           "legendFormat": "Failed Jobs (Today)",
           "range": false,
@@ -461,7 +454,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -470,7 +463,6 @@
           },
           "editorMode": "code",
           "expr": "(\r\n  (sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"allocated|mixed|draining\"}) or vector(0))\r\n  /\r\n  (\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\"})\r\n    -\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"powered_off\"} or vector(0))\r\n  )\r\n) * 100\r\n\r\n",
-          "hide": false,
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -536,7 +528,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -545,7 +537,6 @@
           },
           "editorMode": "code",
           "expr": "(\r\n  (sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\", state=~\"allocated|mixed|draining\"}) or vector(0))\r\n  /\r\n  (\r\n    sum(sinfo_partition_nodes_state{cluster=\"$cluster\", partition=~\"$partition\"})\r\n\r\n  )\r\n) * 100",
-          "hide": false,
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
@@ -623,7 +614,7 @@
                 "id": "custom.hideFrom",
                 "value": {
                   "legend": false,
-                  "tooltip": false,
+                  "tooltip": true,
                   "viz": true
                 }
               }
@@ -660,13 +651,14 @@
           "fields": "",
           "values": false
         },
+        "sort": "desc",
         "tooltip": {
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -676,7 +668,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state!=\"completed\"} or vector(0))[$__range:$__interval]\r\n))",
-          "hide": false,
           "instant": true,
           "legendFormat": "Failed Jobs",
           "range": false,
@@ -690,7 +681,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\",state=\"completed\"} or vector(0))[$__range:$__interval]\r\n))",
-          "hide": false,
           "instant": true,
           "legendFormat": "Completed Jobs",
           "range": false,
@@ -704,7 +694,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "floor(increase(\r\n  sum(sacct_terminal_jobs_total{cluster=\"$cluster\",partition=~\"$partition\"} or vector(0))[$__range:$__interval]\r\n))",
-          "hide": false,
           "instant": true,
           "interval": "",
           "legendFormat": "Finished Jobs",
@@ -728,6 +717,9 @@
             "align": "auto",
             "cellOptions": {
               "type": "auto"
+            },
+            "footer": {
+              "reducers": []
             },
             "inspect": false
           },
@@ -756,17 +748,9 @@
       "id": 1041,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "showHeader": true
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "editorMode": "code",
@@ -833,6 +817,9 @@
               "type": "auto"
             },
             "filterable": true,
+            "footer": {
+              "reducers": []
+            },
             "inspect": false
           },
           "fieldMinMax": false,
@@ -1093,14 +1080,6 @@
       "id": 1051,
       "options": {
         "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
         "frameIndex": 2,
         "showHeader": true,
         "sortBy": [
@@ -1110,7 +1089,7 @@
           }
         ]
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -1120,7 +1099,6 @@
           "editorMode": "code",
           "exemplar": false,
           "expr": "sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"}",
-          "hide": false,
           "instant": true,
           "legendFormat": "__auto",
           "range": false,
@@ -1237,7 +1215,7 @@
         "textMode": "value_and_name",
         "wideLayout": false
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "targets": [
         {
           "datasource": {
@@ -1246,7 +1224,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (cluster)(sinfo_partition_nodes_state{cluster=\"$cluster\"})",
-          "hide": false,
           "instant": false,
           "interval": "",
           "legendFormat": "Total Slurm Nodes",
@@ -1260,7 +1237,6 @@
           },
           "editorMode": "code",
           "expr": "sum by (partition)(sinfo_partition_nodes_state{cluster=\"$cluster\",partition=~\"$partition\"})",
-          "hide": false,
           "instant": false,
           "legendFormat": "{{partition}}",
           "range": true,
@@ -1291,7 +1267,7 @@
         "content": "**Note:** Finished Jobs panel requires Slurm accounting to be enabled in the cluster. Panel will not populate if accounting is disabled.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.6.9",
+      "pluginVersion": "12.4.6",
       "title": "",
       "transparent": true,
       "type": "text"
@@ -1339,6 +1315,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
@@ -1378,6 +1355,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
@@ -1399,6 +1377,7 @@
         },
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       }
     ]
