@@ -23,9 +23,15 @@ dpkg_pkg_install() {
     for pkg_name in $pkg_names; do
         # Check if it's a local .deb file
         if [[ "$pkg_name" == *.deb ]]; then
-            # Extract package name from .deb filename
-            local base_pkg=$(basename "$pkg_name" | sed 's/_.*$//')
-            local version_pattern=$(basename "$pkg_name" | sed 's/^[^_]*_\([^-]*\).*$/\1/')
+            local base_pkg=$(dpkg-deb -f "$pkg_name" Package)
+            local package_version=$(dpkg-deb -f "$pkg_name" Version)
+            # Skip only an exact installed version, including the package release.
+            # db:Status-Status still reports installed for held packages.
+            if [[ "$(dpkg-query -W -f='${db:Status-Status} ${Version}' "$base_pkg" 2>/dev/null || true)" != "installed $package_version" ]]; then
+                packages_to_install="$packages_to_install $pkg_name"
+                packages_to_hold="$packages_to_hold $base_pkg"
+            fi
+            continue
         # Check if it's a versioned SLURM package
         elif [[ "$pkg_name" == *"=${SLURM_VERSION}"* ]]; then
             local base_pkg=$(echo "$pkg_name" | sed "s/=${SLURM_VERSION}.*//")
@@ -67,9 +73,14 @@ if [[ $UBUNTU_VERSION > "19" ]]; then
 fi
 
 dependency_packages="$dependency_packages munge libmysqlclient-dev libssl-dev jq libjansson-dev libjwt-dev binutils gcc make wget"
+if [[ $UBUNTU_VERSION =~ ^26\. ]]; then
+    dependency_packages="$dependency_packages gnu-coreutils"
+fi
 
 arch=$(dpkg --print-architecture)
-if [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
+if [[ $UBUNTU_VERSION =~ ^26\. ]]; then
+    REPO=slurm-ubuntu-resolute
+elif [[ $UBUNTU_VERSION =~ ^24\.* ]]; then
     REPO=slurm-ubuntu-noble
 elif [ $UBUNTU_VERSION == 22.04 ]; then
     REPO=slurm-ubuntu-jammy
@@ -83,7 +94,7 @@ if [[ "$INSIDERS" == "True" ]]; then
     REPO_GROUP="insiders"
 fi
 
-if [ "$arch" == "arm64" ] && [[ ! $UBUNTU_VERSION =~ ^24\.* ]]; then
+if [ "$arch" == "arm64" ] && [[ $UBUNTU_VERSION < "24.04" ]]; then
         echo "Slurm is not supported on arm64 architecture for Ubuntu versions < 24.04"
         exit 1
 fi
@@ -147,7 +158,13 @@ fi
 #verify enroot package
 run_file=${ARTIFACTS_DIR}/enroot-check_${ENROOT_VERSION}_$(uname -m).run
 chmod 755 $run_file
-$run_file --verify
+(
+    if [[ $UBUNTU_VERSION =~ ^26\. ]]; then
+        dd() { gnudd "$@"; }
+        export -f dd
+    fi
+    "$run_file" --verify
+)
 
 # Install enroot package
 dpkg_pkg_install "${ARTIFACTS_DIR}/enroot_${ENROOT_VERSION}-1_${arch}.deb ${ARTIFACTS_DIR}/enroot+caps_${ENROOT_VERSION}-1_${arch}.deb"

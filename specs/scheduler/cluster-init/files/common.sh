@@ -55,6 +55,12 @@ install_python3() {
         apt install -y python3.11 python3.11-venv
         PYTHON_BIN="/usr/bin/python3.11"
 
+    elif [ "$OS" == "ubuntu" ] && [[ $VERSION_ID =~ ^26\. ]]; then
+        echo "Detected Ubuntu 26.04. Installing system Python..." >&2
+        apt update
+        apt install -y python3 python3-venv
+        PYTHON_BIN="/usr/bin/python3"
+
     elif [ "$OS" == "ubuntu" ] && [[ $VERSION =~ ^24\.* ]]; then
         echo "Detected Ubuntu 24. Installing Python 3.12..." >&2
         apt update
