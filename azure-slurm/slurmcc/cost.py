@@ -40,7 +40,7 @@ class CostSlurm:
     def __init__(self, start:str, end: str, cluster: str, cache_root: str, fmt: str=None) -> None:
 
         self.start = start
-        self. end = end
+        self.end = end
         self.cluster = cluster
         self.sacct = shutil.which("sacct")
         if not self.sacct:
@@ -137,7 +137,11 @@ class CostSlurm:
             data = json.load(fp)
 
         for job in data['jobs']:
-            if job['job_state'] != 'RUNNING' and job['job_state'] != 'CONFIGURING':
+            # job_state is a list in newer Slurm versions (e.g., ['RUNNING', 'CONFIGURING', 'POWER_UP_NODE'])
+            job_states = job['job_state']
+            if isinstance(job_states, str):
+                job_states = [job_states]
+            if 'RUNNING' not in job_states and 'CONFIGURING' not in job_states:
                 continue
             job_id = job['job_id']
             if job['admin_comment']:
